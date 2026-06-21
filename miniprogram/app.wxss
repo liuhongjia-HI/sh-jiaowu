@@ -256,6 +256,8 @@ page {
 }
 
 .button {
+  box-sizing: border-box;
+  width: 100%;
   height: 88rpx;
   border-radius: 24rpx;
   background: #ff9f7f;
@@ -289,5 +291,22 @@ page {
   background: rgba(255, 255, 255, .72);
   text-align: center;
   color: #8c7468;
-  padding: 48rpx 32rpx;
+  padding: 52rpx 32rpx 44rpx;
+}
+
+.empty-card .mascot {
+  margin: 0 auto 26rpx;
+}
+
+.empty-card .title {
+  margin-bottom: 14rpx;
+}
+
+.empty-card .sub {
+  max-width: 560rpx;
+  margin: 0 auto;
+}
+
+.empty-card .button {
+  margin-top: 34rpx;
 }

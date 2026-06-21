@@ -19,11 +19,12 @@ function loadAppConfig(envVersion) {
   return appConfig;
 }
 
-test("develop build uses real WeChat login when pointing at production API", () => {
+test("develop build uses real WeChat login", () => {
   const config = loadAppConfig("develop");
 
   assert.equal(config.globalData.apiBaseUrl, "https://gate.starlineeducation.com.cn/api");
   assert.equal(config.globalData.useRealWechatLogin, true);
+  assert.equal(config.globalData.demoLoginCode, undefined);
 });
 
 test("trial and release builds use real WeChat login", () => {

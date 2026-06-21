@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -71,7 +72,7 @@ func wechatCode2Session(client *http.Client, appID, secret, code string) (string
 		return "", errors.New("微信登录返回异常，请稍后再试")
 	}
 	if payload.ErrCode != 0 || payload.OpenID == "" {
-		return "", errors.New("微信登录失败，请重新授权")
+		return "", fmt.Errorf("微信登录失败，请重新授权（%d %s）", payload.ErrCode, payload.ErrMsg)
 	}
 	return payload.OpenID, nil
 }
@@ -105,7 +106,7 @@ func wechatPhoneNumber(client *http.Client, appID, secret, phoneCode string) (st
 		return "", errors.New("微信手机号授权返回异常，请稍后再试")
 	}
 	if payload.ErrCode != 0 || payload.PhoneInfo.PhoneNumber == "" {
-		return "", errors.New("手机号授权失败，请重新授权")
+		return "", fmt.Errorf("手机号授权失败，请重新授权（%d %s）", payload.ErrCode, payload.ErrMsg)
 	}
 	return payload.PhoneInfo.PhoneNumber, nil
 }
@@ -130,7 +131,7 @@ func wechatAccessToken(client *http.Client, appID, secret string) (string, error
 		return "", errors.New("微信授权返回异常，请稍后再试")
 	}
 	if payload.ErrCode != 0 || payload.AccessToken == "" {
-		return "", errors.New("微信授权失败，请稍后再试")
+		return "", fmt.Errorf("微信授权失败，请稍后再试（%d %s）", payload.ErrCode, payload.ErrMsg)
 	}
 	return payload.AccessToken, nil
 }

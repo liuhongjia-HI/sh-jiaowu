@@ -16,9 +16,9 @@
 <view wx:elif="{{!hasContent}}" class="section">
   <view class="empty-card">
     <view class="mascot">🐣</view>
-    <view class="title">还没有可学习内容</view>
-    <view class="sub">你已经登录成功。绑定手机号后，可以自动匹配老师已开通的课程权限。</view>
-    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{bindingPhone}}" disabled="{{bindingPhone}}">绑定手机号匹配课程</button>
+    <view class="title">待匹配课程权限</view>
+    <view class="sub">绑定手机号后，系统会自动匹配老师已开通的课程。若课程仍未显示，请联系老师确认开通状态。</view>
+    <button class="button" open-type="getPhoneNumber" bindtap="beginPhoneAuth" bindgetphonenumber="bindPhone" loading="{{phoneAuthOpening || bindingPhone}}" disabled="{{phoneAuthOpening || bindingPhone}}">绑定手机号匹配课程</button>
   </view>
 </view>
 <view wx:else>

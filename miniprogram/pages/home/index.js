@@ -1,4 +1,8 @@
 const { request } = require("../../utils/request");
+const {
+  showPhoneAuthFailed,
+  isCancel
+} = require("../../utils/phone-auth");
 
 Page({
   data: {
@@ -7,6 +11,7 @@ Page({
     emptyMessage: "请先登录绑定，或联系老师开通学习套餐。",
     home: null,
     hasContent: false,
+    phoneAuthOpening: false,
     bindingPhone: false,
     pendingTask: null,
     continueCourse: null,
@@ -52,20 +57,29 @@ Page({
         loading: false
       }));
   },
+  beginPhoneAuth() {
+    if (this.data.phoneAuthOpening || this.data.bindingPhone) {
+      wx.showToast({ title: "正在打开授权，请稍候", icon: "none" });
+      return;
+    }
+    this.setData({ phoneAuthOpening: true });
+  },
   bindPhone(event) {
     const detail = event.detail || {};
-    if (detail.errMsg && detail.errMsg.indexOf("ok") === -1) {
+    if (isCancel(detail)) {
+      this.setData({ phoneAuthOpening: false });
       wx.showToast({ title: "已取消手机号授权", icon: "none" });
       return;
     }
     if (!detail.code) {
-      wx.showToast({ title: "未获取到手机号授权，请用真机调试", icon: "none" });
+      this.setData({ phoneAuthOpening: false });
+      showPhoneAuthFailed();
       return;
     }
     if (this.data.bindingPhone) {
       return;
     }
-    this.setData({ bindingPhone: true });
+    this.setData({ phoneAuthOpening: false, bindingPhone: true });
     wx.login({
       success: (res) => {
         const code = res.code;
@@ -89,7 +103,7 @@ Page({
       },
       fail: () => {
         wx.showToast({ title: "微信登录失败", icon: "none" });
-        this.setData({ bindingPhone: false });
+        this.setData({ phoneAuthOpening: false, bindingPhone: false });
       }
     });
   },

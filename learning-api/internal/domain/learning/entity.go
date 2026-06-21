@@ -42,6 +42,7 @@ type User struct {
 type Principal struct {
 	UserID             string   `json:"userId"`
 	Name               string   `json:"name"`
+	Phone              string   `json:"phone,omitempty"`
 	StudentID          string   `json:"studentId,omitempty"`
 	CampusID           string   `json:"campusId,omitempty"`
 	Roles              []Role   `json:"roles"`

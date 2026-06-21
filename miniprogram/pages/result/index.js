@@ -10,7 +10,7 @@ Page({
   onLoad(options) {
     const id = options.id || "";
     if (id.indexOf("sub-") !== 0) {
-      // 兼容演示入口（任务列表的占位数据），展示默认文案
+      // 无有效提交编号时保持待批改状态。
       return;
     }
     request(`/student/submissions/${id}`)

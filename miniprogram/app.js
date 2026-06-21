@@ -19,9 +19,7 @@ function resolveApiBaseUrl() {
 }
 
 function resolveUseRealWechatLogin() {
-  const envVersion = resolveEnvVersion();
-  const apiBaseUrl = resolveApiBaseUrl();
-  return envVersion !== "develop" || apiBaseUrl === PRODUCTION_API_BASE_URL;
+  return true;
 }
 
 App({
@@ -41,7 +39,7 @@ App({
     const promise = new Promise((resolve, reject) => {
       wx.login({
         success: (res) => {
-          const code = this.globalData.useRealWechatLogin ? res.code : (this.globalData.demoLoginCode || "student");
+          const code = res.code;
           if (!code) {
             reject(new Error("微信登录失败"));
             return;
@@ -79,9 +77,7 @@ App({
   },
   globalData: {
     apiBaseUrl: resolveApiBaseUrl(),
-    // 生产环境置为 true：登录时上送 wx.login() 真实 code，由后端 jscode2session 换取 openId。
-    // 演示环境保持 false：上送 demoLoginCode，后端用演示映射直接登录，无需微信凭据。
-    useRealWechatLogin: resolveUseRealWechatLogin(),
-    demoLoginCode: "student"
+    // 登录时上送 wx.login() 真实 code，由后端 jscode2session 换取 openId。
+    useRealWechatLogin: resolveUseRealWechatLogin()
   }
 });

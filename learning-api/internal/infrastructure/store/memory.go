@@ -3764,6 +3764,7 @@ func principalFromUser(user learning.User) learning.Principal {
 	return learning.Principal{
 		UserID:             user.ID,
 		Name:               user.Name,
+		Phone:              user.Phone,
 		StudentID:          user.StudentID,
 		CampusID:           user.CampusID,
 		Roles:              append([]learning.Role(nil), user.Roles...),

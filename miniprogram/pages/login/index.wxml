@@ -7,19 +7,9 @@
     <view class="mascot">🐣</view>
     <view class="title">开启今天的学习</view>
     <view class="sub">绑定手机号后，可以同步学习记录、小挑战结果和老师反馈。</view>
-    <block wx:if="{{demoMode}}">
-      <view class="demo-form">
-        <input class="demo-input" type="number" maxlength="11" value="{{phone}}" placeholder="请输入手机号" bindinput="onPhoneInput" />
-        <input class="demo-input" password value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
-      </view>
-      <button class="button" bindtap="demoLogin" loading="{{binding}}" disabled="{{binding}}">手机号密码登录</button>
-      <view class="demo-tip">学生演示账号：18500009069，密码：123456</view>
-    </block>
-    <block wx:else>
-      <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">手机号一键登录</button>
-      <button class="button light" bindtap="login" disabled="{{binding}}">微信授权登录</button>
-      <view class="login-tip">手机号可自动匹配已有课程权限；未开通课程也可以先登录。</view>
-    </block>
+    <button class="button" open-type="getPhoneNumber" bindtap="beginPhoneAuth" bindgetphonenumber="bindPhone" loading="{{phoneAuthOpening || binding}}" disabled="{{phoneAuthOpening || binding}}">绑定手机号并登录</button>
+    <button class="button light" bindtap="login" disabled="{{phoneAuthOpening || binding}}">暂不绑定，先进入</button>
+    <view class="login-tip">手机号可自动匹配已有课程权限；未开通课程也可以先登录。</view>
   </view>
 </view>
 <view class="section">
