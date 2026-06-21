@@ -49,8 +49,8 @@ body {
 
 .app-sider .ant-menu-item-selected {
   color: #fff !important;
-  background: linear-gradient(135deg, #0f8f72, #1378a6) !important;
-  box-shadow: 0 12px 24px rgba(15, 143, 114, .24);
+  background: #07c160 !important;
+  box-shadow: 0 12px 24px rgba(7, 193, 96, .22);
 }
 
 .app-sider .ant-menu-submenu-arrow,
@@ -135,8 +135,8 @@ body {
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #0f8f72;
-  background: #e7f6f1;
+  color: #07c160;
+  background: #e9f8ef;
 }
 
 .user-pill strong,
@@ -232,7 +232,7 @@ body {
 }
 
 .view-toggle .ant-segmented-item-selected {
-  color: #0f8f72;
+  color: #07c160;
   font-weight: 800;
   box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
 }
@@ -326,8 +326,8 @@ body {
 }
 
 .action-button:hover {
-  border-color: #0f8f72 !important;
-  color: #0f8f72 !important;
+  border-color: #07c160 !important;
+  color: #07c160 !important;
   background: #f2fbf7 !important;
 }
 
@@ -915,12 +915,12 @@ button.schedule-block:hover {
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #0f8f72;
-  background: #e8f7f2;
+  color: #07c160;
+  background: #e9f8ef;
 }
 
 .todo-item.high .todo-icon {
-  color: #2563eb;
+  color: #1683f3;
   background: #eaf2ff;
 }
 
@@ -962,28 +962,27 @@ button.schedule-block:hover {
   place-items: center;
   padding: 32px;
   background:
-    radial-gradient(circle at 18% 18%, rgba(15, 143, 114, .16), transparent 30%),
-    radial-gradient(circle at 86% 12%, rgba(37, 99, 235, .14), transparent 28%),
-    linear-gradient(135deg, #f7fbfa 0%, #eef3f7 48%, #e8eef4 100%);
+    linear-gradient(180deg, rgba(7, 193, 96, .08), rgba(7, 193, 96, 0) 42%),
+    #f6f8f7;
 }
 
 .login-shell {
-  width: min(1180px, 100%);
-  min-height: 660px;
+  width: min(980px, 100%);
+  min-height: 560px;
   display: grid;
-  grid-template-columns: minmax(380px, 460px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 430px) minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid rgba(215, 226, 235, .9);
+  border: 1px solid #e5ebe7;
   border-radius: 8px;
-  background: rgba(255, 255, 255, .92);
-  box-shadow: 0 28px 80px rgba(15, 23, 42, .15);
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(17, 24, 39, .08);
 }
 
 .login-panel {
   display: grid;
   align-content: center;
-  gap: 28px;
-  padding: 48px;
+  gap: 24px;
+  padding: 44px;
   background: #fff;
 }
 
@@ -994,15 +993,15 @@ button.schedule-block:hover {
 }
 
 .login-logo {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 8px;
   color: #fff;
-  background: linear-gradient(135deg, #0f8f72, #2563eb);
-  box-shadow: 0 18px 36px rgba(15, 143, 114, .28);
-  font-size: 22px;
+  background: #07c160;
+  box-shadow: 0 14px 28px rgba(7, 193, 96, .22);
+  font-size: 21px;
   font-weight: 800;
 }
 
@@ -1028,29 +1027,28 @@ button.schedule-block:hover {
   position: relative;
   display: grid;
   align-content: center;
-  gap: 28px;
-  padding: 64px;
-  background:
-    linear-gradient(135deg, rgba(18, 32, 43, .96), rgba(15, 64, 86, .94)),
-    #12202b;
-  color: #fff;
+  gap: 22px;
+  padding: 56px;
+  border-left: 1px solid #e5ebe7;
+  background: #f2fbf6;
+  color: #1f2329;
 }
 
 .login-hero .ant-typography,
 .login-hero h1.ant-typography {
-  color: #fff;
+  color: #1f2329;
 }
 
 .login-hero h1.ant-typography {
-  max-width: 680px;
-  margin: 14px 0 12px;
-  font-size: 42px;
-  line-height: 1.16;
+  max-width: 420px;
+  margin: 12px 0 10px;
+  font-size: 36px;
+  line-height: 1.18;
 }
 
 .login-hero .ant-typography-secondary,
 .login-hero .ant-typography {
-  color: rgba(255, 255, 255, .74);
+  color: #59636e;
 }
 
 .login-kicker {
@@ -1059,89 +1057,33 @@ button.schedule-block:hover {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, .18);
+  border: 1px solid #b9ebce;
   border-radius: 8px;
-  background: rgba(255, 255, 255, .08);
-  color: #bff4df;
+  background: #e9f8ef;
+  color: #058f49;
   font-weight: 700;
 }
 
 .login-feature-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 26px;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 .login-feature {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, .16);
+  padding: 11px 12px;
+  border: 1px solid #d9efe2;
   border-radius: 8px;
-  background: rgba(255, 255, 255, .08);
-  color: rgba(255, 255, 255, .9);
+  background: #fff;
+  color: #2f3a45;
 }
 
 .login-feature .anticon {
-  color: #7dd7ba;
-}
-
-.login-preview {
-  width: min(440px, 100%);
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, .18);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .1);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, .18);
-}
-
-.login-preview-head,
-.login-preview-grid {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.login-preview-head {
-  color: rgba(255, 255, 255, .82);
-  font-weight: 700;
-}
-
-.login-preview-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 18px;
-  margin: 22px 0;
-}
-
-.login-preview-grid strong {
-  font-size: 38px;
-  line-height: 1;
-}
-
-.login-preview-grid span,
-.login-preview-list {
-  color: rgba(255, 255, 255, .68);
-}
-
-.login-preview-list {
-  display: grid;
-  gap: 10px;
-}
-
-.login-preview-list div {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.login-preview-list span {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #7dd7ba;
+  color: #07c160;
 }
 
 .ant-card {
@@ -1192,8 +1134,8 @@ button.schedule-block:hover {
 .ant-input-affix-wrapper-focused,
 .ant-select-focused .ant-select-selector,
 .ant-input-number-focused {
-  border-color: #0f8f72 !important;
-  box-shadow: 0 0 0 3px rgba(15, 143, 114, .12) !important;
+  border-color: #07c160 !important;
+  box-shadow: 0 0 0 3px rgba(7, 193, 96, .12) !important;
 }
 
 .ant-btn {
@@ -1201,12 +1143,12 @@ button.schedule-block:hover {
 }
 
 .ant-btn-primary {
-  background: linear-gradient(135deg, #0f8f72, #1378a6);
-  box-shadow: 0 12px 24px rgba(15, 143, 114, .22);
+  background: #07c160;
+  box-shadow: 0 12px 24px rgba(7, 193, 96, .2);
 }
 
 .ant-btn-primary:hover {
-  background: linear-gradient(135deg, #0d7e65, #116f9a) !important;
+  background: #06ad56 !important;
 }
 
 .ant-empty {
