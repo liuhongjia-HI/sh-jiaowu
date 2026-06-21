@@ -14,14 +14,30 @@ fi
 RELEASE_DIR="$APP_ROOT/releases/$RELEASE_ID"
 CURRENT_LINK="$APP_ROOT/current"
 
+if [ -L "$CURRENT_LINK" ] || [ -d "$CURRENT_LINK" ]; then
+  CURRENT_DIR="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
+else
+  CURRENT_DIR=""
+fi
+
 if [ ! -x "$RELEASE_DIR/learning-api/learning-api" ]; then
-  echo "Missing API binary: $RELEASE_DIR/learning-api/learning-api" >&2
-  exit 1
+  if [ -n "$CURRENT_DIR" ] && [ -x "$CURRENT_DIR/learning-api/learning-api" ]; then
+    mkdir -p "$RELEASE_DIR/learning-api"
+    cp "$CURRENT_DIR/learning-api/learning-api" "$RELEASE_DIR/learning-api/learning-api"
+  else
+    echo "Missing API binary: $RELEASE_DIR/learning-api/learning-api" >&2
+    exit 1
+  fi
 fi
 
 if [ ! -d "$RELEASE_DIR/web/dist" ]; then
-  echo "Missing web dist: $RELEASE_DIR/web/dist" >&2
-  exit 1
+  if [ -n "$CURRENT_DIR" ] && [ -d "$CURRENT_DIR/web/dist" ]; then
+    mkdir -p "$RELEASE_DIR/web"
+    cp -R "$CURRENT_DIR/web/dist" "$RELEASE_DIR/web/dist"
+  else
+    echo "Missing web dist: $RELEASE_DIR/web/dist" >&2
+    exit 1
+  fi
 fi
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"

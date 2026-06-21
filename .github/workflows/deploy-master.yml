@@ -22,31 +22,74 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed areas
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ -z "$BEFORE_SHA" ] || [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
+          echo "$changed_files"
+
+          if echo "$changed_files" | grep -Eq '^(learning-api/|deploy/production/|go\.work|go\.work\.sum)|^\.github/workflows/deploy-master\.yml$'; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$changed_files" | grep -Eq '^web/'; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$changed_files" | grep -Eq '^deploy/production/|^\.github/workflows/deploy-master\.yml$'; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Go
+        if: steps.changes.outputs.api == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
           cache-dependency-path: learning-api/go.sum
 
       - name: Test API
+        if: steps.changes.outputs.api == 'true'
         working-directory: learning-api
         run: go test ./...
 
       - name: Build API
+        if: steps.changes.outputs.api == 'true'
         working-directory: learning-api
         run: |
           mkdir -p ../build
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../build/learning-api ./cmd/api
 
       - name: Setup Node
+        if: steps.changes.outputs.web == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: web/package-lock.json
 
       - name: Build web
+        if: steps.changes.outputs.web == 'true'
         working-directory: web
         run: |
           npm ci
@@ -54,12 +97,17 @@ jobs:
 
       - name: Package release
         run: |
+          set -euo pipefail
           RELEASE_DIR="release/${GITHUB_SHA}"
           mkdir -p "$RELEASE_DIR/learning-api" "$RELEASE_DIR/web" "$RELEASE_DIR/deploy"
-          cp build/learning-api "$RELEASE_DIR/learning-api/learning-api"
-          cp -R web/dist "$RELEASE_DIR/web/dist"
+          if [ "${{ steps.changes.outputs.api }}" = "true" ]; then
+            cp build/learning-api "$RELEASE_DIR/learning-api/learning-api"
+            chmod +x "$RELEASE_DIR/learning-api/learning-api"
+          fi
+          if [ "${{ steps.changes.outputs.web }}" = "true" ]; then
+            cp -R web/dist "$RELEASE_DIR/web/dist"
+          fi
           cp -R deploy/production "$RELEASE_DIR/deploy/production"
-          chmod +x "$RELEASE_DIR/learning-api/learning-api"
           chmod +x "$RELEASE_DIR/deploy/production/activate-release.sh"
 
       - name: Configure SSH
