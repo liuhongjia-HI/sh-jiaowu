@@ -650,7 +650,7 @@ INSERT IGNORE INTO students (id, name, grade, phone, account_status) VALUES
 
 INSERT IGNORE INTO users (id, name, phone, open_id, account_status, student_id, campus_id, password_hash, must_change_password, token_version) VALUES
   ('user-teacher', '英语老师', '13800000004', 'demo-teacher', '正常', '', 'campus-main', '', 0, 0),
-  ('user-student-001', '小明', '18500009069', 'demo-student', '正常', 'stu-001', 'campus-main', '', 0, 0),
+  ('user-student-001', '小明', '18500009069', '', '正常', 'stu-001', 'campus-main', '', 0, 0),
   ('user-student-002', 'Lucy', '13600002201', '', '待提醒', 'stu-002', 'campus-main', '', 0, 0),
   ('user-student-003', '小航', '13700003303', '', '正常', 'stu-003', 'campus-main', '', 0, 0);
 

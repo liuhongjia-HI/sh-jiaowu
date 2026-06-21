@@ -1,10 +1,10 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-function loadRequestWithWx(wxMock, pages = []) {
+function loadRequestWithWx(wxMock, pages = [], appMock = null) {
   delete require.cache[require.resolve("../utils/request")];
   global.wx = wxMock;
-  global.getApp = () => ({ globalData: { apiBaseUrl: "https://api.example.com/api" } });
+  global.getApp = () => appMock || ({ globalData: { apiBaseUrl: "https://api.example.com/api" } });
   global.getCurrentPages = () => pages;
   return require("../utils/request").request;
 }
@@ -37,6 +37,43 @@ test("request prefixes student API path and sends stored token", async () => {
   assert.equal(requestCall.method, "GET");
   assert.equal(requestCall.header.Authorization, "Bearer student-token");
   assert.equal(calls.filter((item) => item[0] === "hideLoading").length, 1);
+});
+
+test("request silently logs in before student API when token is missing", async () => {
+  const calls = [];
+  let token = "";
+  const wxMock = {
+    getStorageSync(key) {
+      return key === "starline_token" ? token : "";
+    },
+    showLoading(args) {
+      calls.push(["showLoading", args]);
+    },
+    hideLoading() {
+      calls.push(["hideLoading"]);
+    },
+    request(options) {
+      calls.push(["request", options]);
+      options.success({ statusCode: 200, data: { code: 0, message: "ok", data: { name: "home" } } });
+      options.complete();
+    }
+  };
+  const appMock = {
+    globalData: { apiBaseUrl: "https://api.example.com/api" },
+    ensureLogin() {
+      calls.push(["ensureLogin"]);
+      token = "silent-token";
+      return Promise.resolve(token);
+    }
+  };
+  const request = loadRequestWithWx(wxMock, [], appMock);
+
+  const data = await request("/student/home");
+  const requestCall = calls.find((item) => item[0] === "request")[1];
+
+  assert.deepEqual(data, { name: "home" });
+  assert.deepEqual(calls.find((item) => item[0] === "ensureLogin"), ["ensureLogin"]);
+  assert.equal(requestCall.header.Authorization, "Bearer silent-token");
 });
 
 test("request clears token and redirects when student session expires", async () => {

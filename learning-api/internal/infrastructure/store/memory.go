@@ -168,12 +168,12 @@ func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {
 		{ID: "user-campus", Name: "校区管理员", Phone: "13800000002", OpenID: "demo-campus", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleCampusAdmin}, CampusID: "campus-main", CampusScopes: []string{"campus-main"}},
 		{ID: "user-ops", Name: "运营教务", Phone: "13800000003", OpenID: "demo-ops", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleOpsStaff}, CampusID: "campus-main", CampusScopes: []string{"campus-main"}},
 		{ID: "user-teacher", Name: "英语老师", Phone: "13800000004", OpenID: "demo-teacher", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleTeacher}, CampusID: "campus-main", LearningSpaceIDs: []string{"space-g05-english-s1-mid", "space-g05-english-s1-final"}, CanUploadHandout: true, CanUploadQuestion: true, CanReview: true},
-		{ID: "user-student-001", Name: "小明", Phone: "18500009069", OpenID: "demo-student", AccountStatus: "正常", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-001", CampusID: "campus-main"},
+		{ID: "user-student-001", Name: "小明", Phone: "18500009069", OpenID: "", AccountStatus: "正常", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-001", CampusID: "campus-main"},
 		{ID: "user-student-002", Name: "Lucy", Phone: "13600002201", OpenID: "", AccountStatus: "待提醒", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-002", CampusID: "campus-main"},
 		{ID: "user-student-003", Name: "小航", Phone: "13700003303", OpenID: "", AccountStatus: "正常", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-003", CampusID: "campus-main"},
 	}
 	s.students = []learning.Student{
-		{ID: "stu-001", Name: "小明", Grade: "五年级", Phone: "185****9069", LearningStatus: "连续7天", AccountStatus: "正常", StreakDays: 7, AverageScore: 92, BadgeCount: 5, BindStatus: "已绑定", LastStudyAt: "2026-05-22 18:20:00", EffectiveUntil: "2027-05-22"},
+		{ID: "stu-001", Name: "小明", Grade: "五年级", Phone: "185****9069", LearningStatus: "连续7天", AccountStatus: "正常", StreakDays: 7, AverageScore: 92, BadgeCount: 5, BindStatus: "待绑定", LastStudyAt: "2026-05-22 18:20:00", EffectiveUntil: "2027-05-22"},
 		{ID: "stu-002", Name: "Lucy", Grade: "五年级", Phone: "136****2201", LearningStatus: "今日未学", AccountStatus: "待提醒", StreakDays: 3, AverageScore: 86, BadgeCount: 3, BindStatus: "待绑定", LastStudyAt: "2026-05-21 19:10:00", EffectiveUntil: "2027-05-22"},
 		{ID: "stu-003", Name: "小航", Grade: "五年级", Phone: "137****3303", LearningStatus: "刚开通", AccountStatus: "正常", StreakDays: 1, AverageScore: 80, BadgeCount: 1, BindStatus: "待绑定", LastStudyAt: "2026-05-22 20:00:00", EffectiveUntil: "2027-05-22"},
 	}
@@ -508,15 +508,6 @@ func (s *MemoryStore) LoginWithWechatCode(code, phone, phoneCode string) (learni
 	if err != nil {
 		return learning.Principal{}, err
 	}
-	for _, user := range s.users {
-		if user.OpenID != openID {
-			continue
-		}
-		if user.AccountStatus != "正常" {
-			return learning.Principal{}, errors.New("账号已停用，请联系管理员")
-		}
-		return principalFromUser(user), nil
-	}
 	phone = strings.TrimSpace(phone)
 	if phone == "" && strings.TrimSpace(phoneCode) != "" {
 		resolvedPhone, err := s.resolvePhoneNumber(phoneCode)
@@ -527,13 +518,14 @@ func (s *MemoryStore) LoginWithWechatCode(code, phone, phoneCode string) (learni
 	}
 	if phone != "" {
 		for i, user := range s.users {
-			if user.Phone != phone || user.OpenID != "" || !canBindByPhone(user) {
+			if user.Phone != phone || !canRebindByPhone(user, s.wechatResolver != nil) {
 				continue
 			}
 			if user.AccountStatus != "正常" {
 				return learning.Principal{}, errors.New("账号已停用，请联系管理员")
 			}
 			s.users[i].OpenID = openID
+			s.removeWechatOnlyStudent(openID, s.users[i].StudentID)
 			action := "绑定教师微信"
 			if hasRole(user.Roles, learning.RoleStudent) {
 				action = "绑定学生微信"
@@ -544,7 +536,73 @@ func (s *MemoryStore) LoginWithWechatCode(code, phone, phoneCode string) (learni
 			return principalFromUser(s.users[i]), nil
 		}
 	}
-	return learning.Principal{}, errors.New("微信账号未绑定，请联系老师或管理员")
+	for _, user := range s.users {
+		if user.OpenID != openID {
+			continue
+		}
+		if user.AccountStatus != "正常" {
+			return learning.Principal{}, errors.New("账号已停用，请联系管理员")
+		}
+		return principalFromUser(user), nil
+	}
+	return s.createWechatStudent(openID, phone), nil
+}
+
+func (s *MemoryStore) createWechatStudent(openID, phone string) learning.Principal {
+	now := time.Now()
+	suffix := now.Format("20060102150405.000000000")
+	studentID := "stu-wx-" + suffix
+	userID := "user-wx-" + suffix
+	student := learning.Student{
+		ID:             studentID,
+		Name:           "微信用户",
+		Grade:          "待完善",
+		Phone:          displayPhone(phone),
+		OpenedPackages: []string{},
+		LearningStatus: "待开通",
+		AccountStatus:  "正常",
+		Remark:         "微信授权自动创建",
+		BindStatus:     "已绑定",
+		LastStudyAt:    "",
+	}
+	user := learning.User{
+		ID:            userID,
+		Name:          student.Name,
+		Phone:         phone,
+		OpenID:        openID,
+		AccountStatus: "正常",
+		Remark:        student.Remark,
+		Roles:         []learning.Role{learning.RoleStudent},
+		StudentID:     studentID,
+	}
+	s.students = append([]learning.Student{student}, s.students...)
+	s.users = append(s.users, user)
+	s.prependLog(student.Name, "微信授权登录", "自动创建待开通学生账号")
+	return principalFromUser(user)
+}
+
+func (s *MemoryStore) removeWechatOnlyStudent(openID, keepStudentID string) {
+	removeStudentIDs := map[string]bool{}
+	users := make([]learning.User, 0, len(s.users))
+	for _, user := range s.users {
+		if user.OpenID == openID && user.StudentID != keepStudentID && user.Phone == "" && hasRole(user.Roles, learning.RoleStudent) {
+			removeStudentIDs[user.StudentID] = true
+			continue
+		}
+		users = append(users, user)
+	}
+	if len(removeStudentIDs) == 0 {
+		return
+	}
+	students := make([]learning.Student, 0, len(s.students))
+	for _, student := range s.students {
+		if removeStudentIDs[student.ID] && student.Remark == "微信授权自动创建" {
+			continue
+		}
+		students = append(students, student)
+	}
+	s.users = users
+	s.students = students
 }
 
 func (s *MemoryStore) LoginWithAdminPassword(phone, password string) (learning.Principal, error) {
@@ -1754,9 +1812,6 @@ func (s *MemoryStore) StudentHome(principal learning.Principal) (learning.Studen
 	courses := s.coursesForStudent(student.ID)
 	materials := s.materialsForStudent(student.ID)
 	homework := s.homeworkForStudent(student.ID)
-	if len(courses) == 0 && len(materials) == 0 && len(homework) == 0 {
-		return learning.StudentHome{}, errors.New("暂未开通学习套餐，请联系老师或管理员")
-	}
 	continueCourse := learning.Course{}
 	if len(courses) > 0 {
 		continueCourse = courses[0]
@@ -3863,6 +3918,22 @@ func (s *MemoryStore) activeSuperAdminCount() int {
 
 func canBindByPhone(user learning.User) bool {
 	return hasRole(user.Roles, learning.RoleTeacher) || hasRole(user.Roles, learning.RoleStudent) || isAdminStaffUser(user)
+}
+
+func canRebindByPhone(user learning.User, realWechatLogin bool) bool {
+	if !canBindByPhone(user) {
+		return false
+	}
+	openID := strings.TrimSpace(user.OpenID)
+	return openID == "" || (realWechatLogin && strings.HasPrefix(openID, "demo-"))
+}
+
+func displayPhone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	if len(phone) == 11 {
+		return phone[:3] + "****" + phone[7:]
+	}
+	return phone
 }
 
 func isAdminStaffUser(user learning.User) bool {

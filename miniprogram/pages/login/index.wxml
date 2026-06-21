@@ -16,8 +16,9 @@
       <view class="demo-tip">学生演示账号：18500009069，密码：123456</view>
     </block>
     <block wx:else>
-      <button class="button" bindtap="login" disabled="{{binding}}">微信授权登录</button>
-      <button class="button light" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" disabled="{{binding}}">绑定手机号登录</button>
+      <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">手机号一键登录</button>
+      <button class="button light" bindtap="login" disabled="{{binding}}">微信授权登录</button>
+      <view class="login-tip">手机号可自动匹配已有课程权限；未开通课程也可以先登录。</view>
     </block>
   </view>
 </view>

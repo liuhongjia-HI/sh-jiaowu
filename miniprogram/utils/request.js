@@ -1,5 +1,19 @@
 function request(path, options = {}) {
   const app = getApp();
+  return ensureRequestAuth(app, path, options)
+    .catch((error) => {
+      if (options.skipAuth) {
+        throw error;
+      }
+      if (shouldEnsureAuth(path, options)) {
+        handleUnauthorized(error.message || "登录失败，请重新进入");
+      }
+      throw error;
+    })
+    .then(() => doRequest(app, path, options));
+}
+
+function doRequest(app, path, options = {}) {
   const baseUrl = app.globalData.apiBaseUrl;
   let loading = true;
   wx.showLoading({ title: "加载中" });
@@ -30,6 +44,16 @@ function request(path, options = {}) {
         }
         finishLoading();
         if (res.statusCode === 401 || body.code === 401) {
+          if (shouldEnsureAuth(path, options) && !options.__retried && app.ensureLogin) {
+            wx.removeStorageSync("starline_token");
+            app.ensureLogin({ force: true })
+              .then(() => doRequest(app, path, { ...options, __retried: true }).then(resolve).catch(reject))
+              .catch((error) => {
+                handleUnauthorized(error.message || body.message || "登录已过期，请重新登录");
+                reject(new Error(error.message || body.message || "登录已过期，请重新登录"));
+              });
+            return;
+          }
           handleUnauthorized(body.message || "登录已过期，请重新登录");
           reject(new Error(body.message || "登录已过期，请重新登录"));
           return;
@@ -47,6 +71,23 @@ function request(path, options = {}) {
       }
     });
   });
+}
+
+function ensureRequestAuth(app, path, options = {}) {
+  if (!shouldEnsureAuth(path, options)) {
+    return Promise.resolve();
+  }
+  if (wx.getStorageSync("starline_token")) {
+    return Promise.resolve();
+  }
+  if (!app.ensureLogin) {
+    return Promise.resolve();
+  }
+  return app.ensureLogin();
+}
+
+function shouldEnsureAuth(path, options = {}) {
+  return !options.skipAuth && path.indexOf("/auth/") !== 0 && path.indexOf("/student") === 0;
 }
 
 function handleUnauthorized(message) {

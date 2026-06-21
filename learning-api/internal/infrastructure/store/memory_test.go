@@ -26,6 +26,102 @@ func TestLoginWithDemoStudentPassword(t *testing.T) {
 	}
 }
 
+func TestLoginWithWechatCodeBindsStudentByPhone(t *testing.T) {
+	store := NewMemoryStore()
+
+	unmatched, err := store.LoginWithWechatCode("new-openid", "", "")
+	if err != nil {
+		t.Fatalf("expected unbound wechat login to create a student account: %v", err)
+	}
+	if unmatched.StudentID == "" || !hasRole(unmatched.Roles, learning.RoleStudent) {
+		t.Fatalf("unexpected unmatched student principal: %#v", unmatched)
+	}
+	home, err := store.StudentHome(unmatched)
+	if err != nil {
+		t.Fatalf("expected unmatched student to see empty home: %v", err)
+	}
+	if len(home.Materials) != 0 || len(home.PendingHomework) != 0 || home.ContinueCourse.ID != "" {
+		t.Fatalf("expected unmatched student to have no opened content, got %#v", home)
+	}
+
+	student, err := store.LoginWithWechatCode("student", "18500009069", "")
+	if err != nil {
+		t.Fatalf("expected phone binding to succeed: %v", err)
+	}
+	if student.UserID != "user-student-001" || !hasRole(student.Roles, learning.RoleStudent) {
+		t.Fatalf("unexpected student principal: %#v", student)
+	}
+
+	again, err := store.LoginWithWechatCode("student", "", "")
+	if err != nil {
+		t.Fatalf("expected bound wechat login to succeed: %v", err)
+	}
+	if again.UserID != student.UserID {
+		t.Fatalf("expected same student after binding, got %#v", again)
+	}
+}
+
+func TestPhoneBindingMergesWechatOnlyStudent(t *testing.T) {
+	store := NewMemoryStore()
+
+	wechatOnly, err := store.LoginWithWechatCode("student", "", "")
+	if err != nil {
+		t.Fatalf("expected wechat-only login to succeed: %v", err)
+	}
+	if wechatOnly.UserID == "user-student-001" {
+		t.Fatalf("expected temporary wechat student, got seeded student: %#v", wechatOnly)
+	}
+
+	student, err := store.LoginWithWechatCode("student", "18500009069", "")
+	if err != nil {
+		t.Fatalf("expected phone binding to merge into seeded student: %v", err)
+	}
+	if student.UserID != "user-student-001" {
+		t.Fatalf("unexpected student principal after merge: %#v", student)
+	}
+	for _, user := range store.users {
+		if user.ID == wechatOnly.UserID {
+			t.Fatal("temporary user should be removed after phone binding")
+		}
+	}
+	again, err := store.LoginWithWechatCode("student", "", "")
+	if err != nil {
+		t.Fatalf("expected merged openID to login: %v", err)
+	}
+	if again.UserID != "user-student-001" {
+		t.Fatalf("expected seeded student after merge, got %#v", again)
+	}
+}
+
+func TestRealWechatBindingCanReplaceDemoOpenID(t *testing.T) {
+	store := NewMemoryStore()
+	for i := range store.users {
+		if store.users[i].ID == "user-student-001" {
+			store.users[i].OpenID = "demo-student"
+			break
+		}
+	}
+	store.wechatResolver = func(code string) (string, error) {
+		return "real-" + code, nil
+	}
+
+	student, err := store.LoginWithWechatCode("wx-code", "18500009069", "")
+	if err != nil {
+		t.Fatalf("expected real wechat binding to replace demo openID: %v", err)
+	}
+	if student.UserID != "user-student-001" {
+		t.Fatalf("unexpected student principal: %#v", student)
+	}
+
+	again, err := store.LoginWithWechatCode("wx-code", "", "")
+	if err != nil {
+		t.Fatalf("expected replaced openID to login: %v", err)
+	}
+	if again.UserID != student.UserID {
+		t.Fatalf("expected same student after replacing demo openID, got %#v", again)
+	}
+}
+
 func TestLoginWithAdminPassword(t *testing.T) {
 	store := NewMemoryStore()
 

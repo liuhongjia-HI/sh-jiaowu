@@ -6,6 +6,8 @@ Page({
     error: "",
     emptyMessage: "请先登录绑定，或联系老师开通学习套餐。",
     home: null,
+    hasContent: false,
+    bindingPhone: false,
     pendingTask: null,
     continueCourse: null,
     progressPercent: 0,
@@ -28,9 +30,11 @@ Page({
       .then((home) => {
         const continueCourse = home.continueCourse || {};
         const pendingTask = (home.pendingHomework || [])[0] || null;
+        const hasContent = !!continueCourse.id || (home.pendingHomework || []).length > 0 || (home.materials || []).length > 0;
         const progressPercent = Number(home.continueProgress) || 0;
         this.setData({
           home,
+          hasContent,
           continueCourse,
           pendingTask,
           progressPercent,
@@ -44,8 +48,46 @@ Page({
       .catch((error) => this.setData({
         error: error.message || "加载失败",
         emptyMessage: error.message || "请先登录绑定，或联系老师开通学习套餐。",
+        hasContent: false,
         loading: false
       }));
+  },
+  bindPhone(event) {
+    const detail = event.detail || {};
+    if (detail.errMsg && detail.errMsg.indexOf("ok") === -1) {
+      wx.showToast({ title: "已取消手机号授权", icon: "none" });
+      return;
+    }
+    if (this.data.bindingPhone) {
+      return;
+    }
+    this.setData({ bindingPhone: true });
+    wx.login({
+      success: (res) => {
+        const code = res.code;
+        if (!code) {
+          wx.showToast({ title: "微信登录失败", icon: "none" });
+          this.setData({ bindingPhone: false });
+          return;
+        }
+        request("/auth/wechat-login", {
+          method: "POST",
+          data: { code, phoneCode: detail.code || "" },
+          skipAuth: true
+        })
+          .then((result) => {
+            wx.setStorageSync("starline_token", result.token);
+            wx.showToast({ title: "匹配成功", icon: "success" });
+            this.loadHome();
+          })
+          .catch((error) => wx.showToast({ title: error.message || "匹配失败", icon: "none" }))
+          .then(() => this.setData({ bindingPhone: false }));
+      },
+      fail: () => {
+        wx.showToast({ title: "微信登录失败", icon: "none" });
+        this.setData({ bindingPhone: false });
+      }
+    });
   },
   goStudyDetail() {
     if (!this.data.continueCourse || !this.data.continueCourse.id) {

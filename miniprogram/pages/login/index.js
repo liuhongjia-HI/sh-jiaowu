@@ -16,6 +16,11 @@ Page({
   onPasswordInput(event) {
     this.setData({ password: event.detail.value });
   },
+  showLoginError(error, fallback = "登录失败") {
+    const message = error && error.message ? error.message : fallback;
+    const title = message.indexOf("微信账号未绑定") !== -1 ? "请先用手机号一键登录" : message;
+    wx.showToast({ title, icon: "none" });
+  },
   demoLogin() {
     const phone = (this.data.phone || "").trim();
     const password = this.data.password || "";
@@ -74,7 +79,7 @@ Page({
         wx.showToast({ title: "登录成功", icon: "success" });
         wx.switchTab({ url: "/pages/home/index" });
       })
-      .catch((error) => wx.showToast({ title: error.message || "登录失败", icon: "none" }))
+      .catch((error) => this.showLoginError(error))
       .then(() => this.setData({ binding: false }));
   }
 });

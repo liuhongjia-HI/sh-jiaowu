@@ -27,3 +27,10 @@
   color: #7b8794;
   font-size: 24rpx;
 }
+
+.login-tip {
+  margin-top: 18rpx;
+  color: #8c7468;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
