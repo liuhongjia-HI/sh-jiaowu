@@ -7,6 +7,9 @@ tmp/
 .env
 .env.local
 *.log
+deploy/production/*_nginx.zip
+deploy/production/*.pem
+deploy/production/*.key
 docs/server-info.local.md
 
 # Go
