@@ -23,6 +23,7 @@ type Dependencies struct {
 func New(dep Dependencies) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.CORS(dep.Config.CORS.AllowedOrigins))
 	r.Use(middleware.RequestLogger(dep.Logger))
 	r.Use(middleware.OperatorContext())
 

@@ -122,6 +122,38 @@ func (a *testApp) doJSON(t *testing.T, method, path, token string, body any, wan
 	return envelope
 }
 
+func TestCORSPreflightForAdminLogin(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	req, err := http.NewRequest(http.MethodOptions, app.server.URL+"/api/auth/admin-password-login", nil)
+	if err != nil {
+		t.Fatalf("new preflight request: %v", err)
+	}
+	req.Header.Set("Origin", "https://sa.starlineeducation.com.cn")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("preflight request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("preflight status = %d want %d body=%s", resp.StatusCode, http.StatusNoContent, string(raw))
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://sa.starlineeducation.com.cn" {
+		t.Fatalf("Access-Control-Allow-Origin = %q", got)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Methods"); !strings.Contains(got, "POST") {
+		t.Fatalf("Access-Control-Allow-Methods = %q", got)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Headers"); !strings.Contains(got, "Content-Type") {
+		t.Fatalf("Access-Control-Allow-Headers = %q", got)
+	}
+}
+
 func TestAdminAuthAndPermissionBoundaries(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

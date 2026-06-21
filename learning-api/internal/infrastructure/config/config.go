@@ -15,6 +15,9 @@ type Config struct {
 	HTTP struct {
 		Port int
 	}
+	CORS struct {
+		AllowedOrigins []string
+	}
 	Auth struct {
 		TokenSecret string
 	}
@@ -53,6 +56,7 @@ func MustLoad() *Config {
 	cfg.App.Name = getString("APP_NAME", "starline-learning-api")
 	cfg.App.Env = getString("APP_ENV", "local")
 	cfg.HTTP.Port = getInt("HTTP_PORT", 8892)
+	cfg.CORS.AllowedOrigins = getCSV("CORS_ALLOWED_ORIGINS", defaultCORSAllowedOrigins(cfg.App.Env))
 	cfg.Auth.TokenSecret = getString("AUTH_TOKEN_SECRET", "starline-local-dev-secret")
 	cfg.Demo.SeedData = getBool("DEMO_SEED_DATA", cfg.App.Env != "production")
 	cfg.Demo.AdminPasswordLogin = getBool("ADMIN_PASSWORD_LOGIN_ENABLED", cfg.App.Env != "production")
@@ -69,6 +73,18 @@ func MustLoad() *Config {
 	cfg.Nacos.DataID = getString("NACOS_DATA_ID", "starline-learning-api.yaml")
 	cfg.Nacos.Group = getString("NACOS_GROUP", "mall")
 	return cfg
+}
+
+func defaultCORSAllowedOrigins(env string) []string {
+	origins := []string{"https://sa.starlineeducation.com.cn"}
+	if env == "production" {
+		return origins
+	}
+	return append(origins,
+		"http://sa.starlineeducation.com.cn",
+		"http://localhost:5173",
+		"http://127.0.0.1:5173",
+	)
 }
 
 func (c *Config) Validate() error {
@@ -116,6 +132,25 @@ func getString(env string, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getCSV(env string, fallback []string) []string {
+	value := strings.TrimSpace(os.Getenv(env))
+	if value == "" {
+		return fallback
+	}
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item != "" {
+			items = append(items, item)
+		}
+	}
+	if len(items) == 0 {
+		return fallback
+	}
+	return items
 }
 
 func getInt(env string, fallback int) int {

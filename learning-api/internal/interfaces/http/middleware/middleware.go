@@ -3,6 +3,7 @@ package middleware
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -35,6 +36,32 @@ func RequestLogger(log *logger.Logger) gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 		log.Infof("%s %s %d %s", c.Request.Method, c.Request.URL.Path, c.Writer.Status(), time.Since(start))
+	}
+}
+
+func CORS(allowedOrigins []string) gin.HandlerFunc {
+	allowed := make(map[string]bool, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			allowed[origin] = true
+		}
+	}
+	return func(c *gin.Context) {
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		if allowed[origin] {
+			header := c.Writer.Header()
+			header.Set("Access-Control-Allow-Origin", origin)
+			header.Set("Vary", "Origin")
+			header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			header.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Operator-ID, X-Operator-Name")
+			header.Set("Access-Control-Max-Age", "600")
+		}
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
 	}
 }
 
