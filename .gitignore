@@ -1,0 +1,18 @@
+.DS_Store
+.playwright-cli/
+node_modules/
+dist/
+build/
+tmp/
+.env
+.env.local
+*.log
+docs/server-info.local.md
+
+# Go
+learning-api/bin/
+learning-api/coverage.out
+learning-api/uploads/
+
+# WeChat DevTools
+miniprogram/project.private.config.json

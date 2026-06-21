@@ -1,0 +1,18 @@
+.map-item {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 18rpx;
+  padding: 20rpx;
+  border-radius: 24rpx;
+  background: #fffaf6;
+}
+
+.map-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.small-title {
+  font-size: 28rpx;
+}

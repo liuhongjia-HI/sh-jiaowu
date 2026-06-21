@@ -1,0 +1,24 @@
+<view class="hero">
+  <view class="eyebrow">通知</view>
+  <view class="hero-title">新的学习消息来啦 ✨</view>
+</view>
+<view wx:if="{{loading}}" class="empty">正在加载通知...</view>
+<view wx:elif="{{notices.length === 0}}" class="section">
+  <view class="empty-card">
+    <view class="title">暂无通知</view>
+    <view class="sub">{{emptyMessage}}</view>
+  </view>
+</view>
+<view wx:else class="section">
+  <view wx:for="{{notices}}" wx:key="id" class="card notice-card">
+    <view class="dot">{{item.icon}}</view>
+    <view class="notice-body">
+      <view class="row">
+        <view class="title">{{item.title}}</view>
+        <view class="badge">{{item.status}}</view>
+      </view>
+      <view class="sub">{{item.summary}}</view>
+      <view class="muted">{{item.target}}</view>
+    </view>
+  </view>
+</view>

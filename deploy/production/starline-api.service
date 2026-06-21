@@ -1,0 +1,16 @@
+[Unit]
+Description=Starline Learning API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/starline/current/learning-api
+EnvironmentFile=/etc/starline/learning-api.env
+ExecStart=/opt/starline/current/learning-api/learning-api
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+<view class="hero">
+  <view class="eyebrow">{{taskTitle}}</view>
+  <view class="hero-title">{{resultTitle}}</view>
+  <view wx:if="{{rewardText}}" class="badge">{{rewardText}}</view>
+</view>
+<view class="section">
+  <view wx:if="{{rewardText}}" class="card reward">
+    <view class="title">获得奖励</view>
+    <view class="badges">
+      <view class="badge">{{rewardText}}</view>
+      <view class="badge">🔓 下一节已解锁</view>
+    </view>
+    <view class="sub">继续保持，争取解锁更多成长徽章。</view>
+  </view>
+  <view class="card blue">
+    <view class="title">老师评语</view>
+    <view class="sub">{{teacherComment || '老师正在批改，稍后就能看到反馈。'}}</view>
+  </view>
+  <view class="button-row">
+    <button class="button light" bindtap="goBack">返回小挑战</button>
+    <button class="button" bindtap="goStudy">继续学习</button>
+  </view>
+</view>

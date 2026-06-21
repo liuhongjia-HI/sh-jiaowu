@@ -1,0 +1,22 @@
+<view class="hero">
+  <view class="eyebrow">{{taskTitle}}</view>
+  <view class="hero-title">{{rewardText}}</view>
+  <view class="badge">{{deadlineText}}</view>
+</view>
+<view class="section">
+  <block wx:for="{{questions}}" wx:key="id" wx:for-item="question" wx:for-index="qindex">
+    <view class="card">
+      <view class="badge">{{question.type === 'single' ? '单选题' : '简答题'}}</view>
+      <view class="title">{{question.index}}. {{question.stem}}</view>
+      <block wx:if="{{question.type === 'single'}}">
+        <view wx:for="{{question.options}}" wx:key="value" wx:for-item="option" class="option {{option.className}}" data-qindex="{{qindex}}" data-value="{{option.value}}" bindtap="chooseOption">{{option.label}}</view>
+      </block>
+      <textarea wx:else value="{{question.text}}" placeholder="在这里填写你的答案" data-qindex="{{qindex}}" bindinput="changeAnswer" />
+    </view>
+  </block>
+  <view class="button-row">
+    <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏小挑战 ♡'}}</button>
+    <button class="button light" bindtap="saveDraft">保存草稿</button>
+    <button class="button" loading="{{saving}}" bindtap="submit">我做完啦</button>
+  </view>
+</view>

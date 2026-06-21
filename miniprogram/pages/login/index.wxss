@@ -1,0 +1,29 @@
+.login-card {
+  text-align: center;
+}
+
+.login-card .mascot {
+  margin: 0 auto 22rpx;
+}
+
+.demo-form {
+  margin-top: 28rpx;
+}
+
+.demo-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 88rpx;
+  margin-bottom: 20rpx;
+  padding: 0 28rpx;
+  border: 2rpx solid #e6ebf2;
+  border-radius: 18rpx;
+  background: #ffffff;
+  text-align: left;
+}
+
+.demo-tip {
+  margin-top: 20rpx;
+  color: #7b8794;
+  font-size: 24rpx;
+}

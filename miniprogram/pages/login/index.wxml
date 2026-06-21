@@ -1,0 +1,26 @@
+<view class="hero">
+  <view class="eyebrow">欢迎来到学习小站</view>
+  <view class="hero-title">先完成登录绑定</view>
+</view>
+<view class="section">
+  <view class="card login-card">
+    <view class="mascot">🐣</view>
+    <view class="title">开启今天的学习</view>
+    <view class="sub">绑定手机号后，可以同步学习记录、小挑战结果和老师反馈。</view>
+    <block wx:if="{{demoMode}}">
+      <view class="demo-form">
+        <input class="demo-input" type="number" maxlength="11" value="{{phone}}" placeholder="请输入手机号" bindinput="onPhoneInput" />
+        <input class="demo-input" password value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
+      </view>
+      <button class="button" bindtap="demoLogin" loading="{{binding}}" disabled="{{binding}}">手机号密码登录</button>
+      <view class="demo-tip">学生演示账号：18500009069，密码：123456</view>
+    </block>
+    <block wx:else>
+      <button class="button" bindtap="login" disabled="{{binding}}">微信授权登录</button>
+      <button class="button light" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" disabled="{{binding}}">绑定手机号登录</button>
+    </block>
+  </view>
+</view>
+<view class="section">
+  <view class="bubble">账号被停用或暂未开通学习星球时，请联系老师或管理员处理。</view>
+</view>

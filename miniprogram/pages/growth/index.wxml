@@ -1,0 +1,22 @@
+<view class="hero">
+  <view class="eyebrow">我的成长轨迹</view>
+  <view class="hero-title">看看你的进步 🌱</view>
+</view>
+<view wx:if="{{loading}}" class="empty">正在加载成长记录...</view>
+<view wx:elif="{{records.length === 0}}" class="section">
+  <view class="empty-card">
+    <view class="title">还没有成长记录</view>
+    <view class="sub">{{emptyMessage}}</view>
+  </view>
+</view>
+<view wx:else class="section">
+  <view wx:for="{{records}}" wx:key="id" class="card">
+    <view class="row">
+      <view class="title small-title">{{item.type}} · {{item.title}}</view>
+      <view wx:if="{{item.score}}" class="badge">{{item.score}} 分</view>
+      <view wx:else class="tag">{{item.status}}</view>
+    </view>
+    <view class="sub">{{item.description}}</view>
+    <view class="muted">{{item.occurredAt}}</view>
+  </view>
+</view>

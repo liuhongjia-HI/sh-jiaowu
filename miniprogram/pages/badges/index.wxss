@@ -1,0 +1,19 @@
+.small-title {
+  font-size: 28rpx;
+}
+.grid2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+.grid2 .badge-card {
+  width: calc(50% - 10rpx);
+  text-align: center;
+}
+.badge-icon {
+  font-size: 64rpx;
+  margin-bottom: 12rpx;
+}
+.badge-locked {
+  opacity: 0.55;
+}

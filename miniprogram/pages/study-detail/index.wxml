@@ -1,0 +1,38 @@
+<view class="hero">
+  <view class="eyebrow">学习星球详情</view>
+  <view class="hero-title">{{course.name}}</view>
+  <view class="sub">{{teacherText}} · {{course.grade}} · 成长进度 {{progress}}%</view>
+  <view class="progress"><view class="progress-bar" style="width: {{progress}}%;"></view></view>
+</view>
+
+<view class="section">
+  <view class="grid2">
+    <view class="card" bindtap="goPreview">
+      <view class="cover">📄</view>
+      <view class="title">学习资料</view>
+      <view class="sub">讲义、图片、PPT</view>
+      <view class="badge">{{materialCountText}}</view>
+    </view>
+    <view class="card reward" bindtap="goAnswer">
+      <view class="cover">📝</view>
+      <view class="title">课后小挑战</view>
+      <view class="sub">做完就能看反馈</view>
+      <view class="badge">{{homeworkText}}</view>
+    </view>
+  </view>
+</view>
+
+<view class="section">
+  <view class="section-title">学习小地图</view>
+  <view class="card">
+    <view class="bubble">完成第 3 站后，可以获得一枚“阅读小星星”徽章。</view>
+    <view wx:for="{{stations}}" wx:key="title" class="map-item" data-status="{{item.status}}" data-material-id="{{item.materialId}}" data-homework-id="{{item.homeworkId}}" bindtap="tapStation">
+      <view class="dot">{{item.icon}}</view>
+      <view class="map-text">
+        <view class="title small-title">{{item.title}}</view>
+        <view class="sub">{{item.desc}}</view>
+      </view>
+      <view class="tag">{{item.status}}</view>
+    </view>
+  </view>
+</view>

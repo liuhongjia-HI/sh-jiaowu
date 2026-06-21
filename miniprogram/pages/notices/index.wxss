@@ -1,0 +1,9 @@
+.notice-card {
+  display: flex;
+  gap: 18rpx;
+}
+
+.notice-body {
+  flex: 1;
+  min-width: 0;
+}

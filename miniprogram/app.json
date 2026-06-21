@@ -1,0 +1,38 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/study/index",
+    "pages/study-detail/index",
+    "pages/material-preview/index",
+    "pages/tasks/index",
+    "pages/answer/index",
+    "pages/result/index",
+    "pages/notices/index",
+    "pages/schedule/index",
+    "pages/me/index",
+    "pages/growth/index",
+    "pages/badges/index",
+    "pages/favorites/index",
+    "pages/login/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "Starline 学习",
+    "navigationBarBackgroundColor": "#ffb79d",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#fff8f1"
+  },
+  "tabBar": {
+    "color": "#b1998e",
+    "selectedColor": "#e77951",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/study/index", "text": "学习" },
+      { "pagePath": "pages/tasks/index", "text": "小挑战" },
+      { "pagePath": "pages/notices/index", "text": "通知" },
+      { "pagePath": "pages/me/index", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

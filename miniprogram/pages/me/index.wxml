@@ -1,0 +1,70 @@
+<view class="hero">
+  <view class="eyebrow">我的</view>
+  <view class="hero-title">我的成长小屋 ✨</view>
+</view>
+<view wx:if="{{loading}}" class="empty">正在加载成长记录...</view>
+<view wx:elif="{{!me}}" class="section">
+  <view class="empty-card">
+    <view class="title">还没有登录</view>
+    <view class="sub">{{emptyMessage}}</view>
+    <button class="button" bindtap="goLogin">去登录绑定</button>
+  </view>
+</view>
+<view wx:else>
+  <view class="section">
+    <view class="card reward">
+      <view class="row">
+        <view class="mascot">🐣</view>
+        <view>
+          <view class="title">{{me.name}} 同学</view>
+          <view class="sub">{{me.grade}} · 账号{{me.accountStatus}} · {{me.bindStatus}}</view>
+          <view class="badges">
+            <view class="badge">阅读小星星</view>
+            <view class="badge">连续 {{me.streakDays}} 天</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section grid3">
+    <view class="card reward metric-card">
+      <view class="metric-num">{{me.averageScore}}</view>
+      <view class="sub">平均分</view>
+    </view>
+    <view class="card green metric-card">
+      <view class="metric-num">{{me.streakDays}}</view>
+      <view class="sub">连续天数</view>
+    </view>
+    <view class="card blue metric-card">
+      <view class="metric-num">{{me.badgeCount}}</view>
+      <view class="sub">我的徽章</view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="card" bindtap="goSchedule">
+      <view class="row">
+        <view>
+          <view class="title">可上课时间</view>
+          <view class="sub">提交能上课的时间，并查看已确认课表。</view>
+        </view>
+        <view class="tag">去维护</view>
+      </view>
+    </view>
+    <view class="card">
+      <view class="list-item" bindtap="goGrowth">
+        <view class="title small-title">🌟 我的成长轨迹</view>
+        <view class="sub">最近学习记录、分数和老师反馈</view>
+      </view>
+      <view class="list-item" bindtap="goBadges">
+        <view class="title small-title">🏅 我的徽章墙</view>
+        <view class="sub">已获得 {{me.badgeCount}} 枚徽章</view>
+      </view>
+      <view class="list-item" bindtap="goFavorites">
+        <view class="title small-title">💖 我收藏的内容</view>
+        <view class="sub">收藏的讲义和重点题目会放在这里</view>
+      </view>
+    </view>
+  </view>
+</view>

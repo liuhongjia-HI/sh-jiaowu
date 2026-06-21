@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学生端学习小程序原型</title>
+<style>
+:root{
+  --bg:#fff8f1;
+  --card:#ffffff;
+  --main:#ff9f7f;
+  --main2:#ffc7a8;
+  --text:#2b2522;
+  --sub:#8c7468;
+  --line:#f1dfd4;
+  --yellow:#fff4cb;
+  --green:#e9f8df;
+  --blue:#eaf3ff;
+  --shadow:0 16px 40px rgba(120,75,45,.10);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--text);
+  background:linear-gradient(135deg,#fff3ea 0%,#fffaf6 48%,#fff0e4 100%);
+}
+.app{
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:260px minmax(430px,1fr) 340px;
+}
+.left,.right{
+  background:rgba(255,255,255,.82);
+  backdrop-filter:blur(14px);
+  border-color:var(--line);
+  padding:24px 18px;
+}
+.left{border-right:1px solid var(--line)}
+.right{border-left:1px solid var(--line)}
+.logo h1{font-size:20px;line-height:1.25;margin:0 0 8px}.logo p{margin:0 0 20px;color:var(--sub);font-size:13px;line-height:1.7}
+.menu{display:grid;gap:8px}.menu button{
+  border:0;background:transparent;padding:13px 14px;border-radius:18px;text-align:left;font-size:14px;font-weight:700;color:#6b554b;cursor:pointer;
+  display:flex;align-items:center;gap:10px;
+}
+.menu button.active{background:var(--main);color:#fff;box-shadow:0 12px 24px rgba(255,159,127,.28)}
+.center{display:flex;align-items:center;justify-content:center;padding:28px;position:relative}
+.phone{width:390px;height:820px;background:#4b3830;border-radius:46px;padding:10px;box-shadow:0 28px 80px rgba(86,53,35,.20)}
+.screen{height:100%;border-radius:38px;overflow:hidden;background:var(--bg);position:relative}.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:118px;height:26px;border-radius:999px;background:#4b3830;z-index:20}
+.page{display:none;height:100%;overflow:auto;padding-bottom:82px}.page.active{display:block}.page.noTab{padding-bottom:22px}.page::-webkit-scrollbar{width:0}
+.hero{padding:54px 22px 24px;color:#593325;background:linear-gradient(135deg,#ffb79d,#ffd9c7);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;right:-42px;top:-34px;width:140px;height:140px;border-radius:999px;background:rgba(255,255,255,.28)}
+.small{font-size:13px;opacity:.82}.heroTitle{font-size:25px;font-weight:850;margin-top:6px;letter-spacing:-.3px}.section{padding:18px 20px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:17px;box-shadow:0 10px 28px rgba(120,75,45,.06)}.big{background:linear-gradient(135deg,#ffba9e,#ffe1d1)}.reward{background:linear-gradient(135deg,#fff7d9,#ffe9c7);border-color:#ffe3a7}.green{background:linear-gradient(135deg,#f1ffe8,#ffffff);border-color:#dff2ce}.blue{background:linear-gradient(135deg,#edf6ff,#ffffff);border-color:#d8ebff}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.sub{font-size:12px;color:var(--sub);line-height:1.55}.title{font-size:17px;font-weight:850;margin:0 0 5px}.btn{height:46px;border:0;border-radius:18px;background:var(--main);color:#fff;font-weight:750;width:100%;margin-top:14px;cursor:pointer}.btn.light{background:#fff;color:#5a3324}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.miniNum{font-size:25px;font-weight:850;margin-top:8px}.mascot{width:70px;height:70px;border-radius:28px;background:linear-gradient(135deg,#fff,#ffe7d9);display:grid;place-items:center;font-size:34px;box-shadow:0 12px 26px rgba(255,159,127,.18)}.avatar{width:52px;height:52px;border-radius:21px;background:#fff1e9;display:grid;place-items:center;font-size:24px}.tag,.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#fff1e9;color:#e77951;font-size:12px;font-weight:750}.badge{background:#fff4dc;color:#bd7819}.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.course{margin-bottom:12px;cursor:pointer}.cover{width:56px;height:56px;border-radius:21px;background:#fff1e9;display:grid;place-items:center;font-size:25px}.progress{height:8px;background:#f3e8df;border-radius:999px;overflow:hidden;margin-top:13px}.progress i{display:block;height:100%;background:var(--main);border-radius:999px}.tabs{position:absolute;bottom:0;left:0;right:0;height:74px;background:rgba(255,255,255,.96);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);z-index:10}.tabs div{display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#b1998e;cursor:pointer;gap:3px}.tabs .active{color:#e77951;font-weight:750}.tabs b{font-size:19px}.top{padding:54px 22px 18px;background:#fff;border-bottom:1px solid var(--line)}.back{font-size:13px;color:#e77951;font-weight:750;margin-bottom:12px;cursor:pointer}.title2{font-size:22px;font-weight:850;letter-spacing:-.3px}.bubble{background:#fff7f1;border:1px dashed #ffc6aa;border-radius:22px;padding:12px;color:#8a5a45;font-size:13px;line-height:1.65}.mapItem{display:flex;align-items:center;gap:12px;background:#fffaf6;margin-top:10px;padding:13px;border-radius:20px;cursor:pointer}.dot{width:40px;height:40px;border-radius:16px;background:#fff1e9;display:grid;place-items:center;font-size:20px}.paper{height:430px;background:#fff;border:1px solid var(--line);border-radius:24px;position:relative;padding:24px;overflow:hidden}.water{position:absolute;inset:-20px;display:grid;grid-template-columns:repeat(2,1fr);gap:28px;opacity:.045;transform:rotate(-24deg);font-size:12px;font-weight:750}.line{height:12px;background:#eee3dc;border-radius:999px;margin-bottom:14px;position:relative}.area{height:128px;border-radius:24px;background:#fff2ea;display:grid;place-items:center;font-size:42px;margin:25px 0;position:relative}.answerBox{height:148px;border-radius:22px;background:#fffaf6;border:1px solid var(--line);padding:14px;color:#9a8379;font-size:13px;line-height:1.6;margin-top:14px}.option{padding:13px;border-radius:18px;background:#fffaf6;border:1px solid var(--line);margin-top:10px;font-size:14px}.resultHero{text-align:center;color:#5a3324;padding:58px 22px 34px;background:linear-gradient(135deg,#ffb79d,#ffd9c7)}.score{font-size:54px;font-weight:900}.notice{display:flex;gap:12px;margin-bottom:12px}.formLine{height:44px;border-radius:16px;background:#fffaf6;border:1px solid var(--line);display:flex;align-items:center;padding:0 14px;color:#9a8379;font-size:13px;margin-top:10px}.right h2{margin:0;font-size:27px;line-height:1.25}.right p{color:var(--sub);font-size:14px;line-height:1.8}.infoList{display:grid;gap:12px;margin-top:18px}.infoItem{background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px;font-size:14px;line-height:1.6;color:#5d4d45}.infoItem b{display:block;color:var(--text);margin-bottom:4px}.pill{display:inline-block;margin-top:12px;padding:8px 12px;border-radius:999px;background:#fff0e6;color:#d96f45;font-weight:750;font-size:12px}
+@media(max-width:980px){.app{grid-template-columns:1fr}.left,.right{border:0}.menu{display:flex;overflow:auto}.menu button{white-space:nowrap}.center{padding:18px}.phone{transform:scale(.94);transform-origin:top center}.right{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="left">
+    <div class="logo"><h1>学生端学习小程序</h1><p>左侧切换页面，中间看原型，右侧看页面说明。按一期完整学习闭环设计。</p></div>
+    <div class="menu">
+      <button class="active" data-page="home">🏠 首页</button>
+      <button data-page="study">📚 学习</button>
+      <button data-page="detail">🗺️ 学习星球详情</button>
+      <button data-page="preview">📄 资料预览</button>
+      <button data-page="tasks">📝 小挑战</button>
+      <button data-page="answer">✍️ 答题</button>
+      <button data-page="result">🎉 批改结果</button>
+      <button data-page="notice">🔔 通知</button>
+      <button data-page="me">🐣 我的</button>
+      <button data-page="login">🔐 登录绑定</button>
+    </div>
+  </aside>
+
+  <main class="center">
+    <div class="phone"><div class="screen"><div class="notch"></div>
+
+      <section id="home" class="page active">
+        <div class="hero"><div class="small">🌈 欢迎来到学习乐园</div><div class="heroTitle">今天也一起去冒险吧 ✨</div><div class="badges" style="margin-top:14px"><span class="badge">🔥 连续学习 7 天</span><span class="badge">⭐ 今日能量 82%</span></div></div>
+        <div class="section"><div class="card big"><div class="row"><div><div class="sub">继续上次学习</div><h3 class="title">Python 编程基础</h3><p class="sub">第二单元 · 第 3 节 函数入门</p></div><div class="mascot">🐣</div></div><button class="btn light" onclick="showPage('detail')">继续学习</button></div></div>
+        <div class="section grid2"><div class="card reward"><div style="font-size:28px">🌟</div><div class="miniNum">1</div><div class="sub">还有小挑战没完成</div></div><div class="card green"><div style="font-size:28px">🏅</div><div class="miniNum">7天</div><div class="sub">连续学习，保持得不错</div></div></div>
+        <div class="section"><div class="card"><div class="row" style="justify-content:flex-start"><div class="avatar">🦊</div><div><h3 class="title">学习小伙伴提醒</h3><p class="sub">小狐狸发现你最近越来越厉害啦，再完成一个挑战就能获得新徽章 🦊</p></div></div></div></div>
+        <div class="section"><h3>今日冒险地图</h3><div class="card course" onclick="showPage('detail')"><div class="row"><div class="cover">📖</div><span class="tag">新小挑战</span></div><h3>🌲 阅读森林大冒险</h3><p class="sub">阅读理解 · 写作表达 · 林老师</p><div class="badges"><span class="badge">阅读小达人</span><span class="badge">已学 68%</span></div><div class="progress"><i style="width:68%"></i></div></div></div>
+        <div class="tabs"><div class="active" onclick="showPage('home')"><b>🏠</b>首页</div><div onclick="showPage('study')"><b>📚</b>学习</div><div onclick="showPage('tasks')"><b>📝</b>小挑战</div><div onclick="showPage('notice')"><b>🔔</b>通知</div><div onclick="showPage('me')"><b>🐣</b>我的</div></div>
+      </section>
+
+      <section id="study" class="page">
+        <div class="hero"><div class="small">我的学习</div><div class="heroTitle">选一门课继续学 📚</div></div>
+        <div class="section"><div class="formLine">搜索学习星球 / 老师 / 章节</div></div>
+        <div class="section"><div class="row"><span class="tag">全部</span><span class="tag">学习中</span><span class="tag">已收藏</span><span class="tag">已完成</span></div></div>
+        <div class="section"><div class="card course" onclick="showPage('detail')"><div class="row"><div class="cover">📖</div><span class="tag">学习中</span></div><h3>🌲 阅读森林大冒险</h3><p class="sub">12 个章节 · 3 个小挑战</p><div class="badges"><span class="badge">阅读小达人</span><span class="badge">已解锁 8 节</span></div><div class="progress"><i style="width:68%"></i></div></div>
+        <div class="card course reward"><div class="row"><div class="cover">💡</div><span class="tag">新小挑战</span></div><h3>🚀 编程星球训练营</h3><p class="sub">18 个章节 · 5 个小挑战</p><div class="badges"><span class="badge">逻辑挑战</span><span class="badge">继续加油</span></div><div class="progress"><i style="width:42%"></i></div></div></div>
+        <div class="tabs"><div onclick="showPage('home')"><b>🏠</b>首页</div><div class="active" onclick="showPage('study')"><b>📚</b>学习</div><div onclick="showPage('tasks')"><b>📝</b>小挑战</div><div onclick="showPage('notice')"><b>🔔</b>通知</div><div onclick="showPage('me')"><b>🐣</b>我的</div></div>
+      </section>
+
+      <section id="detail" class="page noTab">
+        <div class="hero"><div class="back" onclick="showPage('study')">‹ 返回学习</div><div class="heroTitle">G8 英语阅读提升班</div><p class="sub">林老师 · 成长进度 68%</p><div class="progress"><i style="width:68%"></i></div></div>
+        <div class="section grid2"><div class="card" onclick="showPage('preview')"><h3 class="title">学习资料</h3><p class="sub">讲义、图片、PPT</p><div class="badges"><span class="badge">3 份资料</span></div></div><div class="card" onclick="showPage('answer')"><h3 class="title">课后小挑战</h3><p class="sub">做完就能看反馈</p><div class="badges"><span class="badge">可得徽章</span></div></div></div>
+        <div class="section"><h3>学习小地图</h3><div class="card"><div class="bubble">完成第 3 站后，可以获得一枚“阅读小星星”徽章。</div><div class="mapItem"><div class="dot">🌟</div><div><b>第 1 站 阅读起航</b><div class="sub">已完成，表现不错</div></div></div><div class="mapItem" onclick="showPage('preview')"><div class="dot">🐾</div><div><b>第 2 站 单词森林</b><div class="sub">正在学习，小伙伴陪你一起看</div></div></div><div class="mapItem" onclick="showPage('answer')"><div class="dot">🎁</div><div><b>第 3 站 理解挑战</b><div class="sub">完成后解锁下一节</div></div></div><div class="mapItem"><div class="dot">🔒</div><div><b>第 4 站 阅读宝箱</b><div class="sub">完成小挑战后解锁</div></div></div></div></div>
+      </section>
+
+      <section id="preview" class="page noTab">
+        <div class="top"><div class="back" onclick="showPage('detail')">‹ 返回章节</div><div class="title2">第 2 节 核心知识讲义</div><p class="sub">可以在线查看，页面带水印</p></div>
+        <div class="section"><div class="card"><div class="bubble">小提示：先看讲义里的例子，再去做小挑战会更轻松。</div><div class="row sub" style="margin:12px 0"><span>学习记录已保存</span><span>资料仅在线查看</span></div><div class="paper"><div class="water"><span>Gavin · 6235</span><span>Gavin · 6235</span><span>Gavin · 6235</span><span>Gavin · 6235</span><span>Gavin · 6235</span><span>Gavin · 6235</span></div><div class="line" style="width:100px"></div><h3>阅读理解核心方法</h3><div class="line"></div><div class="line" style="width:78%"></div><div class="area">📘</div><div class="line"></div><div class="line" style="width:65%"></div></div></div><div class="badges"><span class="badge">已阅读 12 分钟</span><span class="badge">距离小徽章还差一步</span></div><button class="btn" onclick="showPage('answer')">去做小挑战</button></div>
+      </section>
+
+      <section id="tasks" class="page">
+        <div class="hero"><div class="small">小挑战</div><div class="heroTitle">今天还有几个小挑战等你完成 🌟</div></div>
+        <div class="section"><div class="row"><span class="tag">全部</span><span class="tag">待完成</span><span class="tag">批改中</span><span class="tag">已完成</span></div></div>
+        <div class="section"><div class="card course reward" onclick="showPage('answer')"><div class="row"><h3>第一单元小小挑战</h3><span class="tag">待完成</span></div><p class="sub">今天 22:00 前完成，做完可获得“阅读小星星”。</p><div class="badges"><span class="badge">🎁 有奖励</span><span class="badge">预计 8 分钟</span></div></div><div class="card course blue"><div class="row"><h3>阅读理解训练</h3><span class="tag">批改中</span></div><p class="sub">老师正在补充点评，请稍等一下。</p><div class="badges"><span class="badge">已提交</span><span class="badge">等待反馈</span></div></div><div class="card course" onclick="showPage('result')"><div class="row"><h3>学习星球入门测评</h3><span class="tag">已批改</span></div><p class="sub">得分 92，老师已给出建议。</p><div class="badges"><span class="badge">🌟 高分</span><span class="badge">进步 +12</span></div></div></div>
+        <div class="tabs"><div onclick="showPage('home')"><b>🏠</b>首页</div><div onclick="showPage('study')"><b>📚</b>学习</div><div class="active" onclick="showPage('tasks')"><b>📝</b>小挑战</div><div onclick="showPage('notice')"><b>🔔</b>通知</div><div onclick="showPage('me')"><b>🐣</b>我的</div></div>
+      </section>
+
+      <section id="answer" class="page noTab">
+        <div class="top"><div class="back" onclick="showPage('tasks')">‹ 返回小挑战</div><div class="title2">第一单元小小挑战</div><p class="sub">今天 22:00 前完成，提交后有小徽章</p></div>
+        <div class="section"><div class="card"><span class="tag">单选题 · 10分</span><h3>这篇材料主要表达了什么观点？</h3><div class="option">A. 阅读时只看标题即可</div><div class="option">B. 要结合段落和关键词理解中心</div><div class="option">C. 只需要记住生词</div></div></div>
+        <div class="section"><div class="card"><span class="tag">简答题 · 20分</span><h3>请概括这篇材料的中心观点，并说明你的理由。</h3><div class="answerBox">在这里填写你的答案，系统会自动保存。</div></div><div class="grid2" style="margin-top:12px"><button class="btn light">保存草稿</button><button class="btn" onclick="showPage('result')">我做完啦</button></div></div>
+      </section>
+
+      <section id="result" class="page noTab">
+        <div class="resultHero"><div class="back" onclick="showPage('tasks')">‹ 返回小挑战</div><div style="font-size:42px">🎉</div><div class="score">92</div><p>太棒啦！你成功点亮了一颗阅读星星 🌟</p></div>
+        <div class="section"><div class="card reward"><h3>获得奖励</h3><div class="badges"><span class="badge">🌟 阅读小星星</span><span class="badge">🔓 下一节已解锁</span></div><p class="sub">继续保持，下一次争取拿到“表达小达人”。</p></div></div>
+        <div class="section"><div class="card"><h3>命中的关键点</h3><p class="sub">中心观点、论据、作者态度都写到了。</p></div></div>
+        <div class="section"><div class="card"><h3>老师评语</h3><p class="sub">你今天比昨天更棒啦，如果再加一个小例子就更完美啦 ✨</p></div></div>
+      </section>
+
+      <section id="notice" class="page">
+        <div class="hero"><div class="small">通知</div><div class="heroTitle">新的学习消息来啦 ✨</div></div>
+        <div class="section"><div class="card notice"><div class="dot">练</div><div><b>新小挑战发布</b><p class="sub">第一单元小小挑战已经可以开始做了。</p></div></div><div class="card notice"><div class="dot">评</div><div><b>批改完成</b><p class="sub">学习星球入门测评已批改完成。</p></div></div><div class="card notice"><div class="dot">奖</div><div><b>获得新徽章</b><p class="sub">恭喜获得阅读小星星。</p></div></div><div class="card notice"><div class="dot">资</div><div><b>资料更新</b><p class="sub">第 2 节新增一份讲义。</p></div></div></div>
+        <div class="tabs"><div onclick="showPage('home')"><b>🏠</b>首页</div><div onclick="showPage('study')"><b>📚</b>学习</div><div onclick="showPage('tasks')"><b>📝</b>小挑战</div><div class="active" onclick="showPage('notice')"><b>🔔</b>通知</div><div onclick="showPage('me')"><b>🐣</b>我的</div></div>
+      </section>
+
+      <section id="me" class="page">
+        <div class="hero"><div class="small">我的</div><div class="heroTitle">我的成长小屋 ✨</div></div>
+        <div class="section"><div class="card row"><div class="mascot">🐣</div><div><h3>Gavin 同学</h3><p class="sub">账号正常 · 已绑定手机号</p><div class="badges"><span class="badge">阅读小星星</span><span class="badge">连续 7 天</span></div></div></div></div>
+        <div class="section grid3"><div class="card reward"><div class="miniNum">86</div><div class="sub">平均分</div></div><div class="card green"><div class="miniNum">21</div><div class="sub">学习记录</div></div><div class="card blue"><div class="miniNum">5</div><div class="sub">我的徽章</div></div></div>
+        <div class="section"><div class="card"><p>🌟 我的成长轨迹 ›</p><p>🏅 我的徽章墙 ›</p><p>💖 我收藏的内容 ›</p><p>🦊 联系学习伙伴 ›</p><p>账号设置 ›</p></div></div>
+        <div class="tabs"><div onclick="showPage('home')"><b>🏠</b>首页</div><div onclick="showPage('study')"><b>📚</b>学习</div><div onclick="showPage('tasks')"><b>📝</b>小挑战</div><div onclick="showPage('notice')"><b>🔔</b>通知</div><div class="active" onclick="showPage('me')"><b>🐣</b>我的</div></div>
+      </section>
+
+      <section id="login" class="page noTab">
+        <div class="hero"><div class="small">欢迎来到学习小站</div><div class="heroTitle">先完成登录绑定</div></div>
+        <div class="section"><div class="card" style="text-align:center"><div class="mascot" style="margin:0 auto">🐣</div><h3>开启今天的学习</h3><p class="sub">绑定手机号后，可以同步学习记录、小挑战结果和老师反馈。</p><button class="btn">微信授权登录</button><button class="btn light" style="border:1px solid var(--line)">绑定手机号</button></div></div>
+        <div class="section"><div class="bubble">账号被禁用或未授权学习星球时，会提示联系老师或管理员。</div></div>
+      </section>
+
+    </div></div>
+  </main>
+
+  <aside class="right">
+    <span class="pill" id="tag">学生端首页</span>
+    <h2 id="rTitle">打开就知道今天学什么</h2>
+    <p id="rDesc">首页不做复杂入口堆叠，而是突出继续学习、今日小挑战、老师提醒、徽章奖励，让学生有明确下一步。</p>
+    <div class="infoList" id="rList">
+      <div class="infoItem"><b>核心目标</b>提升学习启动率。</div>
+      <div class="infoItem"><b>关键模块</b>继续学习、今日小挑战、连续学习、老师提醒。</div>
+      <div class="infoItem"><b>最佳实践</b>减少选择，让学生直接进入学习。</div>
+    </div>
+  </aside>
+</div>
+<script>
+const meta={
+ home:['学生端首页','打开就知道今天学什么','首页不做复杂入口堆叠，而是突出继续学习、今日小挑战、老师提醒、徽章奖励，让学生有明确下一步。',['核心目标：提升学习启动率。','关键模块：继续学习、今日小挑战、连续学习、老师提醒。','最佳实践：减少选择，让学生直接进入学习。']],
+ study:['学习页','快速找到已授权学习星球','学习页展示学生已授权学习星球，包含搜索、分类、学习星球进度、徽章和学习状态。',['核心目标：快速进入学习星球。','关键模块：搜索、分类、学习星球卡片、进度条。','最佳实践：学习星球卡片要有状态和下一步提示。']],
+ detail:['学习星球详情','用学习小地图推进学习','学习星球详情不是普通目录，而是用章节地图、解锁状态和奖励提示建立学习路径。',['核心目标：形成学习推进感。','关键模块：学习星球进度、资料入口、小挑战入口、学习地图。','最佳实践：用已完成、学习中、未解锁降低迷茫感。']],
+ preview:['资料预览','安全查看资料并引导小挑战','资料页包含水印、学习记录、阅读提示和小挑战入口，既保证内容安全，也让学生知道下一步。',['核心目标：资料学习和小挑战衔接。','关键模块：文档预览、水印、阅读时长、小挑战按钮。','最佳实践：资料页不能只是文件查看器，要有学习提示。']],
+ tasks:['小挑战页','统一管理小挑战任务','小挑战页汇总待完成、批改中、已完成任务，并用奖励提示提高完成率。',['核心目标：降低遗漏率。','关键模块：状态筛选、小挑战卡片、截止提醒、奖励反馈。','最佳实践：用“预计耗时”和“有奖励”降低学生压力。']],
+ answer:['答题页','简单完成小挑战提交','答题页支持选择题、简答题、草稿保存和提交，操作简单清楚。',['核心目标：降低答题阻力。','关键模块：题目、选项、输入框、保存草稿、提交。','最佳实践：避免复杂操作，突出提交反馈。']],
+ result:['批改结果','让学生看到自己的进步','结果页展示得分、关键词、老师评语、徽章奖励和解锁下一节，形成正反馈。',['核心目标：强化学习成就感。','关键模块：分数、徽章、老师评语、解锁提示。','最佳实践：不要只给分数，要给鼓励和下一步。']],
+ notice:['通知页','学习消息集中查看','通知页展示新小挑战、批改完成、资料更新和徽章提醒，减少学生错过任务。',['核心目标：统一提醒。','关键模块：新小挑战、批改、资料、奖励。','最佳实践：消息语气轻松，不要像系统警告。']],
+ me:['我的页','展示个人成长记录','我的页面展示头像、学习数据、徽章、收藏、联系老师和账号设置。',['核心目标：沉淀学习成长。','关键模块：用户信息、学习数据、徽章、记录入口。','最佳实践：让学生看到自己在变好。']],
+ login:['登录绑定','保证账号与学习记录一致','登录页完成微信授权和手机号绑定，用于匹配学习星球授权、学习记录和作业结果。',['核心目标：完成身份识别。','关键模块：微信授权、手机号绑定、账号状态提示。','最佳实践：说明绑定价值，避免学生排斥。']]
+};
+function showPage(id){
+ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+ document.getElementById(id).classList.add('active');
+ document.querySelectorAll('.menu button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
+ const m=meta[id];
+ document.getElementById('tag').innerText=m[0];document.getElementById('rTitle').innerText=m[1];document.getElementById('rDesc').innerText=m[2];
+ document.getElementById('rList').innerHTML=m[3].map(x=>{let parts=x.split('：');return `<div class="infoItem"><b>${parts[0]}</b>${parts.slice(1).join('：')}</div>`}).join('');
+}
+document.querySelectorAll('.menu button').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.page)));
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+.compact {
+  padding: 32rpx 0;
+}
+
+.slot-row {
+  display: grid;
+  grid-template-columns: 136rpx 1fr 1fr 88rpx;
+  gap: 12rpx;
+  align-items: center;
+  margin-top: 18rpx;
+}
+
+.slot-cell,
+.slot-input {
+  min-height: 68rpx;
+  border: 1rpx solid #f1dfd4;
+  border-radius: 16rpx;
+  background: #fffaf6;
+  padding: 0 18rpx;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+}
+
+.slot-delete {
+  color: #c05252;
+  font-size: 24rpx;
+  text-align: right;
+}
+
+.class-item {
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #dbeafe;
+}
+
+.title.small {
+  font-size: 28rpx;
+}

@@ -1,0 +1,73 @@
+<view class="hero">
+  <view class="eyebrow">欢迎来到学习乐园</view>
+  <view class="hero-title">今天也一起去冒险吧</view>
+  <view wx:if="{{home}}" class="badge">连续学习 {{home.student.streakDays}} 天</view>
+  <view wx:if="{{home}}" class="badge">今日能量 {{home.student.averageScore}}%</view>
+</view>
+
+<view wx:if="{{loading}}" class="empty">正在准备今天的学习内容...</view>
+<view wx:elif="{{!home}}" class="section">
+  <view class="empty-card">
+    <view class="title">暂时没有学习内容</view>
+    <view class="sub">{{emptyMessage}}</view>
+    <button class="button" bindtap="goLogin">去登录绑定</button>
+  </view>
+</view>
+<view wx:else>
+  <view class="section">
+    <view class="card big">
+      <view class="row">
+        <view>
+          <view class="sub">继续上次学习</view>
+          <view class="title">{{courseTitle}}</view>
+          <view class="sub">{{courseMeta}}</view>
+        </view>
+        <view class="mascot">🐣</view>
+      </view>
+      <button class="button light" bindtap="goStudyDetail">继续学习</button>
+    </view>
+  </view>
+
+  <view class="section grid2">
+    <view class="card reward metric-card" bindtap="goTasks">
+      <view class="cover">🌟</view>
+      <view class="metric-num">{{pendingCount}}</view>
+      <view class="sub">还有小挑战没完成</view>
+    </view>
+    <view class="card green metric-card">
+      <view class="cover">🏅</view>
+      <view class="metric-num">{{home.student.streakDays}}天</view>
+      <view class="sub">连续学习，保持得不错</view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="card blue">
+      <view class="row">
+        <view class="avatar">🦊</view>
+        <view>
+          <view class="title">学习小伙伴提醒</view>
+          <view class="sub">先看讲义里的例子，再去做小挑战会更轻松。完成一个挑战就能点亮新徽章。</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">今日冒险地图</view>
+    <view class="card" bindtap="goStudyDetail">
+      <view class="row">
+        <view class="cover">📖</view>
+        <view class="tag">{{mapTag}}</view>
+      </view>
+      <view class="title">{{courseTitle}}</view>
+      <view class="sub">{{continueCourse.subject}} · {{continueCourse.grade}} · 老师会在学习后给你反馈</view>
+      <view class="badges">
+        <view class="badge">阅读小达人</view>
+        <view class="badge">已学 {{progressPercent}}%</view>
+      </view>
+      <view class="progress"><view class="progress-bar" style="width: {{progressPercent}}%;"></view></view>
+      <button wx:if="{{pendingTask}}" class="button" catchtap="goAnswer">去做今日小挑战</button>
+    </view>
+  </view>
+</view>
