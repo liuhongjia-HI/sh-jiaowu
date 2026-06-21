@@ -30,14 +30,19 @@ if [ ! -x "$RELEASE_DIR/learning-api/learning-api" ]; then
   fi
 fi
 
-if [ ! -d "$RELEASE_DIR/web/dist" ]; then
-  if [ -n "$CURRENT_DIR" ] && [ -d "$CURRENT_DIR/web/dist" ]; then
-    mkdir -p "$RELEASE_DIR/web"
-    cp -R "$CURRENT_DIR/web/dist" "$RELEASE_DIR/web/dist"
+if [ ! -f "$RELEASE_DIR/web/dist/index.html" ]; then
+  if [ -n "$CURRENT_DIR" ] && [ -f "$CURRENT_DIR/web/dist/index.html" ]; then
+    mkdir -p "$RELEASE_DIR/web/dist"
+    cp -a "$CURRENT_DIR/web/dist/." "$RELEASE_DIR/web/dist/"
   else
-    echo "Missing web dist: $RELEASE_DIR/web/dist" >&2
+    echo "Missing web entry: $RELEASE_DIR/web/dist/index.html" >&2
     exit 1
   fi
+fi
+
+if [ ! -f "$RELEASE_DIR/web/dist/index.html" ]; then
+  echo "Missing web entry after preparation: $RELEASE_DIR/web/dist/index.html" >&2
+  exit 1
 fi
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"

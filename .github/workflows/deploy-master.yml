@@ -49,7 +49,7 @@ jobs:
             echo "api=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if echo "$changed_files" | grep -Eq '^web/'; then
+          if echo "$changed_files" | grep -Eq '^web/|^deploy/production/|^\.github/workflows/deploy-master\.yml$'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
