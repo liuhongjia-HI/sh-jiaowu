@@ -70,7 +70,7 @@ export default function Login() {
           </Form>
           {showDemoAccounts && (
             <div className="login-demo">
-              <Typography.Text type="secondary">演示账号</Typography.Text>
+              <Typography.Text type="secondary">快捷填入</Typography.Text>
               <Space size={8} wrap>
                 {demoAccounts.map((account) => (
                   <Button

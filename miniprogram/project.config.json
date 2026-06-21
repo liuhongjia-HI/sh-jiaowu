@@ -31,8 +31,9 @@
     "tabIndent": "insertSpaces",
     "tabSize": 2
   },
-  "appid": "wx8a707ead2a4aa2fd",
-  "libVersion": "3.11.2",
+  "miniprogramRoot": "",
+  "appid": "wx8251fd0ea9081425",
+  "libVersion": "3.8.12",
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [],

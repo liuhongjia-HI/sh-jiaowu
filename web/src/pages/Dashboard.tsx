@@ -9,6 +9,7 @@ import {
   Space,
   Statistic,
   Tag,
+  Tooltip,
   Typography
 } from 'antd';
 import {
@@ -41,42 +42,46 @@ export default function Dashboard() {
       <div className="dashboard-hero">
         <div>
           <Tag color="green">今日运营</Tag>
-          <Typography.Title level={2}>把需要跟进的学生、课程和资料放在一屏里</Typography.Title>
-          <Typography.Text>优先处理待批改、到期续费和未发布资料，减少跨页面查找。</Typography.Text>
+          <Typography.Title level={2}>今日待办</Typography.Title>
+          <Typography.Text>先处理批改、续费和资料发布。</Typography.Text>
         </div>
         <Space size={10} wrap>
-          <Button type="primary" icon={<TeamOutlined />}>
-            <Link to="/students">查看学生</Link>
-          </Button>
-          <Button icon={<BookOutlined />}>
-            <Link to="/packages">维护套餐</Link>
-          </Button>
+          <Tooltip title="学生">
+            <Link to="/students" aria-label="学生">
+              <Button type="primary" icon={<TeamOutlined />} />
+            </Link>
+          </Tooltip>
+          <Tooltip title="套餐">
+            <Link to="/packages" aria-label="套餐">
+              <Button icon={<BookOutlined />} />
+            </Link>
+          </Tooltip>
         </Space>
       </div>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} md={6}>
           <Card className="metric-card metric-green">
-            <Statistic title="已开通学生" value={data.openedStudents} prefix={<TeamOutlined />} />
-            <span>正在学习套餐内容</span>
+            <Statistic title="学生" value={data.openedStudents} prefix={<TeamOutlined />} />
+            <span>已开通</span>
           </Card>
         </Col>
         <Col xs={24} md={6}>
           <Card className="metric-card metric-blue">
-            <Statistic title="学习套餐" value={data.packageCount} prefix={<BookOutlined />} />
-            <span>可用于开通和续费</span>
+            <Statistic title="套餐" value={data.packageCount} prefix={<BookOutlined />} />
+            <span>可开通</span>
           </Card>
         </Col>
         <Col xs={24} md={6}>
           <Card className="metric-card metric-amber">
             <Statistic title="待批改" value={data.pendingReviews} prefix={<FormOutlined />} />
-            <span>需要老师处理</span>
+            <span>未处理</span>
           </Card>
         </Col>
         <Col xs={24} md={6}>
           <Card className="metric-card metric-purple">
             <Statistic title="资料访问" value={data.materialViews} prefix={<FileTextOutlined />} />
-            <span>学生累计查看次数</span>
+            <span>累计查看</span>
           </Card>
         </Col>
       </Row>
@@ -89,7 +94,7 @@ export default function Dashboard() {
                 <span className="todo-icon"><FormOutlined /></span>
                 <div>
                   <strong>{data.pendingReviews} 份课后练习待批改</strong>
-                  <span>优先反馈最近提交的学生，避免学习结果滞后。</span>
+                  <span>先反馈最近提交的学生。</span>
                 </div>
                 <ArrowRightOutlined />
               </Link>
@@ -97,7 +102,7 @@ export default function Dashboard() {
                 <span className="todo-icon"><WarningOutlined /></span>
                 <div>
                   <strong>{data.expiringStudents} 名学生套餐即将到期</strong>
-                  <span>建议提前提醒家长续费，减少学习中断。</span>
+                  <span>提前提醒续费。</span>
                 </div>
                 <ArrowRightOutlined />
               </Link>
@@ -105,7 +110,7 @@ export default function Dashboard() {
                 <span className="todo-icon"><FileTextOutlined /></span>
                 <div>
                   <strong>{data.unpublishedFiles} 份学习资料未发布</strong>
-                  <span>检查课程范围和资料状态后再开放给学生。</span>
+                  <span>确认课程范围后发布。</span>
                 </div>
                 <ArrowRightOutlined />
               </Link>
@@ -113,12 +118,12 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col xs={24} lg={9}>
-          <Card title="运营健康度">
+          <Card title="批改进度">
             <div className="health-panel">
               <Progress type="dashboard" percent={reviewProgress} strokeColor="#07c160" />
               <div>
-                <Typography.Title level={5}>批改处理节奏</Typography.Title>
-                <Typography.Text type="secondary">待批改越少，学生端结果页和成长记录越完整。</Typography.Text>
+                <Typography.Title level={5}>处理节奏</Typography.Title>
+                <Typography.Text type="secondary">待批改越少，反馈越及时。</Typography.Text>
               </div>
             </div>
             <div className="process-list">

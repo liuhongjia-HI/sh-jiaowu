@@ -88,7 +88,7 @@ export default function AdminStaff() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>管理人员</Typography.Title>
-          <Typography.Text type="secondary">管理后台成员的岗位、校区权限和账号状态。</Typography.Text>
+          <Typography.Text type="secondary">维护岗位、校区权限和账号状态。</Typography.Text>
         </div>
         <div className="page-heading-actions">
           <ListViewToggle storageKey="starline:list-view:admin-staff" value={viewMode} onChange={setViewMode} />
@@ -113,7 +113,7 @@ export default function AdminStaff() {
                   { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
                   { label: '备注', value: record.remark || '-' }
                 ]}
-                actions={<ActionButton icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</ActionButton>}
+                actions={<ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
               />
             )}
           />
@@ -132,7 +132,7 @@ export default function AdminStaff() {
               { title: '微信绑定', dataIndex: 'bindStatus', width: 110, render: (value: string) => <Tag color={value === '已绑定' ? 'green' : 'orange'}>{value}</Tag> },
               { title: '账号状态', dataIndex: 'accountStatus', width: 110, render: (value: string) => <Tag color={value === '正常' ? 'green' : 'default'}>{value}</Tag> },
               { title: '备注', dataIndex: 'remark', ellipsis: true },
-              { title: '操作', width: 100, render: (_, record) => <Button icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button> }
+              { title: '操作', width: 64, render: (_, record) => <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} /> }
             ]}
           />
         )}

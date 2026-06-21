@@ -42,5 +42,9 @@ ADMIN_PASSWORD_LOGIN_ENABLED=true
 
 - 管理后台：`sa.starlineeducation.com.cn`
 - 接口域名：`gate.starlineeducation.com.cn`
+- 管理后台和小程序统一通过 `https://gate.starlineeducation.com.cn/api` 访问接口；管理后台生产构建建议显式设置：
+  ```bash
+  VITE_API_BASE_URL=https://gate.starlineeducation.com.cn/api
+  ```
 - 当前可先启用 `nginx-http.conf`
 - HTTPS 证书签发完成后，把证书放到 `/etc/ssl/starline/sa.starlineeducation.com.cn.pem`、`/etc/ssl/starline/sa.starlineeducation.com.cn.key`、`/etc/ssl/starline/gate.starlineeducation.com.cn.pem`、`/etc/ssl/starline/gate.starlineeducation.com.cn.key`，再把 `nginx-https.conf` 合并进 Nginx 站点配置并 reload。

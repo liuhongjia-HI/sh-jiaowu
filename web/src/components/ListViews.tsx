@@ -1,5 +1,6 @@
 import { AppstoreOutlined, BarsOutlined } from '@ant-design/icons';
-import { Button, Empty, Segmented, Space, Tag, Typography } from 'antd';
+import { Button, Empty, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
+import type { ButtonProps } from 'antd';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -112,6 +113,24 @@ export function TagGroup({ values, color, emptyText = '无' }: { values?: string
   );
 }
 
-export function ActionButton({ children, ...props }: React.ComponentProps<typeof Button>) {
-  return <Button className="action-button" size="small" {...props}>{children}</Button>;
+type ActionButtonProps = Omit<ButtonProps, 'title'> & {
+  tooltip?: ReactNode;
+};
+
+export function ActionButton({ children, tooltip, 'aria-label': ariaLabel, className, type = 'text', ...props }: ActionButtonProps) {
+  const label = ariaLabel ?? (typeof tooltip === 'string' ? tooltip : undefined) ?? (typeof children === 'string' ? children : undefined);
+  const button = (
+    <Button
+      aria-label={label}
+      className={['action-button', !children ? 'action-button-icon' : '', className].filter(Boolean).join(' ')}
+      size="small"
+      type={type}
+      {...props}
+    >
+      {children}
+    </Button>
+  );
+
+  if (!tooltip) return button;
+  return <Tooltip title={tooltip}>{button}</Tooltip>;
 }

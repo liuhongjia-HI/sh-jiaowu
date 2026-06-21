@@ -31,6 +31,7 @@ import {
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, postData } from '../services/http';
+import { ActionButton } from '../components/ListViews';
 import type {
   CommercialOrder,
   CommercialOrderCreateRequest,
@@ -159,16 +160,16 @@ export default function Commercial() {
     },
     {
       title: '操作',
-      width: 260,
+      width: 236,
       render: (_, record) => (
         <Space size={6} wrap>
-          <Button size="small" icon={<PayCircleOutlined />} onClick={() => openAction('payment', record)}>收款</Button>
-          <Button size="small" icon={<RollbackOutlined />} onClick={() => openAction('refund', record)}>退款</Button>
-          <Button size="small" icon={<FileProtectOutlined />} onClick={() => openAction('contract', record)}>合同</Button>
-          <Button size="small" icon={<FileDoneOutlined />} onClick={() => openAction('invoice', record)}>发票</Button>
-          <Button size="small" icon={<RedoOutlined />} onClick={() => openAction('lesson', record)}>课消</Button>
-          <Button size="small" icon={<BellOutlined />} onClick={() => openAction('renewal', record)}>续费</Button>
-          <Button size="small" icon={<MessageOutlined />} onClick={() => openAction('notice', record)}>通知</Button>
+          <ActionButton tooltip="收款" icon={<PayCircleOutlined />} onClick={() => openAction('payment', record)} />
+          <ActionButton tooltip="退款" icon={<RollbackOutlined />} onClick={() => openAction('refund', record)} />
+          <ActionButton tooltip="合同" icon={<FileProtectOutlined />} onClick={() => openAction('contract', record)} />
+          <ActionButton tooltip="发票" icon={<FileDoneOutlined />} onClick={() => openAction('invoice', record)} />
+          <ActionButton tooltip="课消" icon={<RedoOutlined />} onClick={() => openAction('lesson', record)} />
+          <ActionButton tooltip="续费" icon={<BellOutlined />} onClick={() => openAction('renewal', record)} />
+          <ActionButton tooltip="通知" icon={<MessageOutlined />} onClick={() => openAction('notice', record)} />
         </Space>
       )
     }
@@ -205,7 +206,7 @@ export default function Commercial() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>商业运营</Typography.Title>
-          <Typography.Text type="secondary">把订单、收款、退款、合同、发票、课消和续费提醒放在同一个工作面里。</Typography.Text>
+          <Typography.Text type="secondary">处理订单、收款、课消和续费。</Typography.Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建订单</Button>
       </div>

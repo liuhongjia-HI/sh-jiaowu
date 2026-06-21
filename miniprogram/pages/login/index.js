@@ -57,13 +57,17 @@ Page({
       wx.showToast({ title: "已取消手机号授权", icon: "none" });
       return;
     }
+    if (!detail.code) {
+      wx.showToast({ title: "未获取到手机号授权，请用真机调试", icon: "none" });
+      return;
+    }
     const app = getApp();
     wx.login({
       success: (res) => {
         const code = app.globalData.useRealWechatLogin ? res.code : (app.globalData.demoLoginCode || "student");
         // 生产环境：detail.code 为手机号凭据，后端调用 getuserphonenumber 解析后绑定。
         // 演示环境：detail.phoneNumber 可能不可用，后端按手机号匹配既有账号完成绑定。
-        this.doLogin({ code, phone: detail.phoneNumber || "", phoneCode: detail.code || "" });
+        this.doLogin({ code, phone: detail.phoneNumber || "", phoneCode: detail.code });
       },
       fail: () => wx.showToast({ title: "微信登录失败", icon: "none" })
     });

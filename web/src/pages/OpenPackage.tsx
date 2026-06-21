@@ -34,7 +34,7 @@ export default function OpenPackage() {
     <div className="page-stack">
       <div>
         <Typography.Title level={3}>开通套餐</Typography.Title>
-        <Typography.Text type="secondary">为学生开通学习套餐，并在提交前确认可学习的课程、资料和练习。</Typography.Text>
+        <Typography.Text type="secondary">确认课程、资料和练习后开通。</Typography.Text>
       </div>
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={10}>

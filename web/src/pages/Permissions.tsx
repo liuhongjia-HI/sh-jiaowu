@@ -20,7 +20,7 @@ export default function Permissions() {
         <div className="page-heading">
           <div>
             <Typography.Title level={3}>学习权限</Typography.Title>
-            <Typography.Text type="secondary">查看学生、学习套餐和课程内容的对应关系，确认学生能看到该看的课程、资料和练习。</Typography.Text>
+            <Typography.Text type="secondary">核查学生可见的课程、资料和练习。</Typography.Text>
           </div>
           <div className="page-heading-actions">
             <ListViewToggle storageKey="starline:list-view:permissions" value={viewMode} onChange={setViewMode} />

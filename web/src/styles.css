@@ -320,15 +320,29 @@ body {
 }
 
 .action-button {
+  min-width: 32px;
+  min-height: 32px;
   border-color: #dbe5ed;
   background: #fff;
   font-weight: 700;
+}
+
+.action-button-icon {
+  display: inline-grid;
+  place-items: center;
+  padding-inline: 0;
 }
 
 .action-button:hover {
   border-color: #07c160 !important;
   color: #07c160 !important;
   background: #f2fbf7 !important;
+}
+
+.action-button.ant-btn-dangerous:hover {
+  border-color: #ff4d4f !important;
+  color: #ff4d4f !important;
+  background: #fff1f0 !important;
 }
 
 .preview-result {
@@ -805,9 +819,9 @@ button.schedule-block:hover {
 }
 
 .dashboard-hero {
-  min-height: 184px;
+  min-height: 148px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   padding: 28px;
@@ -821,9 +835,9 @@ button.schedule-block:hover {
 
 .dashboard-hero h2.ant-typography {
   max-width: 780px;
-  margin: 12px 0 8px;
+  margin: 10px 0 6px;
   color: #132333;
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1.18;
 }
 
@@ -1159,12 +1173,21 @@ button.schedule-block:hover {
 }
 
 @media (max-width: 900px) {
-  .app-shell {
+  .app-shell,
+  .app-shell.ant-layout.ant-layout-has-sider {
     display: block;
+  }
+
+  .app-shell.ant-layout-has-sider > .ant-layout {
+    flex: 0 0 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   .app-sider {
     position: relative;
+    flex: none !important;
     width: 100% !important;
     max-width: none !important;
     min-width: 0 !important;
@@ -1172,10 +1195,17 @@ button.schedule-block:hover {
   }
 
   .app-header {
+    height: auto;
+    line-height: normal;
     min-height: auto;
     align-items: flex-start;
     padding: 18px;
     gap: 14px;
+  }
+
+  .app-header > .ant-space {
+    flex-wrap: wrap;
+    line-height: normal;
   }
 
   .user-pill {
@@ -1231,6 +1261,7 @@ button.schedule-block:hover {
   .dashboard-hero {
     display: grid;
     align-items: start;
+    min-height: 0;
   }
 
   .dashboard-hero h2.ant-typography {
@@ -1270,6 +1301,17 @@ button.schedule-block:hover {
   .health-panel {
     grid-template-columns: 1fr;
     justify-items: start;
+  }
+
+  .todo-item {
+    grid-template-columns: 36px minmax(0, 1fr) 16px;
+    min-height: 72px;
+    padding: 12px;
+  }
+
+  .todo-icon {
+    width: 36px;
+    height: 36px;
   }
 
   .login-page {

@@ -194,14 +194,14 @@ export default function Students({ user }: { user: CurrentUser }) {
     { title: '最近学习', dataIndex: 'lastStudyAt', width: 160, render: (value) => value || '-' },
     {
       title: '操作',
-      width: writable ? 260 : 100,
+      width: writable ? 150 : 64,
       fixed: 'right',
       render: (_, record) => (
-        <Space>
-          <Button icon={<EyeOutlined />} onClick={() => setSelected(record)}>查看</Button>
-          {writable && <Button icon={<UnlockOutlined />} onClick={() => setGrantStudent(record)}>开通</Button>}
-          {writable && <Button icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)}>提醒</Button>}
-          {writable && <Button icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button>}
+        <Space size={4}>
+          <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
+          {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => setGrantStudent(record)} />}
+          {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
+          {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
         </Space>
       )
     }
@@ -215,7 +215,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>学生管理</Typography.Title>
-          <Typography.Text type="secondary">查看学生账号、学习套餐、学习进度和提醒跟进情况。</Typography.Text>
+          <Typography.Text type="secondary">查看账号、套餐、进度和跟进状态。</Typography.Text>
         </div>
         {writable && (
           <Space>
@@ -271,10 +271,10 @@ export default function Students({ user }: { user: CurrentUser }) {
                   tags={<TagGroup values={record.openedPackages} color="blue" emptyText="暂未开通学习套餐" />}
                   actions={(
                     <>
-                      <ActionButton icon={<EyeOutlined />} onClick={() => setSelected(record)}>查看</ActionButton>
-                      {writable && <ActionButton icon={<UnlockOutlined />} onClick={() => setGrantStudent(record)}>开通</ActionButton>}
-                      {writable && <ActionButton icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)}>提醒</ActionButton>}
-                      {writable && <ActionButton icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</ActionButton>}
+                      <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
+                      {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => setGrantStudent(record)} />}
+                      {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
+                      {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
                     </>
                   )}
                 />

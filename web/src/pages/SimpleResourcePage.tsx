@@ -24,14 +24,14 @@ type ContentFormValues = {
 };
 
 const config: Record<Kind, { title: string; desc: string; path: string }> = {
-  packages: { title: '学习套餐', desc: '管理可开通的学习套餐，设置适用年级、学科和包含的学习内容。', path: '/packages' },
-  content: { title: '课程内容', desc: '管理课程、章节和课节安排，方便老师按课程准备资料和练习。', path: '/courses' },
-  materials: { title: '学习资料', desc: '管理讲义、图片和课件等资料，确保学生开通后能正常查看。', path: '/materials' },
-  homework: { title: '课后练习', desc: '管理课后练习和截止时间，方便老师布置、跟进和批改。', path: '/homework' },
-  review: { title: '批改反馈', desc: '查看待批改练习，为学生填写分数、评语和学习反馈。', path: '/reviews/pending' },
-  notices: { title: '通知提醒', desc: '给学生发送练习、批改完成、资料更新和套餐到期提醒。', path: '/notices' },
-  logs: { title: '操作记录', desc: '查看开通套餐、资料访问和后台操作记录，便于追溯问题。', path: '/logs' },
-  settings: { title: '系统设置', desc: '管理学年、年级、学期、水印、访问规则和提醒策略。', path: '/settings' }
+  packages: { title: '学习套餐', desc: '维护年级、学科和开放内容。', path: '/packages' },
+  content: { title: '课程内容', desc: '维护课程、章节和课节安排。', path: '/courses' },
+  materials: { title: '学习资料', desc: '维护讲义、图片和课件。', path: '/materials' },
+  homework: { title: '课后练习', desc: '维护练习、截止时间和发布状态。', path: '/homework' },
+  review: { title: '批改反馈', desc: '处理分数、评语和学习反馈。', path: '/reviews/pending' },
+  notices: { title: '通知提醒', desc: '发送练习、批改、资料和到期提醒。', path: '/notices' },
+  logs: { title: '操作记录', desc: '查看开通、访问和后台操作。', path: '/logs' },
+  settings: { title: '系统设置', desc: '维护学年、水印、访问和提醒规则。', path: '/settings' }
 };
 
 const emptyTextByKind: Record<Kind, string> = {
@@ -74,7 +74,7 @@ function columnsFor(kind: Kind, rows: Record<string, unknown>[], renderActions?:
     }
   }));
   if (renderActions && (kind === 'packages' || kind === 'content' || kind === 'materials' || kind === 'homework' || kind === 'review')) {
-    columns.push({ title: '操作', fixed: 'right', width: 170, render: (_: unknown, record: Record<string, unknown>) => renderActions(record) });
+    columns.push({ title: '操作', fixed: 'right', width: 120, render: (_: unknown, record: Record<string, unknown>) => renderActions(record) });
   }
   return columns;
 }
@@ -587,37 +587,23 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
   const renderFileActions = (record: Record<string, unknown>) => (
     <Space wrap>
       {isUploadKind(kind) && canUpload(kind, user) && (
-        <ActionButton icon={<EditOutlined />} onClick={() => openEditContent(record)}>
-          编辑
-        </ActionButton>
+        <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditContent(record)} />
       )}
-      <ActionButton icon={<EyeOutlined />} disabled={record.previewStatus !== '可预览'} onClick={() => openFile(record.previewUrl, 'preview', record.fileName)}>
-        查看
-      </ActionButton>
-      <ActionButton icon={<DownloadOutlined />} onClick={() => openFile(record.downloadUrl, 'download', record.fileName)}>
-        下载原文件
-      </ActionButton>
+      <ActionButton tooltip="预览" icon={<EyeOutlined />} disabled={record.previewStatus !== '可预览'} onClick={() => openFile(record.previewUrl, 'preview', record.fileName)} />
+      <ActionButton tooltip="下载" icon={<DownloadOutlined />} onClick={() => openFile(record.downloadUrl, 'download', record.fileName)} />
     </Space>
   );
   const renderReviewActions = (record: Record<string, unknown>) => (
-    <ActionButton icon={<CheckCircleOutlined />} onClick={() => openReview(record)}>
-      填写反馈
-    </ActionButton>
+    <ActionButton tooltip="填写反馈" icon={<CheckCircleOutlined />} onClick={() => openReview(record)} />
   );
   const renderPackageActions = (record: Record<string, unknown>) => (
-    <ActionButton icon={<EditOutlined />} onClick={() => openEditPackage(record)}>
-      编辑
-    </ActionButton>
+    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditPackage(record)} />
   );
   const renderCourseActions = (record: Record<string, unknown>) => (
-    <ActionButton icon={<EditOutlined />} onClick={() => openEditCourse(record)}>
-      编辑
-    </ActionButton>
+    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditCourse(record)} />
   );
   const renderSettingActions = (record: Record<string, unknown>) => (
-    <ActionButton icon={<EditOutlined />} onClick={() => openEditSetting(record)}>
-      编辑
-    </ActionButton>
+    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditSetting(record)} />
   );
   const rowActions = kind === 'packages' && canManagePackages(user) ? renderPackageActions : kind === 'content' && canManageCourses(user) ? renderCourseActions : kind === 'settings' ? renderSettingActions : kind === 'review' ? renderReviewActions : isUploadKind(kind) ? renderFileActions : undefined;
   return (

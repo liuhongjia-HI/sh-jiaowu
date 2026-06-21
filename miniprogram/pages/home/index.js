@@ -58,6 +58,10 @@ Page({
       wx.showToast({ title: "已取消手机号授权", icon: "none" });
       return;
     }
+    if (!detail.code) {
+      wx.showToast({ title: "未获取到手机号授权，请用真机调试", icon: "none" });
+      return;
+    }
     if (this.data.bindingPhone) {
       return;
     }
@@ -72,7 +76,7 @@ Page({
         }
         request("/auth/wechat-login", {
           method: "POST",
-          data: { code, phoneCode: detail.code || "" },
+          data: { code, phoneCode: detail.code },
           skipAuth: true
         })
           .then((result) => {

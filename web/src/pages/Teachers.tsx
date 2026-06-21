@@ -95,7 +95,7 @@ export default function Teachers() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>教师管理</Typography.Title>
-          <Typography.Text type="secondary">管理教师账号、负责课程范围、资料上传和练习批改权限。</Typography.Text>
+          <Typography.Text type="secondary">维护教师账号、课程范围和批改权限。</Typography.Text>
         </div>
         <div className="page-heading-actions">
           <ListViewToggle storageKey="starline:list-view:teachers" value={viewMode} onChange={setViewMode} />
@@ -121,7 +121,7 @@ export default function Teachers() {
                   { label: '备注', value: record.remark || '-' }
                 ]}
                 tags={<TagGroup values={record.learningSpaces} color="blue" emptyText="未分配负责课程范围" />}
-                actions={<ActionButton icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</ActionButton>}
+                actions={<ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
               />
             )}
           />
@@ -141,7 +141,7 @@ export default function Teachers() {
               { title: '可上传内容', width: 180, render: (_, record) => uploadTags(record) },
               { title: '可批改', dataIndex: 'canReview', width: 100, render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag> },
               { title: '备注', dataIndex: 'remark', ellipsis: true },
-              { title: '操作', width: 100, render: (_, record) => <Button icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button> }
+              { title: '操作', width: 64, render: (_, record) => <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} /> }
             ]}
           />
         )}

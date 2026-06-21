@@ -1,9 +1,10 @@
-import { CalendarOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
+import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Popconfirm, Segmented, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { getData, postData, putData } from '../services/http';
+import { ActionButton } from '../components/ListViews';
 import { gradeOptions, subjectOptions } from '../utils/curriculum';
 import type { AvailabilitySlot, Course, CurrentUser, ScheduleCandidate, ScheduleClass, Student, Teacher } from '../types/starline';
 
@@ -259,7 +260,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         </div>
         <Space wrap>
           <Button icon={<SaveOutlined />} onClick={() => setAvailabilityOpen(true)}>维护可上课时间</Button>
-          <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()}>刷新</Button>
+          <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()} />
         </Space>
       </div>
 
@@ -480,7 +481,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                       <Form.Item name={[field.name, 'endTime']} rules={[{ required: true, message: '请输入结束时间' }]}>
                         <Input placeholder="20:30" />
                       </Form.Item>
-                      <Button danger onClick={() => remove(field.name)}>删除</Button>
+                      <ActionButton danger tooltip="删除" icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
                     </div>
                   ))}
                   <Button icon={<PlusOutlined />} onClick={() => add({ dayOfWeek: 3, startTime: '19:00', endTime: '20:30' })}>添加时间段</Button>
@@ -804,12 +805,12 @@ function classColumns(courseById: CourseLookup, teacherById: Record<string, Teac
   if (canManage) {
     columns.push({
       title: '操作',
-      width: 170,
+      width: 92,
       render: (_, record) => record.status === '已取消' ? <Typography.Text type="secondary">-</Typography.Text> : (
-        <Space>
-          <Button icon={<EditOutlined />} onClick={() => onEdit(record)}>调课</Button>
+        <Space size={4}>
+          <ActionButton tooltip="调课" icon={<EditOutlined />} onClick={() => onEdit(record)} />
           <Popconfirm title="取消这节课？" description="取消后该时间不再占用，可重新排课。" okText="取消课程" cancelText="保留" onConfirm={() => onCancel(record.id)}>
-            <Button danger loading={canceling}>取消</Button>
+            <ActionButton danger tooltip="取消课程" icon={<CloseCircleOutlined />} loading={canceling} />
           </Popconfirm>
         </Space>
       )

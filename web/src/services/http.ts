@@ -3,9 +3,14 @@ import type { ApiResponse, AuthResult } from '../types/starline';
 
 const TOKEN_KEY = 'starline_admin_token';
 const USER_KEY = 'starline_admin_user';
+const DEFAULT_PRODUCTION_API_BASE_URL = 'https://gate.starlineeducation.com.cn/api';
+
+function resolveApiBaseUrl() {
+  return import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? DEFAULT_PRODUCTION_API_BASE_URL : '/api');
+}
 
 export const http = axios.create({
-  baseURL: '/api',
+  baseURL: resolveApiBaseUrl(),
   timeout: 15000
 });
 

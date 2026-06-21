@@ -20,7 +20,7 @@ import {
 } from '@ant-design/icons';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { Button, Layout, Menu, Result, Space, Typography } from 'antd';
+import { Button, Layout, Menu, Result, Space, Tooltip, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -58,12 +58,10 @@ type NavNode = NavItem | NavGroup;
 
 const navItems: NavNode[] = [
   {
-    key: 'workspace',
+    key: '/dashboard',
     icon: <DashboardOutlined />,
     label: '工作台',
-    children: [
-      { key: '/dashboard', icon: <DashboardOutlined />, label: '工作台', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] }
-    ]
+    roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin']
   },
   {
     key: 'student-access',
@@ -100,7 +98,7 @@ const navItems: NavNode[] = [
   {
     key: 'system',
     icon: <SettingOutlined />,
-    label: '组织与系统',
+    label: '系统',
     children: [
       { key: '/admin-staff', icon: <UsergroupAddOutlined />, label: '管理人员', roles: ['super_admin'] },
       { key: '/teachers', icon: <UserSwitchOutlined />, label: '教师管理', roles: ['campus_admin', 'super_admin'] },
@@ -220,7 +218,6 @@ function Shell({ user }: { user: CurrentUser }) {
       <Layout>
         <Header className="app-header">
           <div className="header-title-group">
-            <Typography.Text className="header-eyebrow">Starline / {currentItem.label}</Typography.Text>
             <Typography.Title level={4}>{currentItem.label}</Typography.Title>
           </div>
           <Space size={12}>
@@ -231,15 +228,16 @@ function Shell({ user }: { user: CurrentUser }) {
                 <span>{roleLabel(user)}</span>
               </div>
             </div>
-            <Button
-              icon={<LogoutOutlined />}
-              onClick={() => {
-                clearToken();
-                window.location.href = '/login';
-              }}
-            >
-              退出
-            </Button>
+            <Tooltip title="退出登录">
+              <Button
+                aria-label="退出登录"
+                icon={<LogoutOutlined />}
+                onClick={() => {
+                  clearToken();
+                  window.location.href = '/login';
+                }}
+              />
+            </Tooltip>
           </Space>
         </Header>
         <Content className="app-content">
