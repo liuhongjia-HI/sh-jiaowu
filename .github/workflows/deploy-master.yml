@@ -81,8 +81,9 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/releases/${GITHUB_SHA}'"
-          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT" "release/${GITHUB_SHA}/" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/releases/${GITHUB_SHA}/"
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -p $DEPLOY_PORT -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/releases/${GITHUB_SHA}'"
+          rsync -az --delete -e "ssh $SSH_OPTS" "release/${GITHUB_SHA}/" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/releases/${GITHUB_SHA}/"
 
       - name: Activate release
         env:
@@ -90,5 +91,5 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "$DEPLOY_USER@$DEPLOY_HOST" \
             "STARLINE_API_PORT='$API_PORT' '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/activate-release.sh' '$DEPLOY_PATH' '${GITHUB_SHA}'"
