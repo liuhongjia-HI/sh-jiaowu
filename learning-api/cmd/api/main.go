@@ -25,7 +25,12 @@ func main() {
 		log.Errorf("invalid configuration: %v", err)
 		return
 	}
-	repo := store.NewMemoryStoreWithOptions(store.Options{SeedDemoData: cfg.Demo.SeedData})
+	repo := store.NewMemoryStoreWithOptions(store.Options{
+		SeedDemoData:           cfg.Demo.SeedData,
+		BootstrapAdminName:     cfg.BootstrapAdmin.Name,
+		BootstrapAdminPhone:    cfg.BootstrapAdmin.Phone,
+		BootstrapAdminPassword: cfg.BootstrapAdmin.Password,
+	})
 	if cfg.Wechat.AppID != "" && cfg.Wechat.Secret != "" {
 		repo.UseWechatAPI(cfg.Wechat.AppID, cfg.Wechat.Secret)
 		log.Infof("wechat login enabled via jscode2session")

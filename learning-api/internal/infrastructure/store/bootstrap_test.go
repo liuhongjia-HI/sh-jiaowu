@@ -29,3 +29,22 @@ func TestNewMemoryStoreCanSkipAllBootstrapData(t *testing.T) {
 		t.Fatalf("expected no base dictionaries when explicitly skipped, got %#v", store.settings)
 	}
 }
+
+func TestNewMemoryStoreCanSeedBootstrapAdminWithoutDemoData(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{
+		SeedDemoData:           false,
+		BootstrapAdminPhone:    "13800000001",
+		BootstrapAdminPassword: "Starline@0621",
+	})
+
+	admin, err := store.LoginWithAdminPassword("13800000001", "Starline@0621")
+	if err != nil {
+		t.Fatalf("expected bootstrap admin login to succeed: %v", err)
+	}
+	if admin.UserID != "user-super" || !hasRole(admin.Roles, "super_admin") {
+		t.Fatalf("unexpected bootstrap admin: %#v", admin)
+	}
+	if len(store.students) != 0 {
+		t.Fatalf("expected no demo students, got %d", len(store.students))
+	}
+}

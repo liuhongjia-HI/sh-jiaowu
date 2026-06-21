@@ -23,6 +23,11 @@ type Config struct {
 		AdminPasswordLogin   bool
 		StudentPasswordLogin bool
 	}
+	BootstrapAdmin struct {
+		Name     string
+		Phone    string
+		Password string
+	}
 	Wechat struct {
 		AppID  string
 		Secret string
@@ -52,6 +57,9 @@ func MustLoad() *Config {
 	cfg.Demo.SeedData = getBool("DEMO_SEED_DATA", cfg.App.Env != "production")
 	cfg.Demo.AdminPasswordLogin = getBool("ADMIN_PASSWORD_LOGIN_ENABLED", cfg.App.Env != "production")
 	cfg.Demo.StudentPasswordLogin = getBool("DEMO_STUDENT_LOGIN_ENABLED", cfg.App.Env != "production")
+	cfg.BootstrapAdmin.Name = getString("BOOTSTRAP_ADMIN_NAME", "超级管理员")
+	cfg.BootstrapAdmin.Phone = getString("BOOTSTRAP_ADMIN_PHONE", "")
+	cfg.BootstrapAdmin.Password = getString("BOOTSTRAP_ADMIN_PASSWORD", "")
 	cfg.Wechat.AppID = getString("WECHAT_APPID", "")
 	cfg.Wechat.Secret = getString("WECHAT_SECRET", "")
 	cfg.MySQL.DSN = getString("MYSQL_DSN", "app:app123@tcp(127.0.0.1:3317)/starline?charset=utf8mb4&parseTime=True&loc=Local")

@@ -53,8 +53,11 @@ type MemoryStore struct {
 }
 
 type Options struct {
-	SeedDemoData bool
-	SkipBaseData bool
+	SeedDemoData           bool
+	SkipBaseData           bool
+	BootstrapAdminName     string
+	BootstrapAdminPhone    string
+	BootstrapAdminPassword string
 }
 
 type packageGrant struct {
@@ -126,8 +129,27 @@ func NewMemoryStoreWithOptions(options Options) *MemoryStore {
 		store.seedDemoUsers(adminPasswordHash)
 		seedPermissionDemoData(store)
 		seedSchedulingDemoData(store)
+	} else if strings.TrimSpace(options.BootstrapAdminPhone) != "" && strings.TrimSpace(options.BootstrapAdminPassword) != "" {
+		store.seedBootstrapAdmin(options)
 	}
 	return store
+}
+
+func (s *MemoryStore) seedBootstrapAdmin(options Options) {
+	name := strings.TrimSpace(options.BootstrapAdminName)
+	if name == "" {
+		name = "超级管理员"
+	}
+	s.users = []learning.User{{
+		ID:            "user-super",
+		Name:          name,
+		Phone:         strings.TrimSpace(options.BootstrapAdminPhone),
+		OpenID:        "bootstrap-super",
+		PasswordHash:  mustPasswordHash(options.BootstrapAdminPassword),
+		AccountStatus: "正常",
+		Roles:         []learning.Role{learning.RoleSuperAdmin},
+		CampusScopes:  []string{"campus-main"},
+	}}
 }
 
 func (s *MemoryStore) seedBaseDictionaries() {
