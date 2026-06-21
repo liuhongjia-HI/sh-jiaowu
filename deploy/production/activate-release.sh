@@ -47,9 +47,14 @@ fi
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
+if [ ! -f "$CURRENT_LINK/web/dist/index.html" ]; then
+  echo "Current web entry is unavailable after switch: $CURRENT_LINK/web/dist/index.html" >&2
+  exit 1
+fi
+
 if command -v systemctl >/dev/null 2>&1; then
-  systemctl daemon-reload
-  systemctl restart "$SERVICE_NAME"
+	systemctl daemon-reload
+	systemctl restart "$SERVICE_NAME"
 fi
 
 for attempt in $(seq 1 30); do
@@ -70,9 +75,18 @@ if command -v nginx >/dev/null 2>&1; then
   nginx -t
   if command -v systemctl >/dev/null 2>&1; then
     systemctl reload nginx || systemctl restart nginx
-  fi
+	fi
 fi
 
-find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +6 | xargs -r rm -rf
+find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d ! -samefile "$RELEASE_DIR" -printf '%T@ %p\n' |
+  sort -rn |
+  tail -n +5 |
+  cut -d' ' -f2- |
+  xargs -r rm -rf
+
+if [ ! -f "$CURRENT_LINK/web/dist/index.html" ]; then
+  echo "Current web entry is unavailable after cleanup: $CURRENT_LINK/web/dist/index.html" >&2
+  exit 1
+fi
 
 echo "Activated Starline release: $RELEASE_ID"

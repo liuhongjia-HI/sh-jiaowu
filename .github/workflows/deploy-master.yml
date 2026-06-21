@@ -129,9 +129,22 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
         run: |
-          SSH_OPTS="-i $HOME/.ssh/deploy_key -p $DEPLOY_PORT -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3"
-          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$DEPLOY_PATH/releases/${GITHUB_SHA}' && mkdir -p '$DEPLOY_PATH/releases/${GITHUB_SHA}'"
-          tar -C "release/${GITHUB_SHA}" -czf - . | ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" "tar -xzf - -C '$DEPLOY_PATH/releases/${GITHUB_SHA}'"
+          set -euo pipefail
+          SSH_CMD=(ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+          RSYNC_RSH="${SSH_CMD[*]}"
+          RELEASE_DIR="release/${GITHUB_SHA}"
+          LINK_DEST_ARGS=()
+          du -sh "$RELEASE_DIR"
+          "${SSH_CMD[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$DEPLOY_PATH/releases/${GITHUB_SHA}' && mkdir -p '$DEPLOY_PATH/releases/${GITHUB_SHA}'"
+          if "${SSH_CMD[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "test -f '$DEPLOY_PATH/current/web/dist/index.html'"; then
+            LINK_DEST_ARGS=(--link-dest="$DEPLOY_PATH/current")
+          fi
+          if "${SSH_CMD[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "command -v rsync >/dev/null 2>&1"; then
+            rsync -az --delete --human-readable --stats "${LINK_DEST_ARGS[@]}" -e "$RSYNC_RSH" \
+              "$RELEASE_DIR/" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/releases/${GITHUB_SHA}/"
+          else
+            tar -C "$RELEASE_DIR" -czf - . | "${SSH_CMD[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "tar -xzf - -C '$DEPLOY_PATH/releases/${GITHUB_SHA}'"
+          fi
 
       - name: Activate release
         env:
@@ -139,5 +152,5 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "$DEPLOY_USER@$DEPLOY_HOST" \
             "STARLINE_API_PORT='$API_PORT' '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/activate-release.sh' '$DEPLOY_PATH' '${GITHUB_SHA}'"
