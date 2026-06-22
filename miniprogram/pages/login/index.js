@@ -6,8 +6,7 @@ const {
 
 Page({
   data: {
-    binding: false,
-    phoneAuthOpening: false
+    binding: false
   },
   showLoginError(error, fallback = "登录失败") {
     const message = error && error.message ? error.message : fallback;
@@ -27,31 +26,20 @@ Page({
       },
       fail: () => {
         wx.showToast({ title: "微信登录失败", icon: "none" });
-        this.setData({ phoneAuthOpening: false });
       }
     });
-  },
-  beginPhoneAuth() {
-    if (this.data.phoneAuthOpening || this.data.binding) {
-      wx.showToast({ title: "正在打开授权，请稍候", icon: "none" });
-      return;
-    }
-    this.setData({ phoneAuthOpening: true });
   },
   // 手机号绑定：getPhoneNumber 授权后，把手机号随登录一起上送给后端完成绑定。
   bindPhone(event) {
     const detail = event.detail || {};
     if (isCancel(detail)) {
-      this.setData({ phoneAuthOpening: false });
       wx.showToast({ title: "已取消手机号授权", icon: "none" });
       return;
     }
     if (!detail.code) {
-      this.setData({ phoneAuthOpening: false });
       showPhoneAuthFailed();
       return;
     }
-    this.setData({ phoneAuthOpening: false });
     wx.login({
       success: (res) => {
         const code = res.code;
@@ -73,6 +61,6 @@ Page({
         wx.switchTab({ url: "/pages/home/index" });
       })
       .catch((error) => this.showLoginError(error))
-      .then(() => this.setData({ binding: false, phoneAuthOpening: false }));
+      .then(() => this.setData({ binding: false }));
   }
 });

@@ -11,7 +11,6 @@ Page({
     emptyMessage: "请先登录绑定，或联系老师开通学习套餐。",
     home: null,
     hasContent: false,
-    phoneAuthOpening: false,
     bindingPhone: false,
     pendingTask: null,
     continueCourse: null,
@@ -57,29 +56,20 @@ Page({
         loading: false
       }));
   },
-  beginPhoneAuth() {
-    if (this.data.phoneAuthOpening || this.data.bindingPhone) {
-      wx.showToast({ title: "正在打开授权，请稍候", icon: "none" });
-      return;
-    }
-    this.setData({ phoneAuthOpening: true });
-  },
   bindPhone(event) {
     const detail = event.detail || {};
     if (isCancel(detail)) {
-      this.setData({ phoneAuthOpening: false });
       wx.showToast({ title: "已取消手机号授权", icon: "none" });
       return;
     }
     if (!detail.code) {
-      this.setData({ phoneAuthOpening: false });
       showPhoneAuthFailed();
       return;
     }
     if (this.data.bindingPhone) {
       return;
     }
-    this.setData({ phoneAuthOpening: false, bindingPhone: true });
+    this.setData({ bindingPhone: true });
     wx.login({
       success: (res) => {
         const code = res.code;
@@ -103,7 +93,7 @@ Page({
       },
       fail: () => {
         wx.showToast({ title: "微信登录失败", icon: "none" });
-        this.setData({ phoneAuthOpening: false, bindingPhone: false });
+        this.setData({ bindingPhone: false });
       }
     });
   },
