@@ -250,7 +250,12 @@ export type Homework = {
   courseId?: string;
   course: string;
   learningSpaceId?: string;
+  grade?: string;
+  semester?: string;
+  subject?: string;
   questionNum: number;
+  questionIds?: string[];
+  questions?: Question[];
   deadline: string;
   submittedNum: number;
   totalNum: number;
@@ -272,6 +277,39 @@ export type HomeworkUpdateRequest = {
   courseId: string;
   learningSpaceId?: string;
   deadline: string;
+  status: string;
+  questionIds?: string[];
+};
+
+export type Question = {
+  id: string;
+  type: 'single' | 'multiple' | 'text';
+  stem: string;
+  options?: string[];
+  score?: number;
+};
+
+export type QuestionBankItem = Question & {
+  grade: string;
+  semester: string;
+  subject: string;
+  answer?: string;
+  answers?: string[];
+  status: string;
+  ownerTeacherId?: string;
+  ownerTeacherName?: string;
+};
+
+export type QuestionBankUpsertRequest = {
+  grade: string;
+  semester: string;
+  subject: string;
+  type: 'single' | 'multiple' | 'text';
+  stem: string;
+  options: string[];
+  answer?: string;
+  answers?: string[];
+  score: number;
   status: string;
 };
 

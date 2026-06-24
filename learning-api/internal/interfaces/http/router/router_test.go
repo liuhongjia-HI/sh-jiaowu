@@ -585,7 +585,12 @@ func TestStudentSubmissionThroughAPI(t *testing.T) {
 			{QuestionID: "q2", Text: "今天学会了抓中心句。"},
 		},
 	}, http.StatusOK, &result)
-	if result.SubmissionID == "" || result.Status != "已批改" || result.Score == 0 {
+	if result.SubmissionID == "" || result.Status != "待批改" || result.Score == 0 {
 		t.Fatalf("unexpected submission result: %#v", result)
+	}
+	var detail learning.Submission
+	app.doJSON(t, http.MethodGet, "/api/student/submissions/"+result.SubmissionID, token, nil, http.StatusOK, &detail)
+	if detail.ObjectiveScore == 0 || detail.TeacherComment == "" {
+		t.Fatalf("expected pending review result to include objective score and hint: %#v", detail)
 	}
 }

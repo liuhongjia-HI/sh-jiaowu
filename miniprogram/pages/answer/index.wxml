@@ -6,9 +6,9 @@
 <view class="section">
   <block wx:for="{{questions}}" wx:key="id" wx:for-item="question" wx:for-index="qindex">
     <view class="card">
-      <view class="badge">{{question.type === 'single' ? '单选题' : '简答题'}}</view>
+      <view class="badge">{{question.type === 'single' ? '单选题' : question.type === 'multiple' ? '多选题' : '简答题'}}</view>
       <view class="title">{{question.index}}. {{question.stem}}</view>
-      <block wx:if="{{question.type === 'single'}}">
+      <block wx:if="{{question.type === 'single' || question.type === 'multiple'}}">
         <view wx:for="{{question.options}}" wx:key="value" wx:for-item="option" class="option {{option.className}}" data-qindex="{{qindex}}" data-value="{{option.value}}" bindtap="chooseOption">{{option.label}}</view>
       </block>
       <textarea wx:else value="{{question.text}}" placeholder="在这里填写你的答案" data-qindex="{{qindex}}" bindinput="changeAnswer" />

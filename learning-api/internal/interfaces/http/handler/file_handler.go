@@ -68,6 +68,22 @@ func (h *LearningHandler) UpdateMaterial(c *gin.Context) {
 }
 
 func (h *LearningHandler) CreateHomework(c *gin.Context) {
+	if !strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
+		var req learning.HomeworkUploadRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			BadRequest(c, "请求格式不正确")
+			return
+		}
+		principal, _ := middleware.CurrentPrincipal(c)
+		operator, _ := c.Get(middleware.OperatorNameKey)
+		created, err := h.service.CreateHomework(operator.(string), principal, req)
+		if err != nil {
+			BadRequest(c, err.Error())
+			return
+		}
+		OK(c, created)
+		return
+	}
 	asset, ok := h.saveUploadedLearningFile(c)
 	if !ok {
 		return

@@ -42,6 +42,9 @@ type Repository interface {
 	Courses(principal learning.Principal) []learning.Course
 	CreateCourse(operator string, principal learning.Principal, req learning.CourseUpsertRequest) (learning.Course, error)
 	UpdateCourse(operator string, principal learning.Principal, id string, req learning.CourseUpsertRequest) (learning.Course, error)
+	Questions(principal learning.Principal) []learning.QuestionBankItem
+	CreateQuestion(operator string, principal learning.Principal, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
+	UpdateQuestion(operator string, principal learning.Principal, id string, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	Materials(principal learning.Principal) []learning.Material
 	CreateMaterial(operator string, principal learning.Principal, req learning.MaterialUploadRequest) (learning.Material, error)
 	UpdateMaterial(operator string, principal learning.Principal, id string, req learning.MaterialUpdateRequest) (learning.Material, error)
@@ -62,6 +65,7 @@ type Repository interface {
 	GrantPreview(studentID, packageID string) (learning.GrantPreview, error)
 	CreateGrant(operator, studentID, packageID string) (learning.GrantPreview, error)
 	StudentHome(principal learning.Principal) (learning.StudentHome, error)
+	UpdateStudentProfile(operator string, principal learning.Principal, req learning.StudentProfileUpdateRequest) (learning.Student, error)
 	Availability(principal learning.Principal, ownerType, ownerID string) ([]learning.AvailabilitySlot, error)
 	AvailabilityOverview(principal learning.Principal) []learning.AvailabilitySlot
 	SaveAvailability(operator string, principal learning.Principal, req learning.AvailabilityUpsertRequest) ([]learning.AvailabilitySlot, error)
@@ -206,6 +210,15 @@ func (s *Service) CreateCourse(operator string, principal learning.Principal, re
 func (s *Service) UpdateCourse(operator string, principal learning.Principal, id string, req learning.CourseUpsertRequest) (learning.Course, error) {
 	return s.repo.UpdateCourse(operator, principal, id, req)
 }
+func (s *Service) Questions(principal learning.Principal) []learning.QuestionBankItem {
+	return s.repo.Questions(principal)
+}
+func (s *Service) CreateQuestion(operator string, principal learning.Principal, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error) {
+	return s.repo.CreateQuestion(operator, principal, req)
+}
+func (s *Service) UpdateQuestion(operator string, principal learning.Principal, id string, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error) {
+	return s.repo.UpdateQuestion(operator, principal, id, req)
+}
 func (s *Service) Materials(principal learning.Principal) []learning.Material {
 	return s.repo.Materials(principal)
 }
@@ -261,6 +274,9 @@ func (s *Service) CreateGrant(operator, studentID, packageID string) (learning.G
 }
 func (s *Service) StudentHome(principal learning.Principal) (learning.StudentHome, error) {
 	return s.repo.StudentHome(principal)
+}
+func (s *Service) UpdateStudentProfile(operator string, principal learning.Principal, req learning.StudentProfileUpdateRequest) (learning.Student, error) {
+	return s.repo.UpdateStudentProfile(operator, principal, req)
 }
 func (s *Service) Availability(principal learning.Principal, ownerType, ownerID string) ([]learning.AvailabilitySlot, error) {
 	return s.repo.Availability(principal, ownerType, ownerID)

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -9,6 +10,32 @@ import (
 
 	"starline/learning-api/internal/domain/learning"
 )
+
+func mustJSON(value any) string {
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return "[]"
+	}
+	return string(bytes)
+}
+
+func parseStringSliceJSON(value string) []string {
+	out := []string{}
+	if strings.TrimSpace(value) == "" {
+		return out
+	}
+	_ = json.Unmarshal([]byte(value), &out)
+	return out
+}
+
+func parseSubmissionAnswersJSON(value string) []learning.SubmissionAnswer {
+	out := []learning.SubmissionAnswer{}
+	if strings.TrimSpace(value) == "" {
+		return out
+	}
+	_ = json.Unmarshal([]byte(value), &out)
+	return out
+}
 
 func (s *MemoryStore) ConnectDatabase(dsn string) error {
 	db, err := sql.Open("mysql", dsn)
@@ -77,15 +104,35 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			reward VARCHAR(128) NOT NULL DEFAULT '',
 			status VARCHAR(32) NOT NULL DEFAULT ''
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS question_bank_items (
+			id VARCHAR(64) PRIMARY KEY,
+			grade VARCHAR(32) NOT NULL DEFAULT '',
+			semester VARCHAR(32) NOT NULL DEFAULT '',
+			subject VARCHAR(32) NOT NULL DEFAULT '',
+			question_type VARCHAR(32) NOT NULL DEFAULT '',
+			stem TEXT NOT NULL,
+			options_json TEXT NOT NULL,
+			answer VARCHAR(255) NOT NULL DEFAULT '',
+			answers_json TEXT NOT NULL,
+			score INT NOT NULL DEFAULT 10,
+			status VARCHAR(32) NOT NULL DEFAULT '启用',
+			owner_teacher_id VARCHAR(64) NOT NULL DEFAULT '',
+			owner_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS student_submission_results (
 			id VARCHAR(64) PRIMARY KEY,
 			homework_id VARCHAR(64) NOT NULL,
 			student_id VARCHAR(64) NOT NULL,
 			task_title VARCHAR(128) NOT NULL DEFAULT '',
 			score INT NOT NULL DEFAULT 0,
+			objective_score INT NOT NULL DEFAULT 0,
+			final_score INT NOT NULL DEFAULT 0,
 			teacher_comment TEXT NOT NULL,
 			reward VARCHAR(128) NOT NULL DEFAULT '',
 			status VARCHAR(32) NOT NULL DEFAULT '',
+			answers_json TEXT NOT NULL,
 			created_at DATETIME NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS student_favorites (
@@ -191,6 +238,8 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"users", "must_change_password", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"users", "token_version", "INT NOT NULL DEFAULT 0"},
 		{"students", "remark", "VARCHAR(255) NOT NULL DEFAULT ''"},
+		{"students", "nickname", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"students", "avatar_url", "TEXT NOT NULL"},
 		{"students", "learning_status", "VARCHAR(32) NOT NULL DEFAULT '未开始'"},
 		{"students", "streak_days", "INT NOT NULL DEFAULT 0"},
 		{"students", "average_score", "INT NOT NULL DEFAULT 0"},
@@ -209,7 +258,11 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"materials", "preview_url", "TEXT NOT NULL"},
 		{"materials", "download_url", "TEXT NOT NULL"},
 		{"homework_tasks", "package_name", "VARCHAR(128) NOT NULL DEFAULT ''"},
+		{"homework_tasks", "grade", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"homework_tasks", "semester", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"homework_tasks", "subject", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "question_num", "INT NOT NULL DEFAULT 0"},
+		{"homework_tasks", "question_ids_json", "TEXT NOT NULL"},
 		{"homework_tasks", "submitted_num", "INT NOT NULL DEFAULT 0"},
 		{"homework_tasks", "total_num", "INT NOT NULL DEFAULT 0"},
 		{"homework_tasks", "file_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
@@ -226,6 +279,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"operation_logs", "ip", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"operation_logs", "user_agent", "TEXT NOT NULL"},
 		{"operation_logs", "detail", "TEXT NOT NULL"},
+		{"student_submission_results", "objective_score", "INT NOT NULL DEFAULT 0"},
+		{"student_submission_results", "final_score", "INT NOT NULL DEFAULT 0"},
+		{"student_submission_results", "answers_json", "TEXT NOT NULL"},
 	}
 	for _, column := range columns {
 		if err := s.ensureColumn(column.table, column.name, column.def); err != nil {
@@ -293,6 +349,7 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 		"DELETE FROM student_favorites",
 		"DELETE FROM student_submission_results",
 		"DELETE FROM pending_reviews",
+		"DELETE FROM question_bank_items",
 		"DELETE FROM starline_file_assets",
 		"DELETE FROM schedule_class_students",
 		"DELETE FROM schedule_classes",
@@ -333,9 +390,9 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 	}
 	for _, student := range s.students {
 		if _, err := tx.Exec(
-			`INSERT INTO students (id, name, grade, phone, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			student.ID, student.Name, student.Grade, student.Phone, student.AccountStatus, student.Remark, student.LearningStatus,
+			`INSERT INTO students (id, name, nickname, avatar_url, grade, phone, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			student.ID, student.Name, student.Nickname, student.AvatarURL, student.Grade, student.Phone, student.AccountStatus, student.Remark, student.LearningStatus,
 			student.StreakDays, student.AverageScore, student.BadgeCount, student.BindStatus, student.LastStudyAt, student.EffectiveUntil,
 		); err != nil {
 			return err
@@ -409,11 +466,21 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 	}
 	for _, item := range s.homework {
 		if _, err := tx.Exec(
-			`INSERT INTO homework_tasks (id, learning_space_id, course_id, title, deadline, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			item.ID, item.LearningSpaceID, item.CourseID, item.Title, nullableDate(item.Deadline), item.OwnerTeacherID, item.OwnerTeacherName,
+			`INSERT INTO homework_tasks (id, learning_space_id, course_id, title, grade, semester, subject, question_ids_json, deadline, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.LearningSpaceID, item.CourseID, item.Title, item.Grade, item.Semester, item.Subject, mustJSON(item.QuestionIDs), nullableDate(item.Deadline), item.OwnerTeacherID, item.OwnerTeacherName,
 			item.PublishStatus, item.Status, item.PackageName, item.QuestionNum, item.SubmittedNum, item.TotalNum, item.FileID, item.FileName,
 			item.FileSize, item.FileType, item.PreviewStatus, item.PreviewURL, item.DownloadURL,
+		); err != nil {
+			return err
+		}
+	}
+	for _, item := range s.questionBank {
+		if _, err := tx.Exec(
+			`INSERT INTO question_bank_items (id, grade, semester, subject, question_type, stem, options_json, answer, answers_json, score, status, owner_teacher_id, owner_teacher_name, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.Grade, item.Semester, item.Subject, item.Type, item.Stem, mustJSON(item.Options), item.Answer, mustJSON(item.Answers),
+			item.Score, item.Status, item.OwnerTeacherID, item.OwnerTeacherName, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt),
 		); err != nil {
 			return err
 		}
@@ -557,10 +624,10 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 	}
 	for _, submission := range s.submissions {
 		if _, err := tx.Exec(
-			`INSERT INTO student_submission_results (id, homework_id, student_id, task_title, score, teacher_comment, reward, status, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			submission.ID, submission.HomeworkID, submission.StudentID, submission.TaskTitle, submission.Score, submission.TeacherComment,
-			submission.Reward, submission.Status, nullableDateTime(submission.CreatedAt),
+			`INSERT INTO student_submission_results (id, homework_id, student_id, task_title, score, objective_score, final_score, teacher_comment, reward, status, answers_json, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			submission.ID, submission.HomeworkID, submission.StudentID, submission.TaskTitle, submission.Score, submission.ObjectiveScore, submission.FinalScore,
+			submission.TeacherComment, submission.Reward, submission.Status, mustJSON(submission.Answers), nullableDateTime(submission.CreatedAt),
 		); err != nil {
 			return err
 		}
@@ -603,6 +670,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadUsersFromDB,
 		s.loadPackagesFromDB,
 		s.loadCoursesFromDB,
+		s.loadQuestionBankFromDB,
 		s.loadMaterialsFromDB,
 		s.loadHomeworkFromDB,
 		s.loadGrantsFromDB,
@@ -652,7 +720,7 @@ func (s *MemoryStore) loadLearningSpacesFromDB() error {
 }
 
 func (s *MemoryStore) loadStudentsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, name, grade, phone, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until FROM students ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, nickname, avatar_url, grade, phone, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until FROM students ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -660,7 +728,7 @@ func (s *MemoryStore) loadStudentsFromDB() error {
 	out := []learning.Student{}
 	for rows.Next() {
 		var item learning.Student
-		if err := rows.Scan(&item.ID, &item.Name, &item.Grade, &item.Phone, &item.AccountStatus, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.LastStudyAt, &item.EffectiveUntil); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Nickname, &item.AvatarURL, &item.Grade, &item.Phone, &item.AccountStatus, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.LastStudyAt, &item.EffectiveUntil); err != nil {
 			return err
 		}
 		out = append(out, item)
@@ -881,8 +949,32 @@ func (s *MemoryStore) loadMaterialsFromDB() error {
 	return rows.Err()
 }
 
+func (s *MemoryStore) loadQuestionBankFromDB() error {
+	rows, err := s.db.Query(`SELECT id, grade, semester, subject, question_type, stem, options_json, answer, answers_json, score, status, owner_teacher_id, owner_teacher_name, created_at, updated_at FROM question_bank_items ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.QuestionBankItem{}
+	for rows.Next() {
+		var item learning.QuestionBankItem
+		var optionsJSON, answersJSON string
+		var createdAt, updatedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.Grade, &item.Semester, &item.Subject, &item.Type, &item.Stem, &optionsJSON, &item.Answer, &answersJSON, &item.Score, &item.Status, &item.OwnerTeacherID, &item.OwnerTeacherName, &createdAt, &updatedAt); err != nil {
+			return err
+		}
+		item.Options = parseStringSliceJSON(optionsJSON)
+		item.Answers = parseStringSliceJSON(answersJSON)
+		item.CreatedAt = dateTimeString(createdAt)
+		item.UpdatedAt = dateTimeString(updatedAt)
+		out = append(out, item)
+	}
+	s.questionBank = out
+	return rows.Err()
+}
+
 func (s *MemoryStore) loadHomeworkFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, deadline, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM homework_tasks ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, grade, semester, subject, question_ids_json, deadline, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM homework_tasks ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -890,15 +982,31 @@ func (s *MemoryStore) loadHomeworkFromDB() error {
 	out := []learning.Homework{}
 	for rows.Next() {
 		var item learning.Homework
+		var questionIDsJSON string
 		var deadline sql.NullTime
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &deadline, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Grade, &item.Semester, &item.Subject, &questionIDsJSON, &deadline, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
 			return err
 		}
 		item.Deadline = dateString(deadline)
 		item.Course = s.courseName(item.CourseID)
-		if item.QuestionNum > 0 {
-			item.Questions = demoQuestions(s.courseSubject(item.CourseID))
+		if item.Grade == "" || item.Semester == "" || item.Subject == "" {
+			if space, ok := s.findLearningSpace(item.LearningSpaceID); ok {
+				item.Grade = space.Grade
+				item.Semester = space.Semester
+				item.Subject = space.Subject
+			}
 		}
+		item.QuestionIDs = parseStringSliceJSON(questionIDsJSON)
+		for _, id := range item.QuestionIDs {
+			if bankItem, ok := s.findQuestionBankItem(id); ok {
+				item.Questions = append(item.Questions, bankItemQuestion(bankItem))
+			}
+		}
+		if len(item.Questions) == 0 && item.QuestionNum > 0 {
+			item.Questions = s.ensureDemoQuestionBank(item.Grade, item.Semester, item.Subject)
+			item.QuestionIDs = questionIDs(item.Questions)
+		}
+		item.QuestionNum = len(item.Questions)
 		out = append(out, item)
 	}
 	s.homework = out
@@ -1058,7 +1166,7 @@ func (s *MemoryStore) loadSettingsFromDB() error {
 }
 
 func (s *MemoryStore) loadSubmissionsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, homework_id, student_id, task_title, score, teacher_comment, reward, status, created_at FROM student_submission_results ORDER BY created_at`)
+	rows, err := s.db.Query(`SELECT id, homework_id, student_id, task_title, score, objective_score, final_score, teacher_comment, reward, status, answers_json, created_at FROM student_submission_results ORDER BY created_at`)
 	if err != nil {
 		return err
 	}
@@ -1066,10 +1174,12 @@ func (s *MemoryStore) loadSubmissionsFromDB() error {
 	out := map[string]learning.Submission{}
 	for rows.Next() {
 		var item learning.Submission
+		var answersJSON string
 		var createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.HomeworkID, &item.StudentID, &item.TaskTitle, &item.Score, &item.TeacherComment, &item.Reward, &item.Status, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.HomeworkID, &item.StudentID, &item.TaskTitle, &item.Score, &item.ObjectiveScore, &item.FinalScore, &item.TeacherComment, &item.Reward, &item.Status, &answersJSON, &createdAt); err != nil {
 			return err
 		}
+		item.Answers = parseSubmissionAnswersJSON(answersJSON)
 		item.CreatedAt = dateTimeString(createdAt)
 		out[item.ID] = item
 	}

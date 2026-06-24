@@ -191,6 +191,40 @@ func (h *LearningHandler) UpdateCourse(c *gin.Context) {
 	}
 	OK(c, updated)
 }
+func (h *LearningHandler) Questions(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	OK(c, h.service.Questions(principal))
+}
+func (h *LearningHandler) CreateQuestion(c *gin.Context) {
+	var req learning.QuestionBankUpsertRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	created, err := h.service.CreateQuestion(operator.(string), principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, created)
+}
+func (h *LearningHandler) UpdateQuestion(c *gin.Context) {
+	var req learning.QuestionBankUpsertRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	updated, err := h.service.UpdateQuestion(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, updated)
+}
 func (h *LearningHandler) Materials(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	OK(c, h.service.Materials(principal))
@@ -736,6 +770,23 @@ func (h *LearningHandler) StudentMe(c *gin.Context) {
 		return
 	}
 	OK(c, home.Student)
+}
+
+func (h *LearningHandler) UpdateStudentProfile(c *gin.Context) {
+	var req learning.StudentProfileUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	req.Nickname = strings.TrimSpace(req.Nickname)
+	req.AvatarURL = strings.TrimSpace(req.AvatarURL)
+	principal, _ := middleware.CurrentPrincipal(c)
+	updated, err := h.service.UpdateStudentProfile(principal.Name, principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, updated)
 }
 
 func (h *LearningHandler) GrantPreview(c *gin.Context) {

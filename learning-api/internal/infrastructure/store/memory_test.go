@@ -61,6 +61,45 @@ func TestLoginWithWechatCodeBindsStudentByPhone(t *testing.T) {
 	}
 }
 
+func TestUpdateStudentProfile(t *testing.T) {
+	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+
+	if _, err := store.UpdateStudentProfile("学生本人", student, learning.StudentProfileUpdateRequest{
+		Nickname: "小星星",
+	}); err == nil {
+		t.Fatal("expected missing avatar to be rejected")
+	}
+
+	if _, err := store.UpdateStudentProfile("学生本人", student, learning.StudentProfileUpdateRequest{
+		AvatarURL: "https://example.com/avatar.png",
+	}); err == nil {
+		t.Fatal("expected missing nickname to be rejected")
+	}
+
+	updated, err := store.UpdateStudentProfile("学生本人", student, learning.StudentProfileUpdateRequest{
+		Nickname:  " 小星星 ",
+		AvatarURL: " https://example.com/avatar.png ",
+	})
+	if err != nil {
+		t.Fatalf("expected profile update to succeed: %v", err)
+	}
+	if updated.Nickname != "小星星" || updated.AvatarURL != "https://example.com/avatar.png" {
+		t.Fatalf("unexpected updated profile: %#v", updated)
+	}
+
+	home, err := store.StudentHome(student)
+	if err != nil {
+		t.Fatalf("expected student home: %v", err)
+	}
+	if home.Student.Nickname != updated.Nickname || home.Student.AvatarURL != updated.AvatarURL {
+		t.Fatalf("expected student home to include profile, got %#v", home.Student)
+	}
+}
+
 func TestPhoneBindingMergesWechatOnlyStudent(t *testing.T) {
 	store := NewMemoryStore()
 
@@ -648,6 +687,71 @@ func TestDisabledHomeworkIsHiddenFromStudent(t *testing.T) {
 		if task.ID == "hw-g05-english-s1-mid" {
 			t.Fatalf("disabled homework should be hidden from student tasks: %#v", task)
 		}
+	}
+}
+
+func TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+
+	item, err := store.CreateQuestion("英语老师", teacher, learning.QuestionBankUpsertRequest{
+		Grade: "五年级", Semester: "第一学期", Subject: "英语", Type: "multiple",
+		Stem: "哪些做法有助于英语阅读？", Options: []string{"圈关键词", "完全不读题", "复查答案"},
+		Answers: []string{"圈关键词", "复查答案"}, Score: 10, Status: string(learning.StatusEnabled),
+	})
+	if err != nil {
+		t.Fatalf("expected question creation to succeed: %v", err)
+	}
+	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
+		Title: "题库组卷练习", CourseID: "course-g05-english-s1-mid", LearningSpaceID: "space-g05-english-s1-mid",
+		Deadline: "2026-11-01", Status: string(learning.StatusEnabled), QuestionIDs: []string{item.ID},
+	})
+	if err != nil {
+		t.Fatalf("expected homework creation to succeed: %v", err)
+	}
+	if created.QuestionNum != 1 || created.Questions[0].ID != item.ID {
+		t.Fatalf("unexpected homework questions: %#v", created)
+	}
+	submission, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{
+		HomeworkID: created.ID,
+		Answers:    []learning.SubmissionAnswer{{QuestionID: item.ID, Choices: []string{"复查答案", "圈关键词"}}},
+	})
+	if err != nil {
+		t.Fatalf("expected submission to succeed: %v", err)
+	}
+	if submission.Status != "已批改" || submission.Score != 100 {
+		t.Fatalf("expected all-objective homework to auto grade: %#v", submission)
+	}
+}
+
+func TestTextQuestionSubmissionCreatesPendingReview(t *testing.T) {
+	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	submission, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{
+		HomeworkID: "hw-g05-english-s1-mid",
+		Answers: []learning.SubmissionAnswer{
+			{QuestionID: "q1", Choice: "A"},
+			{QuestionID: "q2", Text: "今天学会了抓中心句。"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected submission to succeed: %v", err)
+	}
+	if submission.Status != "待批改" || submission.ObjectiveScore == 0 {
+		t.Fatalf("expected text homework to be pending review with objective score: %#v", submission)
+	}
+	if len(store.reviews) == 0 || store.reviews[0].SubmissionID != submission.ID {
+		t.Fatalf("expected pending review for submission, reviews=%#v", store.reviews)
 	}
 }
 

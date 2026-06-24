@@ -108,7 +108,7 @@ export function TagGroup({ values, color, emptyText = '无' }: { values?: string
   if (!values || values.length === 0) return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
   return (
     <Space size={[4, 4]} wrap>
-      {values.map((value) => <Tag key={value} color={color}>{value}</Tag>)}
+      {values.map((value, index) => <Tag key={`${value}-${index}`} color={color}>{value}</Tag>)}
     </Space>
   );
 }

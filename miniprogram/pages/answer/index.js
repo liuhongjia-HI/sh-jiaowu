@@ -23,11 +23,12 @@ Page({
         ...question,
         index: index + 1,
         options: (question.options || []).map((text, optionIndex) => ({
-          value: letter(optionIndex),
+          value: text,
           label: `${letter(optionIndex)}. ${text}`,
           className: ""
         })),
         choice: "",
+        choices: [],
         text: ""
       }));
       this.setData({
@@ -77,6 +78,15 @@ Page({
       if (index !== qindex) {
         return question;
       }
+      if (question.type === "multiple") {
+        const current = question.choices || [];
+        const choices = current.includes(value) ? current.filter((item) => item !== value) : current.concat(value);
+        return {
+          ...question,
+          choices,
+          options: question.options.map((option) => ({ ...option, className: choices.includes(option.value) ? "active" : "" }))
+        };
+      }
       return {
         ...question,
         choice: value,
@@ -102,6 +112,7 @@ Page({
       answers: this.data.questions.map((question) => ({
         questionId: question.id,
         choice: question.choice || "",
+        choices: question.choices || [],
         text: question.text || ""
       }))
     });
@@ -112,7 +123,7 @@ Page({
       return;
     }
     const unanswered = this.data.questions.find((question) =>
-      question.type === "single" ? !question.choice : !question.text.trim()
+      question.type === "single" ? !question.choice : question.type === "multiple" ? !(question.choices || []).length : !question.text.trim()
     );
     if (unanswered) {
       wx.showToast({ title: "还有题目没有完成哦", icon: "none" });
@@ -126,6 +137,7 @@ Page({
         answers: this.data.questions.map((question) => ({
           questionId: question.id,
           choice: question.choice,
+          choices: question.choices || [],
           text: question.text
         }))
       }
@@ -164,13 +176,15 @@ function restoreDraftAnswers(homeworkId, questions) {
       return question;
     }
     const choice = answer.choice || "";
+    const choices = answer.choices || [];
     return {
       ...question,
       choice,
+      choices,
       text: answer.text || "",
       options: question.options.map((option) => ({
         ...option,
-        className: option.value === choice ? "active" : ""
+        className: option.value === choice || choices.includes(option.value) ? "active" : ""
       }))
     };
   });

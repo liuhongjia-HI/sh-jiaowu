@@ -1,6 +1,7 @@
 <view class="hero">
   <view class="eyebrow">{{taskTitle}}</view>
   <view class="hero-title">{{resultTitle}}</view>
+  <view wx:if="{{objectiveText}}" class="badge">{{objectiveText}}</view>
   <view wx:if="{{rewardText}}" class="badge">{{rewardText}}</view>
 </view>
 <view class="section">

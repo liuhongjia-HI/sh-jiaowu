@@ -1,0 +1,51 @@
+name: Admin Functional Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  admin-functional-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache-dependency-path: learning-api/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Backend API tests
+        working-directory: learning-api
+        run: go test ./...
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Web TypeScript check
+        working-directory: web
+        run: node node_modules/typescript/bin/tsc --noEmit --pretty false
+
+      - name: Playwright spec TypeScript check
+        working-directory: web
+        run: node node_modules/typescript/bin/tsc --noEmit --pretty false --target ES2020 --module ESNext --moduleResolution Node --skipLibCheck --jsx react-jsx --types node playwright.config.ts tests/admin.e2e.spec.ts
+
+      - name: Install Playwright browser
+        working-directory: web
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Admin browser E2E
+        working-directory: web
+        run: npm run test:e2e:spec

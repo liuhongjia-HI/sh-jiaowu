@@ -27,6 +27,7 @@ type MemoryStore struct {
 	contentTypes       []packageContentType
 	spaceAccess        []learningSpaceAccess
 	courses            []learning.Course
+	questionBank       []learning.QuestionBankItem
 	materials          []learning.Material
 	homework           []learning.Homework
 	fileAssets         map[string]learning.FileAsset
@@ -285,10 +286,11 @@ func seedPermissionDemoData(s *MemoryStore) {
 						Chapter: "基础巩固", Type: "讲义", ViewCount: demoViewCount(gradeIndex, semesterIndex, phaseIndex),
 						OwnerTeacherID: "teacher-" + subjectSlug(subject), OwnerTeacherName: subject + "老师", PublishStatus: "已发布", Status: learning.StatusEnabled,
 					})
-					questions := demoQuestions(subject)
+					questions := s.ensureDemoQuestionBank(grade, semester, subject)
 					s.homework = append(s.homework, learning.Homework{
 						ID: homeworkID(spaceID), Title: spaceName + "练习题", PackageName: subject + "题",
-						CourseID: courseID(spaceID), Course: courseName, LearningSpaceID: spaceID, QuestionNum: len(questions), Questions: questions, Deadline: demoDeadline(semesterIndex, phaseIndex),
+						CourseID: courseID(spaceID), Course: courseName, LearningSpaceID: spaceID, Grade: grade, Semester: semester, Subject: subject,
+						QuestionNum: len(questions), QuestionIDs: questionIDs(questions), Questions: questions, Deadline: demoDeadline(semesterIndex, phaseIndex),
 						SubmittedNum: 0, TotalNum: 0, OwnerTeacherID: "teacher-" + subjectSlug(subject),
 						OwnerTeacherName: subject + "老师", PublishStatus: "已发布", Status: "已发布",
 					})
@@ -409,6 +411,43 @@ func demoQuestions(subject string) []learning.Question {
 			Stem: "用一句话说说你今天学到的一个" + subject + "小知识。",
 		},
 	}
+}
+
+func (s *MemoryStore) ensureDemoQuestionBank(grade, semester, subject string) []learning.Question {
+	prefix := "qb-" + slugText(grade) + "-" + subjectSlug(subject) + "-s" + semesterNumber(semester)
+	existing := make([]learning.Question, 0)
+	for _, item := range s.questionBank {
+		if item.Grade == grade && item.Semester == semester && item.Subject == subject {
+			existing = append(existing, bankItemQuestion(item))
+		}
+	}
+	if len(existing) > 0 {
+		return existing
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	for index, question := range demoQuestions(subject) {
+		item := learning.QuestionBankItem{
+			ID: prefix + "-q" + strconv.Itoa(index+1), Grade: grade, Semester: semester, Subject: subject,
+			Type: question.Type, Stem: question.Stem, Options: question.Options, Answer: question.Answer,
+			Answers: normalizedQuestionAnswers(question), Score: 100, Status: string(learning.StatusEnabled),
+			OwnerTeacherID: "teacher-" + subjectSlug(subject), OwnerTeacherName: subject + "老师", CreatedAt: now, UpdatedAt: now,
+		}
+		s.questionBank = append(s.questionBank, item)
+		existing = append(existing, bankItemQuestion(item))
+	}
+	return existing
+}
+
+func slugText(value string) string {
+	replacer := strings.NewReplacer("一年级", "g01", "二年级", "g02", "三年级", "g03", "四年级", "g04", "五年级", "g05", "六年级", "g06", "七年级", "g07", "八年级", "g08", "九年级", "g09", " ", "-")
+	return strings.ToLower(replacer.Replace(value))
+}
+
+func semesterNumber(value string) string {
+	if strings.Contains(value, "第二") {
+		return "2"
+	}
+	return "1"
 }
 
 func demoDeadline(semesterIndex, phaseIndex int) string {
@@ -556,6 +595,8 @@ func (s *MemoryStore) createWechatStudent(openID, phone string) learning.Princip
 	student := learning.Student{
 		ID:             studentID,
 		Name:           "微信用户",
+		Nickname:       "",
+		AvatarURL:      "",
 		Grade:          "待完善",
 		Phone:          displayPhone(phone),
 		OpenedPackages: []string{},
@@ -914,6 +955,8 @@ func (s *MemoryStore) CreateStudent(operator string, principal learning.Principa
 	student := learning.Student{
 		ID:             id,
 		Name:           req.Name,
+		Nickname:       "",
+		AvatarURL:      "",
 		Grade:          req.Grade,
 		Phone:          req.Phone,
 		OpenedPackages: []string{},
@@ -961,6 +1004,43 @@ func (s *MemoryStore) UpdateStudent(operator string, principal learning.Principa
 		after := s.decorateStudent(s.students[i])
 		s.prependLogDetail(operator, "更新学生", s.students[i].Name, auditChangeDetail(studentAuditSnapshot(before), studentAuditSnapshot(after)))
 		return after, nil
+	}
+	return learning.Student{}, errors.New("student not found")
+}
+
+func (s *MemoryStore) UpdateStudentProfile(operator string, principal learning.Principal, req learning.StudentProfileUpdateRequest) (learning.Student, error) {
+	if principal.StudentID == "" {
+		return learning.Student{}, errors.New("student account is not bound")
+	}
+	req.Nickname = strings.TrimSpace(req.Nickname)
+	req.AvatarURL = strings.TrimSpace(req.AvatarURL)
+	if req.Nickname == "" {
+		return learning.Student{}, errors.New("请授权微信昵称")
+	}
+	if req.AvatarURL == "" {
+		return learning.Student{}, errors.New("请授权微信头像")
+	}
+	if len([]rune(req.Nickname)) > 32 {
+		return learning.Student{}, errors.New("昵称最多 32 个字")
+	}
+	if len(req.AvatarURL) > 1000 {
+		return learning.Student{}, errors.New("头像地址过长")
+	}
+	for i := range s.students {
+		if s.students[i].ID != principal.StudentID {
+			continue
+		}
+		if s.students[i].AccountStatus == "停用" {
+			return learning.Student{}, errors.New("账号已停用，请联系老师或管理员")
+		}
+		beforeName := s.students[i].Nickname
+		beforeAvatar := s.students[i].AvatarURL
+		s.students[i].Nickname = req.Nickname
+		s.students[i].AvatarURL = req.AvatarURL
+		if beforeName != req.Nickname || beforeAvatar != req.AvatarURL {
+			s.prependLog(operator, "更新学生资料", s.students[i].Name)
+		}
+		return s.decorateStudent(s.students[i]), nil
 	}
 	return learning.Student{}, errors.New("student not found")
 }
@@ -1434,6 +1514,111 @@ func (s *MemoryStore) Homework(principal learning.Principal) []learning.Homework
 	return s.homeworkForCourses(courses)
 }
 
+func (s *MemoryStore) Questions(principal learning.Principal) []learning.QuestionBankItem {
+	out := make([]learning.QuestionBankItem, 0, len(s.questionBank))
+	for _, item := range s.questionBank {
+		if canSeeQuestionScope(principal, item.Grade, item.Semester, item.Subject, s.learningSpaces) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (s *MemoryStore) CreateQuestion(operator string, principal learning.Principal, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error) {
+	item, err := s.questionFromRequest("qb-"+time.Now().Format("20060102150405.000000000"), principal, req)
+	if err != nil {
+		return learning.QuestionBankItem{}, err
+	}
+	item.OwnerTeacherID = principal.UserID
+	item.OwnerTeacherName = principal.Name
+	now := time.Now().Format("2006-01-02 15:04:05")
+	item.CreatedAt = now
+	item.UpdatedAt = now
+	s.questionBank = append([]learning.QuestionBankItem{item}, s.questionBank...)
+	s.prependLog(operator, "新增题库题目", item.Grade+" "+item.Semester+" "+item.Subject)
+	return item, nil
+}
+
+func (s *MemoryStore) UpdateQuestion(operator string, principal learning.Principal, id string, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error) {
+	id = strings.TrimSpace(id)
+	for index := range s.questionBank {
+		if s.questionBank[index].ID != id {
+			continue
+		}
+		if !canEditQuestion(principal, s.questionBank[index]) {
+			return learning.QuestionBankItem{}, errors.New("只能编辑自己创建或有管理权限的题目")
+		}
+		item, err := s.questionFromRequest(id, principal, req)
+		if err != nil {
+			return learning.QuestionBankItem{}, err
+		}
+		item.OwnerTeacherID = s.questionBank[index].OwnerTeacherID
+		item.OwnerTeacherName = s.questionBank[index].OwnerTeacherName
+		item.CreatedAt = s.questionBank[index].CreatedAt
+		item.UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
+		before := s.questionBank[index]
+		s.questionBank[index] = item
+		s.refreshHomeworkQuestionSnapshots(item.ID)
+		s.prependLogDetail(operator, "编辑题库题目", item.Stem, auditChangeDetail(map[string]any{"stem": before.Stem, "status": before.Status}, map[string]any{"stem": item.Stem, "status": item.Status}))
+		return item, nil
+	}
+	return learning.QuestionBankItem{}, errors.New("题目不存在")
+}
+
+func (s *MemoryStore) questionFromRequest(id string, principal learning.Principal, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error) {
+	req.Grade = strings.TrimSpace(req.Grade)
+	req.Semester = strings.TrimSpace(req.Semester)
+	req.Subject = strings.TrimSpace(req.Subject)
+	req.Type = strings.TrimSpace(req.Type)
+	req.Stem = strings.TrimSpace(req.Stem)
+	req.Answer = strings.TrimSpace(req.Answer)
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = string(learning.StatusEnabled)
+	}
+	if req.Grade == "" || req.Semester == "" || req.Subject == "" {
+		return learning.QuestionBankItem{}, errors.New("请选择年级、学期和学科")
+	}
+	if !canSeeQuestionScope(principal, req.Grade, req.Semester, req.Subject, s.learningSpaces) {
+		return learning.QuestionBankItem{}, errors.New("不能维护未负责范围的题库")
+	}
+	if req.Stem == "" {
+		return learning.QuestionBankItem{}, errors.New("请输入题干")
+	}
+	if req.Type != "single" && req.Type != "multiple" && req.Type != "text" {
+		return learning.QuestionBankItem{}, errors.New("请选择正确的题型")
+	}
+	if !isContentStatus(learning.Status(status)) {
+		return learning.QuestionBankItem{}, errors.New("请选择正确的发布状态")
+	}
+	options := cleanPhrases(req.Options)
+	answers := cleanPhrases(req.Answers)
+	if req.Type == "single" {
+		if len(options) < 2 || req.Answer == "" {
+			return learning.QuestionBankItem{}, errors.New("单选题需要至少两个选项和一个正确答案")
+		}
+		answers = []string{req.Answer}
+	}
+	if req.Type == "multiple" {
+		if len(options) < 2 || len(answers) == 0 {
+			return learning.QuestionBankItem{}, errors.New("多选题需要至少两个选项和正确答案")
+		}
+	}
+	if req.Type == "text" {
+		options = nil
+		answers = nil
+		req.Answer = ""
+	}
+	score := req.Score
+	if score <= 0 {
+		score = 10
+	}
+	return learning.QuestionBankItem{
+		ID: id, Grade: req.Grade, Semester: req.Semester, Subject: req.Subject, Type: req.Type, Stem: req.Stem,
+		Options: options, Answer: req.Answer, Answers: answers, Score: score, Status: status,
+	}, nil
+}
+
 func (s *MemoryStore) CreateHomework(operator string, principal learning.Principal, req learning.HomeworkUploadRequest) (learning.Homework, error) {
 	req.Title = strings.TrimSpace(req.Title)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
@@ -1449,8 +1634,21 @@ func (s *MemoryStore) CreateHomework(operator string, principal learning.Princip
 	if !canUploadQuestion(principal) {
 		return learning.Homework{}, errors.New("当前账号没有上传题目权限，请联系管理员开通")
 	}
+	questions, err := s.questionsForHomework(course, req.QuestionIDs)
+	if err != nil {
+		return learning.Homework{}, err
+	}
 	asset := req.File
-	s.fileAssets[asset.ID] = asset
+	if asset.ID != "" {
+		s.fileAssets[asset.ID] = asset
+	}
+	status := learning.Status(strings.TrimSpace(req.Status))
+	if status == "" {
+		status = learning.StatusEnabled
+	}
+	if !isContentStatus(status) {
+		return learning.Homework{}, errors.New("请选择正确的发布状态")
+	}
 	item := learning.Homework{
 		ID:               "homework-" + time.Now().Format("20060102150405.000000000"),
 		Title:            req.Title,
@@ -1458,12 +1656,17 @@ func (s *MemoryStore) CreateHomework(operator string, principal learning.Princip
 		CourseID:         course.ID,
 		Course:           course.Name,
 		LearningSpaceID:  course.LearningSpaceID,
-		QuestionNum:      1,
+		Grade:            course.Grade,
+		Semester:         s.semesterForSpace(course.LearningSpaceID),
+		Subject:          course.Subject,
+		QuestionNum:      len(questions),
+		QuestionIDs:      questionIDs(questions),
+		Questions:        questions,
 		Deadline:         req.Deadline,
 		OwnerTeacherID:   principal.UserID,
 		OwnerTeacherName: principal.Name,
-		PublishStatus:    "已发布",
-		Status:           string(learning.StatusEnabled),
+		PublishStatus:    publishStatus(status),
+		Status:           string(status),
 		FileID:           asset.ID,
 		FileName:         asset.FileName,
 		FileSize:         asset.FileSize,
@@ -1497,6 +1700,10 @@ func (s *MemoryStore) UpdateHomework(operator string, principal learning.Princip
 	if !canUploadQuestion(principal) {
 		return learning.Homework{}, errors.New("当前账号没有维护题目权限，请联系管理员开通")
 	}
+	questions, err := s.questionsForHomework(course, req.QuestionIDs)
+	if err != nil {
+		return learning.Homework{}, err
+	}
 	for index := range s.homework {
 		if s.homework[index].ID != id {
 			continue
@@ -1510,6 +1717,12 @@ func (s *MemoryStore) UpdateHomework(operator string, principal learning.Princip
 		s.homework[index].CourseID = course.ID
 		s.homework[index].Course = course.Name
 		s.homework[index].LearningSpaceID = course.LearningSpaceID
+		s.homework[index].Grade = course.Grade
+		s.homework[index].Semester = s.semesterForSpace(course.LearningSpaceID)
+		s.homework[index].Subject = course.Subject
+		s.homework[index].QuestionIDs = questionIDs(questions)
+		s.homework[index].Questions = questions
+		s.homework[index].QuestionNum = len(questions)
 		s.homework[index].Deadline = req.Deadline
 		s.homework[index].Status = string(status)
 		s.homework[index].PublishStatus = publishStatus(status)
@@ -1592,17 +1805,24 @@ func (s *MemoryStore) CompleteReview(operator string, principal learning.Princip
 	if req.Reward == "" {
 		req.Reward = rewardForScore(req.Score)
 	}
-	submission := learning.Submission{
-		ID:             "sub-review-" + id,
-		HomeworkID:     homework.ID,
-		StudentID:      review.StudentID,
-		TaskTitle:      homework.Title,
-		Score:          req.Score,
-		TeacherComment: req.TeacherComment,
-		Reward:         req.Reward,
-		Status:         "已批改",
-		CreatedAt:      time.Now().Format("2006-01-02 15:04:05"),
+	submission, ok := s.submissions[review.SubmissionID]
+	if !ok {
+		submission = learning.Submission{
+			ID:         "sub-review-" + id,
+			HomeworkID: homework.ID,
+			StudentID:  review.StudentID,
+			TaskTitle:  homework.Title,
+			CreatedAt:  time.Now().Format("2006-01-02 15:04:05"),
+		}
 	}
+	submission.Score = req.Score
+	submission.FinalScore = req.Score
+	if submission.ObjectiveScore == 0 {
+		submission.ObjectiveScore = review.SystemScore
+	}
+	submission.TeacherComment = req.TeacherComment
+	submission.Reward = req.Reward
+	submission.Status = "已批改"
 	s.submissions[submission.ID] = submission
 	s.reviews = append(s.reviews[:reviewIndex], s.reviews[reviewIndex+1:]...)
 	s.notices = append([]learning.Notice{{
@@ -1862,7 +2082,11 @@ func (s *MemoryStore) StudentTasks(principal learning.Principal) ([]learning.Stu
 	for _, item := range homework {
 		task := learning.StudentTask{Homework: item, StudentStatus: "待完成"}
 		if sub, ok := s.latestSubmission(principal.StudentID, item.ID); ok {
-			task.StudentStatus = "已完成"
+			if sub.Status == "待批改" {
+				task.StudentStatus = "批改中"
+			} else {
+				task.StudentStatus = "已完成"
+			}
 			task.Score = sub.Score
 			task.SubmissionID = sub.ID
 		}
@@ -2527,19 +2751,38 @@ func (s *MemoryStore) CreateSubmission(operator string, principal learning.Princ
 	if len(req.Answers) == 0 {
 		return learning.Submission{}, errors.New("请先作答再提交")
 	}
-	score := gradeSubmission(homework, req.Answers)
+	score, hasText := gradeSubmission(homework, req.Answers)
+	status := "已批改"
+	comment := commentForScore(score, homework.Title)
+	reward := rewardForScore(score)
+	if hasText {
+		status = "待批改"
+		comment = "客观题已完成，简答题老师正在批改。"
+		reward = ""
+	}
 	submission := learning.Submission{
 		ID:             "sub-" + time.Now().Format("20060102150405.000000000"),
 		HomeworkID:     homework.ID,
 		StudentID:      principal.StudentID,
 		TaskTitle:      homework.Title,
 		Score:          score,
-		TeacherComment: commentForScore(score, homework.Title),
-		Reward:         rewardForScore(score),
-		Status:         "已批改",
+		ObjectiveScore: score,
+		FinalScore:     score,
+		TeacherComment: comment,
+		Reward:         reward,
+		Status:         status,
 		CreatedAt:      time.Now().Format("2006-01-02 15:04:05"),
+		Answers:        req.Answers,
 	}
 	s.submissions[submission.ID] = submission
+	if hasText {
+		student, _ := s.findStudent(principal.StudentID)
+		s.reviews = append([]learning.Review{{
+			ID: "rev-" + submission.ID, StudentID: principal.StudentID, HomeworkID: homework.ID, SubmissionID: submission.ID,
+			StudentName: student.Name, PackageName: homework.PackageName, Homework: homework.Title, SystemScore: score,
+			TeacherComment: "", Status: "待批改",
+		}}, s.reviews...)
+	}
 	s.prependLog(operator, "提交小挑战", homework.Title)
 	return submission, nil
 }
@@ -2616,28 +2859,54 @@ func stationProgress(stations []learning.Station) int {
 	return done * 100 / len(stations)
 }
 
-func gradeSubmission(homework learning.Homework, answers []learning.SubmissionAnswer) int {
+func gradeSubmission(homework learning.Homework, answers []learning.SubmissionAnswer) (int, bool) {
 	if len(homework.Questions) == 0 {
-		return 90
+		return 90, false
 	}
 	answerMap := make(map[string]learning.SubmissionAnswer, len(answers))
 	for _, answer := range answers {
 		answerMap[answer.QuestionID] = answer
 	}
-	correct := 0
+	totalScore := 0
+	gotScore := 0
+	hasText := false
 	for _, question := range homework.Questions {
-		answer := answerMap[question.ID]
+		score := question.Score
+		if score <= 0 {
+			score = 10
+		}
+		totalScore += score
+		answer := answerForQuestion(answerMap, question.ID)
 		if question.Type == "single" {
 			if strings.EqualFold(strings.TrimSpace(answer.Choice), strings.TrimSpace(question.Answer)) {
-				correct++
+				gotScore += score
 			}
 			continue
 		}
-		if strings.TrimSpace(answer.Text) != "" {
-			correct++
+		if question.Type == "multiple" {
+			if sameChoiceSet(answer.Choices, normalizedQuestionAnswers(question)) {
+				gotScore += score
+			}
+			continue
+		}
+		hasText = true
+	}
+	if totalScore == 0 {
+		return 0, hasText
+	}
+	return gotScore * 100 / totalScore, hasText
+}
+
+func answerForQuestion(answerMap map[string]learning.SubmissionAnswer, questionID string) learning.SubmissionAnswer {
+	if answer, ok := answerMap[questionID]; ok {
+		return answer
+	}
+	if index := strings.LastIndex(questionID, "-q"); index >= 0 {
+		if answer, ok := answerMap[questionID[index+1:]]; ok {
+			return answer
 		}
 	}
-	return correct * 100 / len(homework.Questions)
+	return learning.SubmissionAnswer{}
 }
 
 func commentForScore(score int, title string) string {
@@ -2847,6 +3116,63 @@ func (s *MemoryStore) findHomework(id string) (learning.Homework, bool) {
 		}
 	}
 	return learning.Homework{}, false
+}
+
+func (s *MemoryStore) questionsForHomework(course learning.Course, ids []string) ([]learning.Question, error) {
+	if len(ids) == 0 {
+		return []learning.Question{}, nil
+	}
+	space, ok := s.findLearningSpace(course.LearningSpaceID)
+	if !ok {
+		return nil, errors.New("请选择正确的课程范围")
+	}
+	out := make([]learning.Question, 0, len(ids))
+	for _, id := range ids {
+		item, ok := s.findQuestionBankItem(id)
+		if !ok {
+			return nil, errors.New("题库题目不存在")
+		}
+		if item.Status != string(learning.StatusEnabled) {
+			return nil, errors.New("只能选择启用的题库题目")
+		}
+		if item.Grade != space.Grade || item.Semester != space.Semester || item.Subject != space.Subject {
+			return nil, errors.New("题目范围必须和发布课程范围一致")
+		}
+		out = append(out, bankItemQuestion(item))
+	}
+	return out, nil
+}
+
+func (s *MemoryStore) findQuestionBankItem(id string) (learning.QuestionBankItem, bool) {
+	for _, item := range s.questionBank {
+		if item.ID == id {
+			return item, true
+		}
+	}
+	return learning.QuestionBankItem{}, false
+}
+
+func (s *MemoryStore) semesterForSpace(id string) string {
+	if space, ok := s.findLearningSpace(id); ok {
+		return space.Semester
+	}
+	return ""
+}
+
+func (s *MemoryStore) refreshHomeworkQuestionSnapshots(questionID string) {
+	for index := range s.homework {
+		if !containsString(s.homework[index].QuestionIDs, questionID) {
+			continue
+		}
+		questions := make([]learning.Question, 0, len(s.homework[index].QuestionIDs))
+		for _, id := range s.homework[index].QuestionIDs {
+			if item, ok := s.findQuestionBankItem(id); ok {
+				questions = append(questions, bankItemQuestion(item))
+			}
+		}
+		s.homework[index].Questions = questions
+		s.homework[index].QuestionNum = len(questions)
+	}
 }
 
 func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRequest) (learning.Package, error) {
@@ -4074,6 +4400,28 @@ func canSeeCourse(principal learning.Principal, course learning.Course) bool {
 	return false
 }
 
+func canSeeQuestionScope(principal learning.Principal, grade, semester, subject string, spaces []learningSpace) bool {
+	if hasRole(principal.Roles, learning.RoleSuperAdmin) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleOpsStaff) {
+		return true
+	}
+	if !hasRole(principal.Roles, learning.RoleTeacher) {
+		return false
+	}
+	for _, space := range spaces {
+		if containsString(principal.LearningSpaceIDs, space.ID) && space.Grade == grade && space.Semester == semester && space.Subject == subject && space.Status == learning.StatusEnabled {
+			return true
+		}
+	}
+	return false
+}
+
+func canEditQuestion(principal learning.Principal, item learning.QuestionBankItem) bool {
+	if hasRole(principal.Roles, learning.RoleSuperAdmin) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleOpsStaff) {
+		return true
+	}
+	return hasRole(principal.Roles, learning.RoleTeacher) && item.OwnerTeacherID == principal.UserID
+}
+
 func canUploadHandout(principal learning.Principal) bool {
 	if hasRole(principal.Roles, learning.RoleSuperAdmin) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleOpsStaff) {
 		return true
@@ -4645,6 +4993,52 @@ func appendHomeworkUnique(values []learning.Homework, addition learning.Homework
 		}
 	}
 	return append(values, addition)
+}
+
+func bankItemQuestion(item learning.QuestionBankItem) learning.Question {
+	answer := item.Answer
+	answers := cleanPhrases(item.Answers)
+	if answer == "" && len(answers) > 0 {
+		answer = answers[0]
+	}
+	return learning.Question{
+		ID: item.ID, Type: item.Type, Stem: item.Stem, Options: append([]string(nil), item.Options...),
+		Answer: answer, Answers: answers, Score: item.Score,
+	}
+}
+
+func questionIDs(questions []learning.Question) []string {
+	ids := make([]string, 0, len(questions))
+	for _, question := range questions {
+		ids = append(ids, question.ID)
+	}
+	return ids
+}
+
+func normalizedQuestionAnswers(question learning.Question) []string {
+	if len(question.Answers) > 0 {
+		return cleanPhrases(question.Answers)
+	}
+	if strings.TrimSpace(question.Answer) != "" {
+		return []string{strings.TrimSpace(question.Answer)}
+	}
+	return nil
+}
+
+func sameChoiceSet(left, right []string) bool {
+	a := cleanPhrases(left)
+	b := cleanPhrases(right)
+	if len(a) != len(b) {
+		return false
+	}
+	sort.Strings(a)
+	sort.Strings(b)
+	for index := range a {
+		if !strings.EqualFold(a[index], b[index]) {
+			return false
+		}
+	}
+	return true
 }
 
 func grantEndsAt(grant packageGrant) string {

@@ -1,3 +1,57 @@
 .small-title {
   font-size: 28rpx;
 }
+
+.profile-avatar-button {
+  flex: none;
+  width: 118rpx;
+  height: 118rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 42rpx;
+  background: transparent;
+  overflow: hidden;
+}
+
+.profile-avatar-button::after {
+  border: 0;
+}
+
+.profile-avatar {
+  display: block;
+  width: 118rpx;
+  height: 118rpx;
+  border-radius: 42rpx;
+}
+
+.profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-form {
+  margin-top: 24rpx;
+}
+
+.profile-auth {
+  box-sizing: border-box;
+  width: 100%;
+  height: 72rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 20rpx;
+  background: #ff9f7f;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 72rpx;
+}
+
+.profile-required {
+  margin-top: 14rpx;
+  color: #d45f3a;
+  font-size: 22rpx;
+  line-height: 1.5;
+}

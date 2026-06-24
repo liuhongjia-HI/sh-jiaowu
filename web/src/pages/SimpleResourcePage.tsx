@@ -7,9 +7,9 @@ import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
 import { gradeOptions, subjectOptions, subjectsForGrade } from '../utils/curriculum';
-import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../types/starline';
+import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../types/starline';
 
-type Kind = 'packages' | 'content' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
+type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
 type UploadKind = Extract<Kind, 'materials' | 'homework'>;
 type PackageFormValues = PackageUpsertRequest;
 type NoticeFormValues = NoticeCreateRequest;
@@ -21,13 +21,16 @@ type ContentFormValues = {
   chapter?: string;
   deadline?: string;
   status: string;
+  questionIds?: string[];
 };
+type QuestionFormValues = QuestionBankUpsertRequest;
 
 const config: Record<Kind, { title: string; desc: string; path: string }> = {
   packages: { title: '学习套餐', desc: '维护年级、学科和开放内容。', path: '/packages' },
   content: { title: '课程内容', desc: '维护课程、章节和课节安排。', path: '/courses' },
+  questions: { title: '题库', desc: '按年级、学期和学科维护可复用题目。', path: '/questions' },
   materials: { title: '学习资料', desc: '维护讲义、图片和课件。', path: '/materials' },
-  homework: { title: '课后练习', desc: '维护练习、截止时间和发布状态。', path: '/homework' },
+  homework: { title: '课后练习', desc: '从题库选题组卷并发布到学习空间。', path: '/homework' },
   review: { title: '批改反馈', desc: '处理分数、评语和学习反馈。', path: '/reviews/pending' },
   notices: { title: '通知提醒', desc: '发送练习、批改、资料和到期提醒。', path: '/notices' },
   logs: { title: '操作记录', desc: '查看开通、访问和后台操作。', path: '/logs' },
@@ -37,8 +40,9 @@ const config: Record<Kind, { title: string; desc: string; path: string }> = {
 const emptyTextByKind: Record<Kind, string> = {
   packages: '还没有学习套餐，先创建套餐后再给学生开通。',
   content: '还没有课程内容，先维护课程和章节。',
+  questions: '还没有题库题目，先按年级、学期和学科新增题目。',
   materials: '还没有学习资料，上传资料后学生开通套餐即可查看。',
-  homework: '还没有课后练习，先为课程创建练习。',
+  homework: '还没有课后练习，先从题库选题组卷。',
   review: '暂时没有待批改练习。',
   notices: '还没有通知提醒。',
   logs: '还没有操作记录。',
@@ -61,7 +65,8 @@ function columnsFor(kind: Kind, rows: Record<string, unknown>[], renderActions?:
 
   const customKeys: Partial<Record<Kind, string[]>> = {
     materials: ['title', 'course', 'fileType', 'fileName', 'previewStatus', 'ownerTeacherName', 'publishStatus'],
-    homework: ['title', 'course', 'fileType', 'fileName', 'previewStatus', 'ownerTeacherName', 'deadline', 'publishStatus']
+    questions: ['grade', 'semester', 'subject', 'type', 'stem', 'ownerTeacherName', 'status'],
+    homework: ['title', 'course', 'questionNum', 'ownerTeacherName', 'deadline', 'publishStatus']
   };
   const keys = customKeys[kind] ?? Object.keys(rows[0] ?? {}).slice(0, 6);
   const columns: TableColumnsType<Record<string, unknown>> = keys.map((key) => ({
@@ -73,7 +78,7 @@ function columnsFor(kind: Kind, rows: Record<string, unknown>[], renderActions?:
       return String(value ?? '');
     }
   }));
-  if (renderActions && (kind === 'packages' || kind === 'content' || kind === 'materials' || kind === 'homework' || kind === 'review')) {
+  if (renderActions && (kind === 'packages' || kind === 'content' || kind === 'questions' || kind === 'materials' || kind === 'homework' || kind === 'review')) {
     columns.push({ title: '操作', fixed: 'right', width: 120, render: (_: unknown, record: Record<string, unknown>) => renderActions(record) });
   }
   return columns;
@@ -102,8 +107,9 @@ function fieldsFor(kind: Kind, row: Record<string, unknown>) {
   const keysByKind: Partial<Record<Kind, string[]>> = {
     packages: ['academicYear', 'grade', 'semester', 'subject', 'phaseScope', 'packageType', 'openStudentNum'],
     content: ['grade', 'subject', 'chapterCount', 'materialNum', 'homeworkNum'],
+    questions: ['grade', 'semester', 'subject', 'type', 'score', 'ownerTeacherName'],
     materials: ['course', 'fileType', 'fileName', 'ownerTeacherName', 'publishStatus', 'viewCount'],
-    homework: ['course', 'fileType', 'fileName', 'ownerTeacherName', 'deadline', 'submittedNum', 'totalNum'],
+    homework: ['course', 'questionNum', 'ownerTeacherName', 'deadline', 'submittedNum', 'totalNum'],
     review: ['studentName', 'packageName', 'homework', 'systemScore'],
     notices: ['type', 'target', 'summary'],
     logs: ['operator', 'action', 'target', 'time']
@@ -116,7 +122,9 @@ function fieldsFor(kind: Kind, row: Record<string, unknown>) {
 
 function tagsFor(row: Record<string, unknown>) {
   const hiddenArrayKeys = new Set(['learningSpaceIds', 'contentTypeCodes']);
-  const arrays = Object.entries(row).filter(([key, value]) => Array.isArray(value) && !hiddenArrayKeys.has(key)) as [string, string[]][];
+  const arrays = Object.entries(row)
+    .filter(([key, value]) => Array.isArray(value) && !hiddenArrayKeys.has(key) && value.every((item) => ['string', 'number', 'boolean'].includes(typeof item)))
+    .map(([key, value]) => [key, (value as Array<string | number | boolean>).map(String)] as [string, string[]]);
   if (arrays.length === 0) return undefined;
   return (
     <>
@@ -134,6 +142,26 @@ function displayValue(value: unknown) {
   if (Array.isArray(value)) return value.join('、') || '-';
   if (value === null || value === undefined || value === '') return '-';
   return String(value);
+}
+
+function questionTypeLabel(type?: string) {
+  if (type === 'single') return '单选';
+  if (type === 'multiple') return '多选';
+  if (type === 'text') return '简答';
+  return type || '-';
+}
+
+function normalizeQuestionForm(values: QuestionFormValues): QuestionBankUpsertRequest {
+  const options = (values.options ?? []).map((item) => String(item).trim()).filter(Boolean);
+  const answers = (values.answers ?? []).map((item) => String(item).trim()).filter(Boolean);
+  return {
+    ...values,
+    options: values.type === 'text' ? [] : options,
+    answer: values.type === 'single' ? String(values.answer || '').trim() : '',
+    answers: values.type === 'multiple' ? answers : values.type === 'single' && values.answer ? [String(values.answer).trim()] : [],
+    score: Number(values.score || 10),
+    status: values.status || '启用'
+  };
 }
 
 function labelOf(key: string) {
@@ -164,6 +192,11 @@ function labelOf(key: string) {
     chapterCount: '章节数',
     materialNum: '资料数',
     homeworkNum: '练习数',
+    questionNum: '题目数',
+    questionIds: '题目',
+    type: '题型',
+    stem: '题干',
+    score: '分值',
     submittedNum: '已提交',
     totalNum: '应提交',
     studentName: '学生',
@@ -266,6 +299,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
   const [courseForm] = Form.useForm<CourseFormValues>();
   const [settingForm] = Form.useForm<SettingFormValues>();
   const [contentForm] = Form.useForm<ContentFormValues>();
+  const [questionForm] = Form.useForm<QuestionFormValues>();
   const [viewMode, setViewMode] = useListViewMode(`starline:list-view:${kind}`);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [packageOpen, setPackageOpen] = useState(false);
@@ -274,13 +308,15 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [editingSetting, setEditingSetting] = useState<SettingFormValues | null>(null);
   const [editingContent, setEditingContent] = useState<Material | Homework | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState<QuestionBankItem | null>(null);
   const [courseOpen, setCourseOpen] = useState(false);
+  const [questionOpen, setQuestionOpen] = useState(false);
   const [reviewing, setReviewing] = useState<Review | null>(null);
   const [keyword, setKeyword] = useState('');
   const [gradeFilter, setGradeFilter] = useState<string | undefined>(undefined);
   const [subjectFilter, setSubjectFilter] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(1);
-  const showGradeSubjectFilter = kind === 'packages' || kind === 'content';
+  const showGradeSubjectFilter = kind === 'packages' || kind === 'content' || kind === 'questions';
   const pageSize = 10;
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({
@@ -300,23 +336,38 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
     enabled: isUploadKind(kind),
     queryFn: () => getData<Course[]>('/courses')
   });
+  const questions = useQuery({
+    queryKey: ['question-bank-for-homework', kind],
+    enabled: kind === 'homework',
+    queryFn: () => getData<QuestionBankItem[]>('/questions')
+  });
   const learningSpaces = useQuery({
     queryKey: ['learning-spaces-for-resource-page', kind],
     enabled: kind === 'packages' || kind === 'content',
     queryFn: () => getData<LearningSpace[]>('/learning-spaces')
   });
   const upload = useMutation({
-    mutationFn: async (values: { title: string; courseId: string; chapter?: string; deadline?: string; fileList: UploadFile[] }) => {
+    mutationFn: async (values: { title: string; courseId: string; chapter?: string; deadline?: string; questionIds?: string[]; fileList?: UploadFile[] }) => {
       if (!isUploadKind(kind)) throw new Error('当前页面不能上传文件');
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
       const file = values.fileList?.[0]?.originFileObj;
-      if (!course || !file) throw new Error('请选择课程和文件');
+      if (!course) throw new Error('请选择课程');
+      if (kind === 'homework') {
+        return postData<Homework>('/homework', {
+          title: values.title,
+          courseId: course.id,
+          learningSpaceId: course.learningSpaceId || '',
+          deadline: values.deadline || '',
+          status: '启用',
+          questionIds: (values as ContentFormValues).questionIds ?? []
+        });
+      }
+      if (!file) throw new Error('请选择文件');
       const form = new FormData();
       form.append('title', values.title);
       form.append('courseId', course.id);
       form.append('learningSpaceId', course.learningSpaceId || '');
       if (kind === 'materials') form.append('chapter', values.chapter || '');
-      if (kind === 'homework') form.append('deadline', values.deadline || '');
       form.append('file', file);
       return postForm<Material | Homework>(meta.path, form);
     },
@@ -408,6 +459,24 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
       message.error(err.message || '保存课程失败，请检查课程范围。');
     }
   });
+  const saveQuestion = useMutation({
+    mutationFn: async (values: QuestionFormValues) => {
+      const body: QuestionBankUpsertRequest = normalizeQuestionForm(values);
+      if (editingQuestion) return putData<QuestionBankItem>(`/questions/${editingQuestion.id}`, body);
+      return postData<QuestionBankItem>('/questions', body);
+    },
+    onSuccess: () => {
+      message.success(editingQuestion ? '题目已保存。' : '题目已加入题库。');
+      setQuestionOpen(false);
+      setEditingQuestion(null);
+      questionForm.resetFields();
+      queryClient.invalidateQueries({ queryKey: [kind] });
+      queryClient.invalidateQueries({ queryKey: ['question-bank-for-homework'] });
+    },
+    onError: (err: Error) => {
+      message.error(err.message || '保存题目失败，请检查题干、选项和答案。');
+    }
+  });
   const saveSetting = useMutation({
     mutationFn: async (values: SettingFormValues) => putData<Record<string, string>>('/settings', values),
     onSuccess: () => {
@@ -441,7 +510,8 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
         courseId: course.id,
         learningSpaceId: course.learningSpaceId,
         deadline: values.deadline || '',
-        status: values.status || '启用'
+        status: values.status || '启用',
+        questionIds: values.questionIds ?? []
       };
       return putData<Homework>(`/homework/${editingContent.id}`, body);
     },
@@ -535,6 +605,41 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
     setCourseOpen(true);
   }
 
+  function openCreateQuestion() {
+    setEditingQuestion(null);
+    questionForm.setFieldsValue({
+      grade: undefined as unknown as string,
+      semester: '第一学期',
+      subject: undefined as unknown as string,
+      type: 'single',
+      stem: '',
+      options: [''],
+      answer: '',
+      answers: [],
+      score: 10,
+      status: '启用'
+    });
+    setQuestionOpen(true);
+  }
+
+  function openEditQuestion(record: Record<string, unknown>) {
+    const item = record as QuestionBankItem;
+    setEditingQuestion(item);
+    questionForm.setFieldsValue({
+      grade: item.grade,
+      semester: item.semester,
+      subject: item.subject,
+      type: item.type,
+      stem: item.stem,
+      options: item.options ?? [],
+      answer: item.answer || (item.answers ?? [])[0] || '',
+      answers: item.answers ?? [],
+      score: item.score || 10,
+      status: item.status || '启用'
+    });
+    setQuestionOpen(true);
+  }
+
   function openEditCourse(record: Record<string, unknown>) {
     const course = record as Course;
     setEditingCourse(course);
@@ -580,7 +685,8 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
       courseId: item.courseId || '',
       chapter: 'chapter' in item ? item.chapter : '',
       deadline: 'deadline' in item ? item.deadline : '',
-      status: item.status === '已发布' ? '启用' : item.status || '启用'
+      status: item.status === '已发布' ? '启用' : item.status || '启用',
+      questionIds: 'questionIds' in item ? item.questionIds ?? [] : []
     });
   }
 
@@ -599,13 +705,16 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
   const renderPackageActions = (record: Record<string, unknown>) => (
     <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditPackage(record)} />
   );
+  const renderQuestionActions = (record: Record<string, unknown>) => (
+    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditQuestion(record)} />
+  );
   const renderCourseActions = (record: Record<string, unknown>) => (
     <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditCourse(record)} />
   );
   const renderSettingActions = (record: Record<string, unknown>) => (
     <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEditSetting(record)} />
   );
-  const rowActions = kind === 'packages' && canManagePackages(user) ? renderPackageActions : kind === 'content' && canManageCourses(user) ? renderCourseActions : kind === 'settings' ? renderSettingActions : kind === 'review' ? renderReviewActions : isUploadKind(kind) ? renderFileActions : undefined;
+  const rowActions = kind === 'packages' && canManagePackages(user) ? renderPackageActions : kind === 'content' && canManageCourses(user) ? renderCourseActions : kind === 'questions' ? renderQuestionActions : kind === 'settings' ? renderSettingActions : kind === 'review' ? renderReviewActions : isUploadKind(kind) ? renderFileActions : undefined;
   return (
     <div className="page-stack">
       <div>
@@ -625,14 +734,19 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
                 新增课程
               </Button>
             )}
+            {kind === 'questions' && canUpload('homework', user) && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreateQuestion}>
+                新增题目
+              </Button>
+            )}
             {kind === 'notices' && (
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreateNotice}>
                 发送通知
               </Button>
             )}
             {isUploadKind(kind) && canUpload(kind, user) && (
-              <Button type="primary" icon={<UploadOutlined />} onClick={() => setUploadOpen(true)}>
-                {kind === 'materials' ? '上传讲义' : '上传题目'}
+              <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => setUploadOpen(true)}>
+                {kind === 'materials' ? '上传讲义' : '新建练习'}
               </Button>
             )}
             <ListViewToggle storageKey={`starline:list-view:${kind}`} value={viewMode} onChange={setViewMode} />
@@ -692,7 +806,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
                   status={statusFor(record)}
                   fields={fieldsFor(kind, record)}
                   tags={tagsFor(record)}
-                  actions={kind === 'packages' && canManagePackages(user) ? renderPackageActions(record) : kind === 'content' && canManageCourses(user) ? renderCourseActions(record) : kind === 'settings' ? renderSettingActions(record) : kind === 'review' ? renderReviewActions(record) : isUploadKind(kind) ? renderFileActions(record) : undefined}
+                  actions={kind === 'packages' && canManagePackages(user) ? renderPackageActions(record) : kind === 'content' && canManageCourses(user) ? renderCourseActions(record) : kind === 'questions' ? renderQuestionActions(record) : kind === 'settings' ? renderSettingActions(record) : kind === 'review' ? renderReviewActions(record) : isUploadKind(kind) ? renderFileActions(record) : undefined}
                 />
               )}
             />
@@ -714,6 +828,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
           open={uploadOpen}
           loading={upload.isPending}
           courses={courses.data ?? []}
+          questions={questions.data ?? []}
           onCancel={() => setUploadOpen(false)}
           onSubmit={(values) => upload.mutate(values)}
         />
@@ -725,8 +840,19 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
           item={editingContent}
           loading={saveContent.isPending}
           courses={courses.data ?? []}
+          questions={questions.data ?? []}
           onCancel={() => setEditingContent(null)}
           onSubmit={(values) => saveContent.mutate(values)}
+        />
+      )}
+      {kind === 'questions' && (
+        <QuestionDialog
+          form={questionForm}
+          open={questionOpen}
+          editing={Boolean(editingQuestion)}
+          loading={saveQuestion.isPending}
+          onCancel={() => setQuestionOpen(false)}
+          onSubmit={(values) => saveQuestion.mutate(values)}
         />
       )}
       {kind === 'review' && (
@@ -1111,11 +1237,95 @@ function ReviewDialog({
   );
 }
 
+function QuestionDialog({
+  form,
+  open,
+  editing,
+  loading,
+  onCancel,
+  onSubmit
+}: {
+  form: ReturnType<typeof Form.useForm<QuestionFormValues>>[0];
+  open: boolean;
+  editing: boolean;
+  loading: boolean;
+  onCancel: () => void;
+  onSubmit: (values: QuestionFormValues) => void;
+}) {
+  const type = Form.useWatch('type', form);
+  const grade = Form.useWatch('grade', form);
+  return (
+    <Modal
+      title={editing ? '编辑题库题目' : '新增题库题目'}
+      open={open}
+      okText="保存"
+      cancelText="取消"
+      confirmLoading={loading}
+      onCancel={onCancel}
+      onOk={() => form.submit()}
+      destroyOnHidden
+    >
+      <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
+        <Space.Compact block>
+          <Form.Item name="grade" rules={[{ required: true, message: '请选择年级' }]} style={{ width: '33%' }}>
+            <Select placeholder="年级" options={gradeOptions()} onChange={() => form.setFieldValue('subject', undefined)} />
+          </Form.Item>
+          <Form.Item name="semester" rules={[{ required: true, message: '请选择学期' }]} style={{ width: '33%' }}>
+            <Select placeholder="学期" options={[{ label: '第一学期', value: '第一学期' }, { label: '第二学期', value: '第二学期' }]} />
+          </Form.Item>
+          <Form.Item name="subject" rules={[{ required: true, message: '请选择学科' }]} style={{ width: '34%' }}>
+            <Select placeholder="学科" options={subjectOptions(grade)} />
+          </Form.Item>
+        </Space.Compact>
+        <Form.Item name="type" label="题型" rules={[{ required: true, message: '请选择题型' }]}>
+          <Select options={[
+            { label: '单选题', value: 'single' },
+            { label: '多选题', value: 'multiple' },
+            { label: '简答题', value: 'text' }
+          ]} />
+        </Form.Item>
+        <Form.Item name="stem" label="题干" rules={[{ required: true, message: '请输入题干' }]}>
+          <Input.TextArea rows={3} placeholder="请输入学生看到的题目内容" />
+        </Form.Item>
+        {type !== 'text' && (
+          <>
+            <Form.Item name="options" label="选项" rules={[{ required: true, message: '请输入选项' }]}>
+              <Select mode="tags" tokenSeparators={['\n']} placeholder="逐个输入选项，回车添加" />
+            </Form.Item>
+            {type === 'single' ? (
+              <Form.Item name="answer" label="正确答案" rules={[{ required: true, message: '请选择正确答案' }]}>
+                <Select placeholder="选择一个正确选项" options={(form.getFieldValue('options') ?? []).map((value: string) => ({ label: value, value }))} />
+              </Form.Item>
+            ) : (
+              <Form.Item name="answers" label="正确答案" rules={[{ required: true, message: '请选择正确答案' }]}>
+                <Select mode="multiple" placeholder="选择所有正确选项" options={(form.getFieldValue('options') ?? []).map((value: string) => ({ label: value, value }))} />
+              </Form.Item>
+            )}
+          </>
+        )}
+        <Space.Compact block>
+          <Form.Item name="score" label="分值" style={{ width: '50%' }} rules={[{ required: true, message: '请输入分值' }]}>
+            <InputNumber min={1} max={100} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="status" label="状态" style={{ width: '50%' }}>
+            <Select options={[
+              { label: '启用', value: '启用' },
+              { label: '草稿', value: '草稿' },
+              { label: '停用', value: '停用' }
+            ]} />
+          </Form.Item>
+        </Space.Compact>
+      </Form>
+    </Modal>
+  );
+}
+
 function UploadDialog({
   kind,
   open,
   loading,
   courses,
+  questions,
   onCancel,
   onSubmit
 }: {
@@ -1123,8 +1333,9 @@ function UploadDialog({
   open: boolean;
   loading: boolean;
   courses: Course[];
+  questions: QuestionBankItem[];
   onCancel: () => void;
-  onSubmit: (values: { title: string; courseId: string; chapter?: string; deadline?: string; fileList: UploadFile[] }) => void;
+  onSubmit: (values: { title: string; courseId: string; chapter?: string; deadline?: string; questionIds?: string[]; fileList?: UploadFile[] }) => void;
 }) {
   const [form] = Form.useForm();
   return (
@@ -1139,8 +1350,8 @@ function UploadDialog({
       destroyOnHidden
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
-        <Form.Item name="title" label={kind === 'materials' ? '讲义标题' : '题目标题'} rules={[{ required: true, message: '请输入标题' }]}>
-          <Input placeholder={kind === 'materials' ? '例如：五年级英语期中核心讲义' : '例如：五年级英语阅读练习题'} />
+        <Form.Item name="title" label={kind === 'materials' ? '讲义标题' : '练习标题'} rules={[{ required: true, message: '请输入标题' }]}>
+          <Input placeholder={kind === 'materials' ? '例如：五年级英语期中核心讲义' : '例如：五年级英语阅读练习'} />
         </Form.Item>
         <Form.Item name="courseId" label="课程范围" rules={[{ required: true, message: '请选择课程范围' }]}>
           <Select
@@ -1155,22 +1366,31 @@ function UploadDialog({
             <Input placeholder="不填则归为未分章节" />
           </Form.Item>
         ) : (
-          <Form.Item name="deadline" label="截止时间">
-            <Input placeholder="例如：2026-06-30" />
-          </Form.Item>
+          <>
+            <Form.Item name="deadline" label="截止时间">
+              <Input placeholder="例如：2026-06-30" />
+            </Form.Item>
+            <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
+              <Select mode="multiple" showSearch optionFilterProp="label" placeholder="从同年级、学期、学科题库选题" options={questions.map((question) => ({ value: question.id, label: `${question.grade} ${question.semester} ${question.subject} · ${questionTypeLabel(question.type)} · ${question.stem}` }))} />
+            </Form.Item>
+          </>
         )}
-        <Form.Item
-          name="fileList"
-          label="文件"
-          valuePropName="fileList"
-          getValueFromEvent={(event) => event?.fileList ?? []}
-          rules={[{ required: true, message: '请选择文件' }]}
-        >
-          <Upload beforeUpload={() => false} maxCount={1} accept=".pdf,.ppt,.pptx,.doc,.docx">
-            <Button icon={<UploadOutlined />}>选择文件</Button>
-          </Upload>
-        </Form.Item>
-        <Typography.Text type="secondary">支持 PDF、PPT、Word，单个文件不超过 50MB。</Typography.Text>
+        {kind === 'materials' && (
+          <>
+            <Form.Item
+              name="fileList"
+              label="文件"
+              valuePropName="fileList"
+              getValueFromEvent={(event) => event?.fileList ?? []}
+              rules={[{ required: true, message: '请选择文件' }]}
+            >
+              <Upload beforeUpload={() => false} maxCount={1} accept=".pdf,.ppt,.pptx,.doc,.docx">
+                <Button icon={<UploadOutlined />}>选择文件</Button>
+              </Upload>
+            </Form.Item>
+            <Typography.Text type="secondary">支持 PDF、PPT、Word，单个文件不超过 50MB。</Typography.Text>
+          </>
+        )}
       </Form>
     </Modal>
   );
@@ -1182,6 +1402,7 @@ function ContentEditDialog({
   item,
   loading,
   courses,
+  questions,
   onCancel,
   onSubmit
 }: {
@@ -1190,6 +1411,7 @@ function ContentEditDialog({
   item: Material | Homework | null;
   loading: boolean;
   courses: Course[];
+  questions: QuestionBankItem[];
   onCancel: () => void;
   onSubmit: (values: ContentFormValues) => void;
 }) {
@@ -1221,9 +1443,14 @@ function ContentEditDialog({
             <Input placeholder="不填则归为未分章节" />
           </Form.Item>
         ) : (
-          <Form.Item name="deadline" label="截止时间">
-            <Input placeholder="例如：2026-06-30" />
-          </Form.Item>
+          <>
+            <Form.Item name="deadline" label="截止时间">
+              <Input placeholder="例如：2026-06-30" />
+            </Form.Item>
+            <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
+              <Select mode="multiple" showSearch optionFilterProp="label" placeholder="从题库选择本练习题目" options={questions.map((question) => ({ value: question.id, label: `${question.grade} ${question.semester} ${question.subject} · ${questionTypeLabel(question.type)} · ${question.stem}` }))} />
+            </Form.Item>
+          </>
         )}
         <Form.Item name="status" label="状态">
           <Select

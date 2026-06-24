@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS students (
   id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(64) NOT NULL,
+  nickname VARCHAR(64) NOT NULL DEFAULT '',
+  avatar_url TEXT NOT NULL,
   grade VARCHAR(32) NOT NULL,
   phone VARCHAR(32) NOT NULL,
   account_status VARCHAR(32) NOT NULL DEFAULT '正常',
@@ -255,6 +257,10 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
   learning_space_id VARCHAR(64) NOT NULL DEFAULT '',
   course_id VARCHAR(64) NOT NULL,
   title VARCHAR(128) NOT NULL,
+  grade VARCHAR(32) NOT NULL DEFAULT '',
+  semester VARCHAR(32) NOT NULL DEFAULT '',
+  subject VARCHAR(32) NOT NULL DEFAULT '',
+  question_ids_json TEXT NOT NULL,
   deadline DATE NULL,
   owner_teacher_id VARCHAR(64) NOT NULL DEFAULT '',
   owner_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
@@ -263,11 +269,31 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS question_bank_items (
+  id VARCHAR(64) PRIMARY KEY,
+  grade VARCHAR(32) NOT NULL DEFAULT '',
+  semester VARCHAR(32) NOT NULL DEFAULT '',
+  subject VARCHAR(32) NOT NULL DEFAULT '',
+  question_type VARCHAR(32) NOT NULL DEFAULT '',
+  stem TEXT NOT NULL,
+  options_json TEXT NOT NULL,
+  answer VARCHAR(255) NOT NULL DEFAULT '',
+  answers_json TEXT NOT NULL,
+  score INT NOT NULL DEFAULT 10,
+  status VARCHAR(32) NOT NULL DEFAULT '启用',
+  owner_teacher_id VARCHAR(64) NOT NULL DEFAULT '',
+  owner_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS homework_submissions (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   homework_id VARCHAR(64) NOT NULL,
   student_id VARCHAR(64) NOT NULL,
   answer_json JSON NULL,
+  objective_score INT NOT NULL DEFAULT 0,
+  final_score INT NOT NULL DEFAULT 0,
   status VARCHAR(32) NOT NULL DEFAULT '待批改',
   submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

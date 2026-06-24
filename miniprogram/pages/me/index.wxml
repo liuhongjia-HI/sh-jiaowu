@@ -14,16 +14,24 @@
   <view class="section">
     <view class="card reward">
       <view class="row">
-        <view class="mascot">🐣</view>
-        <view>
-          <view class="title">{{me.name}} 同学</view>
+        <button class="profile-avatar-button" bindtap="authorizeProfile" aria-label="授权头像和昵称">
+          <image wx:if="{{profileForm.avatarUrl || me.avatarUrl}}" class="profile-avatar" src="{{profileForm.avatarUrl || me.avatarUrl}}" mode="aspectFill"></image>
+          <view wx:else class="mascot">🐣</view>
+        </button>
+        <view class="profile-info">
+          <view class="title">{{profileForm.nickname || me.nickname || me.name}} 同学</view>
           <view class="sub">{{me.grade}} · 账号{{me.accountStatus}} · {{me.bindStatus}}</view>
+          <view class="sub">已绑定手机号：{{me.phone || "未绑定"}}</view>
           <view class="badges">
             <view class="badge">阅读小星星</view>
             <view class="badge">连续 {{me.streakDays}} 天</view>
           </view>
         </view>
       </view>
+      <view class="profile-form">
+        <button class="profile-auth" bindtap="authorizeProfile" loading="{{savingProfile}}" disabled="{{savingProfile}}">授权头像和昵称</button>
+      </view>
+      <view wx:if="{{!me.nickname || !me.avatarUrl}}" class="profile-required">请授权微信头像和昵称，用于显示个人资料。</view>
     </view>
   </view>
 

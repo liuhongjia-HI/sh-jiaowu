@@ -166,6 +166,8 @@ type PackageUpsertRequest struct {
 type Student struct {
 	ID             string   `json:"id"`
 	Name           string   `json:"name"`
+	Nickname       string   `json:"nickname,omitempty"`
+	AvatarURL      string   `json:"avatarUrl,omitempty"`
 	Grade          string   `json:"grade"`
 	Phone          string   `json:"phone"`
 	OpenedPackages []string `json:"openedPackages"`
@@ -186,6 +188,11 @@ type StudentUpsertRequest struct {
 	Grade         string `json:"grade"`
 	AccountStatus string `json:"accountStatus"`
 	Remark        string `json:"remark"`
+}
+
+type StudentProfileUpdateRequest struct {
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatarUrl"`
 }
 
 type StudentQuery struct {
@@ -446,7 +453,11 @@ type Homework struct {
 	CourseID         string     `json:"courseId,omitempty"`
 	Course           string     `json:"course"`
 	LearningSpaceID  string     `json:"learningSpaceId,omitempty"`
+	Grade            string     `json:"grade,omitempty"`
+	Semester         string     `json:"semester,omitempty"`
+	Subject          string     `json:"subject,omitempty"`
 	QuestionNum      int        `json:"questionNum"`
+	QuestionIDs      []string   `json:"questionIds,omitempty"`
 	Questions        []Question `json:"questions,omitempty"`
 	Deadline         string     `json:"deadline"`
 	SubmittedNum     int        `json:"submittedNum"`
@@ -465,20 +476,55 @@ type Homework struct {
 }
 
 type HomeworkUpdateRequest struct {
-	Title           string `json:"title"`
-	CourseID        string `json:"courseId"`
-	LearningSpaceID string `json:"learningSpaceId"`
-	Deadline        string `json:"deadline"`
-	Status          string `json:"status"`
+	Title           string   `json:"title"`
+	CourseID        string   `json:"courseId"`
+	LearningSpaceID string   `json:"learningSpaceId"`
+	Deadline        string   `json:"deadline"`
+	Status          string   `json:"status"`
+	QuestionIDs     []string `json:"questionIds"`
 }
 
 // Question 是小挑战中的单道题目。Answer 仅用于服务端自动判分，不下发给学生端。
 type Question struct {
 	ID      string   `json:"id"`
-	Type    string   `json:"type"` // single | text
+	Type    string   `json:"type"` // single | multiple | text
 	Stem    string   `json:"stem"`
 	Options []string `json:"options,omitempty"`
 	Answer  string   `json:"-"`
+	Answers []string `json:"-"`
+	Score   int      `json:"score,omitempty"`
+}
+
+// QuestionBankItem 是可跨学年复用的题库题目，按年级、学期、学科归档。
+type QuestionBankItem struct {
+	ID               string   `json:"id"`
+	Grade            string   `json:"grade"`
+	Semester         string   `json:"semester"`
+	Subject          string   `json:"subject"`
+	Type             string   `json:"type"` // single | multiple | text
+	Stem             string   `json:"stem"`
+	Options          []string `json:"options,omitempty"`
+	Answer           string   `json:"answer,omitempty"`
+	Answers          []string `json:"answers,omitempty"`
+	Score            int      `json:"score"`
+	Status           string   `json:"status"`
+	OwnerTeacherID   string   `json:"ownerTeacherId,omitempty"`
+	OwnerTeacherName string   `json:"ownerTeacherName,omitempty"`
+	CreatedAt        string   `json:"createdAt,omitempty"`
+	UpdatedAt        string   `json:"updatedAt,omitempty"`
+}
+
+type QuestionBankUpsertRequest struct {
+	Grade    string   `json:"grade"`
+	Semester string   `json:"semester"`
+	Subject  string   `json:"subject"`
+	Type     string   `json:"type"`
+	Stem     string   `json:"stem"`
+	Options  []string `json:"options"`
+	Answer   string   `json:"answer"`
+	Answers  []string `json:"answers"`
+	Score    int      `json:"score"`
+	Status   string   `json:"status"`
 }
 
 // Station 是学习详情页的「学习地图」站点。
@@ -502,21 +548,25 @@ type StudentCourseDetail struct {
 
 // Submission 是学生提交的一次小挑战及其批改结果。
 type Submission struct {
-	ID             string `json:"id"`
-	HomeworkID     string `json:"homeworkId"`
-	StudentID      string `json:"studentId"`
-	TaskTitle      string `json:"taskTitle"`
-	Score          int    `json:"score"`
-	TeacherComment string `json:"teacherComment"`
-	Reward         string `json:"reward"`
-	Status         string `json:"status"`
-	CreatedAt      string `json:"createdAt"`
+	ID             string             `json:"id"`
+	HomeworkID     string             `json:"homeworkId"`
+	StudentID      string             `json:"studentId"`
+	TaskTitle      string             `json:"taskTitle"`
+	Score          int                `json:"score"`
+	ObjectiveScore int                `json:"objectiveScore"`
+	FinalScore     int                `json:"finalScore"`
+	TeacherComment string             `json:"teacherComment"`
+	Reward         string             `json:"reward"`
+	Status         string             `json:"status"`
+	CreatedAt      string             `json:"createdAt"`
+	Answers        []SubmissionAnswer `json:"answers,omitempty"`
 }
 
 type SubmissionAnswer struct {
-	QuestionID string `json:"questionId"`
-	Choice     string `json:"choice"`
-	Text       string `json:"text"`
+	QuestionID string   `json:"questionId"`
+	Choice     string   `json:"choice"`
+	Choices    []string `json:"choices"`
+	Text       string   `json:"text"`
 }
 
 type SubmissionRequest struct {
@@ -589,11 +639,13 @@ type MaterialUploadRequest struct {
 }
 
 type HomeworkUploadRequest struct {
-	Title           string
-	LearningSpaceID string
-	CourseID        string
-	Deadline        string
-	File            FileAsset
+	Title           string    `json:"title"`
+	LearningSpaceID string    `json:"learningSpaceId"`
+	CourseID        string    `json:"courseId"`
+	Deadline        string    `json:"deadline"`
+	Status          string    `json:"status"`
+	QuestionIDs     []string  `json:"questionIds"`
+	File            FileAsset `json:"-"`
 }
 
 type Review struct {

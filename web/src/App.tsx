@@ -81,6 +81,7 @@ const navItems: NavNode[] = [
     children: [
       { key: '/content', icon: <ReadOutlined />, label: '课程内容', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/scheduling', icon: <ScheduleOutlined />, label: '排课管理', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
+      { key: '/questions', icon: <FormOutlined />, label: '题库', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/materials', icon: <FileTextOutlined />, label: '学习资料', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/homework', icon: <FormOutlined />, label: '课后练习', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/review', icon: <CheckCircleOutlined />, label: '批改反馈', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] }
@@ -252,6 +253,7 @@ function Shell({ user }: { user: CurrentUser }) {
               <Route path="/students" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Students user={user} /></GuardedRoute>} />
               <Route path="/content" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><SimpleResourcePage kind="content" user={user} /></GuardedRoute>} />
               <Route path="/scheduling" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Scheduling user={user} /></GuardedRoute>} />
+              <Route path="/questions" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><SimpleResourcePage kind="questions" user={user} /></GuardedRoute>} />
               <Route path="/commercial" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><Commercial /></GuardedRoute>} />
               <Route path="/materials" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><SimpleResourcePage kind="materials" user={user} /></GuardedRoute>} />
               <Route path="/homework" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><SimpleResourcePage kind="homework" user={user} /></GuardedRoute>} />
