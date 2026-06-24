@@ -85,7 +85,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	var course learning.Course
 	app.doJSON(t, http.MethodPost, "/api/courses", token, learning.CourseUpsertRequest{
 		Name:            "接口测试英语课程",
-		LearningSpaceID: "space-g05-english-s1-mid",
+		LearningSpaceID: "space-g05-english-s1-q1",
 		ChapterCount:    6,
 		Status:          learning.StatusEnabled,
 	}, http.StatusOK, &course)
@@ -96,7 +96,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	var updatedCourse learning.Course
 	app.doJSON(t, http.MethodPut, "/api/courses/"+course.ID, token, learning.CourseUpsertRequest{
 		Name:            "接口测试英语课程-已编辑",
-		LearningSpaceID: "space-g05-english-s1-mid",
+		LearningSpaceID: "space-g05-english-s1-q1",
 		ChapterCount:    8,
 		Status:          learning.StatusEnabled,
 	}, http.StatusOK, &updatedCourse)
@@ -108,7 +108,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	doMultipart(t, app, http.MethodPost, "/api/materials", token, map[string]string{
 		"title":           "接口测试讲义",
 		"courseId":        course.ID,
-		"learningSpaceId": "space-g05-english-s1-mid",
+		"learningSpaceId": "space-g05-english-s1-q1",
 		"chapter":         "第一章",
 	}, "file", "material.pdf", []byte("%PDF-1.4 test material"), http.StatusOK, &material)
 	if material.ID == "" || material.FileID == "" || material.PreviewStatus != "可预览" {
@@ -133,7 +133,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodPut, "/api/materials/"+material.ID, token, learning.MaterialUpdateRequest{
 		Title:           "接口测试讲义-草稿",
 		CourseID:        course.ID,
-		LearningSpaceID: "space-g05-english-s1-mid",
+		LearningSpaceID: "space-g05-english-s1-q1",
 		Chapter:         "第二章",
 		Status:          learning.StatusDraft,
 	}, http.StatusOK, &updatedMaterial)
@@ -145,7 +145,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	doMultipart(t, app, http.MethodPost, "/api/homework", token, map[string]string{
 		"title":           "接口测试练习",
 		"courseId":        course.ID,
-		"learningSpaceId": "space-g05-english-s1-mid",
+		"learningSpaceId": "space-g05-english-s1-q1",
 		"deadline":        "2026-07-31",
 	}, "file", "homework.pdf", []byte("%PDF-1.4 test homework"), http.StatusOK, &homework)
 	if homework.ID == "" || homework.FileID == "" {
@@ -156,7 +156,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodPut, "/api/homework/"+homework.ID, token, learning.HomeworkUpdateRequest{
 		Title:           "接口测试练习-停用",
 		CourseID:        course.ID,
-		LearningSpaceID: "space-g05-english-s1-mid",
+		LearningSpaceID: "space-g05-english-s1-q1",
 		Deadline:        "2026-08-01",
 		Status:          string(learning.StatusDisabled),
 	}, http.StatusOK, &updatedHomework)
@@ -201,7 +201,7 @@ func TestAdminSystemManagementThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodPost, "/api/teachers", campusToken, learning.TeacherUpsertRequest{
 		Name:              "接口测试教师",
 		Phone:             "13900002001",
-		LearningSpaceIDs:  []string{"space-g05-english-s1-mid"},
+		LearningSpaceIDs:  []string{"space-g05-english-s1-q1"},
 		CanUploadHandout:  true,
 		CanUploadQuestion: false,
 		CanReview:         true,
@@ -215,7 +215,7 @@ func TestAdminSystemManagementThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodPut, "/api/teachers/"+teacher.ID, campusToken, learning.TeacherUpsertRequest{
 		Name:              "接口测试教师-已编辑",
 		Phone:             "13900002001",
-		LearningSpaceIDs:  []string{"space-g05-english-s1-mid", "space-g05-english-s1-final"},
+		LearningSpaceIDs:  []string{"space-g05-english-s1-q1", "space-g05-english-s1-q2"},
 		CanUploadHandout:  true,
 		CanUploadQuestion: true,
 		CanReview:         false,
@@ -228,10 +228,10 @@ func TestAdminSystemManagementThroughAPI(t *testing.T) {
 
 	var staff learning.AdminStaff
 	app.doJSON(t, http.MethodPost, "/api/admin-staff", superToken, learning.AdminStaffUpsertRequest{
-		Name:     "接口测试教务",
-		Phone:    "13900003001",
-		Role:     learning.RoleOpsStaff,
-		Remark:   "接口测试管理人员新增",
+		Name:   "接口测试教务",
+		Phone:  "13900003001",
+		Role:   learning.RoleOpsStaff,
+		Remark: "接口测试管理人员新增",
 	}, http.StatusOK, &staff)
 	if staff.ID == "" || staff.Role != learning.RoleOpsStaff || staff.AccountStatus != "正常" {
 		t.Fatalf("unexpected admin staff: %#v", staff)

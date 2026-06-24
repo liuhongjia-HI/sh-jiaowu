@@ -318,14 +318,14 @@ func TestGrantPreviewAndCreateGrantThroughAPI(t *testing.T) {
 	var created learning.Package
 	app.doJSON(t, http.MethodPost, "/api/packages", token, learning.PackageUpsertRequest{
 		Name:             "五年级英语接口测试题包",
-		AcademicYear:     "2026 学年",
+		AcademicYear:     "2025.2026学年",
 		Grade:            "五年级",
-		Semester:         "第一学期",
+		Semester:         "S1",
 		Subject:          "英语",
-		PhaseScope:       "期中前",
+		PhaseScope:       "Q1",
 		PackageType:      "题",
 		Summary:          "接口测试专用套餐。",
-		LearningSpaceIDs: []string{"space-g05-english-s1-mid"},
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
 		ContentTypeCodes: []string{"question"},
 		Status:           learning.StatusEnabled,
 	}, http.StatusOK, &created)
@@ -386,14 +386,14 @@ func TestCommercialLifecycleThroughAPI(t *testing.T) {
 	var pkg learning.Package
 	app.doJSON(t, http.MethodPost, "/api/packages", token, learning.PackageUpsertRequest{
 		Name:             "五年级英语商业闭环课包",
-		AcademicYear:     "2026 学年",
+		AcademicYear:     "2025.2026学年",
 		Grade:            "五年级",
-		Semester:         "第一学期",
+		Semester:         "S1",
 		Subject:          "英语",
-		PhaseScope:       "期中前",
+		PhaseScope:       "Q1",
 		PackageType:      "题",
 		Summary:          "商业闭环测试套餐。",
-		LearningSpaceIDs: []string{"space-g05-english-s1-mid"},
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
 		ContentTypeCodes: []string{"question"},
 		Status:           learning.StatusEnabled,
 	}, http.StatusOK, &pkg)
@@ -503,7 +503,7 @@ func TestSchedulingCandidateAndCreateClassThroughAPI(t *testing.T) {
 
 	var class learning.ScheduleClass
 	app.doJSON(t, http.MethodPost, "/api/schedule-classes", token, learning.ScheduleClassCreateRequest{
-		CourseID:        "course-g05-english-s1-mid",
+		CourseID:        "course-g05-english-s1-q1",
 		TeacherID:       "user-teacher",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
@@ -533,7 +533,7 @@ func TestFileDownloadRequiresVisibleContent(t *testing.T) {
 	}
 	material, err := app.store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
 		Title:    "接口测试讲义",
-		CourseID: "course-g05-english-s1-mid",
+		CourseID: "course-g05-english-s1-q1",
 		File: learning.FileAsset{
 			ID:            "file-router-download",
 			FileName:      "material.pdf",
@@ -579,7 +579,7 @@ func TestStudentSubmissionThroughAPI(t *testing.T) {
 		Score        int    `json:"score"`
 	}
 	app.doJSON(t, http.MethodPost, "/api/student/submissions", token, learning.SubmissionRequest{
-		HomeworkID: "hw-g05-english-s1-mid",
+		HomeworkID: "hw-g05-english-s1-q1",
 		Answers: []learning.SubmissionAnswer{
 			{QuestionID: "q1", Choice: "A"},
 			{QuestionID: "q2", Text: "今天学会了抓中心句。"},

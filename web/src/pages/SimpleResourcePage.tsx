@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
-import { gradeOptions, subjectOptions, subjectsForGrade } from '../utils/curriculum';
+import { DEFAULT_ACADEMIC_YEAR, formatLearningSpace, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -75,7 +75,7 @@ function columnsFor(kind: Kind, rows: Record<string, unknown>[], renderActions?:
     render: (value: unknown) => {
       if (Array.isArray(value)) return value.join('、');
       if (key === 'status' || key === 'accountStatus' || key === 'previewStatus') return statusTag(String(value || '-'));
-      return String(value ?? '');
+      return displayFieldValue(key, value);
     }
   }));
   if (renderActions && (kind === 'packages' || kind === 'content' || kind === 'questions' || kind === 'materials' || kind === 'homework' || kind === 'review')) {
@@ -117,7 +117,7 @@ function fieldsFor(kind: Kind, row: Record<string, unknown>) {
   return (keysByKind[kind] ?? Object.keys(row).filter((key) => !['id', 'name', 'title', 'status'].includes(key)).slice(0, 6))
     .filter((key) => row[key] !== undefined && !Array.isArray(row[key]))
     .slice(0, 6)
-    .map((key) => ({ label: labelOf(key), value: displayValue(row[key]) }));
+    .map((key) => ({ label: labelOf(key), value: displayFieldValue(key, row[key]) }));
 }
 
 function tagsFor(row: Record<string, unknown>) {
@@ -142,6 +142,12 @@ function displayValue(value: unknown) {
   if (Array.isArray(value)) return value.join('、') || '-';
   if (value === null || value === undefined || value === '') return '-';
   return String(value);
+}
+
+function displayFieldValue(key: string, value: unknown) {
+  if (key === 'semester') return semesterLabel(String(value || '')) || '-';
+  if (key === 'phase' || key === 'phaseScope') return phaseLabel(String(value || '')) || displayValue(value);
+  return displayValue(value);
 }
 
 function questionTypeLabel(type?: string) {
@@ -346,6 +352,13 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
     enabled: kind === 'packages' || kind === 'content',
     queryFn: () => getData<LearningSpace[]>('/learning-spaces')
   });
+  const settings = useQuery({
+    queryKey: ['settings-for-resource-page'],
+    enabled: kind === 'packages' || kind === 'questions',
+    queryFn: () => getData<Record<string, string>>('/settings')
+  });
+  const currentAcademicYear = settings.data?.academicYear || DEFAULT_ACADEMIC_YEAR;
+  const currentSemesterOptions = semesterOptions(settings.data?.semesters);
   const upload = useMutation({
     mutationFn: async (values: { title: string; courseId: string; chapter?: string; deadline?: string; questionIds?: string[]; fileList?: UploadFile[] }) => {
       if (!isUploadKind(kind)) throw new Error('当前页面不能上传文件');
@@ -484,6 +497,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
       setEditingSetting(null);
       settingForm.resetFields();
       queryClient.invalidateQueries({ queryKey: [kind] });
+      queryClient.invalidateQueries({ queryKey: ['settings-for-resource-page'] });
       queryClient.invalidateQueries({ queryKey: ['logs'] });
     },
     onError: (err: Error) => {
@@ -570,10 +584,10 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
     setEditingPackage(null);
     packageForm.setFieldsValue({
       name: '',
-      academicYear: '2026 学年',
+      academicYear: currentAcademicYear,
       grade: undefined as unknown as string,
       subject: undefined as unknown as string,
-      semester: '第一学期',
+      semester: currentSemesterOptions[0]?.value || 'S1',
       phaseScope: '全学期',
       packageType: '',
       summary: '',
@@ -609,7 +623,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
     setEditingQuestion(null);
     questionForm.setFieldsValue({
       grade: undefined as unknown as string,
-      semester: '第一学期',
+      semester: currentSemesterOptions[0]?.value || 'S1',
       subject: undefined as unknown as string,
       type: 'single',
       stem: '',
@@ -851,6 +865,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
           open={questionOpen}
           editing={Boolean(editingQuestion)}
           loading={saveQuestion.isPending}
+          semesterOptions={currentSemesterOptions}
           onCancel={() => setQuestionOpen(false)}
           onSubmit={(values) => saveQuestion.mutate(values)}
         />
@@ -871,6 +886,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
           editing={Boolean(editingPackage)}
           loading={savePackage.isPending}
           learningSpaces={learningSpaces.data ?? []}
+          semesterOptions={currentSemesterOptions}
           onCancel={() => setPackageOpen(false)}
           onSubmit={(values) => savePackage.mutate(values)}
         />
@@ -972,7 +988,7 @@ function CourseDialog({
 }) {
   const spaceOptions = learningSpaces
     .filter((space) => unrestricted || allowedLearningSpaceIds.includes(space.id))
-    .map((space) => ({ label: `${space.grade} · ${space.subject} · ${space.semester} · ${space.phase}`, value: space.id }));
+    .map((space) => ({ label: formatLearningSpace(space), value: space.id }));
   const hasSpaceOptions = spaceOptions.length > 0;
 
   return (
@@ -997,7 +1013,7 @@ function CourseDialog({
       )}
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="name" label="课程名称" rules={[{ required: true, message: '请输入课程名称' }]}>
-          <Input placeholder="例如：五年级英语第一学期期中前阅读课程" />
+          <Input placeholder="例如：五年级英语 S1 Q1 阅读课程" />
         </Form.Item>
         <Form.Item name="learningSpaceId" label="课程范围" rules={[{ required: true, message: '请选择课程范围' }]}>
           <Select
@@ -1082,6 +1098,7 @@ function PackageDialog({
   editing,
   loading,
   learningSpaces,
+  semesterOptions,
   onCancel,
   onSubmit
 }: {
@@ -1090,6 +1107,7 @@ function PackageDialog({
   editing: boolean;
   loading: boolean;
   learningSpaces: LearningSpace[];
+  semesterOptions: Array<{ label: string; value: string }>;
   onCancel: () => void;
   onSubmit: (values: PackageFormValues) => void;
 }) {
@@ -1098,7 +1116,7 @@ function PackageDialog({
   const semester = Form.useWatch('semester', form);
   const spaceOptions = learningSpaces
     .filter((space) => (!grade || space.grade === grade) && (!subject || space.subject === subject) && (!semester || space.semester === semester))
-    .map((space) => ({ label: `${space.phase} · ${space.name}`, value: space.id }));
+    .map((space) => ({ label: `${phaseLabel(space.phase)} · ${formatLearningSpace(space)}`, value: space.id }));
 
   return (
     <Modal
@@ -1114,7 +1132,7 @@ function PackageDialog({
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="name" label="套餐名称" rules={[{ required: true, message: '请输入套餐名称' }]}>
-          <Input placeholder="例如：2026 学年 五年级 第一学期 英语 题+讲义" />
+          <Input placeholder="例如：2025.2026学年 五年级 S1 英语 题+讲义" />
         </Form.Item>
         <Space size={12} align="start" wrap style={{ width: '100%' }}>
           <Form.Item name="academicYear" label="学年" rules={[{ required: true, message: '请输入学年' }]}>
@@ -1139,10 +1157,7 @@ function PackageDialog({
           <Form.Item name="semester" label="学期" rules={[{ required: true, message: '请选择学期' }]}>
             <Select
               style={{ width: 150 }}
-              options={[
-                { label: '第一学期', value: '第一学期' },
-                { label: '第二学期', value: '第二学期' }
-              ]}
+              options={semesterOptions}
               onChange={() => form.setFieldValue('learningSpaceIds', [])}
             />
           </Form.Item>
@@ -1152,7 +1167,7 @@ function PackageDialog({
             mode="multiple"
             showSearch
             optionFilterProp="label"
-            placeholder="选择期中前、期末前等学习空间"
+            placeholder="选择 Q1 期中、Q2 期末等学习空间"
             options={spaceOptions}
           />
         </Form.Item>
@@ -1242,6 +1257,7 @@ function QuestionDialog({
   open,
   editing,
   loading,
+  semesterOptions,
   onCancel,
   onSubmit
 }: {
@@ -1249,6 +1265,7 @@ function QuestionDialog({
   open: boolean;
   editing: boolean;
   loading: boolean;
+  semesterOptions: Array<{ label: string; value: string }>;
   onCancel: () => void;
   onSubmit: (values: QuestionFormValues) => void;
 }) {
@@ -1271,7 +1288,7 @@ function QuestionDialog({
             <Select placeholder="年级" options={gradeOptions()} onChange={() => form.setFieldValue('subject', undefined)} />
           </Form.Item>
           <Form.Item name="semester" rules={[{ required: true, message: '请选择学期' }]} style={{ width: '33%' }}>
-            <Select placeholder="学期" options={[{ label: '第一学期', value: '第一学期' }, { label: '第二学期', value: '第二学期' }]} />
+            <Select placeholder="学期" options={semesterOptions} />
           </Form.Item>
           <Form.Item name="subject" rules={[{ required: true, message: '请选择学科' }]} style={{ width: '34%' }}>
             <Select placeholder="学科" options={subjectOptions(grade)} />
@@ -1351,7 +1368,7 @@ function UploadDialog({
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="title" label={kind === 'materials' ? '讲义标题' : '练习标题'} rules={[{ required: true, message: '请输入标题' }]}>
-          <Input placeholder={kind === 'materials' ? '例如：五年级英语期中核心讲义' : '例如：五年级英语阅读练习'} />
+          <Input placeholder={kind === 'materials' ? '例如：五年级英语 S1 Q1 核心讲义' : '例如：五年级英语 S1 Q1 阅读练习'} />
         </Form.Item>
         <Form.Item name="courseId" label="课程范围" rules={[{ required: true, message: '请选择课程范围' }]}>
           <Select
@@ -1368,10 +1385,10 @@ function UploadDialog({
         ) : (
           <>
             <Form.Item name="deadline" label="截止时间">
-              <Input placeholder="例如：2026-06-30" />
+              <Input placeholder="例如：2026-10-30" />
             </Form.Item>
             <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
-              <Select mode="multiple" showSearch optionFilterProp="label" placeholder="从同年级、学期、学科题库选题" options={questions.map((question) => ({ value: question.id, label: `${question.grade} ${question.semester} ${question.subject} · ${questionTypeLabel(question.type)} · ${question.stem}` }))} />
+              <Select mode="multiple" showSearch optionFilterProp="label" placeholder="从同年级、学期、学科题库选题" options={questions.map((question) => ({ value: question.id, label: `${question.grade} ${semesterLabel(question.semester)} ${question.subject} · ${questionTypeLabel(question.type)} · ${question.stem}` }))} />
             </Form.Item>
           </>
         )}
@@ -1428,7 +1445,7 @@ function ContentEditDialog({
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="title" label={kind === 'materials' ? '讲义标题' : '题目标题'} rules={[{ required: true, message: '请输入标题' }]}>
-          <Input placeholder={kind === 'materials' ? '例如：五年级英语期中核心讲义' : '例如：五年级英语阅读练习题'} />
+          <Input placeholder={kind === 'materials' ? '例如：五年级英语 S1 Q1 核心讲义' : '例如：五年级英语 S1 Q1 阅读练习题'} />
         </Form.Item>
         <Form.Item name="courseId" label="课程范围" rules={[{ required: true, message: '请选择课程范围' }]}>
           <Select
@@ -1445,10 +1462,10 @@ function ContentEditDialog({
         ) : (
           <>
             <Form.Item name="deadline" label="截止时间">
-              <Input placeholder="例如：2026-06-30" />
+              <Input placeholder="例如：2026-10-30" />
             </Form.Item>
             <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
-              <Select mode="multiple" showSearch optionFilterProp="label" placeholder="从题库选择本练习题目" options={questions.map((question) => ({ value: question.id, label: `${question.grade} ${question.semester} ${question.subject} · ${questionTypeLabel(question.type)} · ${question.stem}` }))} />
+              <Select mode="multiple" showSearch optionFilterProp="label" placeholder="从题库选择本练习题目" options={questions.map((question) => ({ value: question.id, label: `${question.grade} ${semesterLabel(question.semester)} ${question.subject} · ${questionTypeLabel(question.type)} · ${question.stem}` }))} />
             </Form.Item>
           </>
         )}

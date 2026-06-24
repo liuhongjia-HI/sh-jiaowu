@@ -155,9 +155,9 @@ func (s *MemoryStore) seedBootstrapAdmin(options Options) {
 
 func (s *MemoryStore) seedBaseDictionaries() {
 	s.settings = map[string]string{
-		"academicYear":   "2026 学年",
+		"academicYear":   "2025.2026学年",
 		"grades":         "G1-G12",
-		"semesters":      "第一学期 / 第二学期 / 暑期班",
+		"semesters":      "S1 / S2",
 		"watermarkRule":  "昵称 + 手机尾号 + 时间",
 		"downloadPolicy": "默认不可下载",
 	}
@@ -168,7 +168,7 @@ func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {
 		{ID: "user-super", Name: "超级管理员", Phone: "13800000001", OpenID: "demo-super", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleSuperAdmin}, CampusScopes: []string{"campus-main"}},
 		{ID: "user-campus", Name: "校区管理员", Phone: "13800000002", OpenID: "demo-campus", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleCampusAdmin}, CampusID: "campus-main", CampusScopes: []string{"campus-main"}},
 		{ID: "user-ops", Name: "运营教务", Phone: "13800000003", OpenID: "demo-ops", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleOpsStaff}, CampusID: "campus-main", CampusScopes: []string{"campus-main"}},
-		{ID: "user-teacher", Name: "英语老师", Phone: "13800000004", OpenID: "demo-teacher", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleTeacher}, CampusID: "campus-main", LearningSpaceIDs: []string{"space-g05-english-s1-mid", "space-g05-english-s1-final"}, CanUploadHandout: true, CanUploadQuestion: true, CanReview: true},
+		{ID: "user-teacher", Name: "英语老师", Phone: "13800000004", OpenID: "demo-teacher", PasswordHash: adminPasswordHash, AccountStatus: "正常", Roles: []learning.Role{learning.RoleTeacher}, CampusID: "campus-main", LearningSpaceIDs: []string{"space-g05-english-s1-q1", "space-g05-english-s1-q2"}, CanUploadHandout: true, CanUploadQuestion: true, CanReview: true},
 		{ID: "user-student-001", Name: "小明", Phone: "18500009069", OpenID: "", AccountStatus: "正常", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-001", CampusID: "campus-main"},
 		{ID: "user-student-002", Name: "Lucy", Phone: "13600002201", OpenID: "", AccountStatus: "待提醒", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-002", CampusID: "campus-main"},
 		{ID: "user-student-003", Name: "小航", Phone: "13700003303", OpenID: "", AccountStatus: "正常", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-003", CampusID: "campus-main"},
@@ -179,8 +179,8 @@ func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {
 		{ID: "stu-003", Name: "小航", Grade: "五年级", Phone: "137****3303", LearningStatus: "刚开通", AccountStatus: "正常", StreakDays: 1, AverageScore: 80, BadgeCount: 1, BindStatus: "待绑定", LastStudyAt: "2026-05-22 20:00:00", EffectiveUntil: "2027-05-22"},
 	}
 	s.reviews = []learning.Review{
-		{ID: "rev-001", StudentID: "stu-001", HomeworkID: "hw-g05-english-s1-mid", StudentName: "小明", PackageName: "英语班", Homework: "阅读挑战", SystemScore: 86, TeacherComment: "阅读理解整体不错，注意把答案依据写完整。", Reward: "阅读小星星", Status: "待评语"},
-		{ID: "rev-002", StudentID: "stu-002", HomeworkID: "hw-g05-math-s1-mid", StudentName: "Lucy", PackageName: "数学班", Homework: "图形挑战", SystemScore: 78, TeacherComment: "图形思路基本正确，错题建议再画一遍辅助线。", Reward: "图形探索徽章", Status: "待复核"},
+		{ID: "rev-001", StudentID: "stu-001", HomeworkID: "hw-g05-english-s1-q1", StudentName: "小明", PackageName: "英语班", Homework: "阅读挑战", SystemScore: 86, TeacherComment: "阅读理解整体不错，注意把答案依据写完整。", Reward: "阅读小星星", Status: "待评语"},
+		{ID: "rev-002", StudentID: "stu-002", HomeworkID: "hw-g05-math-s1-q1", StudentName: "Lucy", PackageName: "数学班", Homework: "图形挑战", SystemScore: 78, TeacherComment: "图形思路基本正确，错题建议再画一遍辅助线。", Reward: "图形探索徽章", Status: "待复核"},
 	}
 	s.notices = []learning.Notice{
 		{ID: "notice-001", Type: "练", Title: "英语阅读挑战已发布", Target: "英语班 86 名学生", Summary: "今天的小挑战别忘啦", Status: "已发送"},
@@ -251,9 +251,9 @@ func subjectAppliesToGrade(gradeIndex int, subject string) bool {
 	return true
 }
 
-var demoSemesters = []string{"第一学期", "第二学期"}
+var demoSemesters = []string{"S1", "S2"}
 
-var demoPhases = []string{"期中前", "期末前"}
+var demoPhases = []string{"Q1", "Q2"}
 
 var demoPackageTypes = []packageTypeSpec{
 	{Code: "question", Label: "题", Summary: "只开放题", ContentTypes: []string{"question"}},
@@ -262,7 +262,7 @@ var demoPackageTypes = []packageTypeSpec{
 }
 
 func seedPermissionDemoData(s *MemoryStore) {
-	const academicYear = "2026 学年"
+	const academicYear = "2025.2026学年"
 	for gradeIndex, grade := range demoGrades {
 		for _, subject := range demoSubjects {
 			if !subjectAppliesToGrade(gradeIndex, subject) {
@@ -387,9 +387,9 @@ func subjectSlug(subject string) string {
 
 func phaseSlug(phaseIndex int) string {
 	if phaseIndex == 0 {
-		return "mid"
+		return "q1"
 	}
-	return "final"
+	return "q2"
 }
 
 func demoViewCount(gradeIndex, semesterIndex, phaseIndex int) int {
@@ -444,7 +444,7 @@ func slugText(value string) string {
 }
 
 func semesterNumber(value string) string {
-	if strings.Contains(value, "第二") {
+	if value == "S2" || strings.Contains(value, "第二") {
 		return "2"
 	}
 	return "1"
@@ -3188,7 +3188,7 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		return learning.Package{}, errors.New("请输入学习套餐名称")
 	}
 	if req.AcademicYear == "" {
-		req.AcademicYear = "2026 学年"
+		req.AcademicYear = "2025.2026学年"
 	}
 	if req.Grade == "" || req.Subject == "" || req.Semester == "" {
 		return learning.Package{}, errors.New("请选择年级、学科和学期")

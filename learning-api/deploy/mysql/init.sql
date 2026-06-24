@@ -448,9 +448,9 @@ INSERT IGNORE INTO subjects (id, name, status) VALUES
   ('biology', '生物', '启用');
 
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
-  ('academicYear', '2026 学年'),
+  ('academicYear', '2025.2026学年'),
   ('grades', 'G1-G12'),
-  ('semesters', '第一学期 / 第二学期 / 暑期班'),
+  ('semesters', 'S1 / S2'),
   ('watermarkRule', '昵称 + 手机尾号 + 时间'),
   ('downloadPolicy', '默认不可下载');
 
@@ -503,7 +503,7 @@ CREATE TEMPORARY TABLE seed_semesters (
   PRIMARY KEY (semester_no)
 );
 INSERT INTO seed_semesters (semester_no, semester_name) VALUES
-  (1, '第一学期'), (2, '第二学期');
+  (1, 'S1'), (2, 'S2');
 
 DROP TEMPORARY TABLE IF EXISTS seed_phases;
 CREATE TEMPORARY TABLE seed_phases (
@@ -512,7 +512,7 @@ CREATE TEMPORARY TABLE seed_phases (
   PRIMARY KEY (phase_code)
 );
 INSERT INTO seed_phases (phase_code, phase_name) VALUES
-  ('mid', '期中前'), ('final', '期末前');
+  ('q1', 'Q1'), ('q2', 'Q2');
 
 DROP TEMPORARY TABLE IF EXISTS seed_package_types;
 CREATE TEMPORARY TABLE seed_package_types (
@@ -539,7 +539,7 @@ FROM seed_subjects;
 INSERT IGNORE INTO learning_spaces (id, academic_year, grade, subject, semester, phase, name, status)
 SELECT
   CONCAT('space-g', LPAD(g.grade_no, 2, '0'), '-', s.subject_code, '-s', sem.semester_no, '-', p.phase_code),
-  '2026 学年',
+  '2025.2026学年',
   g.grade_name,
   s.subject_name,
   sem.semester_name,
@@ -555,8 +555,8 @@ CROSS JOIN seed_phases p;
 INSERT IGNORE INTO study_packages (id, name, academic_year, grade, semester, subject, phase_scope, package_type, status)
 SELECT
   CONCAT('pkg-g', LPAD(g.grade_no, 2, '0'), '-', s.subject_code, '-s', sem.semester_no, '-', pt.package_type),
-  CONCAT('2026 学年 ', g.grade_name, ' ', sem.semester_name, ' ', s.subject_name, ' ', pt.package_label),
-  '2026 学年',
+  CONCAT('2025.2026学年 ', g.grade_name, ' ', sem.semester_name, ' ', s.subject_name, ' ', pt.package_label),
+  '2025.2026学年',
   g.grade_name,
   sem.semester_name,
   s.subject_name,
@@ -654,9 +654,9 @@ SELECT
   CONCAT('course-g', LPAD(g.grade_no, 2, '0'), '-', s.subject_code, '-s', sem.semester_no, '-', p.phase_code),
   CONCAT(g.grade_name, s.subject_name, sem.semester_name, p.phase_name, '练习题'),
   CASE
-    WHEN sem.semester_no = 1 AND p.phase_code = 'mid' THEN '2026-10-30'
-    WHEN sem.semester_no = 1 AND p.phase_code = 'final' THEN '2027-01-15'
-    WHEN sem.semester_no = 2 AND p.phase_code = 'mid' THEN '2027-04-30'
+    WHEN sem.semester_no = 1 AND p.phase_code = 'q1' THEN '2026-10-30'
+    WHEN sem.semester_no = 1 AND p.phase_code = 'q2' THEN '2027-01-15'
+    WHEN sem.semester_no = 2 AND p.phase_code = 'q1' THEN '2027-04-30'
     ELSE '2027-06-20'
   END,
   CONCAT('teacher-', s.subject_code),
@@ -689,8 +689,8 @@ INSERT IGNORE INTO user_roles (user_id, role_code) VALUES
 INSERT IGNORE INTO teacher_learning_space_access
   (teacher_id, learning_space_id, can_view, can_upload_handout, can_upload_question, can_review, can_manage_content, status)
 VALUES
-  ('user-teacher', 'space-g05-english-s1-mid', 1, 1, 1, 1, 1, 'active'),
-  ('user-teacher', 'space-g05-english-s1-final', 1, 1, 1, 1, 1, 'active');
+  ('user-teacher', 'space-g05-english-s1-q1', 1, 1, 1, 1, 1, 'active'),
+  ('user-teacher', 'space-g05-english-s1-q2', 1, 1, 1, 1, 1, 'active');
 
 INSERT IGNORE INTO student_package_grants (student_id, package_id, starts_at, ends_at, status, operator_id, operator_name) VALUES
   ('stu-001', 'pkg-g05-english-s1-full', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),

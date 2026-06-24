@@ -11,6 +11,22 @@ export const ALL_SUBJECTS = ['语文', '数学', '英语', '物理', '化学', '
 
 export const ELEMENTARY_SUBJECTS = ['语文', '数学', '英语'];
 
+export const DEFAULT_ACADEMIC_YEAR = '2025.2026学年';
+
+export const DEFAULT_SEMESTERS = ['S1', 'S2'];
+
+export const DEFAULT_PHASES = ['Q1', 'Q2'];
+
+const SEMESTER_LABELS: Record<string, string> = {
+  S1: '第一学期',
+  S2: '第二学期'
+};
+
+const PHASE_LABELS: Record<string, string> = {
+  Q1: '期中',
+  Q2: '期末'
+};
+
 // 年级在 GRADES 中的下标，未知或为空返回 -1。
 export function gradeIndex(grade?: string): number {
   if (!grade) return -1;
@@ -31,4 +47,33 @@ export function gradeOptions() {
 
 export function subjectOptions(grade?: string) {
   return subjectsForGrade(grade).map((subject) => ({ label: subject, value: subject }));
+}
+
+export function semesterLabel(value?: string) {
+  if (!value) return '';
+  const label = SEMESTER_LABELS[value];
+  return label ? `${value} ${label}` : value;
+}
+
+export function phaseLabel(value?: string) {
+  if (!value) return '';
+  const label = PHASE_LABELS[value];
+  return label ? `${value} ${label}` : value;
+}
+
+export function parseSemesterSetting(value?: string) {
+  const parsed = (value || '')
+    .split(/[\/,，、\s]+/)
+    .map((item) => item.trim())
+    .filter((item) => DEFAULT_SEMESTERS.includes(item));
+  const unique = Array.from(new Set(parsed));
+  return unique.length > 0 ? unique : DEFAULT_SEMESTERS;
+}
+
+export function semesterOptions(settingValue?: string) {
+  return parseSemesterSetting(settingValue).map((value) => ({ label: semesterLabel(value), value }));
+}
+
+export function formatLearningSpace(space: { grade: string; subject: string; semester: string; phase: string; name?: string }) {
+  return `${space.grade} · ${space.subject} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)}`;
 }

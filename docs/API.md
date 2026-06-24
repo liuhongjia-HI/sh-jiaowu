@@ -122,15 +122,15 @@
 
 ```json
 {
-  "name": "2026 学年 五年级 第一学期 英语 题+讲义",
-  "academicYear": "2026 学年",
+  "name": "2025.2026学年 五年级 S1 英语 题+讲义",
+  "academicYear": "2025.2026学年",
   "grade": "五年级",
-  "semester": "第一学期",
+  "semester": "S1",
   "subject": "英语",
   "phaseScope": "全学期",
   "packageType": "题+讲义",
-  "summary": "开放期中前和期末前英语练习与讲义。",
-  "learningSpaceIds": ["space-g05-english-s1-mid", "space-g05-english-s1-final"],
+  "summary": "开放 S1 Q1 和 S1 Q2 英语练习与讲义。",
+  "learningSpaceIds": ["space-g05-english-s1-q1", "space-g05-english-s1-q2"],
   "contentTypeCodes": ["question", "handout"],
   "status": "启用"
 }
@@ -175,8 +175,8 @@
 
 ```json
 {
-  "name": "五年级英语第一学期期中前阅读课程",
-  "learningSpaceId": "space-g05-english-s1-mid",
+  "name": "五年级英语 S1 Q1 阅读课程",
+  "learningSpaceId": "space-g05-english-s1-q1",
   "chapterCount": 8,
   "status": "启用"
 }
@@ -193,8 +193,8 @@
 ```json
 {
   "title": "五年级英语期中核心讲义",
-  "courseId": "course-g05-english-s1-mid",
-  "learningSpaceId": "space-g05-english-s1-mid",
+  "courseId": "course-g05-english-s1-q1",
+  "learningSpaceId": "space-g05-english-s1-q1",
   "chapter": "第一章",
   "status": "启用"
 }
@@ -205,8 +205,8 @@
 ```json
 {
   "title": "五年级英语阅读练习题",
-  "courseId": "course-g05-english-s1-mid",
-  "learningSpaceId": "space-g05-english-s1-mid",
+  "courseId": "course-g05-english-s1-q1",
+  "learningSpaceId": "space-g05-english-s1-q1",
   "deadline": "2026-06-30",
   "status": "启用"
 }
@@ -241,8 +241,8 @@
   "name": "英语老师",
   "phone": "13800000004",
   "campusId": "campus-main",
-  "learningSpaceIds": ["space-g05-english-s1-mid", "space-g05-english-s1-final"],
-  "learningSpaces": ["五年级英语第一学期期中前", "五年级英语第一学期期末前"],
+  "learningSpaceIds": ["space-g05-english-s1-q1", "space-g05-english-s1-q2"],
+  "learningSpaces": ["五年级英语 S1 Q1", "五年级英语 S1 Q2"],
   "grades": ["五年级"],
   "subjects": ["英语"],
   "canUploadHandout": true,
@@ -260,7 +260,7 @@
 {
   "name": "英语老师",
   "phone": "13800000004",
-  "learningSpaceIds": ["space-g05-english-s1-mid", "space-g05-english-s1-final"],
+  "learningSpaceIds": ["space-g05-english-s1-q1", "space-g05-english-s1-q2"],
   "canUploadHandout": true,
   "canUploadQuestion": true,
   "canReview": true,
@@ -302,7 +302,7 @@
   "type": "练",
   "title": "英语阅读挑战已发布",
   "target": "五年级英语班",
-  "summary": "今天完成期中前阅读挑战。"
+  "summary": "今天完成 S1 Q1 阅读挑战。"
 }
 ```
 
@@ -339,14 +339,14 @@
   "studentId": "stu-001",
   "packageId": "pkg-g05-english-s1-full",
   "studentName": "小明",
-  "packageName": "2026 学年 五年级 第一学期 英语 题+讲义",
+  "packageName": "2025.2026学年 五年级 S1 英语 题+讲义",
   "alreadyOpened": true,
   "existingUntil": "2027-05-22",
-  "learningSpaces": ["五年级英语第一学期期中前"],
+  "learningSpaces": ["五年级英语 S1 Q1"],
   "contentTypes": ["题", "讲义"],
   "openCourses": [],
-  "openMaterials": ["五年级英语第一学期期中前核心讲义"],
-  "openHomework": ["五年级英语第一学期期中前练习题"],
+  "openMaterials": ["五年级英语 S1 Q1 核心讲义"],
+  "openHomework": ["五年级英语 S1 Q1 练习题"],
   "blockedContent": ["课程"],
   "effectiveDefault": "今天起 365 天"
 }
@@ -423,7 +423,7 @@
 
 ```json
 {
-  "homeworkId": "hw-g05-english-s1-mid",
+  "homeworkId": "hw-g05-english-s1-q1",
   "answers": [
     { "questionId": "q1", "choice": "A", "text": "" },
     { "questionId": "q2", "choice": "", "text": "今天学会了抓中心句" }

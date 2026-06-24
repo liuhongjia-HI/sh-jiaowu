@@ -267,7 +267,7 @@ func TestCompleteReviewCreatesStudentSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected review completion to succeed: %v", err)
 	}
-	if submission.StudentID != "stu-001" || submission.HomeworkID != "hw-g05-english-s1-mid" {
+	if submission.StudentID != "stu-001" || submission.HomeworkID != "hw-g05-english-s1-q1" {
 		t.Fatalf("unexpected submission linkage: %#v", submission)
 	}
 	if got := len(store.Reviews(teacher)); got != before-1 {
@@ -309,21 +309,21 @@ func TestCreatePackageSupportsGrantPreview(t *testing.T) {
 
 	pkg, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
 		Name:             "五年级英语专项题包",
-		AcademicYear:     "2026 学年",
+		AcademicYear:     "2025.2026学年",
 		Grade:            "五年级",
-		Semester:         "第一学期",
+		Semester:         "S1",
 		Subject:          "英语",
-		PhaseScope:       "期中前",
+		PhaseScope:       "Q1",
 		PackageType:      "题",
-		Summary:          "只开放期中前英语练习。",
-		LearningSpaceIDs: []string{"space-g05-english-s1-mid"},
+		Summary:          "只开放 S1 Q1 英语练习。",
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
 		ContentTypeCodes: []string{"question"},
 		Status:           learning.StatusEnabled,
 	})
 	if err != nil {
 		t.Fatalf("expected package creation to succeed: %v", err)
 	}
-	if !containsString(pkg.LearningSpaceIDs, "space-g05-english-s1-mid") {
+	if !containsString(pkg.LearningSpaceIDs, "space-g05-english-s1-q1") {
 		t.Fatalf("expected package response to include learning space ids: %#v", pkg.LearningSpaceIDs)
 	}
 	if !containsString(pkg.ContentTypeCodes, "question") {
@@ -347,13 +347,13 @@ func TestUpdatePackageRefreshesExistingGrantAccess(t *testing.T) {
 
 	pkg, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
 		Name:             "五年级英语可编辑套餐",
-		AcademicYear:     "2026 学年",
+		AcademicYear:     "2025.2026学年",
 		Grade:            "五年级",
-		Semester:         "第一学期",
+		Semester:         "S1",
 		Subject:          "英语",
-		PhaseScope:       "期中前",
+		PhaseScope:       "Q1",
 		PackageType:      "题",
-		LearningSpaceIDs: []string{"space-g05-english-s1-mid"},
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
 		ContentTypeCodes: []string{"question"},
 		Status:           learning.StatusEnabled,
 	})
@@ -366,13 +366,13 @@ func TestUpdatePackageRefreshesExistingGrantAccess(t *testing.T) {
 
 	_, err = store.UpdatePackage("运营教务", pkg.ID, learning.PackageUpsertRequest{
 		Name:             "五年级英语可编辑套餐",
-		AcademicYear:     "2026 学年",
+		AcademicYear:     "2025.2026学年",
 		Grade:            "五年级",
-		Semester:         "第一学期",
+		Semester:         "S1",
 		Subject:          "英语",
 		PhaseScope:       "全学期",
 		PackageType:      "题+讲义",
-		LearningSpaceIDs: []string{"space-g05-english-s1-mid", "space-g05-english-s1-final"},
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1", "space-g05-english-s1-q2"},
 		ContentTypeCodes: []string{"question", "handout"},
 		Status:           learning.StatusEnabled,
 	})
@@ -381,13 +381,13 @@ func TestUpdatePackageRefreshesExistingGrantAccess(t *testing.T) {
 	}
 
 	spaceIDs := store.studentAccessibleSpaceIDs("stu-001")
-	if !containsString(spaceIDs, "space-g05-english-s1-final") {
+	if !containsString(spaceIDs, "space-g05-english-s1-q2") {
 		t.Fatalf("expected existing grant access to refresh after package update, got %#v", spaceIDs)
 	}
 	materials := store.materialsForStudent("stu-001")
 	foundFinalMaterial := false
 	for _, material := range materials {
-		if material.LearningSpaceID == "space-g05-english-s1-final" {
+		if material.LearningSpaceID == "space-g05-english-s1-q2" {
 			foundFinalMaterial = true
 			break
 		}
@@ -413,13 +413,13 @@ func TestGrantPreviewMarksExistingActiveGrant(t *testing.T) {
 
 	created, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
 		Name:             "五年级英语未开通套餐",
-		AcademicYear:     "2026 学年",
+		AcademicYear:     "2025.2026学年",
 		Grade:            "五年级",
-		Semester:         "第一学期",
+		Semester:         "S1",
 		Subject:          "英语",
-		PhaseScope:       "期中前",
+		PhaseScope:       "Q1",
 		PackageType:      "题",
-		LearningSpaceIDs: []string{"space-g05-english-s1-mid"},
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
 		ContentTypeCodes: []string{"question"},
 		Status:           learning.StatusEnabled,
 	})
@@ -443,7 +443,7 @@ func TestCreateCourseRespectsTeacherScope(t *testing.T) {
 	}
 	course, err := store.CreateCourse("英语老师", teacher, learning.CourseUpsertRequest{
 		Name:            "五年级英语阅读拓展课",
-		LearningSpaceID: "space-g05-english-s1-mid",
+		LearningSpaceID: "space-g05-english-s1-q1",
 		ChapterCount:    6,
 		Status:          learning.StatusEnabled,
 	})
@@ -456,7 +456,7 @@ func TestCreateCourseRespectsTeacherScope(t *testing.T) {
 
 	if _, err := store.CreateCourse("英语老师", teacher, learning.CourseUpsertRequest{
 		Name:            "五年级数学拓展课",
-		LearningSpaceID: "space-g05-math-s1-mid",
+		LearningSpaceID: "space-g05-math-s1-q1",
 		ChapterCount:    6,
 		Status:          learning.StatusEnabled,
 	}); err == nil {
@@ -470,9 +470,9 @@ func TestUpdateCourseSyncsContentReferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected admin principal: %v", err)
 	}
-	updated, err := store.UpdateCourse("超级管理员", admin, "course-g05-english-s1-mid", learning.CourseUpsertRequest{
+	updated, err := store.UpdateCourse("超级管理员", admin, "course-g05-english-s1-q1", learning.CourseUpsertRequest{
 		Name:            "五年级英语期中阅读精讲课",
-		LearningSpaceID: "space-g05-english-s1-mid",
+		LearningSpaceID: "space-g05-english-s1-q1",
 		ChapterCount:    10,
 		Status:          learning.StatusEnabled,
 	})
@@ -504,7 +504,7 @@ func TestCreateNoticeAndStudentNoticeFiltering(t *testing.T) {
 		Type:    "练",
 		Title:   "英语阅读挑战已发布",
 		Target:  "五年级英语班",
-		Summary: "今天完成期中前阅读挑战。",
+		Summary: "今天完成 S1 Q1 阅读挑战。",
 	})
 	if err != nil {
 		t.Fatalf("expected notice creation to succeed: %v", err)
@@ -670,9 +670,9 @@ func TestDisabledHomeworkIsHiddenFromStudent(t *testing.T) {
 		t.Fatalf("expected student principal: %v", err)
 	}
 
-	if _, err := store.UpdateHomework("英语老师", teacher, "hw-g05-english-s1-mid", learning.HomeworkUpdateRequest{
+	if _, err := store.UpdateHomework("英语老师", teacher, "hw-g05-english-s1-q1", learning.HomeworkUpdateRequest{
 		Title:    "停用练习",
-		CourseID: "course-g05-english-s1-mid",
+		CourseID: "course-g05-english-s1-q1",
 		Deadline: "2026-10-30",
 		Status:   string(learning.StatusDisabled),
 	}); err != nil {
@@ -684,7 +684,7 @@ func TestDisabledHomeworkIsHiddenFromStudent(t *testing.T) {
 		t.Fatalf("expected student tasks: %v", err)
 	}
 	for _, task := range tasks {
-		if task.ID == "hw-g05-english-s1-mid" {
+		if task.ID == "hw-g05-english-s1-q1" {
 			t.Fatalf("disabled homework should be hidden from student tasks: %#v", task)
 		}
 	}
@@ -702,7 +702,7 @@ func TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow(t *test
 	}
 
 	item, err := store.CreateQuestion("英语老师", teacher, learning.QuestionBankUpsertRequest{
-		Grade: "五年级", Semester: "第一学期", Subject: "英语", Type: "multiple",
+		Grade: "五年级", Semester: "S1", Subject: "英语", Type: "multiple",
 		Stem: "哪些做法有助于英语阅读？", Options: []string{"圈关键词", "完全不读题", "复查答案"},
 		Answers: []string{"圈关键词", "复查答案"}, Score: 10, Status: string(learning.StatusEnabled),
 	})
@@ -710,7 +710,7 @@ func TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow(t *test
 		t.Fatalf("expected question creation to succeed: %v", err)
 	}
 	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
-		Title: "题库组卷练习", CourseID: "course-g05-english-s1-mid", LearningSpaceID: "space-g05-english-s1-mid",
+		Title: "题库组卷练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1",
 		Deadline: "2026-11-01", Status: string(learning.StatusEnabled), QuestionIDs: []string{item.ID},
 	})
 	if err != nil {
@@ -738,7 +738,7 @@ func TestTextQuestionSubmissionCreatesPendingReview(t *testing.T) {
 		t.Fatalf("expected student principal: %v", err)
 	}
 	submission, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{
-		HomeworkID: "hw-g05-english-s1-mid",
+		HomeworkID: "hw-g05-english-s1-q1",
 		Answers: []learning.SubmissionAnswer{
 			{QuestionID: "q1", Choice: "A"},
 			{QuestionID: "q2", Text: "今天学会了抓中心句。"},

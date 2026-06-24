@@ -48,6 +48,7 @@ func New(dep Dependencies) *gin.Engine {
 		admin := api.Group("", middleware.AuthRequired(tokens, dep.Service, learning.RoleTeacher, learning.RoleOpsStaff, learning.RoleCampusAdmin, learning.RoleSuperAdmin))
 		{
 			admin.GET("/dashboard/overview", h.Dashboard)
+			admin.GET("/settings", h.Settings)
 			admin.GET("/packages", h.Packages)
 			admin.GET("/learning-spaces", h.LearningSpaces)
 			admin.GET("/students", h.Students)
@@ -114,7 +115,6 @@ func New(dep Dependencies) *gin.Engine {
 			systemAdmin.PUT("/teachers/:id", h.UpdateTeacher)
 			systemAdmin.POST("/teachers/:id/reset-password", h.ResetTeacherPassword)
 			systemAdmin.GET("/logs", h.Logs)
-			systemAdmin.GET("/settings", h.Settings)
 			systemAdmin.PUT("/settings", h.UpdateSetting)
 		}
 
