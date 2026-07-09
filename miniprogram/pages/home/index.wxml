@@ -1,81 +1,147 @@
-<view class="hero">
-  <view class="eyebrow">欢迎来到学习乐园</view>
-  <view class="hero-title">今天也一起去冒险吧</view>
-  <view wx:if="{{home}}" class="badge">连续学习 {{home.student.streakDays}} 天</view>
-  <view wx:if="{{home}}" class="badge">今日能量 {{home.student.averageScore}}%</view>
-</view>
+<view class="home-page">
+  <view class="home-top">
+    <view class="search-panel">
+      <view class="search-icon">⌕</view>
+      <input class="search-input" value="{{keyword}}" placeholder="搜索课程、资料、题目" confirm-type="search" bindinput="changeKeyword" />
+      <view wx:if="{{keyword}}" class="search-clear" bindtap="clearKeyword">清除</view>
+    </view>
+  </view>
 
-<view wx:if="{{loading}}" class="empty">正在准备今天的学习内容...</view>
-<view wx:elif="{{!home}}" class="section">
-  <view class="empty-card">
-    <view class="title">暂时没有学习内容</view>
-    <view class="sub">{{emptyMessage}}</view>
-    <button class="button" bindtap="goLogin">去登录绑定</button>
+  <view wx:if="{{loading}}" class="empty">正在准备今天的学习内容...</view>
+  <view wx:elif="{{!home}}" class="section">
+    <view class="empty-card home-empty">
+      <view class="title">先完成登录绑定</view>
+      <view class="sub">{{emptyMessage}}</view>
+      <button class="button" bindtap="goLogin">去登录绑定</button>
+    </view>
   </view>
-</view>
-<view wx:elif="{{!hasContent}}" class="section">
-  <view class="empty-card">
-    <view class="mascot">🐣</view>
-    <view class="title">待匹配课程权限</view>
-    <view class="sub">绑定手机号后，系统会自动匹配老师已开通的课程。若课程仍未显示，请联系老师确认开通状态。</view>
-    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{bindingPhone}}" disabled="{{bindingPhone}}">绑定手机号匹配课程</button>
-  </view>
-</view>
-<view wx:else>
-  <view class="section">
-    <view class="card big">
-      <view class="row">
-        <view>
-          <view class="sub">继续上次学习</view>
-          <view class="title">{{courseTitle}}</view>
-          <view class="sub">{{courseMeta}}</view>
+  <view wx:else>
+    <view class="section">
+      <view class="home-banner" bindtap="goStudyDetail">
+        <view class="banner-copy">
+          <view class="banner-year">{{home.student.grade || "学习计划"}}</view>
+          <view class="banner-title">{{courseTitle}}</view>
+          <view class="banner-sub">{{hasContent ? courseMeta : emptyMessage}}</view>
+          <view class="banner-action">{{hasContent ? "继续学习" : "查看学习中心"}}</view>
         </view>
-        <view class="mascot">🐣</view>
-      </view>
-      <button class="button light" bindtap="goStudyDetail">继续学习</button>
-    </view>
-  </view>
-
-  <view class="section grid2">
-    <view class="card reward metric-card" bindtap="goTasks">
-      <view class="cover">🌟</view>
-      <view class="metric-num">{{pendingCount}}</view>
-      <view class="sub">还有小挑战没完成</view>
-    </view>
-    <view class="card green metric-card">
-      <view class="cover">🏅</view>
-      <view class="metric-num">{{home.student.streakDays}}天</view>
-      <view class="sub">连续学习，保持得不错</view>
-    </view>
-  </view>
-
-  <view class="section">
-    <view class="card blue">
-      <view class="row">
-        <view class="avatar">🦊</view>
-        <view>
-          <view class="title">学习小伙伴提醒</view>
-          <view class="sub">先看讲义里的例子，再去做小挑战会更轻松。完成一个挑战就能点亮新徽章。</view>
+        <view class="banner-visual">
+          <view class="paper-card"></view>
+          <view class="score-card">{{progressPercent}}%</view>
+          <view class="phone-card"></view>
         </view>
       </view>
     </view>
-  </view>
 
-  <view class="section">
-    <view class="section-title">今日冒险地图</view>
-    <view class="card" bindtap="goStudyDetail">
-      <view class="row">
-        <view class="cover">📖</view>
-        <view class="tag">{{mapTag}}</view>
+    <view class="section shortcut-wrap">
+      <view wx:for="{{shortcuts}}" wx:key="label" class="shortcut-item" data-action="{{item.action}}" bindtap="handleShortcut">
+        <image class="shortcut-icon" src="{{item.icon}}" mode="aspectFit"></image>
+        <view class="shortcut-label">{{item.label}}</view>
       </view>
-      <view class="title">{{courseTitle}}</view>
-      <view class="sub">{{continueCourse.subject}} · {{continueCourse.grade}} · 老师会在学习后给你反馈</view>
-      <view class="badges">
-        <view class="badge">阅读小达人</view>
-        <view class="badge">已学 {{progressPercent}}%</view>
+    </view>
+
+    <view class="section">
+      <view class="status-strip">
+        <view class="status-item">
+          <view class="status-value">{{todoItems.length}}</view>
+          <view class="status-label">今日待办</view>
+        </view>
+        <view class="status-item">
+          <view class="status-value">{{materialCount}}</view>
+          <view class="status-label">学习资料</view>
+        </view>
+        <view class="status-item">
+          <view class="status-value">{{noticeCount}}</view>
+          <view class="status-label">通知消息</view>
+        </view>
       </view>
-      <view class="progress"><view class="progress-bar" style="width: {{progressPercent}}%;"></view></view>
-      <button wx:if="{{pendingTask}}" class="button" catchtap="goAnswer">去做今日小挑战</button>
+    </view>
+
+    <view class="section">
+      <view class="section-head">
+        <view>
+          <view class="section-title tight">今日待办</view>
+          <view class="section-sub">先处理关键学习安排</view>
+        </view>
+      </view>
+      <view wx:if="{{todoItems.length === 0}}" class="empty-card home-empty">
+        <view class="title">今天没有待处理事项</view>
+        <view class="sub">课程、作业、批改反馈和提醒授权会集中显示在这里。</view>
+      </view>
+      <view wx:else class="todo-list">
+        <view wx:for="{{todoItems}}" wx:key="id" class="todo-card {{item.className}}" data-type="{{item.type}}" data-path="{{item.path}}" bindtap="handleTodo">
+          <view class="todo-icon">{{item.icon}}</view>
+          <view class="todo-main">
+            <view class="todo-top">
+              <view class="todo-title">{{item.title}}</view>
+              <view class="todo-status">{{item.status}}</view>
+            </view>
+            <view class="todo-summary">{{item.summary}}</view>
+          </view>
+          <view class="todo-action">{{item.actionText}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-head">
+        <view>
+          <view class="section-title tight">课后课堂反馈</view>
+          <view class="section-sub">看清本节课表现和下一步</view>
+        </view>
+      </view>
+      <view wx:if="{{feedbackItems.length === 0}}" class="empty-card home-empty">
+        <view class="title">还没有课堂反馈</view>
+        <view class="sub">老师完成批改后，会自动生成课后反馈。</view>
+      </view>
+      <view wx:else class="feedback-list">
+        <view wx:for="{{feedbackItems}}" wx:key="id" class="feedback-card" data-id="{{item.relatedSubmissionId}}" bindtap="goFeedback">
+          <view class="feedback-head">
+            <view>
+              <view class="feedback-course">{{item.courseName}}</view>
+              <view class="feedback-title">{{item.lessonTitle}}</view>
+            </view>
+            <view class="feedback-score">{{item.score}}分</view>
+          </view>
+          <view class="feedback-text">{{item.performance}}</view>
+          <view class="feedback-note">老师：{{item.teacherName}}</view>
+          <view class="feedback-focus">重点：{{item.focus}}</view>
+          <view class="feedback-next">下一步：{{item.nextStep}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-head">
+        <view>
+          <view class="section-title tight">推荐内容</view>
+          <view class="section-sub">{{keyword ? "按搜索结果展示" : "先做题，再看资料和课程"}}</view>
+        </view>
+        <view class="section-link" bindtap="goStudy">更多</view>
+      </view>
+
+      <view wx:if="{{!hasContent}}" class="empty-card home-empty">
+        <view class="title">{{hasOpenedPackage ? "等待老师发布内容" : "待开通学习套餐"}}</view>
+        <view class="sub">{{emptyMessage}}</view>
+        <button wx:if="{{!hasOpenedPackage}}" class="button" bindtap="goOpen">查看开通方式</button>
+      </view>
+      <view wx:elif="{{visibleItems.length === 0}}" class="empty-card home-empty">
+        <view class="title">没有找到相关内容</view>
+        <view class="sub">换个关键词，或清除搜索后查看全部学习内容。</view>
+        <button class="button light" bindtap="clearKeyword">清除搜索</button>
+      </view>
+      <view wx:else class="content-list">
+        <view wx:for="{{visibleItems}}" wx:key="id" class="content-card {{item.className}}" data-type="{{item.type}}" data-id="{{item.id}}" bindtap="goContent">
+          <view class="content-icon">{{item.icon}}</view>
+          <view class="content-main">
+            <view class="content-top">
+              <view class="content-type">{{item.typeName}}</view>
+              <view class="content-tag">{{item.tag}}</view>
+            </view>
+            <view class="content-title">{{item.title}}</view>
+            <view class="content-meta">{{item.meta || "学习内容已准备好"}}</view>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 </view>

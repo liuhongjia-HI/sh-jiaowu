@@ -17,11 +17,13 @@ type CardListProps<T> = {
   rowKey: (record: T) => string;
   emptyText: string;
   renderCard: (record: T) => ReactNode;
+  className?: string;
 };
 
 export type InfoField = {
   label: string;
   value: ReactNode;
+  fullWidth?: boolean;
 };
 
 type InfoCardProps = {
@@ -31,6 +33,7 @@ type InfoCardProps = {
   fields?: InfoField[];
   tags?: ReactNode;
   actions?: ReactNode;
+  className?: string;
 };
 
 export function useListViewMode(storageKey: string, defaultMode: ListViewMode = 'card') {
@@ -63,10 +66,10 @@ export function ListViewToggle({ storageKey, value, onChange }: ListViewTogglePr
   );
 }
 
-export function CardList<T>({ rows, rowKey, emptyText, renderCard }: CardListProps<T>) {
+export function CardList<T>({ rows, rowKey, emptyText, renderCard, className }: CardListProps<T>) {
   if (rows.length === 0) return <Empty description={emptyText} />;
   return (
-    <div className="card-list-grid">
+    <div className={['card-list-grid', className].filter(Boolean).join(' ')}>
       {rows.map((record) => (
         <div key={rowKey(record)}>{renderCard(record)}</div>
       ))}
@@ -74,9 +77,9 @@ export function CardList<T>({ rows, rowKey, emptyText, renderCard }: CardListPro
   );
 }
 
-export function InfoCard({ title, subtitle, status, fields = [], tags, actions }: InfoCardProps) {
+export function InfoCard({ title, subtitle, status, fields = [], tags, actions, className }: InfoCardProps) {
   return (
-    <div className="info-card">
+    <div className={['info-card', className].filter(Boolean).join(' ')}>
       <div className="info-card-header">
         <div className="info-card-title-group">
           <Typography.Text className="info-card-title">{title}</Typography.Text>
@@ -87,7 +90,7 @@ export function InfoCard({ title, subtitle, status, fields = [], tags, actions }
       {fields.length > 0 && (
         <div className="info-card-fields">
           {fields.map((field) => (
-            <div className="info-card-field" key={field.label}>
+            <div className={['info-card-field', field.fullWidth ? 'info-card-field-full' : ''].filter(Boolean).join(' ')} key={field.label}>
               <Typography.Text type="secondary">{field.label}</Typography.Text>
               <div>{field.value}</div>
             </div>
@@ -104,10 +107,10 @@ export function InfoCard({ title, subtitle, status, fields = [], tags, actions }
   );
 }
 
-export function TagGroup({ values, color, emptyText = '无' }: { values?: string[]; color?: string; emptyText?: string }) {
+export function TagGroup({ values, color, emptyText = '无', className }: { values?: string[]; color?: string; emptyText?: string; className?: string }) {
   if (!values || values.length === 0) return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
   return (
-    <Space size={[4, 4]} wrap>
+    <Space className={className} size={[4, 4]} wrap>
       {values.map((value, index) => <Tag key={`${value}-${index}`} color={color}>{value}</Tag>)}
     </Space>
   );

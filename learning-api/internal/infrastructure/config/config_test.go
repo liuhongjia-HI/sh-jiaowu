@@ -12,6 +12,10 @@ func TestProductionConfigRejectsLocalDefaultsAndDemoMode(t *testing.T) {
 	cfg.MySQL.DSN = "app:app123@tcp(127.0.0.1:3317)/starline"
 	cfg.Wechat.AppID = ""
 	cfg.Wechat.Secret = ""
+	cfg.OfficialAccount.AppID = ""
+	cfg.OfficialAccount.Secret = ""
+	cfg.OfficialAccount.TemplateID = ""
+	cfg.MiniProgramSubscribe.TemplateIDs = nil
 	cfg.Demo.SeedData = true
 	cfg.Demo.StudentPasswordLogin = true
 	cfg.Demo.AdminPasswordLogin = true
@@ -21,7 +25,7 @@ func TestProductionConfigRejectsLocalDefaultsAndDemoMode(t *testing.T) {
 		t.Fatal("expected production config with local defaults to fail")
 	}
 	message := err.Error()
-	for _, want := range []string{"AUTH_TOKEN_SECRET", "MYSQL_DSN", "WECHAT_APPID", "WECHAT_SECRET", "DEMO_SEED_DATA=false", "DEMO_STUDENT_LOGIN_ENABLED=false"} {
+	for _, want := range []string{"AUTH_TOKEN_SECRET", "MYSQL_DSN", "WECHAT_APPID", "WECHAT_SECRET", "WECHAT_OFFICIAL_ACCOUNT_APPID", "WECHAT_OFFICIAL_ACCOUNT_SECRET", "WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID", "WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS", "DEMO_SEED_DATA=false", "DEMO_STUDENT_LOGIN_ENABLED=false"} {
 		if !strings.Contains(message, want) {
 			t.Fatalf("expected error to mention %s, got %q", want, message)
 		}
@@ -35,6 +39,10 @@ func TestProductionConfigAcceptsExplicitProductionValues(t *testing.T) {
 	cfg.MySQL.DSN = "prod_user:prod_password@tcp(mysql.internal:3306)/starline"
 	cfg.Wechat.AppID = "wx-prod"
 	cfg.Wechat.Secret = "wx-secret"
+	cfg.OfficialAccount.AppID = "oa-prod"
+	cfg.OfficialAccount.Secret = "oa-secret"
+	cfg.OfficialAccount.TemplateID = "tpl-course-reminder"
+	cfg.MiniProgramSubscribe.TemplateIDs = []string{"tpl-homework", "tpl-review"}
 	cfg.Demo.SeedData = false
 	cfg.Demo.StudentPasswordLogin = false
 	cfg.Demo.AdminPasswordLogin = true

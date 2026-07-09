@@ -5,6 +5,9 @@ CREATE TABLE IF NOT EXISTS students (
   avatar_url TEXT NOT NULL,
   grade VARCHAR(32) NOT NULL,
   phone VARCHAR(32) NOT NULL,
+  school_name VARCHAR(64) NOT NULL DEFAULT '',
+  guardian_name VARCHAR(32) NOT NULL DEFAULT '',
+  official_account_open_id VARCHAR(128) NOT NULL DEFAULT '',
   account_status VARCHAR(32) NOT NULL DEFAULT '正常',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -27,6 +30,13 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_users_open_id (open_id),
   KEY idx_users_student_id (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS student_subscriptions (
+  student_id VARCHAR(64) PRIMARY KEY,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
+  template_ids_json TEXT NOT NULL,
+  updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS roles (
@@ -215,6 +225,8 @@ CREATE TABLE IF NOT EXISTS schedule_classes (
   course_name VARCHAR(128) NOT NULL DEFAULT '',
   teacher_id VARCHAR(64) NOT NULL,
   teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+  campus_id VARCHAR(64) NOT NULL DEFAULT '',
+  room_name VARCHAR(64) NOT NULL DEFAULT '',
   class_type VARCHAR(16) NOT NULL,
   capacity INT NOT NULL DEFAULT 1,
   duration_minutes INT NOT NULL DEFAULT 90,
@@ -226,6 +238,7 @@ CREATE TABLE IF NOT EXISTS schedule_classes (
   status VARCHAR(32) NOT NULL DEFAULT '已确认',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_schedule_teacher_time (teacher_id, day_of_week, start_time, end_time),
+  KEY idx_schedule_room_time (campus_id, room_name, day_of_week, start_time, end_time),
   KEY idx_schedule_course (course_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -271,6 +284,7 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
 
 CREATE TABLE IF NOT EXISTS question_bank_items (
   id VARCHAR(64) PRIMARY KEY,
+  title VARCHAR(128) NOT NULL DEFAULT '',
   grade VARCHAR(32) NOT NULL DEFAULT '',
   semester VARCHAR(32) NOT NULL DEFAULT '',
   subject VARCHAR(32) NOT NULL DEFAULT '',
@@ -307,13 +321,36 @@ CREATE TABLE IF NOT EXISTS review_feedbacks (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS student_score_records (
+  id VARCHAR(64) PRIMARY KEY,
+  student_id VARCHAR(64) NOT NULL,
+  subject VARCHAR(32) NOT NULL,
+  exam_type VARCHAR(32) NOT NULL DEFAULT '阶段测评',
+  exam_name VARCHAR(64) NOT NULL,
+  exam_date DATE NOT NULL,
+  score INT NOT NULL,
+  full_score INT NOT NULL,
+  average_score INT NOT NULL DEFAULT 0,
+  teacher_comment TEXT NOT NULL,
+  created_by VARCHAR(64) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  KEY idx_student_score_student (student_id, subject, exam_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS notices (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   notice_type VARCHAR(32) NOT NULL,
   title VARCHAR(128) NOT NULL,
   target VARCHAR(128) NOT NULL,
   content TEXT NOT NULL,
+  channel VARCHAR(32) NOT NULL DEFAULT '站内通知',
+  recipient_open_id VARCHAR(128) NOT NULL DEFAULT '',
   status VARCHAR(32) NOT NULL DEFAULT '待发送',
+  failure_reason TEXT NOT NULL,
+  related_type VARCHAR(32) NOT NULL DEFAULT '',
+  related_id VARCHAR(64) NOT NULL DEFAULT '',
+  retry_count INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -426,7 +463,10 @@ CREATE TABLE IF NOT EXISTS parent_notices (
   title VARCHAR(255) NOT NULL DEFAULT '',
   content TEXT NOT NULL,
   sent_at DATETIME NOT NULL,
-  status VARCHAR(32) NOT NULL DEFAULT ''
+  status VARCHAR(32) NOT NULL DEFAULT '',
+  notice_id VARCHAR(64) NOT NULL DEFAULT '',
+  channel VARCHAR(32) NOT NULL DEFAULT '',
+  failure_reason TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT IGNORE INTO roles (code, name, description) VALUES
@@ -452,7 +492,11 @@ INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('grades', 'G1-G12'),
   ('semesters', 'S1 / S2'),
   ('watermarkRule', '昵称 + 手机尾号 + 时间'),
-  ('downloadPolicy', '默认不可下载');
+  ('downloadPolicy', '默认不可下载'),
+  ('miniProgramDomainStatus', '待确认'),
+  ('officialAccountBindingStatus', '待确认'),
+  ('templateMessageStatus', '待确认'),
+  ('productionApiDomain', '待配置');
 
 DROP PROCEDURE IF EXISTS seed_starline_demo_data;
 DELIMITER //

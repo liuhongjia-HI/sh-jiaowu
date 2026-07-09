@@ -1,78 +1,81 @@
-<view class="hero">
-  <view class="eyebrow">我的</view>
-  <view class="hero-title">我的成长小屋 ✨</view>
-</view>
-<view wx:if="{{loading}}" class="empty">正在加载成长记录...</view>
-<view wx:elif="{{!me}}" class="section">
-  <view class="empty-card">
-    <view class="title">还没有登录</view>
-    <view class="sub">{{emptyMessage}}</view>
-    <button class="button" bindtap="goLogin">去登录绑定</button>
+<view class="me-page">
+  <view wx:if="{{loading}}" class="page-state">正在同步学习状态...</view>
+
+  <view wx:elif="{{!me}}" class="login-state">
+    <view class="login-title">还没有登录</view>
+    <view class="login-desc">{{emptyMessage}}</view>
+    <button class="primary-button" bindtap="goLogin">去登录绑定</button>
   </view>
-</view>
-<view wx:else>
-  <view class="section">
-    <view class="card reward">
-      <view class="row">
-        <button class="profile-avatar-button" bindtap="authorizeProfile" aria-label="授权头像和昵称">
-          <image wx:if="{{profileForm.avatarUrl || me.avatarUrl}}" class="profile-avatar" src="{{profileForm.avatarUrl || me.avatarUrl}}" mode="aspectFill"></image>
-          <view wx:else class="mascot">🐣</view>
-        </button>
-        <view class="profile-info">
-          <view class="title">{{profileForm.nickname || me.nickname || me.name}} 同学</view>
-          <view class="sub">{{me.grade}} · 账号{{me.accountStatus}} · {{me.bindStatus}}</view>
-          <view class="sub">已绑定手机号：{{me.phone || "未绑定"}}</view>
-          <view class="badges">
-            <view class="badge">阅读小星星</view>
-            <view class="badge">连续 {{me.streakDays}} 天</view>
+
+  <view wx:else class="learning-shell">
+    <view class="learning-header">
+      <button class="avatar-control" bindtap="authorizeProfile" disabled="{{savingProfile}}" aria-label="补充头像昵称">
+        <image wx:if="{{studentProfile.avatarUrl}}" class="avatar-image" src="{{studentProfile.avatarUrl}}" mode="aspectFill"></image>
+        <view wx:else class="avatar-text">{{studentProfile.avatarText}}</view>
+      </button>
+      <view class="student-copy">
+        <view class="student-name">{{studentProfile.displayName}}</view>
+        <view class="student-meta">{{studentProfile.meta}}</view>
+        <view class="student-status">{{studentProfile.status}}</view>
+      </view>
+      <view class="profile-sync">{{studentProfile.profileHint}}</view>
+    </view>
+
+    <view class="primary-panel {{primaryTask.tone}}">
+      <view class="task-label">{{primaryTask.label}}</view>
+      <view class="task-title">{{primaryTask.title}}</view>
+      <view class="task-desc">{{primaryTask.desc}}</view>
+      <button class="primary-button task-button" bindtap="handlePrimaryAction">{{primaryTask.buttonText}}</button>
+    </view>
+
+    <view class="metric-strip">
+      <view wx:for="{{overviewMetrics}}" wx:key="label" class="metric-item">
+        <view class="metric-value">{{item.value}}</view>
+        <view class="metric-label">{{item.label}}</view>
+        <view class="metric-hint">{{item.hint}}</view>
+      </view>
+    </view>
+
+    <view class="content-section">
+      <view class="section-title">常用学习</view>
+      <view class="quick-grid">
+        <view wx:for="{{quickActions}}" wx:key="action" class="quick-action" data-action="{{item.action}}" bindtap="handleQuickAction">
+          <view class="quick-symbol">{{item.symbol}}</view>
+          <view class="quick-copy">
+            <view class="quick-title">{{item.title}}</view>
+            <view class="quick-desc">{{item.desc}}</view>
           </view>
+          <view wx:if="{{item.badge}}" class="quick-badge">{{item.badge}}</view>
         </view>
       </view>
-      <view class="profile-form">
-        <button class="profile-auth" bindtap="authorizeProfile" loading="{{savingProfile}}" disabled="{{savingProfile}}">授权头像和昵称</button>
-      </view>
-      <view wx:if="{{!me.nickname || !me.avatarUrl}}" class="profile-required">请授权微信头像和昵称，用于显示个人资料。</view>
     </view>
-  </view>
 
-  <view class="section grid3">
-    <view class="card reward metric-card">
-      <view class="metric-num">{{me.averageScore}}</view>
-      <view class="sub">平均分</view>
-    </view>
-    <view class="card green metric-card">
-      <view class="metric-num">{{me.streakDays}}</view>
-      <view class="sub">连续天数</view>
-    </view>
-    <view class="card blue metric-card">
-      <view class="metric-num">{{me.badgeCount}}</view>
-      <view class="sub">我的徽章</view>
-    </view>
-  </view>
-
-  <view class="section">
-    <view class="card" bindtap="goSchedule">
-      <view class="row">
-        <view>
-          <view class="title">可上课时间</view>
-          <view class="sub">提交能上课的时间，并查看已确认课表。</view>
+    <view class="support-card">
+      <view class="support-main" bindtap="toggleProfileEdit">
+        <view class="support-title-row">
+          <view class="support-title">我的资料</view>
+          <view class="support-status {{profileCompleteness.statusClass}}">{{profileCompleteness.status}}</view>
         </view>
-        <view class="tag">去维护</view>
+        <view class="support-desc">{{profileCompleteness.summary}}</view>
+        <view class="support-note">{{profileCompleteness.detail}}</view>
+      </view>
+      <button class="secondary-button" bindtap="toggleProfileEdit">{{profileEditText}}</button>
+
+      <view wx:if="{{profileEditing}}" class="profile-form">
+        <input class="form-input" value="{{profileForm.studentName}}" data-field="studentName" bindinput="onBasicInput" placeholder="学生姓名" />
+        <input class="form-input" value="{{profileForm.grade}}" data-field="grade" bindinput="onBasicInput" placeholder="年级，例如：五年级" />
+        <input class="form-input" value="{{profileForm.schoolName}}" data-field="schoolName" bindinput="onBasicInput" placeholder="学校" />
+        <input class="form-input" value="{{profileForm.guardianName}}" data-field="guardianName" bindinput="onBasicInput" placeholder="家长称呼（选填）" />
+        <button class="profile-save" bindtap="submitBasicProfile" loading="{{savingBasicProfile}}" disabled="{{savingBasicProfile}}">保存资料</button>
       </view>
     </view>
-    <view class="card">
-      <view class="list-item" bindtap="goGrowth">
-        <view class="title small-title">🌟 我的成长轨迹</view>
-        <view class="sub">最近学习记录、分数和老师反馈</view>
+
+    <view class="notice-line" bindtap="handleSupportTap">
+      <view>
+        <view class="notice-title">{{supportNotice.title}}</view>
+        <view class="notice-desc">{{supportNotice.desc}}</view>
       </view>
-      <view class="list-item" bindtap="goBadges">
-        <view class="title small-title">🏅 我的徽章墙</view>
-        <view class="sub">已获得 {{me.badgeCount}} 枚徽章</view>
-      </view>
-      <view class="list-item" bindtap="goFavorites">
-        <view class="title small-title">💖 我收藏的内容</view>
-        <view class="sub">收藏的讲义和重点题目会放在这里</view>
-      </view>
+      <view class="notice-action">{{supportNotice.actionText}}</view>
     </view>
   </view>
 </view>

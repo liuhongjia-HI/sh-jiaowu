@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 async function login(page: Page, phone: string, password = '123456') {
   await page.goto('/login');
@@ -11,6 +11,46 @@ async function login(page: Page, phone: string, password = '123456') {
 async function expectPageHeading(page: Page, path: string, heading: string) {
   await page.goto(path);
   await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+}
+
+async function selectOption(page: Page, container: Locator, fieldName: string, optionText: string) {
+  const field = container.locator('.ant-form-item').filter({ hasText: fieldName }).first();
+  await field.locator('.ant-select-selector').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText(optionText, { exact: false }).last().click();
+}
+
+async function ensureCompactOption(page: Page, container: Locator, index: number, optionText: string) {
+  const selector = container.locator('.ant-form .ant-select-selector').nth(index);
+  const current = await selector.innerText();
+  if (current.includes(optionText)) return;
+  await selector.click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText(optionText, { exact: false }).last().click();
+}
+
+async function createQuestion(page: Page, title: string, typeText: string, stem: string, score: string, options?: string[], answer?: string) {
+  await expectPageHeading(page, '/questions', '题库');
+  await page.getByRole('button', { name: '新增题目' }).click();
+  const dialog = page.getByRole('dialog', { name: '新增题库题目' });
+  await expect(dialog).toBeVisible();
+
+  await ensureCompactOption(page, dialog, 0, '五年级');
+  await ensureCompactOption(page, dialog, 1, 'S1');
+  await ensureCompactOption(page, dialog, 2, '英语');
+  await dialog.getByLabel('题目名称').fill(title);
+  await selectOption(page, dialog, '题型', typeText);
+  await dialog.getByPlaceholder('请输入学生看到的题目内容，可添加重点、列表或图片 URL。').fill(stem);
+  if (options) {
+    for (const [index, option] of options.entries()) {
+      await dialog.getByPlaceholder(`请输入选项 ${String.fromCharCode(65 + index)} 内容`).fill(option);
+    }
+  }
+  if (answer) {
+    await dialog.locator('label.ant-radio-wrapper').filter({ hasText: answer }).click();
+  }
+  await dialog.getByLabel('分值').fill(score);
+  await dialog.locator('.ant-modal-footer .ant-btn-primary').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(title)).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -80,6 +120,56 @@ test('校区管理员可以打开学生开通和权限核查入口', async ({ pa
   await expect(page.getByRole('tab', { name: '按学生查看' })).toBeVisible();
   await expect(page.getByRole('tab', { name: '按套餐查看' })).toBeVisible();
   await expect(page.getByRole('tab', { name: '按内容查看' })).toBeVisible();
+});
+
+test('教师可以进入题库并打开手动组卷入口', async ({ page }) => {
+  await login(page, '13800000004');
+
+  await expectPageHeading(page, '/questions', '题库');
+  await page.getByRole('button', { name: '新增题目' }).click();
+  const questionDialog = page.getByRole('dialog', { name: '新增题库题目' });
+  await expect(questionDialog).toBeVisible();
+  await page.locator('.question-dialog .ant-modal-footer button').filter({ hasText: /取\s*消/ }).click();
+
+  await expectPageHeading(page, '/homework', '课后练习');
+  await page.getByRole('button', { name: '手动组卷' }).click();
+  const homeworkDialog = page.getByRole('dialog', { name: '组卷发布小挑战' });
+  await expect(homeworkDialog).toBeVisible();
+  await expect(page.getByText('先选课程，再从同年级、同学期、同学科的题库中手动选题组卷。')).toBeVisible();
+});
+
+test('教师可以新增题目并手动组卷发布小挑战', async ({ page }) => {
+  test.setTimeout(90_000);
+  await login(page, '13800000004');
+  const suffix = Date.now();
+  const singleTitle = `验收单选题 ${suffix}`;
+  const textTitle = `验收简答题 ${suffix}`;
+  const homeworkTitle = `验收组卷小挑战 ${suffix}`;
+
+  await createQuestion(page, singleTitle, '单选题', 'Which word means apple?', '10', ['apple', 'book', 'desk', 'pen'], 'apple');
+  await createQuestion(page, textTitle, '简答题', '用一句话说说今天学到的阅读方法。', '20');
+
+  await expectPageHeading(page, '/homework', '课后练习');
+  await page.getByRole('button', { name: '手动组卷' }).click();
+  const dialog = page.getByRole('dialog', { name: '组卷发布小挑战' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('练习标题').fill(homeworkTitle);
+  await selectOption(page, dialog, '课程范围', '五年级英语S1Q1课程');
+  await dialog.getByLabel('截止时间').fill('2026-12-31');
+  await selectOption(page, dialog, '选择题目', singleTitle);
+  await selectOption(page, dialog, '选择题目', textTitle);
+  await dialog.locator('.ant-modal-footer .ant-btn-primary').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(homeworkTitle)).toBeVisible();
+});
+
+test('校区管理员可以从周历入口新建排课', async ({ page }) => {
+  await login(page, '13800000002');
+
+  await expectPageHeading(page, '/scheduling', '排课管理');
+  await expect(page.getByText('周排班工作台')).toBeVisible();
+  await page.getByText(/新建课程/).first().click();
+  await expect(page.getByRole('dialog', { name: '新建课程' })).toBeVisible();
 });
 
 test('退出登录会清理后台访问态', async ({ page }) => {

@@ -1,0 +1,59 @@
+<view class="hero">
+  <view class="eyebrow">我的成绩</view>
+  <view class="hero-title">看清进步和下一步</view>
+</view>
+
+<view wx:if="{{loading}}" class="empty">正在加载成绩...</view>
+<view wx:elif="{{examScores.length === 0 && practiceRecords.length === 0}}" class="section">
+  <view class="empty-card">
+    <view class="title">还没有成绩记录</view>
+    <view class="sub">{{emptyMessage}}</view>
+  </view>
+</view>
+<view wx:else>
+  <view wx:if="{{latestSummary}}" class="section">
+    <view class="card big">
+      <view class="title">{{latestSummary.title}}</view>
+      <rich-text class="sub rich-text" nodes="{{latestSummary.subtitle}}"></rich-text>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">考试成绩</view>
+    <view wx:if="{{examScores.length === 0}}" class="empty-card">
+      <view class="sub">还没有考试成绩。</view>
+    </view>
+    <view wx:for="{{examScores}}" wx:key="subject" class="card">
+      <view class="row">
+        <view>
+          <view class="title small-title">{{item.subject}} · {{item.latestScoreText}} 分</view>
+          <view class="sub">{{item.examTypeText}} · {{item.latest.examName || "最近测评"}} · {{item.latest.examDate}}</view>
+        </view>
+        <view class="badge">{{item.trend}}</view>
+      </view>
+      <view class="score-meta">
+        <view>首次：{{item.first.examType || "阶段测评"}} · {{item.first.examName || "-"}} {{item.first.score || "-"}} 分</view>
+        <view>平均：{{item.latest.averageScore || "-"}} 分</view>
+      </view>
+      <view class="advice-title">问题点</view>
+      <rich-text class="sub rich-text" nodes="{{item.problemPoint}}"></rich-text>
+      <view class="advice-title">下一步</view>
+      <rich-text class="sub rich-text" nodes="{{item.nextStep}}"></rich-text>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">平时练习</view>
+    <view wx:if="{{practiceRecords.length === 0}}" class="empty-card">
+      <view class="sub">还没有平时练习记录。</view>
+    </view>
+    <view wx:for="{{practiceRecords}}" wx:key="id" class="card blue">
+      <view class="row">
+        <view class="title small-title">{{item.title}}</view>
+        <view class="badge">{{item.scoreText}} 分</view>
+      </view>
+      <view class="muted">{{item.occurredAt}}</view>
+      <rich-text class="sub rich-text" nodes="{{item.description || '老师还没有填写建议。'}}"></rich-text>
+    </view>
+  </view>
+</view>

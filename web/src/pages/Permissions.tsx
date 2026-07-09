@@ -15,7 +15,7 @@ export default function Permissions() {
   if (students.error || packages.error || content.error) return <Alert type="error" message="学习权限数据加载失败，请稍后重试。" />;
 
   return (
-    <div className="page-stack">
+    <div className="page-stack permissions-page">
       <div>
         <div className="page-heading">
           <div>
@@ -46,35 +46,37 @@ function StudentPermissions({ rows, viewMode }: { rows: StudentPermissionSummary
     record.studentName, record.grade, record.accountStatus, record.permissionState, record.effectiveUntil,
     record.openedPackages, record.learningSpaces, record.contentTypes, record.openCourses, record.openMaterials, record.openHomework
   ])), [rows, keyword]);
-  const emptyText = rows.length === 0 ? '还没有开通记录，开通学习套餐后可在这里核查学习权限。' : '没有符合条件的结果';
+  const emptyText = rows.length === 0 ? '还没有开通记录，开通学习套餐后可在这里核查学习权限。' : '没有符合条件的权限记录';
   const search = (
-    <Input.Search placeholder="搜索学生、年级或套餐" allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 280 }} />
+    <Input.Search className="permissions-search" placeholder="搜索学生、年级或套餐" allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} />
   );
   if (viewMode === 'card') {
     return (
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space className="permissions-view" direction="vertical" size="middle">
         {search}
         <CardList
+          className="permissions-card-grid"
           rows={filtered}
           rowKey={(record) => record.studentId}
           emptyText={emptyText}
           renderCard={(record) => (
           <InfoCard
+            className="permission-card"
             title={record.studentName}
             subtitle={`${record.grade} · 有效期至 ${record.effectiveUntil || '-'}`}
             status={tagStatus(record.permissionState)}
             fields={[
               { label: '账号状态', value: record.accountStatus },
-              { label: '已开通套餐', value: <TagGroup values={record.openedPackages} color="blue" /> },
-              { label: '适用课程范围', value: <TagGroup values={record.learningSpaces} color="cyan" /> },
-              { label: '包含学习内容', value: <TagGroup values={record.contentTypes} color="geekblue" /> }
+              { label: '已开通套餐', value: permissionTags(record.openedPackages, 'blue', '未绑定套餐'), fullWidth: true },
+              { label: '适用课程范围', value: permissionTags(record.learningSpaces, 'cyan', '未开放课程范围') },
+              { label: '包含学习内容', value: permissionTags(record.contentTypes, 'geekblue', '未开放学习内容') }
             ]}
             tags={(
-              <Space direction="vertical" size={6} style={{ width: '100%' }}>
-                <TagGroup values={record.openCourses} color="green" emptyText="暂无开放课程" />
-                <TagGroup values={record.openMaterials} color="purple" emptyText="暂无开放资料" />
-                <TagGroup values={record.openHomework} color="orange" emptyText="暂无开放练习" />
-              </Space>
+              <PermissionOpenGroups
+                courses={record.openCourses}
+                materials={record.openMaterials}
+                homework={record.openHomework}
+              />
             )}
           />
           )}
@@ -83,7 +85,7 @@ function StudentPermissions({ rows, viewMode }: { rows: StudentPermissionSummary
     );
   }
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space className="permissions-view" direction="vertical" size="middle">
       {search}
       {filtered.length === 0 ? <Empty description={emptyText} /> : (
       <Table
@@ -95,12 +97,12 @@ function StudentPermissions({ rows, viewMode }: { rows: StudentPermissionSummary
           { title: '学生', dataIndex: 'studentName', fixed: 'left', width: 120 },
         { title: '年级', dataIndex: 'grade', width: 100 },
         { title: '状态', dataIndex: 'permissionState', width: 100, render: tagStatus },
-        { title: '已开通套餐', dataIndex: 'openedPackages', width: 260, render: (values) => tagList(values, 'blue') },
-        { title: '适用课程范围', dataIndex: 'learningSpaces', width: 280, render: (values) => tagList(values, 'cyan') },
-        { title: '包含学习内容', dataIndex: 'contentTypes', width: 180, render: (values) => tagList(values, 'geekblue') },
-        { title: '开放课程', dataIndex: 'openCourses', width: 220, render: (values) => tagList(values, 'green') },
-        { title: '开放资料', dataIndex: 'openMaterials', width: 220, render: (values) => tagList(values, 'purple') },
-        { title: '开放练习', dataIndex: 'openHomework', width: 220, render: (values) => tagList(values, 'orange') },
+        { title: '已开通套餐', dataIndex: 'openedPackages', width: 260, render: (values) => tagList(values, 'blue', '未绑定套餐') },
+        { title: '适用课程范围', dataIndex: 'learningSpaces', width: 280, render: (values) => tagList(values, 'cyan', '未开放课程范围') },
+        { title: '包含学习内容', dataIndex: 'contentTypes', width: 180, render: (values) => tagList(values, 'geekblue', '未开放学习内容') },
+        { title: '开放课程', dataIndex: 'openCourses', width: 220, render: (values) => tagList(values, 'green', '未开放课程') },
+        { title: '开放资料', dataIndex: 'openMaterials', width: 220, render: (values) => tagList(values, 'purple', '未开放资料') },
+        { title: '开放练习', dataIndex: 'openHomework', width: 220, render: (values) => tagList(values, 'orange', '未开放练习') },
         { title: '有效期至', dataIndex: 'effectiveUntil', width: 120, render: (value) => value || '-' }
         ]}
       />
@@ -115,34 +117,36 @@ function PackagePermissions({ rows, viewMode }: { rows: PackagePermissionSummary
     record.packageName, record.status, record.students, record.learningSpaces,
     record.contentTypes, record.openCourses, record.openMaterials, record.openHomework
   ])), [rows, keyword]);
-  const emptyText = rows.length === 0 ? '还没有配置学习套餐，创建套餐后可在这里核查学习权限。' : '没有符合条件的结果';
+  const emptyText = rows.length === 0 ? '还没有配置学习套餐，创建套餐后可在这里核查学习权限。' : '没有符合条件的权限记录';
   const search = (
-    <Input.Search placeholder="搜索套餐或学生" allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 280 }} />
+    <Input.Search className="permissions-search" placeholder="搜索套餐或学生" allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} />
   );
   if (viewMode === 'card') {
     return (
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space className="permissions-view" direction="vertical" size="middle">
         {search}
         <CardList
+          className="permissions-card-grid"
           rows={filtered}
           rowKey={(record) => record.packageId}
           emptyText={emptyText}
           renderCard={(record) => (
           <InfoCard
+            className="permission-card"
             title={record.packageName}
             subtitle={`已开通学生 ${record.openedStudents} 人`}
             status={tagStatus(record.status)}
             fields={[
-              { label: '已开通学生', value: <TagGroup values={record.students} color="blue" /> },
-              { label: '适用课程范围', value: <TagGroup values={record.learningSpaces} color="cyan" /> },
-              { label: '包含学习内容', value: <TagGroup values={record.contentTypes} color="geekblue" /> },
-              { label: '开放课程', value: <TagGroup values={record.openCourses} color="green" /> }
+              { label: '已开通学生', value: permissionTags(record.students, 'blue', '还没有学生开通'), fullWidth: true },
+              { label: '适用课程范围', value: permissionTags(record.learningSpaces, 'cyan', '未开放课程范围') },
+              { label: '包含学习内容', value: permissionTags(record.contentTypes, 'geekblue', '未开放学习内容') }
             ]}
             tags={(
-              <Space direction="vertical" size={6} style={{ width: '100%' }}>
-                <TagGroup values={record.openMaterials} color="purple" emptyText="暂无开放资料" />
-                <TagGroup values={record.openHomework} color="orange" emptyText="暂无开放练习" />
-              </Space>
+              <PermissionOpenGroups
+                courses={record.openCourses}
+                materials={record.openMaterials}
+                homework={record.openHomework}
+              />
             )}
           />
           )}
@@ -151,7 +155,7 @@ function PackagePermissions({ rows, viewMode }: { rows: PackagePermissionSummary
     );
   }
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space className="permissions-view" direction="vertical" size="middle">
       {search}
       {filtered.length === 0 ? <Empty description={emptyText} /> : (
       <Table
@@ -163,12 +167,12 @@ function PackagePermissions({ rows, viewMode }: { rows: PackagePermissionSummary
           { title: '套餐', dataIndex: 'packageName', fixed: 'left', width: 260 },
         { title: '状态', dataIndex: 'status', width: 100, render: tagStatus },
         { title: '开通学生数', dataIndex: 'openedStudents', width: 110 },
-        { title: '已开通学生', dataIndex: 'students', width: 180, render: (values) => tagList(values, 'blue') },
-        { title: '适用课程范围', dataIndex: 'learningSpaces', width: 280, render: (values) => tagList(values, 'cyan') },
-        { title: '包含学习内容', dataIndex: 'contentTypes', width: 180, render: (values) => tagList(values, 'geekblue') },
-        { title: '开放课程', dataIndex: 'openCourses', width: 220, render: (values) => tagList(values, 'green') },
-        { title: '开放资料', dataIndex: 'openMaterials', width: 220, render: (values) => tagList(values, 'purple') },
-        { title: '开放练习', dataIndex: 'openHomework', width: 220, render: (values) => tagList(values, 'orange') }
+        { title: '已开通学生', dataIndex: 'students', width: 180, render: (values) => tagList(values, 'blue', '还没有学生开通') },
+        { title: '适用课程范围', dataIndex: 'learningSpaces', width: 280, render: (values) => tagList(values, 'cyan', '未开放课程范围') },
+        { title: '包含学习内容', dataIndex: 'contentTypes', width: 180, render: (values) => tagList(values, 'geekblue', '未开放学习内容') },
+        { title: '开放课程', dataIndex: 'openCourses', width: 220, render: (values) => tagList(values, 'green', '未开放课程') },
+        { title: '开放资料', dataIndex: 'openMaterials', width: 220, render: (values) => tagList(values, 'purple', '未开放资料') },
+        { title: '开放练习', dataIndex: 'openHomework', width: 220, render: (values) => tagList(values, 'orange', '未开放练习') }
         ]}
       />
       )}
@@ -182,28 +186,30 @@ function ContentPermissions({ rows, viewMode }: { rows: ContentPermissionSummary
     record.contentTitle, record.contentType, record.course, record.learningSpace,
     record.ownerTeacherName, record.status, record.openedPackages, record.openedStudents
   ])), [rows, keyword]);
-  const emptyText = rows.length === 0 ? '还没有可开放的课程内容，发布课程、资料或练习后可在这里查看。' : '没有符合条件的结果';
+  const emptyText = rows.length === 0 ? '还没有可开放的课程内容，发布课程、资料或练习后可在这里查看。' : '没有符合条件的权限记录';
   const search = (
-    <Input.Search placeholder="搜索内容、课程或老师" allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 280 }} />
+    <Input.Search className="permissions-search" placeholder="搜索内容、课程或老师" allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} />
   );
   if (viewMode === 'card') {
     return (
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space className="permissions-view" direction="vertical" size="middle">
         {search}
         <CardList
+          className="permissions-card-grid"
           rows={filtered}
           rowKey={(record) => `${record.contentType}-${record.contentId}`}
           emptyText={emptyText}
           renderCard={(record) => (
           <InfoCard
+            className="permission-card"
             title={record.contentTitle}
             subtitle={`${record.contentType} · ${record.course}`}
             status={tagStatus(record.status)}
             fields={[
               { label: '适用课程范围', value: record.learningSpace },
               { label: '负责老师', value: record.ownerTeacherName || '-' },
-              { label: '开放套餐', value: <TagGroup values={record.openedPackages} color="blue" /> },
-              { label: '可见学生', value: <TagGroup values={record.openedStudents} color="green" /> }
+              { label: '开放套餐', value: permissionTags(record.openedPackages, 'blue', '未绑定开放套餐'), fullWidth: true },
+              { label: '可见学生', value: permissionTags(record.openedStudents, 'green', '还没有可见学生'), fullWidth: true }
             ]}
           />
           )}
@@ -212,7 +218,7 @@ function ContentPermissions({ rows, viewMode }: { rows: ContentPermissionSummary
     );
   }
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space className="permissions-view" direction="vertical" size="middle">
       {search}
       {filtered.length === 0 ? <Empty description={emptyText} /> : (
       <Table
@@ -227,8 +233,8 @@ function ContentPermissions({ rows, viewMode }: { rows: ContentPermissionSummary
         { title: '适用课程范围', dataIndex: 'learningSpace', width: 260 },
         { title: '负责老师', dataIndex: 'ownerTeacherName', width: 120, render: (value) => value || <Typography.Text type="secondary">-</Typography.Text> },
         { title: '状态', dataIndex: 'status', width: 100, render: tagStatus },
-        { title: '开放套餐', dataIndex: 'openedPackages', width: 260, render: (values) => tagList(values, 'blue') },
-        { title: '可见学生', dataIndex: 'openedStudents', width: 220, render: (values) => tagList(values, 'green') }
+        { title: '开放套餐', dataIndex: 'openedPackages', width: 260, render: (values) => tagList(values, 'blue', '未绑定开放套餐') },
+        { title: '可见学生', dataIndex: 'openedStudents', width: 220, render: (values) => tagList(values, 'green', '还没有可见学生') }
         ]}
       />
       )}
@@ -248,13 +254,31 @@ function matchKeyword(keyword: string, parts: (string | string[] | undefined)[])
     .includes(kw);
 }
 
-function tagList(values: string[], color: string) {
-  if (!values || values.length === 0) return <Typography.Text type="secondary">无</Typography.Text>;
+function PermissionOpenGroups({ courses, materials, homework }: { courses: string[]; materials: string[]; homework: string[] }) {
   return (
-    <Space size={[4, 4]} wrap>
-      {values.map((value) => <Tag key={value} color={color}>{value}</Tag>)}
-    </Space>
+    <div className="permission-open-groups">
+      <PermissionOpenGroup title="开放课程" values={courses} color="green" emptyText="未开放课程" />
+      <PermissionOpenGroup title="开放资料" values={materials} color="purple" emptyText="未开放资料" />
+      <PermissionOpenGroup title="开放练习" values={homework} color="orange" emptyText="未开放练习" />
+    </div>
   );
+}
+
+function PermissionOpenGroup({ title, values, color, emptyText }: { title: string; values: string[]; color: string; emptyText: string }) {
+  return (
+    <div className="permission-open-group">
+      <Typography.Text type="secondary">{title}</Typography.Text>
+      {permissionTags(values, color, emptyText)}
+    </div>
+  );
+}
+
+function permissionTags(values: string[] | undefined, color: string, emptyText: string) {
+  return <TagGroup className="permission-tag-group" values={values} color={color} emptyText={emptyText} />;
+}
+
+function tagList(values: string[], color: string, emptyText: string) {
+  return permissionTags(values, color, emptyText);
 }
 
 function tagStatus(value: string) {

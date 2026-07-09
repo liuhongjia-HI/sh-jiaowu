@@ -15,7 +15,7 @@
   </view>
   <view class="card blue">
     <view class="title">老师评语</view>
-    <view class="sub">{{teacherComment || '老师正在批改，稍后就能看到反馈。'}}</view>
+    <rich-text class="sub rich-text" nodes="{{teacherCommentNodes}}"></rich-text>
   </view>
   <view class="button-row">
     <button class="button light" bindtap="goBack">返回小挑战</button>

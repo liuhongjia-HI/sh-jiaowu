@@ -1,5 +1,6 @@
 import { Alert, Button, Card, Col, Form, message, Row, Select, Skeleton, Space, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { getData, postData } from '../services/http';
 import type { GrantPreview, Student, StudyPackage } from '../types/starline';
 
@@ -10,6 +11,11 @@ export default function OpenPackage() {
   const packages = useQuery({ queryKey: ['packages'], queryFn: () => getData<StudyPackage[]>('/packages') });
   const studentId = Form.useWatch('studentId', form);
   const packageId = Form.useWatch('packageId', form);
+  const selectedStudent = useMemo(() => (students.data ?? []).find((item) => item.id === studentId), [students.data, studentId]);
+  const availablePackages = useMemo(
+    () => (packages.data ?? []).filter((item) => item.status === '启用' && item.grade === selectedStudent?.grade),
+    [packages.data, selectedStudent?.grade]
+  );
   const preview = useQuery({
     queryKey: ['grant-preview', studentId, packageId],
     enabled: Boolean(studentId && packageId),
@@ -41,12 +47,28 @@ export default function OpenPackage() {
           <Card title="选择学生和套餐">
             <Form form={form} layout="vertical">
               <Form.Item name="studentId" label="学生" rules={[{ required: true, message: '请选择学生' }]}>
-                <Select showSearch optionFilterProp="label" placeholder="选择学生" options={(students.data ?? []).map((item) => ({ label: `${item.name} · ${item.grade}`, value: item.id }))} />
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="选择学生"
+                  options={(students.data ?? []).map((item) => ({ label: `${item.name} · ${item.grade}`, value: item.id }))}
+                  onChange={() => form.setFieldValue('packageId', undefined)}
+                />
               </Form.Item>
               <Form.Item name="packageId" label="学习套餐" rules={[{ required: true, message: '请选择套餐' }]}>
-                <Select showSearch optionFilterProp="label" placeholder="选择学习套餐" options={(packages.data ?? []).map((item) => ({ label: item.name, value: item.id }))} />
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder={selectedStudent ? '选择学习套餐' : '请先选择学生'}
+                  disabled={!selectedStudent}
+                  options={availablePackages.map((item) => ({ label: packageOptionLabel(item), value: item.id }))}
+                  notFoundContent={selectedStudent ? '该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。' : '请先选择学生，再选择该年级可用套餐。'}
+                />
               </Form.Item>
-              <Button type="primary" block loading={createGrant.isPending} disabled={!preview.data || preview.data.alreadyOpened} onClick={() => createGrant.mutate()}>
+              {selectedStudent && availablePackages.length === 0 && (
+                <Alert type="warning" showIcon message="该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。" style={{ marginBottom: 16 }} />
+              )}
+              <Button type="primary" block loading={createGrant.isPending} disabled={!preview.data || preview.data.alreadyOpened || !packageId} onClick={() => createGrant.mutate()}>
                 {preview.data?.alreadyOpened ? '已开通' : '确认开通'}
               </Button>
             </Form>
@@ -77,6 +99,10 @@ export default function OpenPackage() {
       </Row>
     </div>
   );
+}
+
+function packageOptionLabel(item: StudyPackage) {
+  return [item.name, item.subject, item.semester, item.packageType].filter(Boolean).join(' · ');
 }
 
 function PreviewTags({ title, values, color }: { title: string; values: string[]; color: string }) {

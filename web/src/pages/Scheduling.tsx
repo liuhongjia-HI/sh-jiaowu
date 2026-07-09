@@ -1,5 +1,5 @@
 import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Popconfirm, Segmented, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,6 +25,8 @@ type AvailabilityFormValues = {
 type ScheduleClassFormValues = {
   courseId: string;
   teacherId: string;
+  campusId: string;
+  roomName: string;
   classType: string;
   durationMinutes: number;
   dayOfWeek: number;
@@ -37,10 +39,20 @@ type ScheduleClassFormValues = {
 
 type ScheduleFilters = {
   grade?: string;
+  subject?: string;
   teacherId?: string;
+  studentId?: string;
+  campusId?: string;
   courseId?: string;
   classType?: string;
   status?: string;
+};
+
+type ScheduleMoveTarget = {
+  dayOfWeek: number;
+  label: string;
+  startDate?: string;
+  endDate?: string;
 };
 
 type CandidateLevel = 'full' | 'ready' | 'short';
@@ -65,12 +77,18 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [candidateRequest, setCandidateRequest] = useState<CandidateFormValues | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<ScheduleCandidate | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [selectedCampusId, setSelectedCampusId] = useState(user.campusId || 'campus-main');
+  const [selectedRoomName, setSelectedRoomName] = useState('');
   const [editingClass, setEditingClass] = useState<ScheduleClass | null>(null);
+  const [creatingClass, setCreatingClass] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'week' | 'list'>('week');
+  const [viewMode, setViewMode] = useState<'week' | 'month' | 'list'>('week');
   const [classGradeFilter, setClassGradeFilter] = useState<string>();
+  const [classSubjectFilter, setClassSubjectFilter] = useState<string>();
   const [classTeacherFilter, setClassTeacherFilter] = useState<string>();
+  const [classStudentFilter, setClassStudentFilter] = useState<string>();
+  const [classCampusFilter, setClassCampusFilter] = useState<string>();
   const [classCourseFilter, setClassCourseFilter] = useState<string>();
   const [classTypeFilter, setClassTypeFilter] = useState<string>();
   const [statusFilter, setStatusFilter] = useState<string>('已确认');
@@ -122,6 +140,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       return postData<ScheduleClass>('/schedule-classes', {
         courseId: selectedCandidate.courseId,
         teacherId: selectedCandidate.teacherId,
+        campusId: selectedCampusId,
+        roomName: selectedRoomName,
         classType: selectedCandidate.classType,
         durationMinutes: candidateRequest.durationMinutes,
         dayOfWeek: selectedCandidate.dayOfWeek,
@@ -136,6 +156,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       message.success('已确认成班，课表已生成');
       setSelectedCandidate(null);
       setSelectedStudentIds([]);
+      setSelectedRoomName('');
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
@@ -153,6 +174,18 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     onError: () => message.error('取消课程失败，请稍后重试。')
   });
 
+  const createManualClass = useMutation({
+    mutationFn: (values: ScheduleClassFormValues) => postData<ScheduleClass>('/schedule-classes', values),
+    onSuccess: () => {
+      message.success('课程已创建，课表已更新');
+      setCreatingClass(false);
+      editForm.resetFields();
+      queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
+      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
+    },
+    onError: () => message.error('创建课程失败，请检查学生、老师和时间冲突。')
+  });
+
   const updateClass = useMutation({
     mutationFn: (values: ScheduleClassFormValues) => {
       if (!editingClass) throw new Error('请选择要调整的课程');
@@ -167,6 +200,17 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     onError: () => message.error('调课失败，请检查可上课时间和冲突。')
   });
 
+  const moveClass = useMutation({
+    mutationFn: ({ record, target }: { record: ScheduleClass; target: ScheduleMoveTarget }) =>
+      putData<ScheduleClass>(`/schedule-classes/${record.id}`, scheduleClassPayload(record, target)),
+    onSuccess: () => {
+      message.success('调课已保存');
+      queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
+      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
+    },
+    onError: () => message.error('调课失败，请检查老师、学生时间冲突。')
+  });
+
   const ownerOptions = useMemo(() => {
     const teacherOptions = (teachers.data ?? []).map((item) => ({ label: `老师 · ${teacherOptionLabel(item)}`, value: `teacher:${item.id}` }));
     const studentOptions = (students.data ?? []).map((item) => ({ label: `学生 · ${studentDisplayName(item)}`, value: `student:${item.id}` }));
@@ -177,6 +221,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const courseOptions = (courses.data ?? []).map((item) => ({ label: `${item.name} · ${item.grade}/${item.subject}`, value: item.id }));
   const teacherOptions = (teachers.data ?? []).map((item) => ({ label: teacherOptionLabel(item), value: item.id }));
   const studentOptions = (students.data ?? []).map((item) => ({ label: studentOptionLabel(item), value: item.id }));
+  const campusOptions = uniqueScheduleCampuses(classes.data ?? []).map((value) => ({ label: value, value }));
+  const classSubjectOptions = subjectOptions(classGradeFilter);
   const courseById = useMemo(() => Object.fromEntries((courses.data ?? []).map((item) => [item.id, item])), [courses.data]);
   const teacherById = useMemo(() => Object.fromEntries((teachers.data ?? []).map((item) => [item.id, item])), [teachers.data]);
   const studentById = useMemo(() => Object.fromEntries((students.data ?? []).map((item) => [item.id, item])), [students.data]);
@@ -187,11 +233,14 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   ];
   const classFilters = useMemo<ScheduleFilters>(() => ({
     grade: classGradeFilter,
+    subject: classSubjectFilter,
     teacherId: classTeacherFilter,
+    studentId: classStudentFilter,
+    campusId: classCampusFilter,
     courseId: classCourseFilter,
     classType: classTypeFilter,
     status: statusFilter
-  }), [classGradeFilter, classTeacherFilter, classCourseFilter, classTypeFilter, statusFilter]);
+  }), [classGradeFilter, classSubjectFilter, classTeacherFilter, classStudentFilter, classCampusFilter, classCourseFilter, classTypeFilter, statusFilter]);
   const filteredClasses = useMemo(() => filterClasses(classes.data ?? [], classFilters, courseById), [classes.data, classFilters, courseById]);
   const allCandidates = candidates.data ?? [];
   const readyCandidates = useMemo(() => allCandidates.filter((item) => candidateLevel(item) !== 'short'), [allCandidates]);
@@ -202,7 +251,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const availabilitySummary = useMemo(() => availabilityStats(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const activeClassCount = filteredClasses.filter((item) => item.status !== '已取消').length;
   const totalConfirmedClassCount = (classes.data ?? []).filter((item) => item.status === '已确认').length;
-  const hasClassFilters = Boolean(classGradeFilter || classTeacherFilter || classCourseFilter || classTypeFilter || statusFilter !== '已确认');
+  const hasClassFilters = Boolean(classGradeFilter || classSubjectFilter || classTeacherFilter || classStudentFilter || classCampusFilter || classCourseFilter || classTypeFilter || statusFilter !== '已确认');
   const classResultNote = scheduleResultNote(filteredClasses, totalConfirmedClassCount, hasClassFilters, classGradeFilter);
   const recommendedCount = readyCandidates.length;
   const emptyTips = candidateEmptyTips(candidateRequest, allCandidates);
@@ -225,6 +274,12 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     }
   }, [candidateForm, gradeWatch]);
 
+  useEffect(() => {
+    if (classSubjectFilter && !subjectOptions(classGradeFilter).some((item) => item.value === classSubjectFilter)) {
+      setClassSubjectFilter(undefined);
+    }
+  }, [classGradeFilter, classSubjectFilter]);
+
   // 打开「维护可上课时间」抽屉，并预选某个师生，便于一键协调缺时间的对象。
   function openAvailabilityFor(ownerType: 'teacher' | 'student', ownerId: string) {
     availabilityForm.setFieldValue('ownerKey', `${ownerType}:${ownerId}`);
@@ -233,10 +288,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   }
 
   function openEdit(record: ScheduleClass) {
+    setCreatingClass(false);
     setEditingClass(record);
     editForm.setFieldsValue({
       courseId: record.courseId,
       teacherId: record.teacherId,
+      campusId: record.campusId || user.campusId || 'campus-main',
+      roomName: record.roomName || '',
       classType: record.classType,
       durationMinutes: record.durationMinutes,
       dayOfWeek: record.dayOfWeek,
@@ -245,6 +303,39 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       startDate: record.startDate,
       endDate: record.endDate,
       studentIds: record.students.map((student) => student.id)
+    });
+  }
+
+  function openCreateClassForDay(dayOfWeek: number) {
+    if (!canCreateClass) return;
+    setEditingClass(null);
+    setCreatingClass(true);
+    editForm.setFieldsValue({
+      courseId: undefined,
+      teacherId: undefined,
+      campusId: user.campusId || 'campus-main',
+      roomName: '',
+      classType: '1V1',
+      durationMinutes: 90,
+      dayOfWeek,
+      startTime: '19:00',
+      endTime: '20:30',
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: '',
+      studentIds: []
+    });
+  }
+
+  function confirmMoveClass(record: ScheduleClass, target: ScheduleMoveTarget) {
+    const isSameTarget = record.dayOfWeek === target.dayOfWeek &&
+      (!target.startDate || (record.startDate === target.startDate && record.endDate === (target.endDate || target.startDate)));
+    if (!canCreateClass || record.status === '已取消' || isSameTarget) return;
+    Modal.confirm({
+      title: '确认调课',
+      content: `将「${record.name}」调整到${target.label}，时间保持 ${record.startTime}-${record.endTime}。`,
+      okText: '确认调整',
+      cancelText: '取消',
+      onOk: () => moveClass.mutate({ record, target })
     });
   }
 
@@ -325,6 +416,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                 onPick={() => {
                   setSelectedCandidate(candidate);
                   setSelectedStudentIds(candidate.availableStudents.slice(0, candidate.capacity).map((student) => student.id));
+                  setSelectedCampusId(user.campusId || 'campus-main');
+                  setSelectedRoomName('');
                 }}
               />
             ))}
@@ -343,9 +436,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         extra={(
           <Segmented
             value={viewMode}
-            onChange={(value) => setViewMode(value as 'week' | 'list')}
+            onChange={(value) => setViewMode(value as 'week' | 'month' | 'list')}
             options={[
               { label: '课表视图', value: 'week', icon: <CalendarOutlined /> },
+              { label: '月视图', value: 'month', icon: <CalendarOutlined /> },
               { label: '列表视图', value: 'list', icon: <TableOutlined /> }
             ]}
           />
@@ -373,7 +467,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
           <div className="schedule-filterbar">
             <Select allowClear showSearch optionFilterProp="label" placeholder="全部年级" options={gradeOptions()} value={classGradeFilter} onChange={setClassGradeFilter} />
+            <Select allowClear showSearch optionFilterProp="label" placeholder="全部学科" options={classSubjectOptions} value={classSubjectFilter} onChange={setClassSubjectFilter} />
             <Select allowClear placeholder="全部老师" options={teacherOptions} value={classTeacherFilter} onChange={setClassTeacherFilter} />
+            <Select allowClear showSearch optionFilterProp="label" placeholder="全部学生" options={studentOptions} value={classStudentFilter} onChange={setClassStudentFilter} />
+            <Select allowClear showSearch optionFilterProp="label" placeholder="全部校区" options={campusOptions} value={classCampusFilter} onChange={setClassCampusFilter} />
             <Select allowClear showSearch optionFilterProp="label" placeholder="全部课程" options={courseOptions} value={classCourseFilter} onChange={setClassCourseFilter} />
             <Select allowClear placeholder="全部班型" options={classTypeOptions} value={classTypeFilter} onChange={setClassTypeFilter} />
             <Select options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
@@ -381,7 +478,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Button
                 onClick={() => {
                   setClassGradeFilter(undefined);
+                  setClassSubjectFilter(undefined);
                   setClassTeacherFilter(undefined);
+                  setClassStudentFilter(undefined);
                   setClassCourseFilter(undefined);
                   setClassTypeFilter(undefined);
                   setStatusFilter('已确认');
@@ -426,8 +525,21 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               onPickCandidate={(record) => {
                 setSelectedCandidate(record);
                 setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));
+                setSelectedCampusId(user.campusId || 'campus-main');
+                setSelectedRoomName('');
               }}
               onEditClass={openEdit}
+              onMoveClass={confirmMoveClass}
+              onCreateClass={openCreateClassForDay}
+            />
+          ) : viewMode === 'month' ? (
+            <MonthScheduleBoard
+              classes={filteredClasses}
+              courseById={courseById}
+              teacherById={teacherById}
+              canManage={canCreateClass}
+              onEditClass={openEdit}
+              onMoveClass={confirmMoveClass}
             />
           ) : (
             filteredClasses.length === 0 ? (
@@ -520,32 +632,61 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   style={{ width: '100%' }}
                 />
               </Form.Item>
+              <Space.Compact block>
+                <Form.Item label="校区" style={{ width: '45%' }}>
+                  <Input value={selectedCampusId} onChange={(event) => setSelectedCampusId(event.target.value)} placeholder="campus-main" />
+                </Form.Item>
+                <Form.Item label="教室/资源" style={{ width: '55%' }}>
+                  <Input value={selectedRoomName} onChange={(event) => setSelectedRoomName(event.target.value)} placeholder="例如：A101 / 线上会议室" />
+                </Form.Item>
+              </Space.Compact>
             </Form>
           </Space>
         )}
       </Drawer>
 
       <Drawer
-        title="课程详情"
-        open={Boolean(editingClass)}
+        title={creatingClass ? '新建课程' : '课程详情'}
+        open={Boolean(editingClass) || creatingClass}
         width={560}
-        onClose={() => setEditingClass(null)}
-        extra={editingClass && (
+        onClose={() => {
+          setEditingClass(null);
+          setCreatingClass(false);
+        }}
+        extra={(editingClass || creatingClass) && (
           <Space>
-            <Popconfirm title="取消这节课？" description="取消后该时间不再占用，可重新排课。" okText="取消课程" cancelText="保留" onConfirm={() => cancelClass.mutate(editingClass.id)}>
-              <Button danger loading={cancelClass.isPending}>取消课程</Button>
-            </Popconfirm>
-            <Button type="primary" loading={updateClass.isPending} onClick={() => editForm.submit()}>保存调课</Button>
+            {editingClass && (
+              <Popconfirm title="取消这节课？" description="取消后该时间不再占用，可重新排课。" okText="取消课程" cancelText="保留" onConfirm={() => cancelClass.mutate(editingClass.id)}>
+                <Button danger loading={cancelClass.isPending}>取消课程</Button>
+              </Popconfirm>
+            )}
+            <Button type="primary" loading={updateClass.isPending || createManualClass.isPending} onClick={() => editForm.submit()}>
+              {creatingClass ? '创建课程' : '保存调课'}
+            </Button>
           </Space>
         )}
       >
-        <Form form={editForm} layout="vertical" onFinish={(values) => updateClass.mutate(values)}>
+        <Form form={editForm} layout="vertical" onFinish={(values) => {
+          if (creatingClass) {
+            createManualClass.mutate(values);
+            return;
+          }
+          updateClass.mutate(values);
+        }}>
           <Form.Item name="courseId" label="课程" rules={[{ required: true, message: '请选择课程' }]}>
             <Select showSearch optionFilterProp="label" options={courseOptions} />
           </Form.Item>
           <Form.Item name="teacherId" label="老师" rules={[{ required: true, message: '请选择老师' }]}>
             <Select showSearch optionFilterProp="label" options={teacherOptions} />
           </Form.Item>
+          <Space.Compact block>
+            <Form.Item name="campusId" label="校区" style={{ width: '45%' }}>
+              <Input placeholder="campus-main" />
+            </Form.Item>
+            <Form.Item name="roomName" label="教室/资源" style={{ width: '55%' }}>
+              <Input placeholder="例如：A101 / 线上会议室" />
+            </Form.Item>
+          </Space.Compact>
           <Space.Compact block>
             <Form.Item name="classType" rules={[{ required: true, message: '请选择班型' }]} style={{ width: '32%' }}>
               <Select options={classTypeOptions} />
@@ -646,7 +787,9 @@ function WeekScheduleBoard({
   showCandidateEmptyTips,
   canManage,
   onPickCandidate,
-  onEditClass
+  onEditClass,
+  onMoveClass,
+  onCreateClass
 }: {
   loading: boolean;
   availabilityByDay: Record<number, AvailabilitySlot[]>;
@@ -662,6 +805,8 @@ function WeekScheduleBoard({
   canManage: boolean;
   onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
+  onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
+  onCreateClass: (dayOfWeek: number) => void;
 }) {
   const hasAnyItem = weekOptions.some((day) =>
     (availabilityByDay[day.value]?.length ?? 0) > 0 ||
@@ -692,14 +837,30 @@ function WeekScheduleBoard({
           const isEmptyDay = dayAvailability.length === 0 && dayCandidates.length === 0 && dayClasses.length === 0;
 
           return (
-            <div className="week-day" key={day.value}>
+            <div
+              className="week-day"
+              key={day.value}
+              onDragOver={(event) => canManage ? event.preventDefault() : undefined}
+              onDrop={(event) => {
+                const classID = event.dataTransfer.getData('text/schedule-class-id');
+                const record = Object.values(classesByDay).flat().find((item) => item.id === classID);
+                if (record) onMoveClass(record, { dayOfWeek: day.value, label: day.label });
+              }}
+            >
               <div className="week-day-header">
                 <strong>{day.label}</strong>
                 <span>{dayClasses.filter((item) => item.status !== '已取消').length} 节课</span>
               </div>
-              <div className="week-day-body">
+              <div
+                className="week-day-body"
+                onDoubleClick={(event) => {
+                  if (event.currentTarget === event.target && canManage) onCreateClass(day.value);
+                }}
+              >
                 {isEmptyDay ? (
-                  <div className="week-day-empty">暂无安排</div>
+                  <button type="button" className="week-day-empty week-day-create" onClick={() => canManage ? onCreateClass(day.value) : undefined}>
+                    {canManage ? '点击新建课程' : '暂无安排'}
+                  </button>
                 ) : (
                   <>
                     {dayAvailability.map((slot) => (
@@ -741,6 +902,8 @@ function WeekScheduleBoard({
                           type="button"
                           className={`schedule-block schedule-block-class ${item.status === '已取消' ? 'is-canceled' : ''}`}
                           key={item.id}
+                          draggable={canManage && item.status !== '已取消'}
+                          onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
                           onClick={() => canManage && item.status !== '已取消' ? onEditClass(item) : undefined}
                         >
                           <div className="schedule-block-time">{item.startTime}-{item.endTime}</div>
@@ -756,6 +919,11 @@ function WeekScheduleBoard({
                         </button>
                       );
                     })}
+                    {canManage && (
+                      <button type="button" className="week-day-add" onClick={() => onCreateClass(day.value)}>
+                        + 新建课程
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -780,6 +948,75 @@ function ScheduleEmptyTips({ description, tips, compact = false }: { description
   );
 }
 
+function MonthScheduleBoard({
+  classes,
+  courseById,
+  teacherById,
+  canManage,
+  onEditClass,
+  onMoveClass
+}: {
+  classes: ScheduleClass[];
+  courseById: CourseLookup;
+  teacherById: Record<string, Teacher>;
+  canManage: boolean;
+  onEditClass: (record: ScheduleClass) => void;
+  onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
+}) {
+  const days = useMemo(() => buildMonthDays(new Date()), []);
+  if (classes.length === 0) return <Empty description="还没有可展示的课程。" />;
+  return (
+    <div className="month-board">
+      {days.map((day) => {
+        const dayClasses = classes.filter((item) => scheduleClassOccursOn(item, day.date));
+        return (
+          <div
+            className="month-day"
+            key={day.key}
+            onDragOver={(event) => canManage ? event.preventDefault() : undefined}
+            onDrop={(event) => {
+              const classID = event.dataTransfer.getData('text/schedule-class-id');
+              const record = classes.find((item) => item.id === classID);
+              if (record) onMoveClass(record, {
+                dayOfWeek: day.dayOfWeek,
+                label: day.label,
+                startDate: day.key,
+                endDate: day.key
+              });
+            }}
+          >
+            <div className="month-day-head">
+              <strong>{day.day}</strong>
+              <span>{day.weekLabel}</span>
+            </div>
+            <div className="month-day-body">
+              {dayClasses.length === 0 ? (
+                <span className="month-day-empty">暂无课程</span>
+              ) : sortByStartTime(dayClasses).map((item) => {
+                const course = courseById[item.courseId];
+                return (
+                  <button
+                    type="button"
+                    className={`month-class ${item.status === '已取消' ? 'is-canceled' : ''}`}
+                    key={item.id}
+                    draggable={canManage && item.status !== '已取消'}
+                    onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
+                    onClick={() => canManage && item.status !== '已取消' ? onEditClass(item) : undefined}
+                  >
+                    <span>{item.startTime}</span>
+                    <strong>{courseSubjectGradeText(course, item.courseName)}</strong>
+                    <small>{teacherDisplay(item.teacherName, course, teacherById[item.teacherId])}</small>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function parseOwnerKey(value?: string) {
   if (!value) return null;
   const [ownerType, ownerId] = value.split(':');
@@ -798,6 +1035,7 @@ function classColumns(courseById: CourseLookup, teacherById: Record<string, Teac
     { title: '课程', dataIndex: 'courseName', ellipsis: true },
     { title: '老师', width: 220, render: (_, record) => teacherDisplay(record.teacherName, courseById[record.courseId], teacherById[record.teacherId]) },
     { title: '时间', width: 160, render: (_, record) => `${weekLabel(record.dayOfWeek)} ${record.startTime}-${record.endTime}` },
+    { title: '教室/资源', width: 140, render: (_, record) => record.roomName ? `${record.campusId || 'campus-main'} · ${record.roomName}` : '-' },
     { title: '班型', dataIndex: 'classType', width: 90 },
     { title: '学生', render: (_, record) => tagList(record.students.map(studentDisplayName), 'blue') },
     { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '已取消' ? 'default' : 'green'}>{value}</Tag> }
@@ -901,10 +1139,20 @@ function availabilityStats(items: AvailabilitySlot[]) {
   };
 }
 
+function uniqueScheduleCampuses(items: ScheduleClass[]) {
+  const values = items
+    .map((item) => item.campusId || 'campus-main')
+    .filter(Boolean);
+  return Array.from(new Set(values)).sort();
+}
+
 function filterClasses(items: ScheduleClass[], filters: ScheduleFilters, courseById: CourseLookup) {
   return items.filter((item) =>
     (!filters.grade || scheduleClassGrade(item, courseById) === filters.grade) &&
+    (!filters.subject || scheduleClassSubject(item, courseById) === filters.subject) &&
     (!filters.teacherId || item.teacherId === filters.teacherId) &&
+    (!filters.studentId || item.students.some((student) => student.id === filters.studentId)) &&
+    (!filters.campusId || (item.campusId || 'campus-main') === filters.campusId) &&
     (!filters.courseId || item.courseId === filters.courseId) &&
     (!filters.classType || item.classType === filters.classType) &&
     (!filters.status || filters.status === '全部' || item.status === filters.status)
@@ -915,11 +1163,70 @@ function scheduleClassGrade(item: ScheduleClass, courseById: CourseLookup) {
   return courseById[item.courseId]?.grade || item.students[0]?.grade || '';
 }
 
+function scheduleClassSubject(item: ScheduleClass, courseById: CourseLookup) {
+  return courseById[item.courseId]?.subject || '';
+}
+
 function groupScheduleItems<T extends { dayOfWeek: number; startTime: string }>(items: T[]) {
   return items.reduce<Record<number, T[]>>((result, item) => {
     result[item.dayOfWeek] = [...(result[item.dayOfWeek] ?? []), item].sort((left, right) => left.startTime.localeCompare(right.startTime));
     return result;
   }, {});
+}
+
+function scheduleClassPayload(record: ScheduleClass, target: ScheduleMoveTarget = { dayOfWeek: record.dayOfWeek, label: weekLabel(record.dayOfWeek) }): ScheduleClassFormValues {
+  return {
+    courseId: record.courseId,
+    teacherId: record.teacherId,
+    campusId: record.campusId || 'campus-main',
+    roomName: record.roomName || '',
+    classType: record.classType,
+    durationMinutes: record.durationMinutes,
+    dayOfWeek: target.dayOfWeek,
+    startTime: record.startTime,
+    endTime: record.endTime,
+    startDate: target.startDate ?? record.startDate,
+    endDate: target.endDate ?? record.endDate,
+    studentIds: record.students.map((student) => student.id)
+  };
+}
+
+function buildMonthDays(base: Date) {
+  const first = new Date(base.getFullYear(), base.getMonth(), 1);
+  const last = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+  const start = new Date(first);
+  start.setDate(first.getDate() - ((first.getDay() + 6) % 7));
+  const days = [];
+  for (let index = 0; index < 42; index++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
+    days.push({
+      key: localDateText(date),
+      date,
+      day: date.getDate(),
+      dayOfWeek,
+      weekLabel: weekLabel(dayOfWeek),
+      label: `${date.getMonth() + 1}月${date.getDate()}日 ${weekLabel(dayOfWeek)}`,
+      inMonth: date.getMonth() === base.getMonth()
+    });
+  }
+  return days.filter((day) => day.inMonth || day.date >= first && day.date <= last);
+}
+
+function scheduleClassOccursOn(item: ScheduleClass, date: Date) {
+  const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
+  if (item.dayOfWeek !== dayOfWeek) return false;
+  const dateText = localDateText(date);
+  if (item.startDate && dateText < item.startDate) return false;
+  if (item.endDate && dateText > item.endDate) return false;
+  return true;
+}
+
+function localDateText(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 function hasGroupedItems<T>(groups: Record<number, T[]>) {

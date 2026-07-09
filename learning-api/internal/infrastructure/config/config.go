@@ -35,6 +35,14 @@ type Config struct {
 		AppID  string
 		Secret string
 	}
+	OfficialAccount struct {
+		AppID      string
+		Secret     string
+		TemplateID string
+	}
+	MiniProgramSubscribe struct {
+		TemplateIDs []string
+	}
 	MySQL struct {
 		DSN string
 	}
@@ -66,6 +74,10 @@ func MustLoad() *Config {
 	cfg.BootstrapAdmin.Password = getString("BOOTSTRAP_ADMIN_PASSWORD", "")
 	cfg.Wechat.AppID = getString("WECHAT_APPID", "")
 	cfg.Wechat.Secret = getString("WECHAT_SECRET", "")
+	cfg.OfficialAccount.AppID = getString("WECHAT_OFFICIAL_ACCOUNT_APPID", "")
+	cfg.OfficialAccount.Secret = getString("WECHAT_OFFICIAL_ACCOUNT_SECRET", "")
+	cfg.OfficialAccount.TemplateID = getString("WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID", "")
+	cfg.MiniProgramSubscribe.TemplateIDs = getCSV("WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS", nil)
 	cfg.MySQL.DSN = getString("MYSQL_DSN", "app:app123@tcp(127.0.0.1:3317)/starline?charset=utf8mb4&parseTime=True&loc=Local")
 	cfg.Redis.Addr = getString("REDIS_ADDR", "127.0.0.1:6380")
 	cfg.RabbitMQ.URL = getString("RABBITMQ_URL", "amqp://app:app123@127.0.0.1:5674/starline")
@@ -106,6 +118,18 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.Wechat.Secret) == "" {
 		missing = append(missing, "WECHAT_SECRET")
+	}
+	if strings.TrimSpace(c.OfficialAccount.AppID) == "" {
+		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_APPID")
+	}
+	if strings.TrimSpace(c.OfficialAccount.Secret) == "" {
+		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_SECRET")
+	}
+	if strings.TrimSpace(c.OfficialAccount.TemplateID) == "" {
+		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID")
+	}
+	if len(c.MiniProgramSubscribe.TemplateIDs) == 0 {
+		missing = append(missing, "WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS")
 	}
 	if c.Demo.SeedData {
 		missing = append(missing, "DEMO_SEED_DATA=false")

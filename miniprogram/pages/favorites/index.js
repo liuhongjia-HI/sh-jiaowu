@@ -3,7 +3,7 @@ const { request } = require("../../utils/request");
 Page({
   data: {
     loading: true,
-    emptyMessage: "在讲义或小挑战里点「收藏」，就能在这里找到它们。",
+    emptyMessage: "在学习资料或小挑战里点「收藏」，就能在这里找到它们。",
     favorites: []
   },
   onLoad() {

@@ -1,6 +1,6 @@
 <view class="hero">
-  <view class="eyebrow">我的学习</view>
-  <view class="hero-title">选一门课继续学 📚</view>
+  <view class="eyebrow">学习中心</view>
+  <view class="hero-title">选一门课继续学</view>
 </view>
 
 <view class="section">

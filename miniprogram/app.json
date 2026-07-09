@@ -10,6 +10,7 @@
     "pages/notices/index",
     "pages/schedule/index",
     "pages/me/index",
+    "pages/scores/index",
     "pages/growth/index",
     "pages/badges/index",
     "pages/favorites/index",
@@ -22,16 +23,35 @@
     "backgroundColor": "#fff8f1"
   },
   "tabBar": {
-    "color": "#b1998e",
-    "selectedColor": "#e77951",
+    "color": "#8e99a8",
+    "selectedColor": "#2f7de1",
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "list": [
-      { "pagePath": "pages/home/index", "text": "首页" },
-      { "pagePath": "pages/study/index", "text": "学习" },
-      { "pagePath": "pages/tasks/index", "text": "小挑战" },
-      { "pagePath": "pages/notices/index", "text": "通知" },
-      { "pagePath": "pages/me/index", "text": "我的" }
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/icons/tab-home.png",
+        "selectedIconPath": "assets/icons/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/study/index",
+        "text": "学习中心",
+        "iconPath": "assets/icons/tab-study.png",
+        "selectedIconPath": "assets/icons/tab-study-active.png"
+      },
+      {
+        "pagePath": "pages/notices/index",
+        "text": "通知消息",
+        "iconPath": "assets/icons/tab-notice.png",
+        "selectedIconPath": "assets/icons/tab-notice-active.png"
+      },
+      {
+        "pagePath": "pages/me/index",
+        "text": "个人中心",
+        "iconPath": "assets/icons/tab-me.png",
+        "selectedIconPath": "assets/icons/tab-me-active.png"
+      }
     ]
   },
   "sitemapLocation": "sitemap.json"

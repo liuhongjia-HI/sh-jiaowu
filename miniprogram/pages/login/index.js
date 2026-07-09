@@ -6,7 +6,32 @@ const {
 
 Page({
   data: {
-    binding: false
+    binding: false,
+    form: {
+      studentName: "",
+      schoolName: "",
+      grade: ""
+    }
+  },
+  onInput(event) {
+    const field = event.currentTarget.dataset.field;
+    this.setData({ [`form.${field}`]: event.detail.value });
+  },
+  validateProfile() {
+    const form = this.data.form;
+    if (!(form.studentName || "").trim()) {
+      wx.showToast({ title: "请输入学生姓名", icon: "none" });
+      return false;
+    }
+    if (!(form.schoolName || "").trim()) {
+      wx.showToast({ title: "请输入学校", icon: "none" });
+      return false;
+    }
+    if (!(form.grade || "").trim()) {
+      wx.showToast({ title: "请输入年级", icon: "none" });
+      return false;
+    }
+    return true;
   },
   showLoginError(error, fallback = "登录失败") {
     const message = error && error.message ? error.message : fallback;
@@ -31,6 +56,9 @@ Page({
   },
   // 手机号绑定：getPhoneNumber 授权后，把手机号随登录一起上送给后端完成绑定。
   bindPhone(event) {
+    if (!this.validateProfile()) {
+      return;
+    }
     const detail = event.detail || {};
     if (isCancel(detail)) {
       wx.showToast({ title: "已取消手机号授权", icon: "none" });
@@ -44,7 +72,14 @@ Page({
       success: (res) => {
         const code = res.code;
         // detail.code 为手机号凭据，后端调用 getuserphonenumber 解析后绑定。
-        this.doLogin({ code, phoneCode: detail.code });
+        const form = this.data.form;
+        this.doLogin({
+          code,
+          phoneCode: detail.code,
+          studentName: (form.studentName || "").trim(),
+          schoolName: (form.schoolName || "").trim(),
+          grade: (form.grade || "").trim()
+        });
       },
       fail: () => wx.showToast({ title: "微信登录失败", icon: "none" })
     });
@@ -57,7 +92,7 @@ Page({
     request(path, { method: "POST", data: payload })
       .then((result) => {
         wx.setStorageSync("starline_token", result.token);
-        wx.showToast({ title: "登录成功", icon: "success" });
+        wx.showToast({ title: "绑定成功", icon: "success" });
         wx.switchTab({ url: "/pages/home/index" });
       })
       .catch((error) => this.showLoginError(error))

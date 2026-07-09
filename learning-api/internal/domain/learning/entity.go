@@ -43,6 +43,7 @@ type Principal struct {
 	UserID             string   `json:"userId"`
 	Name               string   `json:"name"`
 	Phone              string   `json:"phone,omitempty"`
+	AuthMethod         string   `json:"authMethod,omitempty"`
 	StudentID          string   `json:"studentId,omitempty"`
 	CampusID           string   `json:"campusId,omitempty"`
 	Roles              []Role   `json:"roles"`
@@ -56,8 +57,18 @@ type Principal struct {
 }
 
 type AuthResult struct {
-	Token string    `json:"token"`
-	User  Principal `json:"user"`
+	Token      string    `json:"token"`
+	User       Principal `json:"user"`
+	AuthMethod string    `json:"authMethod"`
+}
+
+type WechatLoginRequest struct {
+	Code        string `json:"code"`
+	Phone       string `json:"phone"`
+	PhoneCode   string `json:"phoneCode"`
+	StudentName string `json:"studentName"`
+	SchoolName  string `json:"schoolName"`
+	Grade       string `json:"grade"`
 }
 
 type Teacher struct {
@@ -164,35 +175,46 @@ type PackageUpsertRequest struct {
 }
 
 type Student struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Nickname       string   `json:"nickname,omitempty"`
-	AvatarURL      string   `json:"avatarUrl,omitempty"`
-	Grade          string   `json:"grade"`
-	Phone          string   `json:"phone"`
-	OpenedPackages []string `json:"openedPackages"`
-	LearningStatus string   `json:"learningStatus"`
-	AccountStatus  string   `json:"accountStatus"`
-	StreakDays     int      `json:"streakDays"`
-	AverageScore   int      `json:"averageScore"`
-	BadgeCount     int      `json:"badgeCount"`
-	Remark         string   `json:"remark,omitempty"`
-	BindStatus     string   `json:"bindStatus"`
-	LastStudyAt    string   `json:"lastStudyAt,omitempty"`
-	EffectiveUntil string   `json:"effectiveUntil,omitempty"`
+	ID                    string   `json:"id"`
+	Name                  string   `json:"name"`
+	Nickname              string   `json:"nickname,omitempty"`
+	AvatarURL             string   `json:"avatarUrl,omitempty"`
+	Grade                 string   `json:"grade"`
+	Phone                 string   `json:"phone"`
+	SchoolName            string   `json:"schoolName,omitempty"`
+	GuardianName          string   `json:"guardianName,omitempty"`
+	OfficialAccountOpenID string   `json:"officialAccountOpenId,omitempty"`
+	OpenedPackages        []string `json:"openedPackages"`
+	LearningStatus        string   `json:"learningStatus"`
+	AccountStatus         string   `json:"accountStatus"`
+	StreakDays            int      `json:"streakDays"`
+	AverageScore          int      `json:"averageScore"`
+	BadgeCount            int      `json:"badgeCount"`
+	Remark                string   `json:"remark,omitempty"`
+	BindStatus            string   `json:"bindStatus"`
+	LastStudyAt           string   `json:"lastStudyAt,omitempty"`
+	LastSubmittedAt       string   `json:"lastSubmittedAt,omitempty"`
+	LastSubmissionStatus  string   `json:"lastSubmissionStatus,omitempty"`
+	EffectiveUntil        string   `json:"effectiveUntil,omitempty"`
 }
 
 type StudentUpsertRequest struct {
-	Name          string `json:"name"`
-	Phone         string `json:"phone"`
-	Grade         string `json:"grade"`
-	AccountStatus string `json:"accountStatus"`
-	Remark        string `json:"remark"`
+	Name                  string `json:"name"`
+	Phone                 string `json:"phone"`
+	Grade                 string `json:"grade"`
+	SchoolName            string `json:"schoolName"`
+	OfficialAccountOpenID string `json:"officialAccountOpenId"`
+	AccountStatus         string `json:"accountStatus"`
+	Remark                string `json:"remark"`
 }
 
 type StudentProfileUpdateRequest struct {
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatarUrl"`
+	Nickname     string `json:"nickname"`
+	AvatarURL    string `json:"avatarUrl"`
+	StudentName  string `json:"studentName"`
+	Grade        string `json:"grade"`
+	SchoolName   string `json:"schoolName"`
+	GuardianName string `json:"guardianName"`
 }
 
 type StudentQuery struct {
@@ -218,8 +240,48 @@ type StudentLearningRecord struct {
 	Course      string `json:"course"`
 	Status      string `json:"status"`
 	Score       int    `json:"score,omitempty"`
+	FullScore   int    `json:"fullScore,omitempty"`
 	OccurredAt  string `json:"occurredAt"`
 	Description string `json:"description"`
+}
+
+type StudentScoreRecord struct {
+	ID             string `json:"id"`
+	StudentID      string `json:"studentId"`
+	Subject        string `json:"subject"`
+	ExamType       string `json:"examType"`
+	ExamName       string `json:"examName"`
+	ExamDate       string `json:"examDate"`
+	Score          int    `json:"score"`
+	FullScore      int    `json:"fullScore"`
+	AverageScore   int    `json:"averageScore,omitempty"`
+	TeacherComment string `json:"teacherComment,omitempty"`
+	CreatedBy      string `json:"createdBy,omitempty"`
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
+}
+
+type StudentScoreUpsertRequest struct {
+	Subject        string `json:"subject"`
+	ExamType       string `json:"examType"`
+	ExamName       string `json:"examName"`
+	ExamDate       string `json:"examDate"`
+	Score          int    `json:"score"`
+	FullScore      int    `json:"fullScore"`
+	AverageScore   int    `json:"averageScore"`
+	TeacherComment string `json:"teacherComment"`
+}
+
+type StudentScoreSummary struct {
+	Subject        string               `json:"subject"`
+	Records        []StudentScoreRecord `json:"records"`
+	FirstRecord    *StudentScoreRecord  `json:"firstRecord,omitempty"`
+	LatestRecord   *StudentScoreRecord  `json:"latestRecord,omitempty"`
+	Improvement    int                  `json:"improvement"`
+	ImprovementPct int                  `json:"improvementPct"`
+	Description    string               `json:"description"`
+	ProblemPoint   string               `json:"problemPoint,omitempty"`
+	NextStep       string               `json:"nextStep,omitempty"`
 }
 
 type StudentDetail struct {
@@ -368,13 +430,16 @@ type RenewalReminderCreateRequest struct {
 }
 
 type ParentNotice struct {
-	ID        string `json:"id"`
-	OrderID   string `json:"orderId"`
-	StudentID string `json:"studentId"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	SentAt    string `json:"sentAt"`
-	Status    string `json:"status"`
+	ID            string `json:"id"`
+	OrderID       string `json:"orderId"`
+	StudentID     string `json:"studentId"`
+	Title         string `json:"title"`
+	Content       string `json:"content"`
+	SentAt        string `json:"sentAt"`
+	Status        string `json:"status"`
+	NoticeID      string `json:"noticeId,omitempty"`
+	Channel       string `json:"channel,omitempty"`
+	FailureReason string `json:"failureReason,omitempty"`
 }
 
 type ParentNoticeCreateRequest struct {
@@ -422,6 +487,10 @@ type Material struct {
 	CourseID         string `json:"courseId,omitempty"`
 	Course           string `json:"course"`
 	LearningSpaceID  string `json:"learningSpaceId,omitempty"`
+	AcademicYear     string `json:"academicYear,omitempty"`
+	Grade            string `json:"grade,omitempty"`
+	Semester         string `json:"semester,omitempty"`
+	Subject          string `json:"subject,omitempty"`
 	Chapter          string `json:"chapter"`
 	Type             string `json:"type"`
 	ViewCount        int    `json:"viewCount"`
@@ -487,7 +556,8 @@ type HomeworkUpdateRequest struct {
 // Question 是小挑战中的单道题目。Answer 仅用于服务端自动判分，不下发给学生端。
 type Question struct {
 	ID      string   `json:"id"`
-	Type    string   `json:"type"` // single | multiple | text
+	Title   string   `json:"title,omitempty"`
+	Type    string   `json:"type"` // single | multiple | judge | fill | text
 	Stem    string   `json:"stem"`
 	Options []string `json:"options,omitempty"`
 	Answer  string   `json:"-"`
@@ -498,10 +568,11 @@ type Question struct {
 // QuestionBankItem 是可跨学年复用的题库题目，按年级、学期、学科归档。
 type QuestionBankItem struct {
 	ID               string   `json:"id"`
+	Title            string   `json:"title"`
 	Grade            string   `json:"grade"`
 	Semester         string   `json:"semester"`
 	Subject          string   `json:"subject"`
-	Type             string   `json:"type"` // single | multiple | text
+	Type             string   `json:"type"` // single | multiple | judge | fill | text
 	Stem             string   `json:"stem"`
 	Options          []string `json:"options,omitempty"`
 	Answer           string   `json:"answer,omitempty"`
@@ -515,6 +586,7 @@ type QuestionBankItem struct {
 }
 
 type QuestionBankUpsertRequest struct {
+	Title    string   `json:"title"`
 	Grade    string   `json:"grade"`
 	Semester string   `json:"semester"`
 	Subject  string   `json:"subject"`
@@ -562,6 +634,23 @@ type Submission struct {
 	Answers        []SubmissionAnswer `json:"answers,omitempty"`
 }
 
+type HomeworkSubmissionStudent struct {
+	StudentID    string `json:"studentId"`
+	StudentName  string `json:"studentName"`
+	Phone        string `json:"phone"`
+	SubmittedAt  string `json:"submittedAt,omitempty"`
+	ReviewStatus string `json:"reviewStatus"`
+	SubmissionID string `json:"submissionId,omitempty"`
+}
+
+type HomeworkSubmissionSummary struct {
+	HomeworkID    string                      `json:"homeworkId"`
+	HomeworkTitle string                      `json:"homeworkTitle"`
+	TotalNum      int                         `json:"totalNum"`
+	SubmittedNum  int                         `json:"submittedNum"`
+	Students      []HomeworkSubmissionStudent `json:"students"`
+}
+
 type SubmissionAnswer struct {
 	QuestionID string   `json:"questionId"`
 	Choice     string   `json:"choice"`
@@ -582,6 +671,7 @@ type StudentCourseCard struct {
 
 // StudentStudyBoard 是学习页的聚合数据：课程卡（带进度）+ 资料。
 type StudentStudyBoard struct {
+	Student   Student             `json:"student"`
 	Courses   []StudentCourseCard `json:"courses"`
 	Materials []Material          `json:"materials"`
 }
@@ -594,6 +684,52 @@ type StudentTask struct {
 	SubmissionID  string `json:"submissionId,omitempty"`
 }
 
+// StudentTodo 是学生首页的今日待办，聚合课程、练习、反馈和提醒授权。
+type StudentTodo struct {
+	ID         string `json:"id"`
+	Type       string `json:"type"`
+	Title      string `json:"title"`
+	Summary    string `json:"summary"`
+	ActionText string `json:"actionText"`
+	Path       string `json:"path,omitempty"`
+	Priority   int    `json:"priority"`
+	Status     string `json:"status"`
+}
+
+// ClassroomFeedback 是家长可读的课后课堂反馈，由已批改练习沉淀。
+type ClassroomFeedback struct {
+	ID                  string `json:"id"`
+	CourseName          string `json:"courseName"`
+	LessonTitle         string `json:"lessonTitle"`
+	TeacherName         string `json:"teacherName"`
+	Performance         string `json:"performance"`
+	Focus               string `json:"focus"`
+	NextStep            string `json:"nextStep"`
+	Score               int    `json:"score"`
+	CreatedAt           string `json:"createdAt"`
+	RelatedSubmissionID string `json:"relatedSubmissionId,omitempty"`
+}
+
+type SubscriptionReminder struct {
+	Enabled            bool     `json:"enabled"`
+	TemplateConfigured bool     `json:"templateConfigured"`
+	TemplateIDs        []string `json:"templateIds,omitempty"`
+	Title              string   `json:"title"`
+	Summary            string   `json:"summary"`
+	ActionText         string   `json:"actionText"`
+}
+
+type StudentSubscriptionRequest struct {
+	TemplateIDs []string `json:"templateIds"`
+}
+
+type StudentSubscriptionPreference struct {
+	StudentID   string   `json:"studentId"`
+	Enabled     bool     `json:"enabled"`
+	TemplateIDs []string `json:"templateIds"`
+	UpdatedAt   string   `json:"updatedAt"`
+}
+
 // Badge 是成长徽章；Obtained 表示当前学生是否已获得。
 type Badge struct {
 	ID       string `json:"id"`
@@ -603,7 +739,7 @@ type Badge struct {
 	Obtained bool   `json:"obtained"`
 }
 
-// Favorite 是学生收藏的一条内容（讲义或小挑战）。
+// Favorite 是学生收藏的一条内容（学习资料或小挑战）。
 type Favorite struct {
 	ID         string `json:"id"`
 	StudentID  string `json:"studentId"`
@@ -666,22 +802,33 @@ type ReviewCompleteRequest struct {
 	Score          int    `json:"score"`
 	TeacherComment string `json:"teacherComment"`
 	Reward         string `json:"reward"`
+	FinalStatus    string `json:"finalStatus"`
 }
 
 type Notice struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Title   string `json:"title"`
-	Target  string `json:"target"`
-	Summary string `json:"summary"`
-	Status  string `json:"status"`
+	ID              string `json:"id"`
+	Type            string `json:"type"`
+	Title           string `json:"title"`
+	Target          string `json:"target"`
+	Summary         string `json:"summary"`
+	Channel         string `json:"channel,omitempty"`
+	RecipientOpenID string `json:"recipientOpenId,omitempty"`
+	Status          string `json:"status"`
+	FailureReason   string `json:"failureReason,omitempty"`
+	RelatedType     string `json:"relatedType,omitempty"`
+	RelatedID       string `json:"relatedId,omitempty"`
+	RetryCount      int    `json:"retryCount,omitempty"`
 }
 
 type NoticeCreateRequest struct {
-	Type    string `json:"type"`
-	Title   string `json:"title"`
-	Target  string `json:"target"`
-	Summary string `json:"summary"`
+	Type            string `json:"type"`
+	Title           string `json:"title"`
+	Target          string `json:"target"`
+	Summary         string `json:"summary"`
+	Channel         string `json:"channel"`
+	RecipientOpenID string `json:"recipientOpenId"`
+	RelatedType     string `json:"relatedType"`
+	RelatedID       string `json:"relatedId"`
 }
 
 type OperationLog struct {
@@ -761,13 +908,30 @@ type DashboardOverview struct {
 	UnpublishedFiles int `json:"unpublishedFiles"`
 }
 
+type ReadinessItem struct {
+	Key     string `json:"key"`
+	Title   string `json:"title"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Action  string `json:"action,omitempty"`
+}
+
+type SystemReadiness struct {
+	ReadyCount int             `json:"readyCount"`
+	TotalCount int             `json:"totalCount"`
+	Items      []ReadinessItem `json:"items"`
+}
+
 type StudentHome struct {
-	Student          Student    `json:"student"`
-	ContinueCourse   Course     `json:"continueCourse"`
-	ContinueProgress int        `json:"continueProgress"`
-	PendingHomework  []Homework `json:"pendingHomework"`
-	Notices          []Notice   `json:"notices"`
-	Materials        []Material `json:"materials"`
+	Student              Student              `json:"student"`
+	ContinueCourse       Course               `json:"continueCourse"`
+	ContinueProgress     int                  `json:"continueProgress"`
+	PendingHomework      []Homework           `json:"pendingHomework"`
+	Notices              []Notice             `json:"notices"`
+	Materials            []Material           `json:"materials"`
+	TodayTodos           []StudentTodo        `json:"todayTodos"`
+	ClassroomFeedback    []ClassroomFeedback  `json:"classroomFeedback"`
+	SubscriptionReminder SubscriptionReminder `json:"subscriptionReminder"`
 }
 
 type AvailabilitySlot struct {
@@ -830,6 +994,8 @@ type ScheduleCandidate struct {
 type ScheduleClassCreateRequest struct {
 	CourseID        string   `json:"courseId"`
 	TeacherID       string   `json:"teacherId"`
+	CampusID        string   `json:"campusId"`
+	RoomName        string   `json:"roomName"`
 	ClassType       string   `json:"classType"`
 	DurationMinutes int      `json:"durationMinutes"`
 	DayOfWeek       int      `json:"dayOfWeek"`
@@ -847,6 +1013,8 @@ type ScheduleClass struct {
 	CourseName      string             `json:"courseName"`
 	TeacherID       string             `json:"teacherId"`
 	TeacherName     string             `json:"teacherName"`
+	CampusID        string             `json:"campusId"`
+	RoomName        string             `json:"roomName"`
 	ClassType       string             `json:"classType"`
 	Capacity        int                `json:"capacity"`
 	DurationMinutes int                `json:"durationMinutes"`

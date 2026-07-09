@@ -13,10 +13,11 @@
   <view wx:for="{{records}}" wx:key="id" class="card">
     <view class="row">
       <view class="title small-title">{{item.type}} · {{item.title}}</view>
-      <view wx:if="{{item.score}}" class="badge">{{item.score}} 分</view>
+      <view wx:if="{{item.score && item.fullScore}}" class="badge">{{item.score}}/{{item.fullScore}} 分</view>
+      <view wx:elif="{{item.score}}" class="badge">{{item.score}} 分</view>
       <view wx:else class="tag">{{item.status}}</view>
     </view>
-    <view class="sub">{{item.description}}</view>
+    <rich-text class="sub rich-text" nodes="{{item.description}}"></rich-text>
     <view class="muted">{{item.occurredAt}}</view>
   </view>
 </view>

@@ -6,10 +6,18 @@
   <view class="card login-card">
     <view class="mascot">🐣</view>
     <view class="title">开启今天的学习</view>
-    <view class="sub">绑定手机号后，可以同步学习记录、小挑战结果和老师反馈。</view>
+    <view class="sub">先填写学生信息，再绑定手机号匹配老师已开通的课程。</view>
+    <view class="form-line">
+      <input value="{{form.studentName}}" data-field="studentName" bindinput="onInput" placeholder="学生姓名" />
+    </view>
+    <view class="form-line">
+      <input value="{{form.schoolName}}" data-field="schoolName" bindinput="onInput" placeholder="学校" />
+    </view>
+    <view class="form-line">
+      <input value="{{form.grade}}" data-field="grade" bindinput="onInput" placeholder="年级，例如：五年级" />
+    </view>
     <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">绑定手机号并登录</button>
-    <button class="button light" bindtap="login" disabled="{{binding}}">暂不绑定，先进入</button>
-    <view class="login-tip">手机号可自动匹配已有课程权限；未开通课程也可以先登录。</view>
+    <view class="login-tip">手机号会用于匹配已有课程权限；匹配不到时请联系老师确认开通状态。</view>
   </view>
 </view>
 <view class="section">

@@ -9,6 +9,19 @@ textarea {
   margin-top: 18rpx;
 }
 
+.question-title {
+  margin-top: 14rpx;
+}
+
+.question-stem {
+  display: block;
+  margin-top: 10rpx;
+  color: #2b2522;
+  font-size: 30rpx;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
 .option {
   margin-top: 18rpx;
   padding: 22rpx;

@@ -7,6 +7,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Select,
   Skeleton,
@@ -26,7 +27,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { getData, postData, postForm, putData } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
-import { gradeOptions as curriculumGradeOptions } from '../utils/curriculum';
+import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
 import type {
   CurrentUser,
   GrantPreview,
@@ -34,6 +35,9 @@ import type {
   StudentDetail,
   StudentImportResult,
   StudentRemindResult,
+  StudentScoreRecord,
+  StudentScoreSummary,
+  StudentScoreUpsertRequest,
   StudentUpsertRequest,
   StudyPackage
 } from '../types/starline';
@@ -42,6 +46,8 @@ type StudentFormValues = {
   name: string;
   phone: string;
   grade: string;
+  schoolName: string;
+  officialAccountOpenId: string;
   remark: string;
   enabled: boolean;
 };
@@ -60,6 +66,10 @@ type GrantFormValues = {
 
 function canWrite(user: CurrentUser) {
   return user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
+}
+
+function canManageScores(user: CurrentUser) {
+  return user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
@@ -88,6 +98,10 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
 
   const packageId = Form.useWatch('packageId', grantForm);
+  const availableGrantPackages = useMemo(
+    () => (packages.data ?? []).filter((item) => item.status === '启用' && item.grade === grantStudent?.grade),
+    [packages.data, grantStudent?.grade]
+  );
   const grantPreview = useQuery({
     queryKey: ['student-grant-preview', grantStudent?.id, packageId],
     enabled: Boolean(grantStudent?.id && packageId),
@@ -100,6 +114,8 @@ export default function Students({ user }: { user: CurrentUser }) {
         name: values.name,
         phone: values.phone,
         grade: values.grade,
+        schoolName: values.schoolName ?? '',
+        officialAccountOpenId: values.officialAccountOpenId ?? '',
         remark: values.remark ?? '',
         accountStatus: editing ? (values.enabled ? '正常' : '停用') : undefined
       };
@@ -132,7 +148,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       grantForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['students'] });
     },
-    onError: () => message.error('开通失败，请检查学生和学习套餐。')
+    onError: (err: Error) => message.error(err.message || '开通失败，请检查学生和学习套餐。')
   });
 
   const importStudents = useMutation({
@@ -164,7 +180,7 @@ export default function Students({ user }: { user: CurrentUser }) {
 
   function openCreate() {
     setEditing(null);
-    studentForm.setFieldsValue({ name: '', phone: '', grade: '', remark: '', enabled: true });
+    studentForm.setFieldsValue({ name: '', phone: '', grade: '', schoolName: '', officialAccountOpenId: '', remark: '', enabled: true });
     setStudentModalOpen(true);
   }
 
@@ -174,6 +190,8 @@ export default function Students({ user }: { user: CurrentUser }) {
       name: student.name,
       phone: student.phone,
       grade: student.grade,
+      schoolName: student.schoolName ?? '',
+      officialAccountOpenId: student.officialAccountOpenId ?? '',
       remark: student.remark ?? '',
       enabled: student.accountStatus !== '停用'
     });
@@ -184,6 +202,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     { title: '学生', dataIndex: 'name', width: 120, fixed: 'left' },
     { title: '年级', dataIndex: 'grade', width: 100 },
     { title: '手机号', dataIndex: 'phone', width: 140 },
+    { title: '学校', dataIndex: 'schoolName', width: 160, render: (value) => value || '-' },
+    { title: '公众号', dataIndex: 'officialAccountOpenId', width: 110, render: (value) => <Tag color={value ? 'green' : 'orange'}>{value ? '已关联' : '未关联'}</Tag> },
     { title: '微信绑定', dataIndex: 'bindStatus', width: 110, render: (value) => <Tag color={value === '已绑定' ? 'green' : 'orange'}>{value}</Tag> },
     { title: '已开通套餐', dataIndex: 'openedPackages', render: (values: string[]) => tagList(values, 'blue', '暂未开通') },
     { title: '学习状态', dataIndex: 'learningStatus', width: 110, render: (value) => <Tag color={String(value).includes('未') ? 'orange' : 'green'}>{value}</Tag> },
@@ -193,19 +213,31 @@ export default function Students({ user }: { user: CurrentUser }) {
     { title: '徽章', dataIndex: 'badgeCount', width: 80 },
     { title: '最近学习', dataIndex: 'lastStudyAt', width: 160, render: (value) => value || '-' },
     {
+      title: '最近提交',
+      width: 180,
+      render: (_, record) => record.lastSubmissionStatus
+        ? <Space size={4}><Tag color={submissionStatusColor(record.lastSubmissionStatus)}>{record.lastSubmissionStatus}</Tag><Typography.Text type="secondary">{record.lastSubmittedAt || '-'}</Typography.Text></Space>
+        : '-'
+    },
+    {
       title: '操作',
       width: writable ? 150 : 64,
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
           <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
-          {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => setGrantStudent(record)} />}
+          {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
           {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
           {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
         </Space>
       )
     }
   ];
+
+  function openGrant(student: Student) {
+    grantForm.resetFields();
+    setGrantStudent(student);
+  }
 
   if (students.isLoading) return <Skeleton active />;
   if (students.error) return <Alert type="error" message="学生列表加载失败，请稍后重试。" />;
@@ -262,17 +294,25 @@ export default function Students({ user }: { user: CurrentUser }) {
                   status={<Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>}
                   fields={[
                     { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
+                    { label: '学校', value: record.schoolName || '-' },
+                    { label: '公众号', value: <Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '已关联' : '未关联'}</Tag> },
                     { label: '学习状态', value: <Tag color={record.learningStatus.includes('未') ? 'orange' : 'green'}>{record.learningStatus}</Tag> },
                     { label: '连续学习', value: `${record.streakDays} 天` },
                     { label: '平均分', value: record.averageScore ?? '-' },
                     { label: '徽章', value: `${record.badgeCount} 枚` },
-                    { label: '最近学习', value: record.lastStudyAt || '-' }
+                    { label: '最近学习', value: record.lastStudyAt || '-' },
+                    {
+                      label: '最近提交',
+                      value: record.lastSubmissionStatus
+                        ? <Space size={4}><Tag color={submissionStatusColor(record.lastSubmissionStatus)}>{record.lastSubmissionStatus}</Tag><Typography.Text type="secondary">{record.lastSubmittedAt || '-'}</Typography.Text></Space>
+                        : '-'
+                    }
                   ]}
                   tags={<TagGroup values={record.openedPackages} color="blue" emptyText="暂未开通学习套餐" />}
                   actions={(
                     <>
                       <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
-                      {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => setGrantStudent(record)} />}
+                      {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
                       {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
                       {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
                     </>
@@ -304,6 +344,12 @@ export default function Students({ user }: { user: CurrentUser }) {
           <Form.Item name="grade" label="年级" rules={[{ required: true, message: '请选择年级' }]}>
             <Select options={gradeOptions.length ? gradeOptions : curriculumGradeOptions()} placeholder="请选择年级" />
           </Form.Item>
+          <Form.Item name="schoolName" label="学校" rules={[{ required: true, message: '请输入学校' }]}>
+            <Input placeholder="例如：星河小学" />
+          </Form.Item>
+          <Form.Item name="officialAccountOpenId" label="公众号 openid">
+            <Input placeholder="关注公众号后的 openid，用于模板消息提醒" />
+          </Form.Item>
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={3} placeholder="可填写家长沟通、分班或交接信息" />
           </Form.Item>
@@ -318,18 +364,32 @@ export default function Students({ user }: { user: CurrentUser }) {
       <Modal
         title={grantStudent ? `给 ${grantStudent.name} 开通套餐` : '开通套餐'}
         open={Boolean(grantStudent)}
-        onCancel={() => setGrantStudent(null)}
+        onCancel={() => {
+          setGrantStudent(null);
+          grantForm.resetFields();
+        }}
         onOk={() => grantForm.submit()}
         confirmLoading={createGrant.isPending}
-        okButtonProps={{ disabled: Boolean(grantPreview.data?.alreadyOpened) }}
+        okButtonProps={{ disabled: Boolean(grantPreview.data?.alreadyOpened) || !packageId }}
         destroyOnHidden
       >
         <Form form={grantForm} layout="vertical" onFinish={(values) => createGrant.mutate(values)}>
           <Form.Item name="packageId" label="学习套餐" rules={[{ required: true, message: '请选择套餐' }]}>
-            <Select options={(packages.data ?? []).map((item) => ({ label: item.name, value: item.id }))} loading={packages.isLoading} />
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder={grantStudent ? '选择学习套餐' : '请先选择学生'}
+              options={availableGrantPackages.map((item) => ({ label: packageOptionLabel(item), value: item.id }))}
+              loading={packages.isLoading}
+              disabled={!grantStudent}
+              notFoundContent={grantStudent ? '该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。' : '请先选择学生，再选择该年级可用套餐。'}
+            />
           </Form.Item>
         </Form>
-        {!packageId && <Alert type="info" message="请选择学习套餐后查看学生可学习的内容。" />}
+        {grantStudent && availableGrantPackages.length === 0 && (
+          <Alert type="warning" showIcon message="该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。" />
+        )}
+        {!packageId && availableGrantPackages.length > 0 && <Alert type="info" message="请选择学习套餐后查看学生可学习的内容。" />}
         {grantPreview.isLoading && <Skeleton active />}
         {grantPreview.data && (
           <Alert
@@ -358,7 +418,7 @@ export default function Students({ user }: { user: CurrentUser }) {
           <Button icon={<UploadOutlined />}>选择 CSV 文件</Button>
         </Upload>
         <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
-          CSV 第一行请使用表头：name, phone, grade, remark。
+          CSV 第一行请使用表头：name, phone, grade, schoolName, remark, officialAccountOpenId。
         </Typography.Paragraph>
         {importStudents.data && importStudents.data.errors.length > 0 && (
           <Alert
@@ -377,12 +437,189 @@ export default function Students({ user }: { user: CurrentUser }) {
             items={[
               { key: 'profile', label: '基础信息', children: <StudentProfile detail={detail.data} /> },
               { key: 'records', label: '学习记录', children: <RecordTable detail={detail.data} /> },
+              { key: 'scores', label: '成绩对比', children: selected ? <ScorePanel student={selected} canEdit={canManageScores(user)} /> : null },
               { key: 'logs', label: '操作记录', children: <LogTable detail={detail.data} /> }
             ]}
           />
         )}
       </Drawer>
     </div>
+  );
+}
+
+const examTypeOptions = ['期中', '期末', '单元测', '模拟考', '阶段测评'].map((value) => ({ label: value, value }));
+
+function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }) {
+  const [form] = Form.useForm<StudentScoreUpsertRequest>();
+  const [editing, setEditing] = useState<StudentScoreRecord | null>(null);
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const queryKey = ['students', student.id, 'scores'];
+  const scores = useQuery({
+    queryKey,
+    queryFn: () => getData<StudentScoreSummary[]>(`/students/${student.id}/scores`)
+  });
+
+  const saveScore = useMutation({
+    mutationFn: (values: StudentScoreUpsertRequest) => {
+      const body: StudentScoreUpsertRequest = {
+        subject: values.subject,
+        examType: values.examType || '阶段测评',
+        examName: values.examName,
+        examDate: values.examDate,
+        score: Number(values.score),
+        fullScore: Number(values.fullScore),
+        averageScore: Number(values.averageScore || 0),
+        teacherComment: values.teacherComment ?? ''
+      };
+      if (editing) return putData<StudentScoreRecord>(`/students/${student.id}/scores/${editing.id}`, body);
+      return postData<StudentScoreRecord>(`/students/${student.id}/scores`, body);
+    },
+    onSuccess: () => {
+      message.success(editing ? '成绩已修正' : '成绩已录入');
+      setOpen(false);
+      setEditing(null);
+      form.resetFields();
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ['students', student.id, 'detail'] });
+    },
+    onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请检查成绩信息。')
+  });
+
+  function openCreate() {
+    setEditing(null);
+    form.setFieldsValue({
+      subject: undefined as unknown as string,
+      examType: '阶段测评',
+      examName: '',
+      examDate: new Date().toISOString().slice(0, 10),
+      score: 0,
+      fullScore: 100,
+      averageScore: 0,
+      teacherComment: ''
+    });
+    setOpen(true);
+  }
+
+  function openEdit(record: StudentScoreRecord) {
+    setEditing(record);
+    form.setFieldsValue({
+      subject: record.subject,
+      examType: record.examType || '阶段测评',
+      examName: record.examName,
+      examDate: record.examDate,
+      score: record.score,
+      fullScore: record.fullScore,
+      averageScore: record.averageScore ?? 0,
+      teacherComment: record.teacherComment ?? ''
+    });
+    setOpen(true);
+  }
+
+  if (scores.isLoading) return <Skeleton active />;
+  if (scores.error) return <Alert type="error" message="成绩记录加载失败，请稍后重试。" />;
+
+  const summaries = scores.data ?? [];
+  const rows = summaries.flatMap((summary) => summary.records.map((record) => ({ ...record, subject: summary.subject })));
+
+  return (
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+        <Typography.Text type="secondary">用于给家长展示课前和阶段成绩变化。</Typography.Text>
+        {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>录入成绩</Button>}
+      </div>
+      {summaries.length === 0 ? (
+        <Empty description="还没有成绩记录。" />
+      ) : (
+        <CardList
+          rows={summaries}
+          rowKey={(record) => record.subject}
+          emptyText="还没有成绩记录。"
+          renderCard={(summary) => {
+            const latest = summary.latestRecord;
+            const first = summary.firstRecord;
+            const improvementText = !latest || !first || latest.id === first.id
+              ? '暂无对比'
+              : `${summary.improvement >= 0 ? '+' : ''}${summary.improvement} 分`;
+            return (
+              <InfoCard
+                title={`${summary.subject} · ${latest?.score ?? '-'} / ${latest?.fullScore ?? '-'}`}
+                subtitle={summary.description}
+                status={<Tag color={summary.improvement > 0 ? 'green' : summary.improvement < 0 ? 'orange' : 'blue'}>{improvementText}</Tag>}
+                fields={[
+                  { label: '最近测评', value: latest ? `${latest.examType || '阶段测评'} · ${latest.examName} · ${latest.examDate}` : '-' },
+                  { label: '首次测评', value: first ? `${first.examType || '阶段测评'} · ${first.examName} · ${first.score} 分` : '-' },
+                  { label: '百分比变化', value: latest && first && latest.id !== first.id ? `${summary.improvementPct >= 0 ? '+' : ''}${summary.improvementPct}%` : '-' },
+                  { label: '问题点', value: summary.problemPoint || '-' },
+                  { label: '下一步', value: summary.nextStep || '-' }
+                ]}
+              />
+            );
+          }}
+        />
+      )}
+      {rows.length > 0 && (
+        <Table
+          rowKey="id"
+          size="small"
+          dataSource={rows}
+          pagination={false}
+          columns={[
+            { title: '日期', dataIndex: 'examDate', width: 110 },
+            { title: '学科', dataIndex: 'subject', width: 80 },
+            { title: '类型', dataIndex: 'examType', width: 90, render: (value) => value || '阶段测评' },
+            { title: '考试/测评', dataIndex: 'examName' },
+            { title: '分数', width: 100, render: (_, record) => `${record.score}/${record.fullScore}` },
+            { title: '平均分', dataIndex: 'averageScore', width: 90, render: (value) => value || '-' },
+            { title: '老师建议', dataIndex: 'teacherComment', render: (value) => <RichTextPreview value={value} /> },
+            {
+              title: '操作',
+              width: 70,
+              render: (_, record) => canEdit ? <ActionButton tooltip="修正" icon={<EditOutlined />} onClick={() => openEdit(record)} /> : null
+            }
+          ]}
+        />
+      )}
+      <Modal
+        title={editing ? '修正成绩' : '录入成绩'}
+        open={open}
+        onCancel={() => setOpen(false)}
+        onOk={() => form.submit()}
+        confirmLoading={saveScore.isPending}
+        destroyOnHidden
+      >
+        <Form form={form} layout="vertical" onFinish={(values) => saveScore.mutate(values)}>
+          <Form.Item name="examName" label="考试/测评名称" rules={[{ required: true, message: '请输入考试或测评名称' }]}>
+            <Input placeholder="例如：入学测评 / 期中考试" />
+          </Form.Item>
+          <Space.Compact style={{ width: '100%' }}>
+            <Form.Item name="examType" label="考试类型" rules={[{ required: true, message: '请选择考试类型' }]} style={{ width: '34%' }}>
+              <Select options={examTypeOptions} />
+            </Form.Item>
+            <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]} style={{ width: '33%' }}>
+              <Select placeholder="学科" options={subjectOptions(student.grade)} />
+            </Form.Item>
+            <Form.Item name="examDate" label="考试日期" rules={[{ required: true, message: '请选择考试日期' }]} style={{ width: '33%' }}>
+              <Input type="date" />
+            </Form.Item>
+          </Space.Compact>
+          <Space.Compact style={{ width: '100%' }}>
+            <Form.Item name="score" label="分数" rules={[{ required: true, message: '请输入分数' }]} style={{ width: '33%' }}>
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="fullScore" label="满分" rules={[{ required: true, message: '请输入满分' }]} style={{ width: '33%' }}>
+              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="averageScore" label="平均分" style={{ width: '34%' }}>
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </Space.Compact>
+          <Form.Item name="teacherComment" label="老师建议">
+            <RichTextInput placeholder="用家长能看懂的话说明下一步怎么补。" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </Space>
   );
 }
 
@@ -393,9 +630,17 @@ function StudentProfile({ detail }: { detail: StudentDetail }) {
         <Descriptions.Item label="姓名">{detail.student.name}</Descriptions.Item>
         <Descriptions.Item label="年级">{detail.student.grade}</Descriptions.Item>
         <Descriptions.Item label="手机号">{detail.student.phone}</Descriptions.Item>
+        <Descriptions.Item label="学校">{detail.student.schoolName || '-'}</Descriptions.Item>
+        <Descriptions.Item label="家长称呼">{detail.student.guardianName || '-'}</Descriptions.Item>
+        <Descriptions.Item label="公众号">{detail.student.officialAccountOpenId ? '已关联' : '未关联'}</Descriptions.Item>
         <Descriptions.Item label="微信绑定">{detail.student.bindStatus}</Descriptions.Item>
         <Descriptions.Item label="账号状态">{detail.student.accountStatus}</Descriptions.Item>
         <Descriptions.Item label="最近学习">{detail.student.lastStudyAt || '-'}</Descriptions.Item>
+        <Descriptions.Item label="最近提交">
+          {detail.student.lastSubmissionStatus
+            ? <Space size={4}><Tag color={submissionStatusColor(detail.student.lastSubmissionStatus)}>{detail.student.lastSubmissionStatus}</Tag><Typography.Text type="secondary">{detail.student.lastSubmittedAt || '-'}</Typography.Text></Space>
+            : '-'}
+        </Descriptions.Item>
         <Descriptions.Item label="备注" span={2}>{detail.student.remark || '-'}</Descriptions.Item>
       </Descriptions>
       <CardList
@@ -483,12 +728,58 @@ function LogTable({ detail }: { detail: StudentDetail }) {
   );
 }
 
+function RichTextInput({ value, onChange, placeholder }: { value?: string; onChange?: (value: string) => void; placeholder?: string }) {
+  const insert = (before: string, after = '') => {
+    const current = value || '';
+    onChange?.(`${current}${before}${after}`);
+  };
+  return (
+    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+      <Space wrap>
+        <Button size="small" onClick={() => insert('<strong>', '</strong>')}>B</Button>
+        <Button size="small" onClick={() => insert('<ul><li>', '</li></ul>')}>列表</Button>
+        <Button size="small" onClick={() => insert('<span style="color:#ef4444">', '</span>')}>重点</Button>
+        <Button size="small" onClick={() => insert('<img src="" alt="建议配图" />')}>图片</Button>
+      </Space>
+      <Input.TextArea rows={4} value={value} onChange={(event) => onChange?.(event.target.value)} placeholder={placeholder} />
+    </Space>
+  );
+}
+
+function RichTextPreview({ value }: { value?: string }) {
+  const content = sanitizeRichText(value || '');
+  if (!content) return <Typography.Text type="secondary">-</Typography.Text>;
+  return (
+    <div
+      className="rich-text-preview"
+      dangerouslySetInnerHTML={{ __html: content }}
+    />
+  );
+}
+
+function sanitizeRichText(value: string) {
+  return value
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/\s(href|src)=["']\s*javascript:[^"']*["']/gi, '')
+    .replace(/<(?!\/?(strong|b|ul|ol|li|span|img|br|p)\b)[^>]+>/gi, '')
+    .replace(/<span([^>]*)style=["'][^"']*color\s*:\s*(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)[^"']*["']([^>]*)>/gi, '<span style="color:$2">')
+    .replace(/<span(?![^>]*style=)[^>]*>/gi, '<span>')
+    .replace(/<img([^>]*)src=["'](https?:\/\/[^"']+)["']([^>]*)>/gi, '<img src="$2" alt="老师建议配图" />')
+    .replace(/<img(?![^>]*src=)[^>]*>/gi, '');
+}
+
 function compactParams(filters: StudentFilters) {
   return Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as Record<string, string>;
 }
 
 function uniqueOptions(values: string[]) {
   return Array.from(new Set(values.filter(Boolean))).map((value) => ({ label: value, value }));
+}
+
+function packageOptionLabel(item: StudyPackage) {
+  return [item.name, item.subject, item.semester, item.packageType].filter(Boolean).join(' · ');
 }
 
 function tagList(values: string[], color: string, emptyText: string) {
@@ -498,4 +789,11 @@ function tagList(values: string[], color: string, emptyText: string) {
       {values.map((value) => <Tag key={value} color={color}>{value}</Tag>)}
     </Space>
   );
+}
+
+function submissionStatusColor(status?: string) {
+  if (status === '已批改') return 'green';
+  if (status === '待复核') return 'blue';
+  if (status === '待批改') return 'orange';
+  return 'default';
 }

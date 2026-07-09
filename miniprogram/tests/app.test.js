@@ -22,7 +22,7 @@ function loadAppConfig(envVersion) {
 test("develop build uses real WeChat login", () => {
   const config = loadAppConfig("develop");
 
-  assert.equal(config.globalData.apiBaseUrl, "https://gate.starlineeducation.com.cn/api");
+  assert.equal(config.globalData.apiBaseUrl, "http://127.0.0.1:8892/api");
   assert.equal(config.globalData.useRealWechatLogin, true);
   assert.equal(config.globalData.demoLoginCode, undefined);
 });
@@ -71,6 +71,6 @@ test("ensureLogin exchanges wx.login code for token", async () => {
   assert.deepEqual(calls.find((item) => item[0] === "login"), ["login"]);
   assert.deepEqual(
     calls.find((item) => item[0] === "request"),
-    ["request", "https://gate.starlineeducation.com.cn/api/auth/wechat-login", { code: "wx-code" }]
+    ["request", "http://127.0.0.1:8892/api/auth/wechat-login", { code: "wx-code" }]
   );
 });

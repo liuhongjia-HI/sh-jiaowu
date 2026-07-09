@@ -10,8 +10,10 @@ export type CurrentUser = {
   userId: string;
   name: string;
   studentId?: string;
+  authMethod?: 'wechat' | 'password' | 'demo';
   campusId?: string;
   roles: Role[];
+  mustChangePassword?: boolean;
   campusScopes?: string[];
   learningSpaceIds?: string[];
   canUploadHandout?: boolean;
@@ -22,6 +24,18 @@ export type CurrentUser = {
 export type AuthResult = {
   token: string;
   user: CurrentUser;
+  authMethod: 'wechat' | 'password' | 'demo';
+};
+
+export type CaptchaChallenge = {
+  captchaId: string;
+  question: string;
+};
+
+export type PasswordResetResult = {
+  userId: string;
+  temporaryPassword: string;
+  mustChangePassword: boolean;
 };
 
 export type Teacher = {
@@ -93,6 +107,20 @@ export type DashboardOverview = {
   unpublishedFiles: number;
 };
 
+export type ReadinessItem = {
+  key: string;
+  title: string;
+  status: 'ready' | 'warning' | 'missing';
+  message: string;
+  action?: string;
+};
+
+export type SystemReadiness = {
+  readyCount: number;
+  totalCount: number;
+  items: ReadinessItem[];
+};
+
 export type StudyPackage = {
   id: string;
   name: string;
@@ -128,8 +156,13 @@ export type PackageUpsertRequest = {
 export type Student = {
   id: string;
   name: string;
+  nickname?: string;
+  avatarUrl?: string;
   grade: string;
   phone: string;
+  schoolName?: string;
+  guardianName?: string;
+  officialAccountOpenId?: string;
   openedPackages: string[];
   learningStatus: string;
   accountStatus: string;
@@ -139,6 +172,8 @@ export type Student = {
   remark?: string;
   bindStatus: string;
   lastStudyAt?: string;
+  lastSubmittedAt?: string;
+  lastSubmissionStatus?: string;
   effectiveUntil?: string;
 };
 
@@ -146,6 +181,8 @@ export type StudentUpsertRequest = {
   name: string;
   phone: string;
   grade: string;
+  schoolName?: string;
+  officialAccountOpenId?: string;
   accountStatus?: string;
   remark: string;
 };
@@ -165,8 +202,48 @@ export type StudentLearningRecord = {
   course: string;
   status: string;
   score?: number;
+  fullScore?: number;
   occurredAt: string;
   description: string;
+};
+
+export type StudentScoreRecord = {
+  id: string;
+  studentId: string;
+  subject: string;
+  examType: string;
+  examName: string;
+  examDate: string;
+  score: number;
+  fullScore: number;
+  averageScore?: number;
+  teacherComment?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StudentScoreSummary = {
+  subject: string;
+  records: StudentScoreRecord[];
+  firstRecord?: StudentScoreRecord;
+  latestRecord?: StudentScoreRecord;
+  improvement: number;
+  improvementPct: number;
+  description: string;
+  problemPoint?: string;
+  nextStep?: string;
+};
+
+export type StudentScoreUpsertRequest = {
+  subject: string;
+  examType: string;
+  examName: string;
+  examDate: string;
+  score: number;
+  fullScore: number;
+  averageScore: number;
+  teacherComment: string;
 };
 
 export type StudentDetail = {
@@ -219,6 +296,10 @@ export type Material = {
   courseId?: string;
   course: string;
   learningSpaceId?: string;
+  academicYear?: string;
+  grade?: string;
+  semester?: string;
+  subject?: string;
   chapter: string;
   type: string;
   viewCount: number;
@@ -272,6 +353,23 @@ export type Homework = {
   status: string;
 };
 
+export type HomeworkSubmissionStudent = {
+  studentId: string;
+  studentName: string;
+  phone: string;
+  submittedAt?: string;
+  reviewStatus: string;
+  submissionId?: string;
+};
+
+export type HomeworkSubmissionSummary = {
+  homeworkId: string;
+  homeworkTitle: string;
+  totalNum: number;
+  submittedNum: number;
+  students: HomeworkSubmissionStudent[];
+};
+
 export type HomeworkUpdateRequest = {
   title: string;
   courseId: string;
@@ -283,13 +381,15 @@ export type HomeworkUpdateRequest = {
 
 export type Question = {
   id: string;
-  type: 'single' | 'multiple' | 'text';
+  title?: string;
+  type: 'single' | 'multiple' | 'judge' | 'fill' | 'text';
   stem: string;
   options?: string[];
   score?: number;
 };
 
 export type QuestionBankItem = Question & {
+  title: string;
   grade: string;
   semester: string;
   subject: string;
@@ -301,10 +401,11 @@ export type QuestionBankItem = Question & {
 };
 
 export type QuestionBankUpsertRequest = {
+  title: string;
   grade: string;
   semester: string;
   subject: string;
-  type: 'single' | 'multiple' | 'text';
+  type: 'single' | 'multiple' | 'judge' | 'fill' | 'text';
   stem: string;
   options: string[];
   answer?: string;
@@ -331,6 +432,7 @@ export type ReviewCompleteRequest = {
   score: number;
   teacherComment: string;
   reward?: string;
+  finalStatus?: string;
 };
 
 export type Notice = {
@@ -339,7 +441,13 @@ export type Notice = {
   title: string;
   target: string;
   summary: string;
+  channel?: string;
+  recipientOpenId?: string;
   status: string;
+  failureReason?: string;
+  relatedType?: string;
+  relatedId?: string;
+  retryCount?: number;
 };
 
 export type NoticeCreateRequest = {
@@ -347,6 +455,10 @@ export type NoticeCreateRequest = {
   title: string;
   target: string;
   summary: string;
+  channel?: string;
+  recipientOpenId?: string;
+  relatedType?: string;
+  relatedId?: string;
 };
 
 export type OperationLog = {
@@ -541,6 +653,8 @@ export type ScheduleClass = {
   courseName: string;
   teacherId: string;
   teacherName: string;
+  campusId: string;
+  roomName: string;
   classType: string;
   capacity: number;
   durationMinutes: number;

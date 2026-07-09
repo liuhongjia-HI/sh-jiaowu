@@ -15,7 +15,8 @@ Page({
     ],
     courses: [],
     visibleCourses: [],
-    materials: []
+    materials: [],
+    hasOpenedPackage: false
   },
   onLoad() {
     this.loadStudy();
@@ -26,11 +27,20 @@ Page({
       .then(([data, favorites]) => {
         const courses = Array.isArray(data) ? data : (data.courses || []);
         const materials = Array.isArray(data) ? [] : (data.materials || []);
-        this.setData({ courses: decorateCourses(courses, favorites || []), materials, loading: false }, () => this.applyFilters());
+        const student = Array.isArray(data) ? {} : (data.student || {});
+        const hasOpenedPackage = Array.isArray(student.openedPackages) && student.openedPackages.length > 0;
+        this.setData({
+          courses: decorateCourses(courses, favorites || []),
+          materials,
+          hasOpenedPackage,
+          emptyMessage: studyEmptyMessage(hasOpenedPackage),
+          loading: false
+        }, () => this.applyFilters());
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
         emptyMessage: error.message || "老师开通学习套餐后，你会在这里看到学习星球。",
+        hasOpenedPackage: false,
         loading: false
       }));
   },
@@ -78,4 +88,11 @@ function decorateCourses(courses, favorites) {
       coverIcon: index % 2 === 0 ? "📖" : "💡"
     };
   });
+}
+
+function studyEmptyMessage(hasOpenedPackage) {
+  if (hasOpenedPackage) {
+    return "学习套餐已开通，老师发布课程后会显示在这里。你也可以先回首页查看学习资料和小挑战。";
+  }
+  return "你的身份已绑定，暂时还没有开通学习套餐，请联系老师或教务确认。";
 }

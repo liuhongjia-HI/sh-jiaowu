@@ -106,6 +106,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS question_bank_items (
 			id VARCHAR(64) PRIMARY KEY,
+			title VARCHAR(128) NOT NULL DEFAULT '',
 			grade VARCHAR(32) NOT NULL DEFAULT '',
 			semester VARCHAR(32) NOT NULL DEFAULT '',
 			subject VARCHAR(32) NOT NULL DEFAULT '',
@@ -135,6 +136,22 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			answers_json TEXT NOT NULL,
 			created_at DATETIME NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS student_score_records (
+			id VARCHAR(64) PRIMARY KEY,
+			student_id VARCHAR(64) NOT NULL,
+			subject VARCHAR(32) NOT NULL,
+			exam_type VARCHAR(32) NOT NULL DEFAULT '阶段测评',
+			exam_name VARCHAR(64) NOT NULL,
+			exam_date DATE NOT NULL,
+			score INT NOT NULL,
+			full_score INT NOT NULL,
+			average_score INT NOT NULL DEFAULT 0,
+			teacher_comment TEXT NOT NULL,
+			created_by VARCHAR(64) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			KEY idx_student_score_student (student_id, subject, exam_date)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS student_favorites (
 			id VARCHAR(64) PRIMARY KEY,
 			student_id VARCHAR(64) NOT NULL,
@@ -144,6 +161,12 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			course VARCHAR(128) NOT NULL DEFAULT '',
 			created_at DATETIME NOT NULL,
 			UNIQUE KEY uk_student_favorite_target (student_id, target_type, target_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS student_subscriptions (
+			student_id VARCHAR(64) PRIMARY KEY,
+			enabled TINYINT(1) NOT NULL DEFAULT 0,
+			template_ids_json TEXT NOT NULL,
+			updated_at DATETIME NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS commercial_orders (
 			id VARCHAR(64) PRIMARY KEY,
@@ -221,7 +244,10 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			title VARCHAR(255) NOT NULL DEFAULT '',
 			content TEXT NOT NULL,
 			sent_at DATETIME NOT NULL,
-			status VARCHAR(32) NOT NULL DEFAULT ''
+			status VARCHAR(32) NOT NULL DEFAULT '',
+			notice_id VARCHAR(64) NOT NULL DEFAULT '',
+			channel VARCHAR(32) NOT NULL DEFAULT '',
+			failure_reason TEXT NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, statement := range statements {
@@ -240,6 +266,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"students", "remark", "VARCHAR(255) NOT NULL DEFAULT ''"},
 		{"students", "nickname", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"students", "avatar_url", "TEXT NOT NULL"},
+		{"students", "school_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"students", "guardian_name", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"students", "official_account_open_id", "VARCHAR(128) NOT NULL DEFAULT ''"},
 		{"students", "learning_status", "VARCHAR(32) NOT NULL DEFAULT '未开始'"},
 		{"students", "streak_days", "INT NOT NULL DEFAULT 0"},
 		{"students", "average_score", "INT NOT NULL DEFAULT 0"},
@@ -272,16 +301,29 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"homework_tasks", "preview_status", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "preview_url", "TEXT NOT NULL"},
 		{"homework_tasks", "download_url", "TEXT NOT NULL"},
+		{"schedule_classes", "campus_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"schedule_classes", "room_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"notices", "channel", "VARCHAR(32) NOT NULL DEFAULT '站内通知'"},
+		{"notices", "recipient_open_id", "VARCHAR(128) NOT NULL DEFAULT ''"},
+		{"notices", "failure_reason", "TEXT NOT NULL"},
+		{"notices", "related_type", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"notices", "related_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"notices", "retry_count", "INT NOT NULL DEFAULT 0"},
+		{"parent_notices", "notice_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"parent_notices", "channel", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"parent_notices", "failure_reason", "TEXT NOT NULL"},
 		{"operation_logs", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"operation_logs", "ip", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"operation_logs", "user_agent", "TEXT NOT NULL"},
 		{"operation_logs", "detail", "TEXT NOT NULL"},
+		{"question_bank_items", "title", "VARCHAR(128) NOT NULL DEFAULT ''"},
 		{"student_submission_results", "objective_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "final_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "answers_json", "TEXT NOT NULL"},
+		{"student_score_records", "exam_type", "VARCHAR(32) NOT NULL DEFAULT '阶段测评'"},
 	}
 	for _, column := range columns {
 		if err := s.ensureColumn(column.table, column.name, column.def); err != nil {
@@ -346,7 +388,9 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 		"DELETE FROM commercial_refunds",
 		"DELETE FROM commercial_payments",
 		"DELETE FROM commercial_orders",
+		"DELETE FROM student_subscriptions",
 		"DELETE FROM student_favorites",
+		"DELETE FROM student_score_records",
 		"DELETE FROM student_submission_results",
 		"DELETE FROM pending_reviews",
 		"DELETE FROM question_bank_items",
@@ -390,9 +434,9 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 	}
 	for _, student := range s.students {
 		if _, err := tx.Exec(
-			`INSERT INTO students (id, name, nickname, avatar_url, grade, phone, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			student.ID, student.Name, student.Nickname, student.AvatarURL, student.Grade, student.Phone, student.AccountStatus, student.Remark, student.LearningStatus,
+			`INSERT INTO students (id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			student.ID, student.Name, student.Nickname, student.AvatarURL, student.Grade, student.Phone, student.SchoolName, student.GuardianName, student.OfficialAccountOpenID, student.AccountStatus, student.Remark, student.LearningStatus,
 			student.StreakDays, student.AverageScore, student.BadgeCount, student.BindStatus, student.LastStudyAt, student.EffectiveUntil,
 		); err != nil {
 			return err
@@ -477,9 +521,9 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 	}
 	for _, item := range s.questionBank {
 		if _, err := tx.Exec(
-			`INSERT INTO question_bank_items (id, grade, semester, subject, question_type, stem, options_json, answer, answers_json, score, status, owner_teacher_id, owner_teacher_name, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			item.ID, item.Grade, item.Semester, item.Subject, item.Type, item.Stem, mustJSON(item.Options), item.Answer, mustJSON(item.Answers),
+			`INSERT INTO question_bank_items (id, title, grade, semester, subject, question_type, stem, options_json, answer, answers_json, score, status, owner_teacher_id, owner_teacher_name, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.Title, item.Grade, item.Semester, item.Subject, item.Type, item.Stem, mustJSON(item.Options), item.Answer, mustJSON(item.Answers),
 			item.Score, item.Status, item.OwnerTeacherID, item.OwnerTeacherName, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt),
 		); err != nil {
 			return err
@@ -530,9 +574,9 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 	}
 	for _, item := range s.scheduleClasses {
 		if _, err := tx.Exec(
-			`INSERT INTO schedule_classes (id, name, course_id, course_name, teacher_id, teacher_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			item.ID, item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.ClassType, item.Capacity, item.DurationMinutes,
+			`INSERT INTO schedule_classes (id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.CampusID, item.RoomName, item.ClassType, item.Capacity, item.DurationMinutes,
 			item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Status, nullableDateTime(item.CreatedAt),
 		); err != nil {
 			return err
@@ -586,7 +630,10 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 		}
 	}
 	for _, item := range s.parentNotices {
-		if _, err := tx.Exec(`INSERT INTO parent_notices (id, order_id, student_id, title, content, sent_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)`, item.ID, item.OrderID, item.StudentID, item.Title, item.Content, nullableDateTime(item.SentAt), item.Status); err != nil {
+		if _, err := tx.Exec(
+			`INSERT INTO parent_notices (id, order_id, student_id, title, content, sent_at, status, notice_id, channel, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.OrderID, item.StudentID, item.Title, item.Content, nullableDateTime(item.SentAt), item.Status, item.NoticeID, item.Channel, item.FailureReason,
+		); err != nil {
 			return err
 		}
 	}
@@ -602,8 +649,8 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 	}
 	for _, notice := range s.notices {
 		if _, err := tx.Exec(
-			`INSERT INTO notices (external_id, notice_type, title, target, content, status) VALUES (?, ?, ?, ?, ?, ?)`,
-			notice.ID, notice.Type, notice.Title, notice.Target, notice.Summary, notice.Status,
+			`INSERT INTO notices (external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, retry_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			notice.ID, notice.Type, notice.Title, notice.Target, notice.Summary, notice.Channel, notice.RecipientOpenID, notice.Status, notice.FailureReason, notice.RelatedType, notice.RelatedID, notice.RetryCount,
 		); err != nil {
 			return err
 		}
@@ -632,11 +679,29 @@ func (s *MemoryStore) persistAllTx(tx *sql.Tx) error {
 			return err
 		}
 	}
+	for _, item := range s.scoreRecords {
+		if _, err := tx.Exec(
+			`INSERT INTO student_score_records (id, student_id, subject, exam_type, exam_name, exam_date, score, full_score, average_score, teacher_comment, created_by, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.StudentID, item.Subject, firstNonEmpty(item.ExamType, "阶段测评"), item.ExamName, nullableDate(item.ExamDate), item.Score, item.FullScore, item.AverageScore,
+			item.TeacherComment, item.CreatedBy, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt),
+		); err != nil {
+			return err
+		}
+	}
 	for _, favorite := range s.favorites {
 		if _, err := tx.Exec(
 			`INSERT INTO student_favorites (id, student_id, target_type, target_id, title, course, created_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			favorite.ID, favorite.StudentID, favorite.TargetType, favorite.TargetID, favorite.Title, favorite.Course, nullableDateTime(favorite.CreatedAt),
+		); err != nil {
+			return err
+		}
+	}
+	for _, preference := range s.subscriptionPreferences {
+		if _, err := tx.Exec(
+			`INSERT INTO student_subscriptions (student_id, enabled, template_ids_json, updated_at) VALUES (?, ?, ?, ?)`,
+			preference.StudentID, preference.Enabled, mustJSON(preference.TemplateIDs), nullableDateTime(preference.UpdatedAt),
 		); err != nil {
 			return err
 		}
@@ -680,7 +745,9 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadLogsFromDB,
 		s.loadSettingsFromDB,
 		s.loadSubmissionsFromDB,
+		s.loadScoreRecordsFromDB,
 		s.loadFavoritesFromDB,
+		s.loadSubscriptionPreferencesFromDB,
 		s.loadCommercialFromDB,
 	}
 	for _, loader := range loaders {
@@ -720,7 +787,7 @@ func (s *MemoryStore) loadLearningSpacesFromDB() error {
 }
 
 func (s *MemoryStore) loadStudentsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, name, nickname, avatar_url, grade, phone, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until FROM students ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, last_study_at, effective_until FROM students ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -728,7 +795,7 @@ func (s *MemoryStore) loadStudentsFromDB() error {
 	out := []learning.Student{}
 	for rows.Next() {
 		var item learning.Student
-		if err := rows.Scan(&item.ID, &item.Name, &item.Nickname, &item.AvatarURL, &item.Grade, &item.Phone, &item.AccountStatus, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.LastStudyAt, &item.EffectiveUntil); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Nickname, &item.AvatarURL, &item.Grade, &item.Phone, &item.SchoolName, &item.GuardianName, &item.OfficialAccountOpenID, &item.AccountStatus, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.LastStudyAt, &item.EffectiveUntil); err != nil {
 			return err
 		}
 		out = append(out, item)
@@ -942,6 +1009,8 @@ func (s *MemoryStore) loadMaterialsFromDB() error {
 		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Chapter, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
 			return err
 		}
+		item.Status = normalizeMaterialStatus(item.Status)
+		item.PublishStatus = publishStatus(item.Status)
 		item.Course = s.courseName(item.CourseID)
 		out = append(out, item)
 	}
@@ -950,7 +1019,7 @@ func (s *MemoryStore) loadMaterialsFromDB() error {
 }
 
 func (s *MemoryStore) loadQuestionBankFromDB() error {
-	rows, err := s.db.Query(`SELECT id, grade, semester, subject, question_type, stem, options_json, answer, answers_json, score, status, owner_teacher_id, owner_teacher_name, created_at, updated_at FROM question_bank_items ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, title, grade, semester, subject, question_type, stem, options_json, answer, answers_json, score, status, owner_teacher_id, owner_teacher_name, created_at, updated_at FROM question_bank_items ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -960,8 +1029,11 @@ func (s *MemoryStore) loadQuestionBankFromDB() error {
 		var item learning.QuestionBankItem
 		var optionsJSON, answersJSON string
 		var createdAt, updatedAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.Grade, &item.Semester, &item.Subject, &item.Type, &item.Stem, &optionsJSON, &item.Answer, &answersJSON, &item.Score, &item.Status, &item.OwnerTeacherID, &item.OwnerTeacherName, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Grade, &item.Semester, &item.Subject, &item.Type, &item.Stem, &optionsJSON, &item.Answer, &answersJSON, &item.Score, &item.Status, &item.OwnerTeacherID, &item.OwnerTeacherName, &createdAt, &updatedAt); err != nil {
 			return err
+		}
+		if strings.TrimSpace(item.Title) == "" {
+			item.Title = shortQuestionTitle(item.Stem)
 		}
 		item.Options = parseStringSliceJSON(optionsJSON)
 		item.Answers = parseStringSliceJSON(answersJSON)
@@ -1102,7 +1174,7 @@ func (s *MemoryStore) loadReviewsFromDB() error {
 }
 
 func (s *MemoryStore) loadNoticesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, external_id, notice_type, title, target, content, status FROM notices ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, retry_count FROM notices ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -1111,7 +1183,7 @@ func (s *MemoryStore) loadNoticesFromDB() error {
 	for rows.Next() {
 		var dbID int
 		var item learning.Notice
-		if err := rows.Scan(&dbID, &item.ID, &item.Type, &item.Title, &item.Target, &item.Summary, &item.Status); err != nil {
+		if err := rows.Scan(&dbID, &item.ID, &item.Type, &item.Title, &item.Target, &item.Summary, &item.Channel, &item.RecipientOpenID, &item.Status, &item.FailureReason, &item.RelatedType, &item.RelatedID, &item.RetryCount); err != nil {
 			return err
 		}
 		if item.ID == "" {
@@ -1162,6 +1234,7 @@ func (s *MemoryStore) loadSettingsFromDB() error {
 		out[key] = value
 	}
 	s.settings = out
+	s.ensureDefaultSettings()
 	return rows.Err()
 }
 
@@ -1187,6 +1260,31 @@ func (s *MemoryStore) loadSubmissionsFromDB() error {
 	return rows.Err()
 }
 
+func (s *MemoryStore) loadScoreRecordsFromDB() error {
+	rows, err := s.db.Query(`SELECT id, student_id, subject, exam_type, exam_name, exam_date, score, full_score, average_score, teacher_comment, created_by, created_at, updated_at FROM student_score_records ORDER BY exam_date DESC, created_at DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.StudentScoreRecord{}
+	for rows.Next() {
+		var item learning.StudentScoreRecord
+		var examDate, createdAt, updatedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.Subject, &item.ExamType, &item.ExamName, &examDate, &item.Score, &item.FullScore, &item.AverageScore, &item.TeacherComment, &item.CreatedBy, &createdAt, &updatedAt); err != nil {
+			return err
+		}
+		if item.ExamType == "" {
+			item.ExamType = "阶段测评"
+		}
+		item.ExamDate = dateString(examDate)
+		item.CreatedAt = dateTimeString(createdAt)
+		item.UpdatedAt = dateTimeString(updatedAt)
+		out = append(out, item)
+	}
+	s.scoreRecords = out
+	return rows.Err()
+}
+
 func (s *MemoryStore) loadFavoritesFromDB() error {
 	rows, err := s.db.Query(`SELECT id, student_id, target_type, target_id, title, course, created_at FROM student_favorites ORDER BY created_at`)
 	if err != nil {
@@ -1204,6 +1302,41 @@ func (s *MemoryStore) loadFavoritesFromDB() error {
 		out[item.ID] = item
 	}
 	s.favorites = out
+	return rows.Err()
+}
+
+func (s *MemoryStore) persistSubscriptionPreference(preference learning.StudentSubscriptionPreference) error {
+	if s.db == nil {
+		return nil
+	}
+	_, err := s.db.Exec(
+		`INSERT INTO student_subscriptions (student_id, enabled, template_ids_json, updated_at)
+		 VALUES (?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE enabled=VALUES(enabled), template_ids_json=VALUES(template_ids_json), updated_at=VALUES(updated_at)`,
+		preference.StudentID, preference.Enabled, mustJSON(preference.TemplateIDs), nullableDateTime(preference.UpdatedAt),
+	)
+	return err
+}
+
+func (s *MemoryStore) loadSubscriptionPreferencesFromDB() error {
+	rows, err := s.db.Query(`SELECT student_id, enabled, template_ids_json, updated_at FROM student_subscriptions`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := map[string]learning.StudentSubscriptionPreference{}
+	for rows.Next() {
+		var item learning.StudentSubscriptionPreference
+		var updatedAt sql.NullTime
+		var templateJSON string
+		if err := rows.Scan(&item.StudentID, &item.Enabled, &templateJSON, &updatedAt); err != nil {
+			return err
+		}
+		item.TemplateIDs = parseStringSliceJSON(templateJSON)
+		item.UpdatedAt = dateTimeString(updatedAt)
+		out[item.StudentID] = item
+	}
+	s.subscriptionPreferences = out
 	return rows.Err()
 }
 
@@ -1371,7 +1504,7 @@ func (s *MemoryStore) loadRenewalRemindersFromDB() error {
 }
 
 func (s *MemoryStore) loadParentNoticesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, order_id, student_id, title, content, sent_at, status FROM parent_notices ORDER BY sent_at DESC`)
+	rows, err := s.db.Query(`SELECT id, order_id, student_id, title, content, sent_at, status, notice_id, channel, failure_reason FROM parent_notices ORDER BY sent_at DESC`)
 	if err != nil {
 		return err
 	}
@@ -1380,7 +1513,7 @@ func (s *MemoryStore) loadParentNoticesFromDB() error {
 	for rows.Next() {
 		var item learning.ParentNotice
 		var at sql.NullTime
-		if err := rows.Scan(&item.ID, &item.OrderID, &item.StudentID, &item.Title, &item.Content, &at, &item.Status); err != nil {
+		if err := rows.Scan(&item.ID, &item.OrderID, &item.StudentID, &item.Title, &item.Content, &at, &item.Status, &item.NoticeID, &item.Channel, &item.FailureReason); err != nil {
 			return err
 		}
 		item.SentAt = dateTimeString(at)

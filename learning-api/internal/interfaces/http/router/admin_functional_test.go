@@ -106,7 +106,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 
 	var material learning.Material
 	doMultipart(t, app, http.MethodPost, "/api/materials", token, map[string]string{
-		"title":           "接口测试讲义",
+		"title":           "接口测试学习资料",
 		"courseId":        course.ID,
 		"learningSpaceId": "space-g05-english-s1-q1",
 		"chapter":         "第一章",
@@ -131,7 +131,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 
 	var updatedMaterial learning.Material
 	app.doJSON(t, http.MethodPut, "/api/materials/"+material.ID, token, learning.MaterialUpdateRequest{
-		Title:           "接口测试讲义-草稿",
+		Title:           "接口测试学习资料-草稿",
 		CourseID:        course.ID,
 		LearningSpaceID: "space-g05-english-s1-q1",
 		Chapter:         "第二章",
@@ -253,9 +253,9 @@ func TestAdminSystemManagementThroughAPI(t *testing.T) {
 	var settings map[string]string
 	app.doJSON(t, http.MethodPut, "/api/settings", campusToken, learning.SettingUpdateRequest{
 		Key:   "downloadPolicy",
-		Value: "接口测试允许下载已发布讲义",
+		Value: "接口测试允许下载已发布学习资料",
 	}, http.StatusOK, &settings)
-	if settings["downloadPolicy"] != "接口测试允许下载已发布讲义" || settings["academicYear"] == "" {
+	if settings["downloadPolicy"] != "接口测试允许下载已发布学习资料" || settings["academicYear"] == "" {
 		t.Fatalf("unexpected settings: %#v", settings)
 	}
 

@@ -1,10 +1,10 @@
-import { EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Form, Input, Modal, Select, Skeleton, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getData, postData, putData } from '../services/http';
+import { getData, postData, putData, resetTeacherPassword } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
-import type { LearningSpace, Teacher, TeacherUpsertRequest } from '../types/starline';
+import type { LearningSpace, PasswordResetResult, Teacher, TeacherUpsertRequest } from '../types/starline';
 
 type TeacherFormValues = {
   name: string;
@@ -21,6 +21,7 @@ export default function Teachers() {
   const [form] = Form.useForm<TeacherFormValues>();
   const [editing, setEditing] = useState<Teacher | null>(null);
   const [open, setOpen] = useState(false);
+  const [resetResult, setResetResult] = useState<PasswordResetResult | null>(null);
   const [viewMode, setViewMode] = useListViewMode('starline:list-view:teachers');
   const queryClient = useQueryClient();
 
@@ -49,6 +50,15 @@ export default function Teachers() {
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
     },
     onError: () => message.error('保存失败，请检查姓名、手机号和负责课程范围。')
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: (teacher: Teacher) => resetTeacherPassword(teacher.id),
+    onSuccess: (result) => {
+      setResetResult(result);
+      message.success('临时密码已生成');
+    },
+    onError: (error: any) => message.error(error.response?.data?.message || '重置密码失败，请稍后重试。')
   });
 
   function openCreate() {
@@ -116,12 +126,18 @@ export default function Teachers() {
                 status={<Tag color={record.accountStatus === '正常' ? 'green' : 'default'}>{record.accountStatus}</Tag>}
                 fields={[
                   { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
+                  { label: '登录方式', value: passwordFallbackTag(record.bindStatus) },
                   { label: '可上传内容', value: uploadTags(record) },
                   { label: '可批改', value: <Tag color={record.canReview ? 'green' : 'default'}>{record.canReview ? '是' : '否'}</Tag> },
                   { label: '备注', value: record.remark || '-' }
                 ]}
                 tags={<TagGroup values={record.learningSpaces} color="blue" emptyText="未分配负责课程范围" />}
-                actions={<ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
+                actions={(
+                  <>
+                    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+                    <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(record)} />
+                  </>
+                )}
               />
             )}
           />
@@ -136,12 +152,22 @@ export default function Teachers() {
               { title: '姓名', dataIndex: 'name', width: 120 },
               { title: '手机号', dataIndex: 'phone', width: 140 },
               { title: '微信绑定', dataIndex: 'bindStatus', width: 110, render: (value: string) => <Tag color={value === '已绑定' ? 'green' : 'orange'}>{value}</Tag> },
+              { title: '登录方式', dataIndex: 'bindStatus', width: 130, render: passwordFallbackTag },
               { title: '账号状态', dataIndex: 'accountStatus', width: 110, render: (value: string) => <Tag color={value === '正常' ? 'green' : 'default'}>{value}</Tag> },
               { title: '负责课程范围', dataIndex: 'learningSpaces', render: (values: string[]) => scopeTags(values, 'blue', '未分配') },
               { title: '可上传内容', width: 180, render: (_, record) => uploadTags(record) },
               { title: '可批改', dataIndex: 'canReview', width: 100, render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag> },
               { title: '备注', dataIndex: 'remark', ellipsis: true },
-              { title: '操作', width: 64, render: (_, record) => <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} /> }
+              {
+                title: '操作',
+                width: 96,
+                render: (_, record) => (
+                  <Space size={4}>
+                    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+                    <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(record)} />
+                  </Space>
+                )
+              }
             ]}
           />
         )}
@@ -172,7 +198,7 @@ export default function Teachers() {
               placeholder="选择负责的年级、学科、学期和阶段"
             />
           </Form.Item>
-          <Form.Item name="canUploadHandout" label="可上传讲义" valuePropName="checked">
+          <Form.Item name="canUploadHandout" label="可上传学习资料" valuePropName="checked">
             <Switch />
           </Form.Item>
           <Form.Item name="canUploadQuestion" label="可上传练习" valuePropName="checked">
@@ -191,16 +217,32 @@ export default function Teachers() {
           )}
         </Form>
       </Modal>
+      <Modal
+        title="临时密码"
+        open={Boolean(resetResult)}
+        onCancel={() => setResetResult(null)}
+        footer={<Button type="primary" onClick={() => setResetResult(null)}>我已记录</Button>}
+        destroyOnHidden
+      >
+        <Typography.Paragraph>请把下面的临时密码通过安全渠道发给老师。对方首次用手机号密码登录时需要修改密码。</Typography.Paragraph>
+        <Typography.Text copyable strong>{resetResult?.temporaryPassword}</Typography.Text>
+      </Modal>
     </div>
   );
 }
 
 function uploadTags(record: Teacher) {
   const values = [
-    record.canUploadHandout ? '讲义' : '',
+    record.canUploadHandout ? '学习资料' : '',
     record.canUploadQuestion ? '练习' : ''
   ].filter(Boolean);
   return scopeTags(values, 'purple', '不可上传');
+}
+
+function passwordFallbackTag(bindStatus: string) {
+  return bindStatus === '已绑定'
+    ? <Tag color="green">微信优先</Tag>
+    : <Tag color="orange">可用临时密码</Tag>;
 }
 
 function scopeTags(values: string[], color: string, emptyText: string) {

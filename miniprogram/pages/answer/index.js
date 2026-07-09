@@ -22,7 +22,7 @@ Page({
       const questions = (homework.questions || []).map((question, index) => ({
         ...question,
         index: index + 1,
-        options: (question.options || []).map((text, optionIndex) => ({
+        options: ((question.type === "judge" && (!question.options || question.options.length === 0)) ? ["正确", "错误"] : (question.options || [])).map((text, optionIndex) => ({
           value: text,
           label: `${letter(optionIndex)}. ${text}`,
           className: ""
@@ -123,7 +123,7 @@ Page({
       return;
     }
     const unanswered = this.data.questions.find((question) =>
-      question.type === "single" ? !question.choice : question.type === "multiple" ? !(question.choices || []).length : !question.text.trim()
+      question.type === "single" || question.type === "judge" ? !question.choice : question.type === "multiple" ? !(question.choices || []).length : !question.text.trim()
     );
     if (unanswered) {
       wx.showToast({ title: "还有题目没有完成哦", icon: "none" });

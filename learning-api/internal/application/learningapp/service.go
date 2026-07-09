@@ -3,7 +3,7 @@ package learningapp
 import "starline/learning-api/internal/domain/learning"
 
 type Repository interface {
-	LoginWithWechatCode(code, phone, phoneCode string) (learning.Principal, error)
+	LoginWithWechatCode(req learning.WechatLoginRequest) (learning.Principal, error)
 	LoginWithAdminPassword(phone, password string) (learning.Principal, error)
 	LoginWithDemoStudentPassword(phone, password string) (learning.Principal, error)
 	ChangePassword(operator string, principal learning.Principal, req learning.PasswordChangeRequest) error
@@ -17,6 +17,7 @@ type Repository interface {
 	CreateTeacher(operator string, principal learning.Principal, req learning.TeacherUpsertRequest) (learning.Teacher, error)
 	UpdateTeacher(operator string, principal learning.Principal, id string, req learning.TeacherUpsertRequest) (learning.Teacher, error)
 	Dashboard() learning.DashboardOverview
+	SystemReadiness() learning.SystemReadiness
 	Packages() []learning.Package
 	CreatePackage(operator string, req learning.PackageUpsertRequest) (learning.Package, error)
 	UpdatePackage(operator string, id string, req learning.PackageUpsertRequest) (learning.Package, error)
@@ -29,6 +30,9 @@ type Repository interface {
 	ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) learning.StudentImportResult
 	StudentGrants(principal learning.Principal, id string) ([]learning.StudentGrant, error)
 	StudentLearningRecords(principal learning.Principal, id string) ([]learning.StudentLearningRecord, error)
+	StudentScores(principal learning.Principal, id string) ([]learning.StudentScoreSummary, error)
+	CreateStudentScore(operator string, principal learning.Principal, studentID string, req learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
+	UpdateStudentScore(operator string, principal learning.Principal, studentID string, scoreID string, req learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	CommercialSummary(principal learning.Principal) learning.CommercialSummary
 	CommercialOrders(principal learning.Principal) []learning.CommercialOrder
 	CreateCommercialOrder(operator string, principal learning.Principal, req learning.CommercialOrderCreateRequest) (learning.CommercialOrder, error)
@@ -49,6 +53,7 @@ type Repository interface {
 	CreateMaterial(operator string, principal learning.Principal, req learning.MaterialUploadRequest) (learning.Material, error)
 	UpdateMaterial(operator string, principal learning.Principal, id string, req learning.MaterialUpdateRequest) (learning.Material, error)
 	Homework(principal learning.Principal) []learning.Homework
+	HomeworkSubmissions(principal learning.Principal, homeworkID string) (learning.HomeworkSubmissionSummary, error)
 	CreateHomework(operator string, principal learning.Principal, req learning.HomeworkUploadRequest) (learning.Homework, error)
 	UpdateHomework(operator string, principal learning.Principal, id string, req learning.HomeworkUpdateRequest) (learning.Homework, error)
 	ContentFile(principal learning.Principal, fileID string) (learning.FileAsset, error)
@@ -56,6 +61,7 @@ type Repository interface {
 	CompleteReview(operator string, principal learning.Principal, id string, req learning.ReviewCompleteRequest) (learning.Submission, error)
 	Notices(principal learning.Principal) []learning.Notice
 	CreateNotice(operator string, principal learning.Principal, req learning.NoticeCreateRequest) (learning.Notice, error)
+	RetryNotice(operator string, principal learning.Principal, id string) (learning.Notice, error)
 	Logs() []learning.OperationLog
 	Settings() map[string]string
 	UpdateSetting(operator string, req learning.SettingUpdateRequest) (map[string]string, error)
@@ -65,6 +71,7 @@ type Repository interface {
 	GrantPreview(studentID, packageID string) (learning.GrantPreview, error)
 	CreateGrant(operator, studentID, packageID string) (learning.GrantPreview, error)
 	StudentHome(principal learning.Principal) (learning.StudentHome, error)
+	ConfirmStudentSubscription(operator string, principal learning.Principal, req learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error)
 	UpdateStudentProfile(operator string, principal learning.Principal, req learning.StudentProfileUpdateRequest) (learning.Student, error)
 	Availability(principal learning.Principal, ownerType, ownerID string) ([]learning.AvailabilitySlot, error)
 	AvailabilityOverview(principal learning.Principal) []learning.AvailabilitySlot
@@ -83,6 +90,7 @@ type Repository interface {
 	StudentStudy(principal learning.Principal) (learning.StudentStudyBoard, error)
 	StudentTasks(principal learning.Principal) ([]learning.StudentTask, error)
 	StudentGrowth(principal learning.Principal) ([]learning.StudentLearningRecord, error)
+	StudentOwnScores(principal learning.Principal) ([]learning.StudentScoreSummary, error)
 	StudentBadges(principal learning.Principal) ([]learning.Badge, error)
 	StudentFavorites(principal learning.Principal) ([]learning.Favorite, error)
 	AddFavorite(operator string, principal learning.Principal, req learning.FavoriteRequest) (learning.Favorite, error)
@@ -97,8 +105,8 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) LoginWithWechatCode(code, phone, phoneCode string) (learning.Principal, error) {
-	return s.repo.LoginWithWechatCode(code, phone, phoneCode)
+func (s *Service) LoginWithWechatCode(req learning.WechatLoginRequest) (learning.Principal, error) {
+	return s.repo.LoginWithWechatCode(req)
 }
 func (s *Service) LoginWithAdminPassword(phone, password string) (learning.Principal, error) {
 	return s.repo.LoginWithAdminPassword(phone, password)
@@ -137,7 +145,10 @@ func (s *Service) UpdateTeacher(operator string, principal learning.Principal, i
 	return s.repo.UpdateTeacher(operator, principal, id, req)
 }
 func (s *Service) Dashboard() learning.DashboardOverview { return s.repo.Dashboard() }
-func (s *Service) Packages() []learning.Package          { return s.repo.Packages() }
+func (s *Service) SystemReadiness() learning.SystemReadiness {
+	return s.repo.SystemReadiness()
+}
+func (s *Service) Packages() []learning.Package { return s.repo.Packages() }
 func (s *Service) CreatePackage(operator string, req learning.PackageUpsertRequest) (learning.Package, error) {
 	return s.repo.CreatePackage(operator, req)
 }
@@ -170,6 +181,15 @@ func (s *Service) StudentGrants(principal learning.Principal, id string) ([]lear
 }
 func (s *Service) StudentLearningRecords(principal learning.Principal, id string) ([]learning.StudentLearningRecord, error) {
 	return s.repo.StudentLearningRecords(principal, id)
+}
+func (s *Service) StudentScores(principal learning.Principal, id string) ([]learning.StudentScoreSummary, error) {
+	return s.repo.StudentScores(principal, id)
+}
+func (s *Service) CreateStudentScore(operator string, principal learning.Principal, studentID string, req learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error) {
+	return s.repo.CreateStudentScore(operator, principal, studentID, req)
+}
+func (s *Service) UpdateStudentScore(operator string, principal learning.Principal, studentID string, scoreID string, req learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error) {
+	return s.repo.UpdateStudentScore(operator, principal, studentID, scoreID, req)
 }
 func (s *Service) CommercialSummary(principal learning.Principal) learning.CommercialSummary {
 	return s.repo.CommercialSummary(principal)
@@ -231,6 +251,9 @@ func (s *Service) UpdateMaterial(operator string, principal learning.Principal, 
 func (s *Service) Homework(principal learning.Principal) []learning.Homework {
 	return s.repo.Homework(principal)
 }
+func (s *Service) HomeworkSubmissions(principal learning.Principal, homeworkID string) (learning.HomeworkSubmissionSummary, error) {
+	return s.repo.HomeworkSubmissions(principal, homeworkID)
+}
 func (s *Service) CreateHomework(operator string, principal learning.Principal, req learning.HomeworkUploadRequest) (learning.Homework, error) {
 	return s.repo.CreateHomework(operator, principal, req)
 }
@@ -251,6 +274,9 @@ func (s *Service) Notices(principal learning.Principal) []learning.Notice {
 }
 func (s *Service) CreateNotice(operator string, principal learning.Principal, req learning.NoticeCreateRequest) (learning.Notice, error) {
 	return s.repo.CreateNotice(operator, principal, req)
+}
+func (s *Service) RetryNotice(operator string, principal learning.Principal, id string) (learning.Notice, error) {
+	return s.repo.RetryNotice(operator, principal, id)
 }
 func (s *Service) Logs() []learning.OperationLog { return s.repo.Logs() }
 func (s *Service) StudentPermissions() []learning.StudentPermissionSummary {
@@ -274,6 +300,9 @@ func (s *Service) CreateGrant(operator, studentID, packageID string) (learning.G
 }
 func (s *Service) StudentHome(principal learning.Principal) (learning.StudentHome, error) {
 	return s.repo.StudentHome(principal)
+}
+func (s *Service) ConfirmStudentSubscription(operator string, principal learning.Principal, req learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error) {
+	return s.repo.ConfirmStudentSubscription(operator, principal, req)
 }
 func (s *Service) UpdateStudentProfile(operator string, principal learning.Principal, req learning.StudentProfileUpdateRequest) (learning.Student, error) {
 	return s.repo.UpdateStudentProfile(operator, principal, req)
@@ -328,6 +357,9 @@ func (s *Service) StudentTasks(principal learning.Principal) ([]learning.Student
 }
 func (s *Service) StudentGrowth(principal learning.Principal) ([]learning.StudentLearningRecord, error) {
 	return s.repo.StudentGrowth(principal)
+}
+func (s *Service) StudentOwnScores(principal learning.Principal) ([]learning.StudentScoreSummary, error) {
+	return s.repo.StudentOwnScores(principal)
 }
 func (s *Service) StudentBadges(principal learning.Principal) ([]learning.Badge, error) {
 	return s.repo.StudentBadges(principal)

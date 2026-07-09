@@ -37,6 +37,18 @@ func main() {
 	} else {
 		log.Infof("wechat login running in demo mode (no WECHAT_APPID/WECHAT_SECRET)")
 	}
+	if cfg.OfficialAccount.AppID != "" && cfg.OfficialAccount.Secret != "" && cfg.OfficialAccount.TemplateID != "" {
+		repo.UseOfficialAccountAPI(cfg.OfficialAccount.AppID, cfg.OfficialAccount.Secret, cfg.OfficialAccount.TemplateID)
+		log.Infof("wechat official account template messages enabled")
+	} else {
+		log.Infof("wechat official account template messages not configured")
+	}
+	if len(cfg.MiniProgramSubscribe.TemplateIDs) > 0 {
+		repo.UseMiniProgramSubscribeTemplates(cfg.MiniProgramSubscribe.TemplateIDs)
+		log.Infof("wechat mini program subscribe templates enabled")
+	} else {
+		log.Infof("wechat mini program subscribe templates not configured")
+	}
 	if err := repo.ConnectDatabase(cfg.MySQL.DSN); err != nil {
 		log.Errorf("mysql is required but unavailable: %v", err)
 		return

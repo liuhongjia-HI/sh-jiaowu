@@ -159,6 +159,45 @@ func (h *LearningHandler) StudentLearningRecords(c *gin.Context) {
 	}
 	OK(c, records)
 }
+func (h *LearningHandler) StudentScores(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	scores, err := h.service.StudentScores(principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, scores)
+}
+func (h *LearningHandler) CreateStudentScore(c *gin.Context) {
+	var req learning.StudentScoreUpsertRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求数据格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	created, err := h.service.CreateStudentScore(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, created)
+}
+func (h *LearningHandler) UpdateStudentScore(c *gin.Context) {
+	var req learning.StudentScoreUpsertRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求数据格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	updated, err := h.service.UpdateStudentScore(operator.(string), principal, c.Param("id"), c.Param("scoreId"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, updated)
+}
 func (h *LearningHandler) Courses(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	OK(c, h.service.Courses(principal))
@@ -233,6 +272,15 @@ func (h *LearningHandler) Homework(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	OK(c, h.service.Homework(principal))
 }
+func (h *LearningHandler) HomeworkSubmissions(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	summary, err := h.service.HomeworkSubmissions(principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, summary)
+}
 func (h *LearningHandler) Reviews(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	OK(c, h.service.Reviews(principal))
@@ -268,6 +316,10 @@ func (h *LearningHandler) CreateNotice(c *gin.Context) {
 	req.Title = strings.TrimSpace(req.Title)
 	req.Target = strings.TrimSpace(req.Target)
 	req.Summary = strings.TrimSpace(req.Summary)
+	req.Channel = strings.TrimSpace(req.Channel)
+	req.RecipientOpenID = strings.TrimSpace(req.RecipientOpenID)
+	req.RelatedType = strings.TrimSpace(req.RelatedType)
+	req.RelatedID = strings.TrimSpace(req.RelatedID)
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)
 	notice, err := h.service.CreateNotice(operator.(string), principal, req)
@@ -277,8 +329,21 @@ func (h *LearningHandler) CreateNotice(c *gin.Context) {
 	}
 	OK(c, notice)
 }
+func (h *LearningHandler) RetryNotice(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	notice, err := h.service.RetryNotice(operator.(string), principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, notice)
+}
 func (h *LearningHandler) Logs(c *gin.Context)     { OK(c, h.service.Logs()) }
 func (h *LearningHandler) Settings(c *gin.Context) { OK(c, h.service.Settings()) }
+func (h *LearningHandler) SystemReadiness(c *gin.Context) {
+	OK(c, h.service.SystemReadiness())
+}
 func (h *LearningHandler) UpdateSetting(c *gin.Context) {
 	var req learning.SettingUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -390,22 +455,24 @@ func (h *LearningHandler) ContentPermissions(c *gin.Context) {
 	OK(c, h.service.ContentPermissions())
 }
 func (h *LearningHandler) WechatLogin(c *gin.Context) {
-	var req struct {
-		Code      string `json:"code"`
-		Phone     string `json:"phone"`
-		PhoneCode string `json:"phoneCode"`
-	}
+	var req learning.WechatLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		BadRequest(c, "invalid request")
 		return
 	}
+	req.Code = strings.TrimSpace(req.Code)
+	req.Phone = strings.TrimSpace(req.Phone)
+	req.PhoneCode = strings.TrimSpace(req.PhoneCode)
+	req.StudentName = strings.TrimSpace(req.StudentName)
+	req.SchoolName = strings.TrimSpace(req.SchoolName)
+	req.Grade = strings.TrimSpace(req.Grade)
 	key := loginKey(c, "wechat", req.Code)
 	if err := h.loginProtector.Allow(key); err != nil {
 		h.recordSecurityEvent(c, "登录拦截", req.Code, err.Error())
 		Unauthorized(c, err.Error())
 		return
 	}
-	principal, err := h.service.LoginWithWechatCode(req.Code, req.Phone, req.PhoneCode)
+	principal, err := h.service.LoginWithWechatCode(req)
 	if err != nil {
 		h.loginProtector.RegisterFailure(key)
 		h.recordSecurityEvent(c, "微信登录失败", req.Code, err.Error())
@@ -413,12 +480,13 @@ func (h *LearningHandler) WechatLogin(c *gin.Context) {
 		return
 	}
 	h.loginProtector.RegisterSuccess(key)
+	principal.AuthMethod = "wechat"
 	token, err := h.tokens.Issue(principal)
 	if err != nil {
 		BadRequest(c, "login failed")
 		return
 	}
-	OK(c, learning.AuthResult{Token: token, User: principal})
+	OK(c, learning.AuthResult{Token: token, User: principal, AuthMethod: principal.AuthMethod})
 }
 
 func (h *LearningHandler) AdminPasswordLogin(c *gin.Context) {
@@ -456,12 +524,13 @@ func (h *LearningHandler) AdminPasswordLogin(c *gin.Context) {
 		return
 	}
 	h.loginProtector.RegisterSuccess(key)
+	principal.AuthMethod = "password"
 	token, err := h.tokens.Issue(principal)
 	if err != nil {
 		BadRequest(c, "login failed")
 		return
 	}
-	OK(c, learning.AuthResult{Token: token, User: principal})
+	OK(c, learning.AuthResult{Token: token, User: principal, AuthMethod: principal.AuthMethod})
 }
 
 func (h *LearningHandler) Captcha(c *gin.Context) {
@@ -500,12 +569,13 @@ func (h *LearningHandler) DemoStudentLogin(c *gin.Context) {
 		return
 	}
 	h.loginProtector.RegisterSuccess(key)
+	principal.AuthMethod = "demo"
 	token, err := h.tokens.Issue(principal)
 	if err != nil {
 		BadRequest(c, "login failed")
 		return
 	}
-	OK(c, learning.AuthResult{Token: token, User: principal})
+	OK(c, learning.AuthResult{Token: token, User: principal, AuthMethod: principal.AuthMethod})
 }
 
 func loginKey(c *gin.Context, scope string, account string) string {
@@ -587,7 +657,7 @@ func (h *LearningHandler) RefreshToken(c *gin.Context) {
 	}
 	operator, _ := c.Get(middleware.OperatorNameKey)
 	h.service.RecordSecurityEvent(operator.(string), "刷新登录状态", principal.Name, "旧 token 已作废并签发新 token")
-	OK(c, learning.AuthResult{Token: nextToken, User: principal})
+	OK(c, learning.AuthResult{Token: nextToken, User: principal, AuthMethod: principal.AuthMethod})
 }
 
 func (h *LearningHandler) StudentHome(c *gin.Context) {
@@ -598,6 +668,22 @@ func (h *LearningHandler) StudentHome(c *gin.Context) {
 		return
 	}
 	OK(c, home)
+}
+
+func (h *LearningHandler) ConfirmStudentSubscription(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	var req learning.StudentSubscriptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "订阅消息参数不正确")
+		return
+	}
+	reminder, err := h.service.ConfirmStudentSubscription(operator.(string), principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, reminder)
 }
 
 func (h *LearningHandler) Availability(c *gin.Context) {
@@ -886,6 +972,16 @@ func (h *LearningHandler) StudentGrowth(c *gin.Context) {
 	OK(c, records)
 }
 
+func (h *LearningHandler) StudentOwnScores(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	scores, err := h.service.StudentOwnScores(principal)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, scores)
+}
+
 func (h *LearningHandler) StudentBadges(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	badges, err := h.service.StudentBadges(principal)
@@ -970,6 +1066,8 @@ func bindStudent(c *gin.Context) (learning.StudentUpsertRequest, bool) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Phone = strings.TrimSpace(req.Phone)
 	req.Grade = strings.TrimSpace(req.Grade)
+	req.SchoolName = strings.TrimSpace(req.SchoolName)
+	req.OfficialAccountOpenID = strings.TrimSpace(req.OfficialAccountOpenID)
 	req.AccountStatus = strings.TrimSpace(req.AccountStatus)
 	req.Remark = strings.TrimSpace(req.Remark)
 	return req, true
@@ -1037,15 +1135,25 @@ func parseStudentCSV(reader io.Reader) ([]learning.StudentUpsertRequest, error) 
 			rows = append(rows, learning.StudentUpsertRequest{})
 			continue
 		}
+		schoolName := ""
 		remark := ""
 		if len(record) > 3 {
-			remark = strings.TrimSpace(record[3])
+			schoolName = strings.TrimSpace(record[3])
+		}
+		if len(record) > 4 {
+			remark = strings.TrimSpace(record[4])
+		}
+		officialAccountOpenID := ""
+		if len(record) > 5 {
+			officialAccountOpenID = strings.TrimSpace(record[5])
 		}
 		rows = append(rows, learning.StudentUpsertRequest{
-			Name:   strings.TrimSpace(record[0]),
-			Phone:  strings.TrimSpace(record[1]),
-			Grade:  strings.TrimSpace(record[2]),
-			Remark: remark,
+			Name:                  strings.TrimSpace(record[0]),
+			Phone:                 strings.TrimSpace(record[1]),
+			Grade:                 strings.TrimSpace(record[2]),
+			SchoolName:            schoolName,
+			Remark:                remark,
+			OfficialAccountOpenID: officialAccountOpenID,
 		})
 	}
 	return rows, nil

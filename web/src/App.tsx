@@ -20,11 +20,11 @@ import {
 } from '@ant-design/icons';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { Button, Layout, Menu, Result, Space, Tooltip, Typography } from 'antd';
+import { Alert, Button, Form, Input, Layout, Menu, Result, Space, Tooltip, Typography, message } from 'antd';
 import type { MenuProps } from 'antd';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { clearToken, getData, getToken } from './services/http';
+import { changePassword, clearToken, getData, getToken, logout } from './services/http';
 import type { CurrentUser, Role } from './types/starline';
 
 const { Header, Sider, Content } = Layout;
@@ -193,6 +193,72 @@ function PageLoading({ text = '正在加载页面...' }: { text?: string }) {
   return <div className="page-loading">{text}</div>;
 }
 
+type PasswordFormValues = {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+function MustChangePasswordPage({ user }: { user: CurrentUser }) {
+  const [form] = Form.useForm<PasswordFormValues>();
+  const [saving, setSaving] = useState(false);
+
+  async function submit(values: PasswordFormValues) {
+    if (values.newPassword !== values.confirmPassword) {
+      message.error('两次输入的新密码不一致。');
+      return;
+    }
+    setSaving(true);
+    try {
+      await changePassword(values.oldPassword, values.newPassword);
+      message.success('密码已修改，请用新密码重新登录。');
+      clearToken();
+      window.location.href = '/login';
+    } catch (error: any) {
+      message.error(error.response?.data?.message || error.message || '修改失败，请检查原密码。');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="login-page">
+      <section className="login-panel">
+        <div className="login-brand">
+          <div className="login-logo">S</div>
+          <div>
+            <Typography.Title level={3}>修改初始密码</Typography.Title>
+            <Typography.Text>{user.name}，请先设置自己的后台登录密码。</Typography.Text>
+          </div>
+        </div>
+        <Alert type="info" showIcon message="这只影响手机号密码登录。微信登录不会要求修改初始密码。" style={{ marginBottom: 16 }} />
+        <Form form={form} layout="vertical" requiredMark={false} onFinish={submit}>
+          <Form.Item name="oldPassword" label="临时密码" rules={[{ required: true, message: '请输入临时密码' }]}>
+            <Input.Password autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item
+            name="newPassword"
+            label="新密码"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              { min: 8, message: '新密码至少 8 位' },
+              { pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/, message: '新密码需同时包含字母和数字' }
+            ]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item name="confirmPassword" label="确认新密码" rules={[{ required: true, message: '请再次输入新密码' }]}>
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" block size="large" loading={saving}>
+            保存并重新登录
+          </Button>
+        </Form>
+      </section>
+    </div>
+  );
+}
+
 function Shell({ user }: { user: CurrentUser }) {
   const location = useLocation();
   const items = useMemo(() => buildMenuItems(user), [user]);
@@ -219,7 +285,7 @@ function Shell({ user }: { user: CurrentUser }) {
       <Layout>
         <Header className="app-header">
           <div className="header-title-group">
-            <Typography.Title level={4}>{currentItem.label}</Typography.Title>
+            <Typography.Text className="app-header-title">{currentItem.label}</Typography.Text>
           </div>
           <Space size={12}>
             <div className="user-pill">
@@ -233,9 +299,15 @@ function Shell({ user }: { user: CurrentUser }) {
               <Button
                 aria-label="退出登录"
                 icon={<LogoutOutlined />}
-                onClick={() => {
-                  clearToken();
-                  window.location.href = '/login';
+                onClick={async () => {
+                  try {
+                    await logout();
+                  } catch {
+                    message.warning('本机已退出，服务端登录状态稍后自动过期。');
+                  } finally {
+                    clearToken();
+                    window.location.href = '/login';
+                  }
                 }}
               />
             </Tooltip>
@@ -295,6 +367,9 @@ export default function App() {
   if (me.error || !me.data) {
     clearToken();
     return loginRoutes;
+  }
+  if (me.data.mustChangePassword && me.data.authMethod === 'password') {
+    return <BrowserRouter><Routes><Route path="*" element={<MustChangePasswordPage user={me.data} />} /></Routes></BrowserRouter>;
   }
   return <BrowserRouter><Routes><Route path="/login" element={<Navigate to="/dashboard" />} /><Route path="*" element={<Shell user={me.data} />} /></Routes></BrowserRouter>;
 }

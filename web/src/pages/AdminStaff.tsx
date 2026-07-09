@@ -1,10 +1,10 @@
-import { EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Form, Input, Modal, Select, Skeleton, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getData, postData, putData } from '../services/http';
+import { getData, postData, putData, resetAdminStaffPassword } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
-import type { AdminStaff, AdminStaffUpsertRequest, Role } from '../types/starline';
+import type { AdminStaff, AdminStaffUpsertRequest, PasswordResetResult, Role } from '../types/starline';
 
 type AdminStaffFormValues = {
   name: string;
@@ -31,6 +31,7 @@ export default function AdminStaff() {
   const [form] = Form.useForm<AdminStaffFormValues>();
   const [editing, setEditing] = useState<AdminStaff | null>(null);
   const [open, setOpen] = useState(false);
+  const [resetResult, setResetResult] = useState<PasswordResetResult | null>(null);
   const [viewMode, setViewMode] = useListViewMode('starline:list-view:admin-staff');
   const role = Form.useWatch('role', form);
   const queryClient = useQueryClient();
@@ -57,6 +58,15 @@ export default function AdminStaff() {
       queryClient.invalidateQueries({ queryKey: ['admin-staff'] });
     },
     onError: (error: any) => message.error(error.response?.data?.message || '保存失败，请检查姓名、手机号和岗位。')
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: (record: AdminStaff) => resetAdminStaffPassword(record.id),
+    onSuccess: (result) => {
+      setResetResult(result);
+      message.success('临时密码已生成');
+    },
+    onError: (error: any) => message.error(error.response?.data?.message || '重置密码失败，请稍后重试。')
   });
 
   function openCreate() {
@@ -111,9 +121,15 @@ export default function AdminStaff() {
                   { label: '岗位', value: <Tag color={roleColor(record.role)}>{roleLabels[record.role] ?? record.role}</Tag> },
                   { label: '校区', value: record.campusId || <Typography.Text type="secondary">全部校区</Typography.Text> },
                   { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
+                  { label: '登录方式', value: passwordFallbackTag(record.bindStatus) },
                   { label: '备注', value: record.remark || '-' }
                 ]}
-                actions={<ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
+                actions={(
+                  <>
+                    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+                    <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(record)} />
+                  </>
+                )}
               />
             )}
           />
@@ -130,9 +146,19 @@ export default function AdminStaff() {
               { title: '岗位', dataIndex: 'role', width: 120, render: (value: string) => <Tag color={roleColor(value)}>{roleLabels[value] ?? value}</Tag> },
               { title: '校区', dataIndex: 'campusId', width: 120, render: (value?: string) => value || <Typography.Text type="secondary">全部校区</Typography.Text> },
               { title: '微信绑定', dataIndex: 'bindStatus', width: 110, render: (value: string) => <Tag color={value === '已绑定' ? 'green' : 'orange'}>{value}</Tag> },
+              { title: '登录方式', dataIndex: 'bindStatus', width: 130, render: passwordFallbackTag },
               { title: '账号状态', dataIndex: 'accountStatus', width: 110, render: (value: string) => <Tag color={value === '正常' ? 'green' : 'default'}>{value}</Tag> },
               { title: '备注', dataIndex: 'remark', ellipsis: true },
-              { title: '操作', width: 64, render: (_, record) => <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} /> }
+              {
+                title: '操作',
+                width: 96,
+                render: (_, record) => (
+                  <Space size={4}>
+                    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+                    <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(record)} />
+                  </Space>
+                )
+              }
             ]}
           />
         )}
@@ -171,6 +197,16 @@ export default function AdminStaff() {
           )}
         </Form>
       </Modal>
+      <Modal
+        title="临时密码"
+        open={Boolean(resetResult)}
+        onCancel={() => setResetResult(null)}
+        footer={<Button type="primary" onClick={() => setResetResult(null)}>我已记录</Button>}
+        destroyOnHidden
+      >
+        <Typography.Paragraph>请把下面的临时密码通过安全渠道发给对方。对方首次用手机号密码登录时需要修改密码。</Typography.Paragraph>
+        <Typography.Text copyable strong>{resetResult?.temporaryPassword}</Typography.Text>
+      </Modal>
     </div>
   );
 }
@@ -179,4 +215,10 @@ function roleColor(role: string) {
   if (role === 'super_admin') return 'red';
   if (role === 'campus_admin') return 'blue';
   return 'purple';
+}
+
+function passwordFallbackTag(bindStatus: string) {
+  return bindStatus === '已绑定'
+    ? <Tag color="green">微信优先</Tag>
+    : <Tag color="orange">可用临时密码</Tag>;
 }

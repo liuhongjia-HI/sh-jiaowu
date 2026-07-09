@@ -50,7 +50,7 @@ import type {
 type ActionKind = 'payment' | 'refund' | 'contract' | 'invoice' | 'lesson' | 'renewal' | 'notice';
 
 const actionTitle: Record<ActionKind, string> = {
-  payment: '登记收款',
+  payment: '登记线下收款',
   refund: '登记退款',
   contract: '签署合同',
   invoice: '开具发票',
@@ -163,7 +163,7 @@ export default function Commercial() {
       width: 236,
       render: (_, record) => (
         <Space size={6} wrap>
-          <ActionButton tooltip="收款" icon={<PayCircleOutlined />} onClick={() => openAction('payment', record)} />
+          <ActionButton tooltip="线下收款" icon={<PayCircleOutlined />} onClick={() => openAction('payment', record)} />
           <ActionButton tooltip="退款" icon={<RollbackOutlined />} onClick={() => openAction('refund', record)} />
           <ActionButton tooltip="合同" icon={<FileProtectOutlined />} onClick={() => openAction('contract', record)} />
           <ActionButton tooltip="发票" icon={<FileDoneOutlined />} onClick={() => openAction('invoice', record)} />
@@ -179,7 +179,7 @@ export default function Commercial() {
     setActiveAction({ kind, order });
     actionForm.resetFields();
     if (kind === 'payment') {
-      actionForm.setFieldsValue({ amountCent: Math.max(0, order.amountCent - order.paidAmountCent), method: '微信支付' });
+      actionForm.setFieldsValue({ amountCent: Math.max(0, order.amountCent - order.paidAmountCent), method: '线下收款' });
     }
     if (kind === 'invoice') {
       actionForm.setFieldsValue({ amountCent: Math.max(0, order.paidAmountCent - order.refundedAmountCent), title: order.studentName });
@@ -206,7 +206,7 @@ export default function Commercial() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>商业运营</Typography.Title>
-          <Typography.Text type="secondary">处理订单、收款、课消和续费。</Typography.Text>
+          <Typography.Text type="secondary">记录线下订单、收款、课消和续费跟进；学习权限请到开通套餐中处理。</Typography.Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建订单</Button>
       </div>
@@ -227,7 +227,7 @@ export default function Commercial() {
           dataSource={orders.data ?? []}
           pagination={{ pageSize: 8 }}
           scroll={{ x: 1160 }}
-          locale={{ emptyText: '暂无订单。先为学生创建订单，再登记收款和课消。' }}
+          locale={{ emptyText: '暂无订单。先为学生创建订单，再记录线下收款和课消。' }}
         />
       </Card>
 
@@ -287,7 +287,7 @@ function ActionFields({ kind }: { kind: ActionKind }) {
     return (
       <>
         <Form.Item name="amountCent" label="收款金额" rules={[{ required: true, message: '请输入收款金额' }]}><InputNumber min={1} precision={0} addonAfter="分" style={{ width: '100%' }} /></Form.Item>
-        <Form.Item name="method" label="收款方式" rules={[{ required: true, message: '请选择收款方式' }]}><Select options={['微信支付', '支付宝', '银行卡', '现金', '其他'].map((value) => ({ label: value, value }))} /></Form.Item>
+        <Form.Item name="method" label="收款方式" rules={[{ required: true, message: '请选择收款方式' }]}><Select options={['线下收款', '微信支付', '支付宝', '银行卡', '现金', '其他'].map((value) => ({ label: value, value }))} /></Form.Item>
         <Form.Item name="transactionNo" label="交易单号"><Input maxLength={64} placeholder="有第三方流水时填写" /></Form.Item>
       </>
     );

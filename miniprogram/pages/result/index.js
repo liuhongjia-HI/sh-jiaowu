@@ -5,6 +5,7 @@ Page({
     taskTitle: "批改结果",
     resultTitle: "完成啦 🎉",
     teacherComment: "老师正在批改，稍后就能看到反馈。",
+    teacherCommentNodes: "老师正在批改，稍后就能看到反馈。",
     rewardText: "",
     pendingReview: false,
     objectiveText: ""
@@ -22,6 +23,7 @@ Page({
           taskTitle: data.taskTitle || "批改结果",
           resultTitle: pending ? "已提交，等待老师批改" : `${data.score} 分，${scoreTag(data.score)}`,
           teacherComment: data.teacherComment || "",
+          teacherCommentNodes: data.teacherComment || "老师正在批改，稍后就能看到反馈。",
           rewardText: data.reward || "",
           pendingReview: pending,
           objectiveText: pending ? `客观题得分 ${data.objectiveScore || data.score || 0} 分` : ""
@@ -33,7 +35,7 @@ Page({
     wx.navigateBack({
       delta: 1,
       fail() {
-        wx.switchTab({ url: "/pages/tasks/index" });
+        wx.navigateTo({ url: "/pages/tasks/index" });
       }
     });
   },

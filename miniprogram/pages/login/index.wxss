@@ -12,3 +12,21 @@
   font-size: 24rpx;
   line-height: 1.5;
 }
+
+.form-line {
+  margin-top: 18rpx;
+  padding: 0 22rpx;
+  height: 88rpx;
+  border: 1rpx solid #f0ddd2;
+  border-radius: 24rpx;
+  background: #fffaf6;
+  display: flex;
+  align-items: center;
+}
+
+.form-line input {
+  width: 100%;
+  text-align: left;
+  font-size: 28rpx;
+  color: #4f3428;
+}

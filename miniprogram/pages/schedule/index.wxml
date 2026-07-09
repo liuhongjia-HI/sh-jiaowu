@@ -1,20 +1,69 @@
-<view class="hero">
+<view class="hero schedule-hero">
   <view class="eyebrow">课表</view>
-  <view class="hero-title">我的可上课时间</view>
+  <view class="hero-title">我的课表</view>
+  <view class="hero-sub">查看已确认课程，维护可排课时间</view>
 </view>
 
 <view wx:if="{{loading}}" class="empty">正在加载课表...</view>
 <view wx:else>
+  <view wx:if="{{loadError}}" class="section">
+    <view class="notice">{{loadError}}</view>
+  </view>
+
   <view class="section">
-    <view class="card">
+    <view class="section-headline">
+      <view>
+        <view class="section-kicker">近期课程</view>
+        <view class="title">下一节课</view>
+      </view>
+      <view wx:if="{{nextClass}}" class="status-pill">{{nextClass.statusText}}</view>
+    </view>
+    <view wx:if="{{nextClass}}" class="next-card">
+      <view class="time-primary">{{nextClass.timeText}}</view>
+      <view class="class-name">{{nextClass.name}}</view>
+      <view class="course-name">{{nextClass.courseName}}</view>
+      <view class="class-meta">
+        <view>老师：{{nextClass.teacherName}}</view>
+        <view>周期：{{nextClass.periodText}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty-state">还没有确认课程，教务排好后会显示在这里。</view>
+  </view>
+
+  <view class="section">
+    <view class="section-headline">
+      <view>
+        <view class="section-kicker">正式课表</view>
+        <view class="title">已确认课表</view>
+      </view>
+      <view class="count-pill">{{classes.length}} 节</view>
+    </view>
+    <view wx:if="{{classes.length === 0}}" class="empty-state">还没有确认课程，教务排好后会显示在这里。</view>
+    <view wx:else class="class-list">
+      <view wx:for="{{classes}}" wx:key="id" class="class-row">
+        <view class="class-row-main">
+          <view class="class-row-time">{{item.timeText}}</view>
+          <view class="class-row-title">{{item.name}}</view>
+          <view class="class-row-sub">{{item.courseName}}</view>
+        </view>
+        <view class="class-row-meta">
+          <view>{{item.teacherName}}</view>
+          <view>{{item.statusText}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="availability-card">
       <view class="row">
         <view>
-          <view class="title">可上课时间</view>
-          <view class="sub">教务会根据这些时间安排 1V3、1V4 小班。</view>
+          <view class="title">可排课时间</view>
+          <view class="sub">这是你的可排课时间，教务会线下确认后生成正式课表。</view>
         </view>
-        <view class="badge" bindtap="addSlot">添加</view>
+        <view class="add-action" bindtap="addSlot">添加</view>
       </view>
-      <view wx:if="{{availability.length === 0}}" class="empty compact">还没有提交时间。</view>
+      <view wx:if="{{availability.length === 0}}" class="empty-state compact">还没有提交可排课时间。</view>
       <view wx:for="{{availability}}" wx:key="id" class="slot-row">
         <picker mode="selector" range="{{weekOptions}}" range-key="label" bindchange="changeWeek" data-index="{{index}}">
           <view class="slot-cell">{{item.weekLabel}}</view>
@@ -23,20 +72,7 @@
         <input class="slot-input" value="{{item.endTime}}" placeholder="20:30" bindinput="changeEnd" data-index="{{index}}" />
         <view class="slot-delete" bindtap="removeSlot" data-index="{{index}}">删除</view>
       </view>
-      <button class="button" bindtap="saveAvailability">保存时间</button>
-    </view>
-  </view>
-
-  <view class="section">
-    <view class="card blue">
-      <view class="title">已确认课表</view>
-      <view wx:if="{{classes.length === 0}}" class="sub">还没有确认的课程，教务排好后会显示在这里。</view>
-      <view wx:for="{{classes}}" wx:key="id" class="class-item">
-        <view class="title small">{{item.name}}</view>
-        <view class="sub">{{item.courseName}}</view>
-        <view class="badge">{{item.weekLabel}} {{item.startTime}}-{{item.endTime}}</view>
-        <view class="sub">老师：{{item.teacherName}}</view>
-      </view>
+      <button class="button schedule-save" bindtap="saveAvailability">保存可排课时间</button>
     </view>
   </view>
 </view>

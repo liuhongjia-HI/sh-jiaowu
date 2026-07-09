@@ -5,7 +5,7 @@
 </view>
 <view class="section">
   <view class="card">
-    <view class="bubble">小提示：先看讲义里的例子，再去做小挑战会更轻松。</view>
+    <view class="bubble">小提示：先看学习资料里的例子，再去做小挑战会更轻松。</view>
     <view class="row preview-meta">
       <view class="sub">学习记录已保存</view>
       <view class="sub">带专属水印</view>
@@ -26,7 +26,7 @@
       <view class="badge">距离小徽章还差一步</view>
     </view>
     <view class="button-row">
-      <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
+      <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
       <button class="button" bindtap="goAnswer">去做小挑战</button>
     </view>
   </view>

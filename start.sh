@@ -5,10 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$ROOT_DIR/tmp/start"
 API_PORT="${HTTP_PORT:-8892}"
 WEB_PORT="${WEB_PORT:-5173}"
+MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS="${WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS:-vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0}"
 API_LOG="$LOG_DIR/learning-api.log"
 WEB_LOG="$LOG_DIR/web.log"
 API_PID=""
 WEB_PID=""
+CLEANED_UP=0
 
 mkdir -p "$LOG_DIR"
 
@@ -69,6 +71,21 @@ stop_port_listener() {
   port_in_use "$port" && fail "Port $port is still in use after stopping the existing $name process."
 }
 
+wait_for_port_release() {
+  local port="$1"
+  local attempt=1
+
+  while [ "$attempt" -le 10 ]; do
+    if ! port_in_use "$port"; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+
+  return 1
+}
+
 wait_for_url() {
   local url="$1"
   local name="$2"
@@ -87,20 +104,80 @@ wait_for_url() {
   return 1
 }
 
+process_alive() {
+  local pid="$1"
+  [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1
+}
+
+stop_child() {
+  local pid="$1"
+  local name="$2"
+
+  if ! process_alive "$pid"; then
+    return
+  fi
+
+  info "Stopping $name..."
+  kill "$pid" >/dev/null 2>&1 || true
+  wait "$pid" >/dev/null 2>&1 || true
+}
+
 cleanup() {
+  if [ "$CLEANED_UP" -eq 1 ]; then
+    return
+  fi
+  CLEANED_UP=1
+
   if [ -z "$WEB_PID" ] && [ -z "$API_PID" ]; then
     return
   fi
   info "Stopping Starline..."
-  if [ -n "$WEB_PID" ] && kill -0 "$WEB_PID" >/dev/null 2>&1; then
-    kill "$WEB_PID" >/dev/null 2>&1 || true
+  stop_child "$WEB_PID" "web"
+  stop_child "$API_PID" "learning-api"
+
+  if ! wait_for_port_release "$WEB_PORT"; then
+    warn "Port $WEB_PORT is still in use after stopping web. Cleaning up listener..."
+    stop_port_listener "$WEB_PORT" "web"
   fi
-  if [ -n "$API_PID" ] && kill -0 "$API_PID" >/dev/null 2>&1; then
-    kill "$API_PID" >/dev/null 2>&1 || true
+  if ! wait_for_port_release "$API_PORT"; then
+    warn "Port $API_PORT is still in use after stopping learning-api. Cleaning up listener..."
+    stop_port_listener "$API_PORT" "API"
   fi
 }
 
-trap cleanup INT TERM EXIT
+shutdown() {
+  cleanup
+  exit 0
+}
+
+monitor_processes() {
+  while true; do
+    if ! process_alive "$API_PID"; then
+      warn "learning-api stopped unexpectedly. Last log lines:"
+      tail -n 40 "$API_LOG" || true
+      exit 1
+    fi
+    if ! curl -fsS "http://127.0.0.1:$API_PORT/api/health" >/dev/null 2>&1; then
+      warn "learning-api is unavailable. Last log lines:"
+      tail -n 40 "$API_LOG" || true
+      exit 1
+    fi
+    if ! process_alive "$WEB_PID"; then
+      warn "web stopped unexpectedly. Last log lines:"
+      tail -n 40 "$WEB_LOG" || true
+      exit 1
+    fi
+    if ! curl -fsS "http://127.0.0.1:$WEB_PORT" >/dev/null 2>&1; then
+      warn "web is unavailable. Last log lines:"
+      tail -n 40 "$WEB_LOG" || true
+      exit 1
+    fi
+    sleep 1
+  done
+}
+
+trap shutdown INT TERM
+trap cleanup EXIT
 
 need_command go
 need_command npm
@@ -112,7 +189,7 @@ if port_in_use "$API_PORT"; then
 fi
 
 if port_in_use "$WEB_PORT"; then
-  fail "Port $WEB_PORT is already in use. Stop the existing web process first."
+  stop_port_listener "$WEB_PORT" "web"
 fi
 
 if command -v docker >/dev/null 2>&1; then
@@ -137,7 +214,7 @@ fi
 info "Starting learning-api on http://127.0.0.1:$API_PORT ..."
 (
   cd "$ROOT_DIR/learning-api"
-  HTTP_PORT="$API_PORT" go run ./cmd/api
+  HTTP_PORT="$API_PORT" WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS="$MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS" go run ./cmd/api
 ) >"$API_LOG" 2>&1 &
 API_PID="$!"
 
@@ -176,4 +253,4 @@ Docker dependencies remain running. Stop them with: docker compose down
 
 EOF
 
-wait
+monitor_processes

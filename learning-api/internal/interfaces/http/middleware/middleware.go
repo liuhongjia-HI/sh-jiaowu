@@ -90,11 +90,12 @@ func AuthRequired(tokens *auth.TokenManager, resolver PrincipalResolver, roles .
 			c.AbortWithStatusJSON(401, gin.H{"code": 401, "message": "登录状态已更新，请重新登录", "data": nil})
 			return
 		}
+		principal.AuthMethod = tokenPrincipal.AuthMethod
 		if len(allowed) > 0 && !hasAnyRole(principal.Roles, allowed) {
 			c.AbortWithStatusJSON(403, gin.H{"code": 403, "message": "没有权限访问该功能", "data": nil})
 			return
 		}
-		if principal.MustChangePassword && !isPasswordBootstrapPath(c.Request.URL.Path) {
+		if principal.MustChangePassword && principal.AuthMethod == "password" && !isPasswordBootstrapPath(c.Request.URL.Path) {
 			c.AbortWithStatusJSON(403, gin.H{"code": 403, "message": "请先修改初始密码", "data": nil})
 			return
 		}

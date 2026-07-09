@@ -7,15 +7,18 @@ import {
 } from '@ant-design/icons';
 import { Button, Form, Input, Space, Typography, message } from 'antd';
 import { useState } from 'react';
-import { loginWithAdminPassword } from '../services/http';
+import { getCaptcha, loginWithAdminPassword } from '../services/http';
+import type { CaptchaChallenge } from '../types/starline';
 
 type LoginFormValues = {
   phone: string;
   password: string;
+  captchaAnswer?: string;
 };
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
+  const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
   const [form] = Form.useForm<LoginFormValues>();
   const env = (import.meta as { env?: Record<string, string> }).env ?? {};
   const showDemoAccounts = env.VITE_DEMO_ACCOUNTS_ENABLED === 'true' || env.MODE !== 'production';
@@ -29,11 +32,21 @@ export default function Login() {
   async function handleLogin(values: LoginFormValues) {
     setLoading(true);
     try {
-      await loginWithAdminPassword(values.phone, values.password);
+      await loginWithAdminPassword(values.phone, values.password, captcha ? { captchaId: captcha.captchaId, captchaAnswer: values.captchaAnswer } : undefined);
       message.success('登录成功');
       window.location.href = '/dashboard';
     } catch (error: any) {
-      message.error(error.response?.data?.message || '登录失败，请检查手机号和密码。');
+      const errorMessage = error.response?.data?.message || '登录失败，请检查手机号和密码。';
+      message.error(errorMessage);
+      if (errorMessage.includes('验证码')) {
+        try {
+          const nextCaptcha = await getCaptcha();
+          setCaptcha(nextCaptcha);
+          form.setFieldValue('captchaAnswer', '');
+        } catch {
+          message.error('验证码获取失败，请稍后重试。');
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -64,6 +77,11 @@ export default function Login() {
             <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
               <Input.Password size="large" prefix={<LockOutlined />} placeholder="请输入密码" autoComplete="current-password" />
             </Form.Item>
+            {captcha && (
+              <Form.Item name="captchaAnswer" label={captcha.question} rules={[{ required: true, message: '请输入验证码答案' }]}>
+                <Input size="large" placeholder="请输入答案" autoComplete="off" />
+              </Form.Item>
+            )}
             <Button type="primary" htmlType="submit" block size="large" loading={loading} icon={<ArrowRightOutlined />}>
               进入工作台
             </Button>

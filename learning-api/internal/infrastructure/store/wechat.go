@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"starline/learning-api/internal/domain/learning"
 )
 
 // resolveOpenID 把小程序 wx.login() 的临时 code 换成稳定的 openId。
@@ -49,6 +51,32 @@ func (s *MemoryStore) UseWechatAPI(appID, secret string) {
 	s.phoneResolver = func(phoneCode string) (string, error) {
 		return wechatPhoneNumber(client, appID, secret, phoneCode)
 	}
+}
+
+func (s *MemoryStore) UseOfficialAccountAPI(appID, secret, templateID string) {
+	appID = strings.TrimSpace(appID)
+	secret = strings.TrimSpace(secret)
+	templateID = strings.TrimSpace(templateID)
+	if appID == "" || secret == "" || templateID == "" {
+		return
+	}
+	s.officialAccountReady = true
+	client := &http.Client{Timeout: 5 * time.Second}
+	s.officialNoticeSender = func(notice learning.Notice) error {
+		return wechatOfficialTemplateMessage(client, appID, secret, templateID, notice)
+	}
+}
+
+func (s *MemoryStore) UseMiniProgramSubscribeTemplates(templateIDs []string) {
+	ids := compactStrings(templateIDs)
+	if len(ids) == 0 {
+		return
+	}
+	s.miniProgramSubscribeTemplateIDs = ids
+	if s.settings == nil {
+		s.settings = map[string]string{}
+	}
+	s.settings["miniProgramSubscribeStatus"] = "已完成"
 }
 
 func wechatCode2Session(client *http.Client, appID, secret, code string) (string, error) {
@@ -134,4 +162,48 @@ func wechatAccessToken(client *http.Client, appID, secret string) (string, error
 		return "", fmt.Errorf("微信授权失败，请稍后再试（%d %s）", payload.ErrCode, payload.ErrMsg)
 	}
 	return payload.AccessToken, nil
+}
+
+func wechatOfficialTemplateMessage(client *http.Client, appID, secret, templateID string, notice learning.Notice) error {
+	token, err := wechatAccessToken(client, appID, secret)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(notice.RecipientOpenID) == "" {
+		return errors.New("缺少公众号接收人 openid")
+	}
+	endpoint := "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=" + url.QueryEscape(token)
+	requestBody, err := json.Marshal(struct {
+		ToUser     string         `json:"touser"`
+		TemplateID string         `json:"template_id"`
+		Data       map[string]any `json:"data"`
+	}{
+		ToUser:     notice.RecipientOpenID,
+		TemplateID: templateID,
+		Data: map[string]any{
+			"first":    map[string]string{"value": notice.Title},
+			"keyword1": map[string]string{"value": notice.Type},
+			"keyword2": map[string]string{"value": notice.Target},
+			"remark":   map[string]string{"value": notice.Summary},
+		},
+	})
+	if err != nil {
+		return errors.New("公众号模板消息请求生成失败")
+	}
+	resp, err := client.Post(endpoint, "application/json", strings.NewReader(string(requestBody)))
+	if err != nil {
+		return errors.New("公众号模板消息服务暂不可用，请稍后重试")
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		ErrCode int    `json:"errcode"`
+		ErrMsg  string `json:"errmsg"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return errors.New("公众号模板消息返回异常，请稍后重试")
+	}
+	if payload.ErrCode != 0 {
+		return fmt.Errorf("公众号模板消息发送失败（%d %s）", payload.ErrCode, payload.ErrMsg)
+	}
+	return nil
 }

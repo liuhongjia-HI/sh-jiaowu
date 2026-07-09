@@ -15,7 +15,9 @@ import {
 import {
   ArrowRightOutlined,
   BookOutlined,
+  CheckCircleOutlined,
   ClockCircleOutlined,
+  ExclamationCircleOutlined,
   FileTextOutlined,
   FormOutlined,
   TeamOutlined,
@@ -24,12 +26,17 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { getData } from '../services/http';
-import type { DashboardOverview } from '../types/starline';
+import type { DashboardOverview, SystemReadiness } from '../types/starline';
 
 export default function Dashboard() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => getData<DashboardOverview>('/dashboard/overview')
+  });
+  const readiness = useQuery({
+    queryKey: ['system-readiness'],
+    queryFn: () => getData<SystemReadiness>('/system/readiness'),
+    retry: false
   });
 
   if (isLoading) return <Skeleton active />;
@@ -134,6 +141,39 @@ export default function Dashboard() {
           </Card>
         </Col>
       </Row>
+
+      {readiness.data && (
+        <Card title="上线配置检查" extra={<Link to="/settings">去配置 <ArrowRightOutlined /></Link>}>
+          <div className="readiness-summary">
+            <Progress
+              percent={Math.round((readiness.data.readyCount / readiness.data.totalCount) * 100)}
+              status={readiness.data.readyCount === readiness.data.totalCount ? 'success' : 'active'}
+            />
+            <Typography.Text type="secondary">
+              {readiness.data.readyCount}/{readiness.data.totalCount} 项已就绪，外部平台事项需人工确认后更新系统设置。
+            </Typography.Text>
+          </div>
+          <div className="readiness-list">
+            {readiness.data.items.map((item) => (
+              <div className={`readiness-item ${item.status}`} key={item.key}>
+                <span className="readiness-icon">
+                  {item.status === 'ready' ? <CheckCircleOutlined /> : item.status === 'warning' ? <ExclamationCircleOutlined /> : <WarningOutlined />}
+                </span>
+                <div>
+                  <Space size={8} wrap>
+                    <strong>{item.title}</strong>
+                    <Tag color={item.status === 'ready' ? 'green' : item.status === 'warning' ? 'orange' : 'red'}>
+                      {item.status === 'ready' ? '已就绪' : item.status === 'warning' ? '需关注' : '未完成'}
+                    </Tag>
+                  </Space>
+                  <Typography.Text type="secondary">{item.message}</Typography.Text>
+                  {item.action && <Typography.Text className="readiness-action">{item.action}</Typography.Text>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

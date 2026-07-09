@@ -146,10 +146,23 @@ body {
   margin: 0;
 }
 
+.app-header-title {
+  color: rgba(17, 24, 39, .88);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .header-eyebrow {
   color: #667085;
   font-size: 12px;
   font-weight: 700;
+}
+
+.question-dialog .ant-modal-body {
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .user-pill {
@@ -345,6 +358,10 @@ body {
   word-break: break-word;
 }
 
+.info-card-field-full {
+  grid-column: 1 / -1;
+}
+
 .info-card-tags {
   min-width: 0;
 }
@@ -352,6 +369,96 @@ body {
 .info-card-actions {
   padding-top: 12px;
   border-top: 1px solid #edf0f5;
+}
+
+.permissions-view {
+  width: 100%;
+  min-width: 0;
+}
+
+.permissions-page,
+.permissions-page .ant-card,
+.permissions-page .ant-card-body,
+.permissions-page .ant-tabs,
+.permissions-page .ant-tabs-content,
+.permissions-page .ant-tabs-tabpane,
+.permissions-view .ant-space-item {
+  min-width: 0;
+}
+
+.permissions-page .ant-table-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.permissions-search {
+  width: min(360px, 100%);
+}
+
+.permissions-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  align-items: start;
+}
+
+.permission-card {
+  gap: 16px;
+}
+
+.permission-card .info-card-fields {
+  gap: 14px 16px;
+}
+
+.permission-card .info-card-field {
+  align-content: start;
+}
+
+.permission-open-groups {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0f5;
+}
+
+.permission-open-group {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.permission-tag-group {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.permission-tag-group .ant-space-item {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.permission-tag-group .ant-tag {
+  max-width: 100%;
+  height: auto;
+  margin-inline-end: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  .permission-card .info-card-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .permissions-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .permissions-search {
+    width: 100%;
+  }
 }
 
 .action-button {
@@ -386,6 +493,34 @@ body {
   border: 1px solid #dfe7ee;
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.rich-text-preview {
+  max-width: 360px;
+  color: #344054;
+  font-size: 13px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.rich-text-preview p,
+.rich-text-preview ul,
+.rich-text-preview ol {
+  margin: 0 0 6px;
+}
+
+.rich-text-preview ul,
+.rich-text-preview ol {
+  padding-left: 18px;
+}
+
+.rich-text-preview img {
+  display: block;
+  max-width: 180px;
+  max-height: 120px;
+  margin-top: 6px;
+  border-radius: 6px;
+  object-fit: contain;
 }
 
 .schedule-search-form {
@@ -684,6 +819,38 @@ body {
   font-size: 13px;
 }
 
+.week-day-create {
+  width: 100%;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.week-day-create:hover {
+  border-color: #07c160;
+  color: #047857;
+  background: #f0fdf4;
+}
+
+.week-day-add {
+  width: 100%;
+  height: 36px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  font: inherit;
+}
+
+.week-day-add:hover {
+  border-color: #07c160;
+  color: #047857;
+  background: #f0fdf4;
+}
+
 .schedule-block {
   width: 100%;
   min-height: 104px;
@@ -846,6 +1013,85 @@ button.schedule-block:hover {
   margin: 0;
 }
 
+.month-board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.month-day {
+  min-width: 132px;
+  min-height: 154px;
+  border: 1px solid #e6ebf2;
+  border-radius: 8px;
+  background: #fbfcff;
+  overflow: hidden;
+}
+
+.month-day-head {
+  height: 42px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e6ebf2;
+  background: #fff;
+}
+
+.month-day-head strong {
+  font-size: 16px;
+}
+
+.month-day-head span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.month-day-body {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+
+.month-day-empty {
+  padding-top: 34px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.month-class {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  border: 1px solid #a9dfbd;
+  border-radius: 8px;
+  background: #f1fbf4;
+  padding: 8px;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+}
+
+.month-class span,
+.month-class small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.month-class strong {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.month-class.is-canceled {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
 .page-loading {
   min-height: 100vh;
   display: grid;
@@ -1003,6 +1249,68 @@ button.schedule-block:hover {
   border-radius: 8px;
   background: #f7fafc;
   color: #344054;
+}
+
+.readiness-summary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.readiness-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.readiness-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.readiness-item.ready {
+  border-color: #bbf7d0;
+}
+
+.readiness-item.warning {
+  border-color: #fde68a;
+}
+
+.readiness-item.missing {
+  border-color: #fecaca;
+}
+
+.readiness-icon {
+  color: #64748b;
+  font-size: 18px;
+  padding-top: 2px;
+}
+
+.readiness-item.ready .readiness-icon {
+  color: #16a34a;
+}
+
+.readiness-item.warning .readiness-icon {
+  color: #d97706;
+}
+
+.readiness-item.missing .readiness-icon {
+  color: #dc2626;
+}
+
+.readiness-item > div {
+  display: grid;
+  gap: 6px;
+}
+
+.readiness-action {
+  display: block;
+  color: #334155;
 }
 
 .login-page {
@@ -1331,7 +1639,7 @@ button.schedule-block:hover {
     display: grid;
   }
 
-  .header-title-group h4.ant-typography {
+  .app-header-title {
     font-size: 18px;
   }
 

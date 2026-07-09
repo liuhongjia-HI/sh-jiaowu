@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,39 +20,54 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+var (
+	richTextScriptPattern     = regexp.MustCompile(`(?is)<script[\s\S]*?>[\s\S]*?</script>`)
+	richTextEventAttrPattern  = regexp.MustCompile(`(?i)\s+on[a-z0-9_-]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)`)
+	richTextJSURLAttrPattern  = regexp.MustCompile(`(?i)\s+(href|src)\s*=\s*("|')?\s*javascript:[^\s"'>]+("|')?`)
+	richTextTagPattern        = regexp.MustCompile(`(?is)<[^>]+>`)
+	richTextTagNamePattern    = regexp.MustCompile(`(?is)^</?\s*([a-z0-9]+)`)
+	richTextColorPattern      = regexp.MustCompile(`(?i)color\s*:\s*(#[0-9a-f]{3,6}|[a-z]+)`)
+	richTextHTTPSImagePattern = regexp.MustCompile(`(?i)\ssrc\s*=\s*["'](https?://[^"']+)["']`)
+)
+
 type MemoryStore struct {
-	users              []learning.User
-	packages           []learning.Package
-	students           []learning.Student
-	learningSpaces     []learningSpace
-	packageSpaces      []packageSpace
-	contentTypes       []packageContentType
-	spaceAccess        []learningSpaceAccess
-	courses            []learning.Course
-	questionBank       []learning.QuestionBankItem
-	materials          []learning.Material
-	homework           []learning.Homework
-	fileAssets         map[string]learning.FileAsset
-	reviews            []learning.Review
-	notices            []learning.Notice
-	logs               []learning.OperationLog
-	settings           map[string]string
-	grants             []packageGrant
-	availability       []learning.AvailabilitySlot
-	scheduleClasses    []learning.ScheduleClass
-	commercialOrders   []learning.CommercialOrder
-	payments           []learning.PaymentRecord
-	refunds            []learning.RefundRecord
-	contracts          []learning.ContractRecord
-	invoices           []learning.InvoiceRecord
-	lessonConsumptions []learning.LessonConsumption
-	renewalReminders   []learning.RenewalReminder
-	parentNotices      []learning.ParentNotice
-	submissions        map[string]learning.Submission
-	favorites          map[string]learning.Favorite
-	wechatResolver     func(code string) (string, error)
-	phoneResolver      func(phoneCode string) (string, error)
-	db                 *sql.DB
+	users                           []learning.User
+	packages                        []learning.Package
+	students                        []learning.Student
+	learningSpaces                  []learningSpace
+	packageSpaces                   []packageSpace
+	contentTypes                    []packageContentType
+	spaceAccess                     []learningSpaceAccess
+	courses                         []learning.Course
+	questionBank                    []learning.QuestionBankItem
+	materials                       []learning.Material
+	homework                        []learning.Homework
+	fileAssets                      map[string]learning.FileAsset
+	reviews                         []learning.Review
+	notices                         []learning.Notice
+	logs                            []learning.OperationLog
+	settings                        map[string]string
+	grants                          []packageGrant
+	availability                    []learning.AvailabilitySlot
+	scheduleClasses                 []learning.ScheduleClass
+	commercialOrders                []learning.CommercialOrder
+	payments                        []learning.PaymentRecord
+	refunds                         []learning.RefundRecord
+	contracts                       []learning.ContractRecord
+	invoices                        []learning.InvoiceRecord
+	lessonConsumptions              []learning.LessonConsumption
+	renewalReminders                []learning.RenewalReminder
+	parentNotices                   []learning.ParentNotice
+	submissions                     map[string]learning.Submission
+	favorites                       map[string]learning.Favorite
+	subscriptionPreferences         map[string]learning.StudentSubscriptionPreference
+	scoreRecords                    []learning.StudentScoreRecord
+	wechatResolver                  func(code string) (string, error)
+	phoneResolver                   func(phoneCode string) (string, error)
+	officialNoticeSender            func(learning.Notice) error
+	officialAccountReady            bool
+	miniProgramSubscribeTemplateIDs []string
+	db                              *sql.DB
 }
 
 type Options struct {
@@ -118,10 +135,11 @@ func NewMemoryStore() *MemoryStore {
 func NewMemoryStoreWithOptions(options Options) *MemoryStore {
 	adminPasswordHash := mustPasswordHash(demoLoginPassword)
 	store := &MemoryStore{
-		fileAssets:  map[string]learning.FileAsset{},
-		submissions: map[string]learning.Submission{},
-		favorites:   map[string]learning.Favorite{},
-		settings:    map[string]string{},
+		fileAssets:              map[string]learning.FileAsset{},
+		submissions:             map[string]learning.Submission{},
+		favorites:               map[string]learning.Favorite{},
+		subscriptionPreferences: map[string]learning.StudentSubscriptionPreference{},
+		settings:                map[string]string{},
 	}
 	if !options.SkipBaseData {
 		store.seedBaseDictionaries()
@@ -154,12 +172,32 @@ func (s *MemoryStore) seedBootstrapAdmin(options Options) {
 }
 
 func (s *MemoryStore) seedBaseDictionaries() {
-	s.settings = map[string]string{
-		"academicYear":   "2025.2026学年",
-		"grades":         "G1-G12",
-		"semesters":      "S1 / S2",
-		"watermarkRule":  "昵称 + 手机尾号 + 时间",
-		"downloadPolicy": "默认不可下载",
+	s.settings = defaultSettings()
+}
+
+func defaultSettings() map[string]string {
+	return map[string]string{
+		"academicYear":                 "2025.2026学年",
+		"grades":                       "G1-G12",
+		"semesters":                    "S1 / S2",
+		"watermarkRule":                "昵称 + 手机尾号 + 时间",
+		"downloadPolicy":               "默认不可下载",
+		"miniProgramDomainStatus":      "待确认",
+		"officialAccountBindingStatus": "待确认",
+		"templateMessageStatus":        "待确认",
+		"miniProgramSubscribeStatus":   "待配置",
+		"productionApiDomain":          "待配置",
+	}
+}
+
+func (s *MemoryStore) ensureDefaultSettings() {
+	if s.settings == nil {
+		s.settings = map[string]string{}
+	}
+	for key, value := range defaultSettings() {
+		if strings.TrimSpace(s.settings[key]) == "" {
+			s.settings[key] = value
+		}
 	}
 }
 
@@ -179,7 +217,7 @@ func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {
 		{ID: "stu-003", Name: "小航", Grade: "五年级", Phone: "137****3303", LearningStatus: "刚开通", AccountStatus: "正常", StreakDays: 1, AverageScore: 80, BadgeCount: 1, BindStatus: "待绑定", LastStudyAt: "2026-05-22 20:00:00", EffectiveUntil: "2027-05-22"},
 	}
 	s.reviews = []learning.Review{
-		{ID: "rev-001", StudentID: "stu-001", HomeworkID: "hw-g05-english-s1-q1", StudentName: "小明", PackageName: "英语班", Homework: "阅读挑战", SystemScore: 86, TeacherComment: "阅读理解整体不错，注意把答案依据写完整。", Reward: "阅读小星星", Status: "待评语"},
+		{ID: "rev-001", StudentID: "stu-001", HomeworkID: "hw-g05-english-s1-q1", StudentName: "小明", PackageName: "英语班", Homework: "阅读挑战", SystemScore: 86, TeacherComment: "阅读理解整体不错，注意把答案依据写完整。", Reward: "阅读小星星", Status: "待批改"},
 		{ID: "rev-002", StudentID: "stu-002", HomeworkID: "hw-g05-math-s1-q1", StudentName: "Lucy", PackageName: "数学班", Homework: "图形挑战", SystemScore: 78, TeacherComment: "图形思路基本正确，错题建议再画一遍辅助线。", Reward: "图形探索徽章", Status: "待复核"},
 	}
 	s.notices = []learning.Notice{
@@ -257,8 +295,8 @@ var demoPhases = []string{"Q1", "Q2"}
 
 var demoPackageTypes = []packageTypeSpec{
 	{Code: "question", Label: "题", Summary: "只开放题", ContentTypes: []string{"question"}},
-	{Code: "question_handout", Label: "题+讲义", Summary: "开放题和讲义", ContentTypes: []string{"question", "handout"}},
-	{Code: "full", Label: "课程+题+讲义", Summary: "开放课程、题和讲义", ContentTypes: []string{"course", "question", "handout"}},
+	{Code: "question_handout", Label: "题+学习资料", Summary: "开放题和学习资料", ContentTypes: []string{"question", "handout"}},
+	{Code: "full", Label: "课程+题+学习资料", Summary: "开放课程、题和学习资料", ContentTypes: []string{"course", "question", "handout"}},
 }
 
 func seedPermissionDemoData(s *MemoryStore) {
@@ -282,8 +320,8 @@ func seedPermissionDemoData(s *MemoryStore) {
 						ChapterCount: 8, MaterialNum: 1, HomeworkNum: 1, Status: learning.StatusEnabled,
 					})
 					s.materials = append(s.materials, learning.Material{
-						ID: materialID(spaceID), Title: spaceName + "核心讲义", CourseID: courseID(spaceID), Course: courseName, LearningSpaceID: spaceID,
-						Chapter: "基础巩固", Type: "讲义", ViewCount: demoViewCount(gradeIndex, semesterIndex, phaseIndex),
+						ID: materialID(spaceID), Title: spaceName + "核心学习资料", CourseID: courseID(spaceID), Course: courseName, LearningSpaceID: spaceID,
+						Chapter: "基础巩固", Type: "学习资料", ViewCount: demoViewCount(gradeIndex, semesterIndex, phaseIndex),
 						OwnerTeacherID: "teacher-" + subjectSlug(subject), OwnerTeacherName: subject + "老师", PublishStatus: "已发布", Status: learning.StatusEnabled,
 					})
 					questions := s.ensureDemoQuestionBank(grade, semester, subject)
@@ -478,6 +516,43 @@ func (s *MemoryStore) Dashboard() learning.DashboardOverview {
 	}
 }
 
+func (s *MemoryStore) SystemReadiness() learning.SystemReadiness {
+	s.ensureDefaultSettings()
+	items := []learning.ReadinessItem{
+		readinessFromConfirmedSetting(
+			"miniProgramDomainStatus",
+			"小程序域名备案",
+			s.settings["miniProgramDomainStatus"],
+			"已确认小程序业务域名和服务器域名可用于开发、体验和发布。",
+			"在微信公众平台完成域名备案和合法域名配置后，把系统设置改为“已完成”。",
+		),
+		readinessFromDomain(s.settings["productionApiDomain"]),
+		readinessFromConfirmedSetting(
+			"officialAccountBindingStatus",
+			"微信公众号关联",
+			s.settings["officialAccountBindingStatus"],
+			"已确认小程序主体和公众号关联关系，可用于后续统一触达。",
+			"在微信公众平台完成公众号关联后，把系统设置改为“已完成”。",
+		),
+		readinessFromConfirmedSetting(
+			"templateMessageStatus",
+			"模板消息审核",
+			s.settings["templateMessageStatus"],
+			"已确认课程提醒、练习发布、批改完成等模板可用。",
+			"在公众号后台完成模板申请/审核后，把系统设置改为“已完成”。",
+		),
+		s.officialAccountConfigReadiness(),
+		s.studentOfficialAccountReadiness(),
+	}
+	ready := 0
+	for _, item := range items {
+		if item.Status == "ready" {
+			ready++
+		}
+	}
+	return learning.SystemReadiness{ReadyCount: ready, TotalCount: len(items), Items: items}
+}
+
 func (s *MemoryStore) Packages() []learning.Package {
 	out := make([]learning.Package, 0, len(s.packages))
 	for _, pkg := range s.packages {
@@ -542,38 +617,65 @@ func (s *MemoryStore) LearningSpaces() []learning.LearningSpace {
 	return out
 }
 
-func (s *MemoryStore) LoginWithWechatCode(code, phone, phoneCode string) (learning.Principal, error) {
-	openID, err := s.resolveOpenID(code)
+func (s *MemoryStore) LoginWithWechatCode(req learning.WechatLoginRequest) (learning.Principal, error) {
+	req.Code = strings.TrimSpace(req.Code)
+	req.Phone = strings.TrimSpace(req.Phone)
+	req.PhoneCode = strings.TrimSpace(req.PhoneCode)
+	req.StudentName = strings.TrimSpace(req.StudentName)
+	req.SchoolName = strings.TrimSpace(req.SchoolName)
+	req.Grade = strings.TrimSpace(req.Grade)
+	openID, err := s.resolveOpenID(req.Code)
 	if err != nil {
 		return learning.Principal{}, err
 	}
-	phone = strings.TrimSpace(phone)
-	if phone == "" && strings.TrimSpace(phoneCode) != "" {
-		resolvedPhone, err := s.resolvePhoneNumber(phoneCode)
+	if req.Phone == "" && req.PhoneCode != "" {
+		resolvedPhone, err := s.resolvePhoneNumber(req.PhoneCode)
 		if err != nil {
 			return learning.Principal{}, err
 		}
-		phone = resolvedPhone
+		req.Phone = resolvedPhone
 	}
-	if phone != "" {
+	if req.Phone != "" {
+		matches := make([]int, 0, 1)
 		for i, user := range s.users {
-			if user.Phone != phone || !canRebindByPhone(user, s.wechatResolver != nil) {
+			if user.Phone != req.Phone || !canBindByPhone(user) {
 				continue
 			}
-			if user.AccountStatus != "正常" {
-				return learning.Principal{}, errors.New("账号已停用，请联系管理员")
-			}
-			s.users[i].OpenID = openID
-			s.removeWechatOnlyStudent(openID, s.users[i].StudentID)
-			action := "绑定教师微信"
-			if hasRole(user.Roles, learning.RoleStudent) {
-				action = "绑定学生微信"
-			} else if isAdminStaffUser(user) {
-				action = "绑定后台人员微信"
-			}
-			s.prependLog(user.Name, action, user.Name)
-			return principalFromUser(s.users[i]), nil
+			matches = append(matches, i)
 		}
+		if len(matches) == 0 {
+			return learning.Principal{}, errors.New("手机号未匹配到后台账号，请联系老师确认学生档案和套餐开通状态")
+		}
+		if len(matches) > 1 {
+			return learning.Principal{}, errors.New("手机号匹配到多个账号，请联系老师确认后再绑定")
+		}
+		i := matches[0]
+		user := s.users[i]
+		if !canRebindByPhone(user, openID, s.wechatResolver != nil) {
+			if hasRole(user.Roles, learning.RoleStudent) {
+				return learning.Principal{}, errors.New("该学生已绑定其他微信，请联系老师处理")
+			}
+			return learning.Principal{}, errors.New("该手机号已绑定其他微信，请联系管理员处理")
+		}
+		if user.AccountStatus != "正常" {
+			return learning.Principal{}, errors.New("账号已停用，请联系管理员")
+		}
+		if hasRole(user.Roles, learning.RoleStudent) {
+			if err := s.validateStudentWechatBinding(user, openID, req); err != nil {
+				return learning.Principal{}, err
+			}
+			s.applyStudentBindingProfile(user.StudentID, req)
+		}
+		s.users[i].OpenID = openID
+		s.removeWechatOnlyStudent(openID, s.users[i].StudentID)
+		action := "绑定教师微信"
+		if hasRole(user.Roles, learning.RoleStudent) {
+			action = "绑定学生微信"
+		} else if isAdminStaffUser(user) {
+			action = "绑定后台人员微信"
+		}
+		s.prependLog(user.Name, action, user.Name)
+		return principalFromUser(s.users[i]), nil
 	}
 	for _, user := range s.users {
 		if user.OpenID != openID {
@@ -584,42 +686,7 @@ func (s *MemoryStore) LoginWithWechatCode(code, phone, phoneCode string) (learni
 		}
 		return principalFromUser(user), nil
 	}
-	return s.createWechatStudent(openID, phone), nil
-}
-
-func (s *MemoryStore) createWechatStudent(openID, phone string) learning.Principal {
-	now := time.Now()
-	suffix := now.Format("20060102150405.000000000")
-	studentID := "stu-wx-" + suffix
-	userID := "user-wx-" + suffix
-	student := learning.Student{
-		ID:             studentID,
-		Name:           "微信用户",
-		Nickname:       "",
-		AvatarURL:      "",
-		Grade:          "待完善",
-		Phone:          displayPhone(phone),
-		OpenedPackages: []string{},
-		LearningStatus: "待开通",
-		AccountStatus:  "正常",
-		Remark:         "微信授权自动创建",
-		BindStatus:     "已绑定",
-		LastStudyAt:    "",
-	}
-	user := learning.User{
-		ID:            userID,
-		Name:          student.Name,
-		Phone:         phone,
-		OpenID:        openID,
-		AccountStatus: "正常",
-		Remark:        student.Remark,
-		Roles:         []learning.Role{learning.RoleStudent},
-		StudentID:     studentID,
-	}
-	s.students = append([]learning.Student{student}, s.students...)
-	s.users = append(s.users, user)
-	s.prependLog(student.Name, "微信授权登录", "自动创建待开通学生账号")
-	return principalFromUser(user)
+	return learning.Principal{}, errors.New("微信账号未绑定，请先填写学生信息并授权手机号完成身份绑定")
 }
 
 func (s *MemoryStore) removeWechatOnlyStudent(openID, keepStudentID string) {
@@ -953,17 +1020,19 @@ func (s *MemoryStore) CreateStudent(operator string, principal learning.Principa
 	}
 	id := "stu-" + time.Now().Format("20060102150405")
 	student := learning.Student{
-		ID:             id,
-		Name:           req.Name,
-		Nickname:       "",
-		AvatarURL:      "",
-		Grade:          req.Grade,
-		Phone:          req.Phone,
-		OpenedPackages: []string{},
-		LearningStatus: "未开始",
-		AccountStatus:  "正常",
-		Remark:         req.Remark,
-		BindStatus:     "待绑定",
+		ID:                    id,
+		Name:                  req.Name,
+		Nickname:              "",
+		AvatarURL:             "",
+		Grade:                 req.Grade,
+		Phone:                 req.Phone,
+		SchoolName:            req.SchoolName,
+		OfficialAccountOpenID: req.OfficialAccountOpenID,
+		OpenedPackages:        []string{},
+		LearningStatus:        "未开始",
+		AccountStatus:         "正常",
+		Remark:                req.Remark,
+		BindStatus:            "待绑定",
 	}
 	s.students = append([]learning.Student{student}, s.students...)
 	s.users = append(s.users, learning.User{
@@ -998,6 +1067,8 @@ func (s *MemoryStore) UpdateStudent(operator string, principal learning.Principa
 		s.students[i].Name = req.Name
 		s.students[i].Phone = req.Phone
 		s.students[i].Grade = req.Grade
+		s.students[i].SchoolName = req.SchoolName
+		s.students[i].OfficialAccountOpenID = req.OfficialAccountOpenID
 		s.students[i].AccountStatus = req.AccountStatus
 		s.students[i].Remark = req.Remark
 		s.syncStudentUser(s.students[i])
@@ -1014,17 +1085,27 @@ func (s *MemoryStore) UpdateStudentProfile(operator string, principal learning.P
 	}
 	req.Nickname = strings.TrimSpace(req.Nickname)
 	req.AvatarURL = strings.TrimSpace(req.AvatarURL)
-	if req.Nickname == "" {
-		return learning.Student{}, errors.New("请授权微信昵称")
-	}
-	if req.AvatarURL == "" {
-		return learning.Student{}, errors.New("请授权微信头像")
-	}
+	req.StudentName = strings.TrimSpace(req.StudentName)
+	req.Grade = strings.TrimSpace(req.Grade)
+	req.SchoolName = strings.TrimSpace(req.SchoolName)
+	req.GuardianName = strings.TrimSpace(req.GuardianName)
 	if len([]rune(req.Nickname)) > 32 {
 		return learning.Student{}, errors.New("昵称最多 32 个字")
 	}
 	if len(req.AvatarURL) > 1000 {
 		return learning.Student{}, errors.New("头像地址过长")
+	}
+	if len([]rune(req.StudentName)) > 32 {
+		return learning.Student{}, errors.New("学生姓名最多 32 个字")
+	}
+	if len([]rune(req.Grade)) > 32 {
+		return learning.Student{}, errors.New("年级最多 32 个字")
+	}
+	if len([]rune(req.SchoolName)) > 64 {
+		return learning.Student{}, errors.New("学校名称最多 64 个字")
+	}
+	if len([]rune(req.GuardianName)) > 32 {
+		return learning.Student{}, errors.New("家长称呼最多 32 个字")
 	}
 	for i := range s.students {
 		if s.students[i].ID != principal.StudentID {
@@ -1033,14 +1114,32 @@ func (s *MemoryStore) UpdateStudentProfile(operator string, principal learning.P
 		if s.students[i].AccountStatus == "停用" {
 			return learning.Student{}, errors.New("账号已停用，请联系老师或管理员")
 		}
-		beforeName := s.students[i].Nickname
-		beforeAvatar := s.students[i].AvatarURL
-		s.students[i].Nickname = req.Nickname
-		s.students[i].AvatarURL = req.AvatarURL
-		if beforeName != req.Nickname || beforeAvatar != req.AvatarURL {
+		before := s.decorateStudent(s.students[i])
+		if req.Nickname != "" {
+			s.students[i].Nickname = req.Nickname
+		}
+		if req.AvatarURL != "" {
+			s.students[i].AvatarURL = req.AvatarURL
+		}
+		if req.StudentName != "" {
+			s.students[i].Name = req.StudentName
+		}
+		if req.Grade != "" {
+			s.students[i].Grade = req.Grade
+		}
+		if req.SchoolName != "" {
+			s.students[i].SchoolName = req.SchoolName
+		}
+		if strings.TrimSpace(s.students[i].SchoolName) == "" {
+			return learning.Student{}, errors.New("请填写学校")
+		}
+		s.students[i].GuardianName = req.GuardianName
+		s.syncStudentUser(s.students[i])
+		after := s.decorateStudent(s.students[i])
+		if auditChangeDetail(studentAuditSnapshot(before), studentAuditSnapshot(after)) != "" {
 			s.prependLog(operator, "更新学生资料", s.students[i].Name)
 		}
-		return s.decorateStudent(s.students[i]), nil
+		return after, nil
 	}
 	return learning.Student{}, errors.New("student not found")
 }
@@ -1052,16 +1151,23 @@ func (s *MemoryStore) RemindStudent(operator string, principal learning.Principa
 	}
 	noticeID := "notice-" + time.Now().Format("20060102150405")
 	notice := learning.Notice{
-		ID:      noticeID,
-		Type:    "提醒",
-		Title:   "学习提醒",
-		Target:  student.Name,
-		Summary: "今天的小挑战别忘啦",
-		Status:  "已创建",
+		ID:              noticeID,
+		Type:            "提醒",
+		Title:           "学习提醒",
+		Target:          student.Name,
+		Summary:         "今天的小挑战别忘啦",
+		Channel:         "公众号模板消息",
+		RecipientOpenID: student.OfficialAccountOpenID,
+		RelatedType:     "student",
+		RelatedID:       student.ID,
 	}
-	s.notices = append([]learning.Notice{notice}, s.notices...)
+	notice = s.deliverNotice(notice)
+	s.prependNoticeRecord(notice)
 	s.prependLog(operator, "提醒学生", student.Name)
-	return learning.StudentRemindResult{NoticeID: noticeID, Message: "已创建学习提醒"}, nil
+	if notice.Status == "已发送" {
+		return learning.StudentRemindResult{NoticeID: noticeID, Message: "已发送学习提醒"}, nil
+	}
+	return learning.StudentRemindResult{NoticeID: noticeID, Message: "已创建学习提醒，待完成通知配置后补发"}, nil
 }
 
 func (s *MemoryStore) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) learning.StudentImportResult {
@@ -1124,7 +1230,94 @@ func (s *MemoryStore) StudentLearningRecords(principal learning.Principal, id st
 			Status: review.Status, Score: review.SystemScore, OccurredAt: "2026-05-22 20:10:00", Description: "提交后等待老师反馈",
 		})
 	}
+	for _, summary := range s.scoreSummariesForStudent(id) {
+		if summary.LatestRecord == nil {
+			continue
+		}
+		score := *summary.LatestRecord
+		records = append(records, learning.StudentLearningRecord{
+			ID: "score-" + score.ID, Type: "成绩", Title: score.ExamName, Course: score.Subject,
+			Status: "已记录", Score: score.Score, FullScore: score.FullScore, OccurredAt: score.ExamDate, Description: summary.Description,
+		})
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].OccurredAt > records[j].OccurredAt })
 	return records, nil
+}
+
+func (s *MemoryStore) StudentScores(principal learning.Principal, id string) ([]learning.StudentScoreSummary, error) {
+	if _, err := s.visibleStudent(principal, id); err != nil {
+		return nil, err
+	}
+	return s.scoreSummariesForStudent(id), nil
+}
+
+func (s *MemoryStore) StudentOwnScores(principal learning.Principal) ([]learning.StudentScoreSummary, error) {
+	if principal.StudentID == "" {
+		return nil, errors.New("student account is not bound")
+	}
+	if _, err := s.visibleStudent(principal, principal.StudentID); err != nil {
+		return nil, err
+	}
+	return s.scoreSummariesForStudent(principal.StudentID), nil
+}
+
+func (s *MemoryStore) CreateStudentScore(operator string, principal learning.Principal, studentID string, req learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error) {
+	student, err := s.visibleStudent(principal, studentID)
+	if err != nil {
+		return learning.StudentScoreRecord{}, err
+	}
+	req, err = s.normalizeScoreRequest(principal, student, req)
+	if err != nil {
+		return learning.StudentScoreRecord{}, err
+	}
+	nowTime := time.Now()
+	now := nowTime.Format("2006-01-02 15:04:05")
+	item := learning.StudentScoreRecord{
+		ID:             "score-" + nowTime.Format("20060102150405") + "-" + strconv.Itoa(nowTime.Nanosecond()),
+		StudentID:      student.ID,
+		Subject:        req.Subject,
+		ExamType:       req.ExamType,
+		ExamName:       req.ExamName,
+		ExamDate:       req.ExamDate,
+		Score:          req.Score,
+		FullScore:      req.FullScore,
+		AverageScore:   req.AverageScore,
+		TeacherComment: req.TeacherComment,
+		CreatedBy:      principal.Name,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	s.scoreRecords = append([]learning.StudentScoreRecord{item}, s.scoreRecords...)
+	s.prependLogDetail(operator, "录入成绩", student.Name, "学科: "+item.Subject+"; 测评: "+item.ExamName)
+	return item, nil
+}
+
+func (s *MemoryStore) UpdateStudentScore(operator string, principal learning.Principal, studentID string, scoreID string, req learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error) {
+	student, err := s.visibleStudent(principal, studentID)
+	if err != nil {
+		return learning.StudentScoreRecord{}, err
+	}
+	req, err = s.normalizeScoreRequest(principal, student, req)
+	if err != nil {
+		return learning.StudentScoreRecord{}, err
+	}
+	for i := range s.scoreRecords {
+		if s.scoreRecords[i].ID != scoreID || s.scoreRecords[i].StudentID != student.ID {
+			continue
+		}
+		s.scoreRecords[i].Subject = req.Subject
+		s.scoreRecords[i].ExamType = req.ExamType
+		s.scoreRecords[i].ExamName = req.ExamName
+		s.scoreRecords[i].ExamDate = req.ExamDate
+		s.scoreRecords[i].Score = req.Score
+		s.scoreRecords[i].FullScore = req.FullScore
+		s.scoreRecords[i].AverageScore = req.AverageScore
+		s.scoreRecords[i].TeacherComment = req.TeacherComment
+		s.scoreRecords[i].UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
+		s.prependLogDetail(operator, "修正成绩", student.Name, "学科: "+req.Subject+"; 测评: "+req.ExamName)
+		return s.scoreRecords[i], nil
+	}
+	return learning.StudentScoreRecord{}, errors.New("成绩记录不存在")
 }
 
 func (s *MemoryStore) CommercialSummary(principal learning.Principal) learning.CommercialSummary {
@@ -1220,9 +1413,6 @@ func (s *MemoryStore) CreatePayment(operator string, principal learning.Principa
 	order.PaidAmountCent += req.AmountCent
 	if order.PaidAmountCent >= order.AmountCent {
 		order.Status = "已支付"
-		if _, err := s.CreateGrant(operator, order.StudentID, order.PackageID); err != nil && !strings.Contains(err.Error(), "已有生效套餐") {
-			return learning.PaymentRecord{}, err
-		}
 	} else {
 		order.Status = "部分支付"
 	}
@@ -1362,9 +1552,33 @@ func (s *MemoryStore) CreateParentNotice(operator string, principal learning.Pri
 		return learning.ParentNotice{}, errors.New("请输入通知标题和内容")
 	}
 	now := time.Now()
-	item := learning.ParentNotice{ID: "parent-notice-" + now.Format("20060102150405.000000000"), OrderID: order.ID, StudentID: order.StudentID, Title: req.Title, Content: req.Content, SentAt: now.Format("2006-01-02 15:04:05"), Status: "已发送"}
+	noticeID := "parent-notice-" + now.Format("20060102150405.000000000")
+	notice := learning.Notice{
+		ID:              noticeID,
+		Type:            "续",
+		Title:           req.Title,
+		Target:          order.StudentName,
+		Summary:         req.Content,
+		Channel:         "公众号模板消息",
+		RecipientOpenID: s.officialAccountOpenIDForStudent(order.StudentID),
+		RelatedType:     "commercial_order",
+		RelatedID:       order.ID,
+	}
+	notice = s.deliverNotice(notice)
+	item := learning.ParentNotice{
+		ID:            noticeID,
+		OrderID:       order.ID,
+		StudentID:     order.StudentID,
+		Title:         req.Title,
+		Content:       req.Content,
+		SentAt:        now.Format("2006-01-02 15:04:05"),
+		Status:        notice.Status,
+		NoticeID:      notice.ID,
+		Channel:       notice.Channel,
+		FailureReason: notice.FailureReason,
+	}
 	s.parentNotices = append([]learning.ParentNotice{item}, s.parentNotices...)
-	s.notices = append([]learning.Notice{{ID: item.ID, Type: "续", Title: item.Title, Target: order.StudentName, Summary: item.Content, Status: "已发送"}}, s.notices...)
+	s.prependNoticeRecord(notice)
 	s.prependLog(operator, "发送家长通知", order.StudentName+" / "+item.Title)
 	return item, nil
 }
@@ -1427,14 +1641,14 @@ func (s *MemoryStore) CreateMaterial(operator string, principal learning.Princip
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.Chapter = strings.TrimSpace(req.Chapter)
 	if req.Title == "" {
-		return learning.Material{}, errors.New("请输入讲义标题")
+		return learning.Material{}, errors.New("请输入学习资料标题")
 	}
 	course, err := s.courseForUpload(principal, req.CourseID, req.LearningSpaceID)
 	if err != nil {
 		return learning.Material{}, err
 	}
 	if !canUploadHandout(principal) {
-		return learning.Material{}, errors.New("当前账号没有上传讲义权限，请联系管理员开通")
+		return learning.Material{}, errors.New("当前账号没有上传学习资料权限，请联系管理员开通")
 	}
 	if req.Chapter == "" {
 		req.Chapter = "未分章节"
@@ -1448,7 +1662,7 @@ func (s *MemoryStore) CreateMaterial(operator string, principal learning.Princip
 		Course:           course.Name,
 		LearningSpaceID:  course.LearningSpaceID,
 		Chapter:          req.Chapter,
-		Type:             "讲义",
+		Type:             "学习资料",
 		OwnerTeacherID:   principal.UserID,
 		OwnerTeacherName: principal.Name,
 		PublishStatus:    "已发布",
@@ -1462,8 +1676,8 @@ func (s *MemoryStore) CreateMaterial(operator string, principal learning.Princip
 		DownloadURL:      "/api/files/" + asset.ID + "/download",
 	}
 	s.materials = append([]learning.Material{item}, s.materials...)
-	s.prependLog(operator, "上传讲义", item.Title)
-	return item, nil
+	s.prependLog(operator, "上传学习资料", item.Title)
+	return s.decorateMaterial(item), nil
 }
 
 func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Principal, id string, req learning.MaterialUpdateRequest) (learning.Material, error) {
@@ -1473,8 +1687,9 @@ func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Princip
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.Chapter = strings.TrimSpace(req.Chapter)
 	if req.Title == "" {
-		return learning.Material{}, errors.New("请输入讲义标题")
+		return learning.Material{}, errors.New("请输入学习资料标题")
 	}
+	req.Status = normalizeMaterialStatus(req.Status)
 	if !isContentStatus(req.Status) {
 		return learning.Material{}, errors.New("请选择正确的发布状态")
 	}
@@ -1483,7 +1698,7 @@ func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Princip
 		return learning.Material{}, err
 	}
 	if !canUploadHandout(principal) {
-		return learning.Material{}, errors.New("当前账号没有维护讲义权限，请联系管理员开通")
+		return learning.Material{}, errors.New("当前账号没有维护学习资料权限，请联系管理员开通")
 	}
 	if req.Chapter == "" {
 		req.Chapter = "未分章节"
@@ -1493,7 +1708,7 @@ func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Princip
 			continue
 		}
 		if !canSeeCourse(principal, learning.Course{ID: s.materials[index].CourseID, LearningSpaceID: s.materials[index].LearningSpaceID}) {
-			return learning.Material{}, errors.New("不能维护未负责的讲义")
+			return learning.Material{}, errors.New("不能维护未负责的学习资料")
 		}
 		before := s.materials[index]
 		s.materials[index].Title = req.Title
@@ -1503,15 +1718,110 @@ func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Princip
 		s.materials[index].Chapter = req.Chapter
 		s.materials[index].Status = req.Status
 		s.materials[index].PublishStatus = publishStatus(req.Status)
-		s.prependLogDetail(operator, "编辑讲义", req.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(s.materials[index])))
-		return s.materials[index], nil
+		s.prependLogDetail(operator, "编辑学习资料", req.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(s.materials[index])))
+		return s.decorateMaterial(s.materials[index]), nil
 	}
-	return learning.Material{}, errors.New("讲义不存在")
+	return learning.Material{}, errors.New("学习资料不存在")
 }
 
 func (s *MemoryStore) Homework(principal learning.Principal) []learning.Homework {
 	courses := courseNames(s.Courses(principal))
 	return s.homeworkForCourses(courses)
+}
+
+func (s *MemoryStore) HomeworkSubmissions(principal learning.Principal, homeworkID string) (learning.HomeworkSubmissionSummary, error) {
+	homeworkID = strings.TrimSpace(homeworkID)
+	var homework learning.Homework
+	found := false
+	for _, item := range s.Homework(principal) {
+		if item.ID == homeworkID {
+			homework = item
+			found = true
+			break
+		}
+	}
+	if !found {
+		return learning.HomeworkSubmissionSummary{}, errors.New("练习不存在或没有权限查看")
+	}
+	students := make([]learning.HomeworkSubmissionStudent, 0)
+	studentIDs := map[string]bool{}
+	for _, grant := range s.grants {
+		if !grantActive(grant) {
+			continue
+		}
+		pkg, ok := s.findPackage(grant.PackageID)
+		if !ok || !s.packageOpensContent(pkg, homework.LearningSpaceID, "question") {
+			continue
+		}
+		student, ok := s.findStudent(grant.StudentID)
+		if !ok || studentIDs[student.ID] {
+			continue
+		}
+		studentIDs[student.ID] = true
+		row := learning.HomeworkSubmissionStudent{
+			StudentID:    student.ID,
+			StudentName:  student.Name,
+			Phone:        student.Phone,
+			ReviewStatus: "未提交",
+		}
+		if submission, ok := s.latestSubmissionForStudent(student.ID, homework.ID); ok {
+			row.SubmittedAt = submission.CreatedAt
+			row.ReviewStatus = submission.Status
+			row.SubmissionID = submission.ID
+		}
+		students = append(students, row)
+	}
+	return learning.HomeworkSubmissionSummary{
+		HomeworkID:    homework.ID,
+		HomeworkTitle: homework.Title,
+		TotalNum:      len(students),
+		SubmittedNum:  countSubmittedStudents(students),
+		Students:      students,
+	}, nil
+}
+
+func (s *MemoryStore) notifyHomeworkPublished(homework learning.Homework) {
+	students := s.expectedStudentsForHomework(homework)
+	for _, student := range students {
+		summary := homework.Title + "已发布，请按时完成。"
+		if homework.Deadline != "" {
+			summary = homework.Title + "已发布，截止时间 " + homework.Deadline + "。"
+		}
+		notice := learning.Notice{
+			ID:              "notice-homework-" + homework.ID + "-" + student.ID,
+			Type:            "练",
+			Title:           homework.Subject + "练习已发布",
+			Target:          student.Name,
+			Summary:         summary,
+			Channel:         "公众号模板消息",
+			RecipientOpenID: student.OfficialAccountOpenID,
+			RelatedType:     "homework",
+			RelatedID:       homework.ID,
+		}
+		notice = s.deliverNotice(notice)
+		s.prependNoticeRecord(notice)
+	}
+}
+
+func (s *MemoryStore) expectedStudentsForHomework(homework learning.Homework) []learning.Student {
+	students := make([]learning.Student, 0)
+	seen := map[string]bool{}
+	for _, grant := range s.grants {
+		if !grantActive(grant) {
+			continue
+		}
+		pkg, ok := s.findPackage(grant.PackageID)
+		if !ok || !s.packageOpensContent(pkg, homework.LearningSpaceID, "question") {
+			continue
+		}
+		student, ok := s.findStudent(grant.StudentID)
+		if !ok || seen[student.ID] {
+			continue
+		}
+		seen[student.ID] = true
+		students = append(students, student)
+	}
+	return students
 }
 
 func (s *MemoryStore) Questions(principal learning.Principal) []learning.QuestionBankItem {
@@ -1566,11 +1876,12 @@ func (s *MemoryStore) UpdateQuestion(operator string, principal learning.Princip
 }
 
 func (s *MemoryStore) questionFromRequest(id string, principal learning.Principal, req learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error) {
+	req.Title = strings.TrimSpace(req.Title)
 	req.Grade = strings.TrimSpace(req.Grade)
 	req.Semester = strings.TrimSpace(req.Semester)
 	req.Subject = strings.TrimSpace(req.Subject)
 	req.Type = strings.TrimSpace(req.Type)
-	req.Stem = strings.TrimSpace(req.Stem)
+	req.Stem = sanitizeRichText(req.Stem)
 	req.Answer = strings.TrimSpace(req.Answer)
 	status := strings.TrimSpace(req.Status)
 	if status == "" {
@@ -1585,7 +1896,13 @@ func (s *MemoryStore) questionFromRequest(id string, principal learning.Principa
 	if req.Stem == "" {
 		return learning.QuestionBankItem{}, errors.New("请输入题干")
 	}
-	if req.Type != "single" && req.Type != "multiple" && req.Type != "text" {
+	if len([]rune(req.Stem)) > 4000 {
+		return learning.QuestionBankItem{}, errors.New("题干最多 4000 个字")
+	}
+	if req.Title == "" {
+		req.Title = shortQuestionTitle(req.Stem)
+	}
+	if req.Type != "single" && req.Type != "multiple" && req.Type != "judge" && req.Type != "fill" && req.Type != "text" {
 		return learning.QuestionBankItem{}, errors.New("请选择正确的题型")
 	}
 	if !isContentStatus(learning.Status(status)) {
@@ -1604,6 +1921,23 @@ func (s *MemoryStore) questionFromRequest(id string, principal learning.Principa
 			return learning.QuestionBankItem{}, errors.New("多选题需要至少两个选项和正确答案")
 		}
 	}
+	if req.Type == "judge" {
+		options = []string{"正确", "错误"}
+		if req.Answer != "正确" && req.Answer != "错误" {
+			return learning.QuestionBankItem{}, errors.New("判断题请选择正确或错误")
+		}
+		answers = []string{req.Answer}
+	}
+	if req.Type == "fill" {
+		options = nil
+		if len(answers) == 0 && req.Answer != "" {
+			answers = []string{req.Answer}
+		}
+		if len(answers) == 0 {
+			return learning.QuestionBankItem{}, errors.New("填空题需要填写参考答案")
+		}
+		req.Answer = answers[0]
+	}
 	if req.Type == "text" {
 		options = nil
 		answers = nil
@@ -1614,7 +1948,7 @@ func (s *MemoryStore) questionFromRequest(id string, principal learning.Principa
 		score = 10
 	}
 	return learning.QuestionBankItem{
-		ID: id, Grade: req.Grade, Semester: req.Semester, Subject: req.Subject, Type: req.Type, Stem: req.Stem,
+		ID: id, Title: req.Title, Grade: req.Grade, Semester: req.Semester, Subject: req.Subject, Type: req.Type, Stem: req.Stem,
 		Options: options, Answer: req.Answer, Answers: answers, Score: score, Status: status,
 	}, nil
 }
@@ -1676,6 +2010,9 @@ func (s *MemoryStore) CreateHomework(operator string, principal learning.Princip
 		DownloadURL:      "/api/files/" + asset.ID + "/download",
 	}
 	s.homework = append([]learning.Homework{item}, s.homework...)
+	if status == learning.StatusEnabled {
+		s.notifyHomeworkPublished(item)
+	}
 	s.prependLog(operator, "上传题目", item.Title)
 	return item, nil
 }
@@ -1726,6 +2063,9 @@ func (s *MemoryStore) UpdateHomework(operator string, principal learning.Princip
 		s.homework[index].Deadline = req.Deadline
 		s.homework[index].Status = string(status)
 		s.homework[index].PublishStatus = publishStatus(status)
+		if before.Status != string(learning.StatusEnabled) && status == learning.StatusEnabled {
+			s.notifyHomeworkPublished(s.homework[index])
+		}
 		s.prependLogDetail(operator, "编辑题目", req.Title, auditChangeDetail(homeworkAuditSnapshot(before), homeworkAuditSnapshot(s.homework[index])))
 		return s.homework[index], nil
 	}
@@ -1765,8 +2105,12 @@ func (s *MemoryStore) CompleteReview(operator string, principal learning.Princip
 		return learning.Submission{}, errors.New("当前账号没有批改权限，请联系管理员开通")
 	}
 	id = strings.TrimSpace(id)
-	req.TeacherComment = strings.TrimSpace(req.TeacherComment)
+	req.TeacherComment = sanitizeRichText(req.TeacherComment)
 	req.Reward = strings.TrimSpace(req.Reward)
+	req.FinalStatus = normalizeReviewFinalStatus(req.FinalStatus)
+	if req.FinalStatus == "" {
+		return learning.Submission{}, errors.New("批改状态只能为待复核或已批改")
+	}
 	if req.Score < 0 || req.Score > 100 {
 		return learning.Submission{}, errors.New("分数需在 0 到 100 之间")
 	}
@@ -1822,26 +2166,39 @@ func (s *MemoryStore) CompleteReview(operator string, principal learning.Princip
 	}
 	submission.TeacherComment = req.TeacherComment
 	submission.Reward = req.Reward
-	submission.Status = "已批改"
+	submission.Status = req.FinalStatus
 	s.submissions[submission.ID] = submission
-	s.reviews = append(s.reviews[:reviewIndex], s.reviews[reviewIndex+1:]...)
-	s.notices = append([]learning.Notice{{
-		ID:      "notice-review-" + time.Now().Format("20060102150405.000000000"),
-		Type:    "评",
-		Title:   "批改完成提醒",
-		Target:  review.StudentName,
-		Summary: homework.Title + "已完成批改，快去查看老师反馈。",
-		Status:  "自动发送",
-	}}, s.notices...)
-	s.prependLog(operator, "完成批改", review.StudentName+" · "+homework.Title)
+	if req.FinalStatus == "待复核" {
+		review.SubmissionID = submission.ID
+		review.SystemScore = req.Score
+		review.TeacherComment = req.TeacherComment
+		review.Reward = req.Reward
+		review.Status = "待复核"
+		s.reviews[reviewIndex] = review
+	} else {
+		s.reviews = append(s.reviews[:reviewIndex], s.reviews[reviewIndex+1:]...)
+	}
+	notice := learning.Notice{
+		ID:              "notice-review-" + time.Now().Format("20060102150405.000000000"),
+		Type:            "评",
+		Title:           reviewNoticeTitle(req.FinalStatus),
+		Target:          review.StudentName,
+		Summary:         reviewNoticeSummary(homework.Title, req.FinalStatus),
+		Channel:         "公众号模板消息",
+		RecipientOpenID: s.officialAccountOpenIDForTarget(review.StudentName),
+		RelatedType:     "review",
+		RelatedID:       review.ID,
+	}
+	notice = s.deliverNotice(notice)
+	s.prependNoticeRecord(notice)
+	s.prependLog(operator, reviewLogAction(req.FinalStatus), review.StudentName+" · "+homework.Title)
 	return submission, nil
 }
 
 func (s *MemoryStore) Notices(principal learning.Principal) []learning.Notice {
-	subjects := subjectsForCourses(s.Courses(principal))
 	out := make([]learning.Notice, 0, len(s.notices))
 	for _, notice := range s.notices {
-		if canSeeSubject(principal, subjects, notice.Target) || canSeeSubject(principal, subjects, notice.Title) {
+		if s.canSeeNotice(principal, notice) {
 			out = append(out, notice)
 		}
 	}
@@ -1853,8 +2210,15 @@ func (s *MemoryStore) CreateNotice(operator string, principal learning.Principal
 	req.Title = strings.TrimSpace(req.Title)
 	req.Target = strings.TrimSpace(req.Target)
 	req.Summary = strings.TrimSpace(req.Summary)
+	req.Channel = strings.TrimSpace(req.Channel)
+	req.RecipientOpenID = strings.TrimSpace(req.RecipientOpenID)
+	req.RelatedType = strings.TrimSpace(req.RelatedType)
+	req.RelatedID = strings.TrimSpace(req.RelatedID)
 	if req.Type == "" {
 		req.Type = "通知"
+	}
+	if req.Channel == "" {
+		req.Channel = "站内通知"
 	}
 	if req.Title == "" {
 		return learning.Notice{}, errors.New("请输入通知标题")
@@ -1868,17 +2232,159 @@ func (s *MemoryStore) CreateNotice(operator string, principal learning.Principal
 	if !s.canSendNoticeTo(principal, req.Target, req.Title, req.Summary) {
 		return learning.Notice{}, errors.New("不能发送到未负责的学生范围")
 	}
-	notice := learning.Notice{
-		ID:      "notice-" + time.Now().Format("20060102150405.000000000"),
-		Type:    req.Type,
-		Title:   req.Title,
-		Target:  req.Target,
-		Summary: req.Summary,
-		Status:  "已发送",
+	if req.Channel == "公众号模板消息" && req.RecipientOpenID == "" {
+		req.RecipientOpenID = s.officialAccountOpenIDForTarget(req.Target)
 	}
-	s.notices = append([]learning.Notice{notice}, s.notices...)
+	notice := learning.Notice{
+		ID:              "notice-" + time.Now().Format("20060102150405.000000000"),
+		Type:            req.Type,
+		Title:           req.Title,
+		Target:          req.Target,
+		Summary:         req.Summary,
+		Channel:         req.Channel,
+		RecipientOpenID: req.RecipientOpenID,
+		RelatedType:     req.RelatedType,
+		RelatedID:       req.RelatedID,
+	}
+	notice = s.deliverNotice(notice)
+	s.prependNoticeRecord(notice)
 	s.prependLog(operator, "发送通知", notice.Target+" / "+notice.Title)
 	return notice, nil
+}
+
+func (s *MemoryStore) RetryNotice(operator string, principal learning.Principal, id string) (learning.Notice, error) {
+	id = strings.TrimSpace(id)
+	for index := range s.notices {
+		if s.notices[index].ID != id {
+			continue
+		}
+		notice := s.notices[index]
+		if !s.canSeeNotice(principal, notice) {
+			return learning.Notice{}, errors.New("不能补发未负责范围的通知")
+		}
+		if notice.Channel == "公众号模板消息" && notice.RecipientOpenID == "" {
+			notice.RecipientOpenID = s.officialAccountOpenIDForTarget(notice.Target)
+		}
+		notice.RetryCount++
+		notice = s.deliverNotice(notice)
+		s.notices[index] = notice
+		s.ensureStationNoticeForOfficialNotice(notice)
+		s.prependLog(operator, "补发通知", notice.Target+" / "+notice.Title)
+		return notice, nil
+	}
+	return learning.Notice{}, errors.New("通知记录不存在")
+}
+
+func (s *MemoryStore) canSeeNotice(principal learning.Principal, notice learning.Notice) bool {
+	if hasRole(principal.Roles, learning.RoleSuperAdmin) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleOpsStaff) {
+		return true
+	}
+	subjects := subjectsForCourses(s.Courses(principal))
+	return canSeeSubject(principal, subjects, notice.Target) ||
+		canSeeSubject(principal, subjects, notice.Title) ||
+		canSeeSubject(principal, subjects, notice.Summary)
+}
+
+func readinessFromConfirmedSetting(key, title, value, readyMessage, action string) learning.ReadinessItem {
+	value = strings.TrimSpace(value)
+	if value == "已完成" || value == "已配置" || value == "已确认" {
+		return learning.ReadinessItem{Key: key, Title: title, Status: "ready", Message: readyMessage}
+	}
+	if value == "" {
+		value = "待确认"
+	}
+	return learning.ReadinessItem{
+		Key:     key,
+		Title:   title,
+		Status:  "missing",
+		Message: title + "当前为“" + value + "”。",
+		Action:  action,
+	}
+}
+
+func readinessFromDomain(value string) learning.ReadinessItem {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "https://") && !strings.Contains(value, "localhost") && !strings.Contains(value, "127.0.0.1") {
+		return learning.ReadinessItem{
+			Key:     "productionApiDomain",
+			Title:   "生产接口域名",
+			Status:  "ready",
+			Message: "已配置生产接口域名：" + value,
+		}
+	}
+	if value == "" {
+		value = "待配置"
+	}
+	return learning.ReadinessItem{
+		Key:     "productionApiDomain",
+		Title:   "生产接口域名",
+		Status:  "missing",
+		Message: "当前生产接口域名为“" + value + "”。",
+		Action:  "配置 https 生产接口域名，并确保已加入小程序合法域名。",
+	}
+}
+
+func (s *MemoryStore) officialAccountConfigReadiness() learning.ReadinessItem {
+	if s.officialAccountReady && s.officialNoticeSender != nil {
+		return learning.ReadinessItem{
+			Key:     "officialAccountConfig",
+			Title:   "公众号发送配置",
+			Status:  "ready",
+			Message: "已配置公众号 AppID、Secret 和模板 ID，系统可尝试发送模板消息。",
+		}
+	}
+	return learning.ReadinessItem{
+		Key:     "officialAccountConfig",
+		Title:   "公众号发送配置",
+		Status:  "missing",
+		Message: "公众号模板消息环境变量未完整配置。",
+		Action:  "配置 WECHAT_OFFICIAL_ACCOUNT_APPID、WECHAT_OFFICIAL_ACCOUNT_SECRET、WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID 后重启服务。",
+	}
+}
+
+func (s *MemoryStore) studentOfficialAccountReadiness() learning.ReadinessItem {
+	opened := map[string]bool{}
+	for _, grant := range s.grants {
+		if grantActive(grant) {
+			opened[grant.StudentID] = true
+		}
+	}
+	total := 0
+	linked := 0
+	for _, student := range s.students {
+		if !opened[student.ID] {
+			continue
+		}
+		total++
+		if strings.TrimSpace(student.OfficialAccountOpenID) != "" {
+			linked++
+		}
+	}
+	if total == 0 {
+		return learning.ReadinessItem{
+			Key:     "studentOfficialAccountOpenID",
+			Title:   "学生公众号关联",
+			Status:  "warning",
+			Message: "当前没有已开通套餐的学生，暂时无法计算公众号 openid 覆盖率。",
+			Action:  "先为学生开通学习套餐，再补充公众号 openid。",
+		}
+	}
+	message := fmt.Sprintf("已开通学生公众号 openid 覆盖 %d/%d。", linked, total)
+	if linked == total {
+		return learning.ReadinessItem{
+			Key:     "studentOfficialAccountOpenID",
+			Title:   "学生公众号关联",
+			Status:  "ready",
+			Message: message,
+		}
+	}
+	return learning.ReadinessItem{
+		Key:     "studentOfficialAccountOpenID",
+		Title:   "学生公众号关联",
+		Status:  "warning",
+		Message: message,
+		Action:  "在学生档案补充公众号 openid，或通过关注公众号后的绑定流程自动回填。",
+	}
 }
 
 func (s *MemoryStore) Logs() []learning.OperationLog {
@@ -1886,6 +2392,7 @@ func (s *MemoryStore) Logs() []learning.OperationLog {
 }
 
 func (s *MemoryStore) Settings() map[string]string {
+	s.ensureDefaultSettings()
 	out := make(map[string]string, len(s.settings))
 	for key, value := range s.settings {
 		out[key] = value
@@ -1913,15 +2420,10 @@ func (s *MemoryStore) UpdateSetting(operator string, req learning.SettingUpdateR
 }
 
 func (s *MemoryStore) GrantPreview(studentID, packageID string) (learning.GrantPreview, error) {
-	student, ok := s.findStudent(studentID)
-	if !ok {
-		return learning.GrantPreview{}, errors.New("student not found")
+	student, pkg, err := s.validateGrantTarget(studentID, packageID)
+	if err != nil {
+		return learning.GrantPreview{}, err
 	}
-	pkg, ok := s.findPackage(packageID)
-	if !ok {
-		return learning.GrantPreview{}, errors.New("package not found")
-	}
-
 	openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
 	alreadyOpened, existingUntil := s.activeGrantState(student.ID, pkg.ID)
 	return learning.GrantPreview{
@@ -1956,6 +2458,24 @@ func (s *MemoryStore) CreateGrant(operator, studentID, packageID string) (learni
 	}
 	s.prependLog(operator, "开通套餐", preview.StudentName+" / "+preview.PackageName)
 	return preview, nil
+}
+
+func (s *MemoryStore) validateGrantTarget(studentID, packageID string) (learning.Student, learning.Package, error) {
+	student, ok := s.findStudent(studentID)
+	if !ok {
+		return learning.Student{}, learning.Package{}, errors.New("student not found")
+	}
+	pkg, ok := s.findPackage(packageID)
+	if !ok {
+		return learning.Student{}, learning.Package{}, errors.New("package not found")
+	}
+	if pkg.Status != learning.StatusEnabled {
+		return learning.Student{}, learning.Package{}, errors.New("该套餐当前未启用，不能开通")
+	}
+	if student.Grade != pkg.Grade {
+		return learning.Student{}, learning.Package{}, errors.New("该套餐适用于" + pkg.Grade + "，不能给" + student.Grade + "学生开通")
+	}
+	return student, pkg, nil
 }
 
 func (s *MemoryStore) StudentPermissions() []learning.StudentPermissionSummary {
@@ -2031,7 +2551,7 @@ func (s *MemoryStore) StudentHome(principal learning.Principal) (learning.Studen
 	}
 	courses := s.coursesForStudent(student.ID)
 	materials := s.materialsForStudent(student.ID)
-	homework := s.homeworkForStudent(student.ID)
+	pendingHomework := s.pendingHomeworkForStudent(student.ID)
 	continueCourse := learning.Course{}
 	if len(courses) > 0 {
 		continueCourse = courses[0]
@@ -2039,17 +2559,245 @@ func (s *MemoryStore) StudentHome(principal learning.Principal) (learning.Studen
 	if len(materials) == 0 {
 		materials = []learning.Material{}
 	}
-	if len(homework) == 0 {
-		homework = []learning.Homework{}
+	if len(pendingHomework) == 0 {
+		pendingHomework = []learning.Homework{}
 	}
+	notices := s.noticesForStudent(student)
+	feedback := s.classroomFeedbackForStudent(student.ID)
+	subscriptionReminder := s.subscriptionReminder(student.ID)
 	return learning.StudentHome{
-		Student:          student,
-		ContinueCourse:   continueCourse,
-		ContinueProgress: s.courseProgress(student.ID, continueCourse.ID),
-		PendingHomework:  homework,
-		Notices:          s.noticesForStudent(student),
-		Materials:        materials,
+		Student:              student,
+		ContinueCourse:       continueCourse,
+		ContinueProgress:     s.courseProgress(student.ID, continueCourse.ID),
+		PendingHomework:      pendingHomework,
+		Notices:              notices,
+		Materials:            materials,
+		TodayTodos:           s.todayTodosForStudent(student, pendingHomework, feedback, subscriptionReminder),
+		ClassroomFeedback:    feedback,
+		SubscriptionReminder: subscriptionReminder,
 	}, nil
+}
+
+func (s *MemoryStore) todayTodosForStudent(student learning.Student, pendingHomework []learning.Homework, feedback []learning.ClassroomFeedback, subscriptionReminder learning.SubscriptionReminder) []learning.StudentTodo {
+	out := make([]learning.StudentTodo, 0)
+	for index, item := range pendingHomework {
+		if index >= 3 {
+			break
+		}
+		out = append(out, learning.StudentTodo{
+			ID:         "todo-homework-" + item.ID,
+			Type:       "homework",
+			Title:      item.Title,
+			Summary:    homeworkTodoSummary(item),
+			ActionText: "去完成",
+			Path:       "/pages/answer/index?id=" + item.ID,
+			Priority:   100 - index,
+			Status:     "待完成",
+		})
+	}
+	if class, ok := s.nextScheduleTodoClass(student.ID); ok {
+		out = append(out, learning.StudentTodo{
+			ID:         "todo-schedule-" + class.ID,
+			Type:       "schedule",
+			Title:      "下一节课",
+			Summary:    class.CourseName + " · " + weekLabelCN(class.DayOfWeek) + " " + class.StartTime + "-" + class.EndTime + " · " + class.TeacherName,
+			ActionText: "看课表",
+			Path:       "/pages/schedule/index",
+			Priority:   80,
+			Status:     class.Status,
+		})
+	}
+	if len(feedback) > 0 {
+		item := feedback[0]
+		out = append(out, learning.StudentTodo{
+			ID:         "todo-feedback-" + item.ID,
+			Type:       "feedback",
+			Title:      "查看课堂反馈",
+			Summary:    item.CourseName + " · " + item.Performance,
+			ActionText: "查看反馈",
+			Path:       "/pages/result/index?id=" + item.RelatedSubmissionID,
+			Priority:   70,
+			Status:     "待查看",
+		})
+	}
+	if !subscriptionReminder.Enabled {
+		out = append(out, learning.StudentTodo{
+			ID:         "todo-subscribe-learning",
+			Type:       "subscribe",
+			Title:      subscriptionReminder.Title,
+			Summary:    subscriptionReminder.Summary,
+			ActionText: subscriptionReminder.ActionText,
+			Priority:   50,
+			Status:     subscriptionTodoStatus(subscriptionReminder),
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Priority > out[j].Priority })
+	return out
+}
+
+func subscriptionTodoStatus(reminder learning.SubscriptionReminder) string {
+	if reminder.TemplateConfigured {
+		return "建议开启"
+	}
+	return "开通中"
+}
+
+func homeworkTodoSummary(item learning.Homework) string {
+	parts := []string{item.Course}
+	if item.Deadline != "" {
+		parts = append(parts, "截止 "+item.Deadline)
+	}
+	if item.QuestionNum > 0 {
+		parts = append(parts, itoa(item.QuestionNum)+" 道题")
+	}
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if strings.TrimSpace(part) != "" {
+			out = append(out, part)
+		}
+	}
+	return strings.Join(out, " · ")
+}
+
+func (s *MemoryStore) nextScheduleTodoClass(studentID string) (learning.ScheduleClass, bool) {
+	for _, item := range s.scheduleClasses {
+		if item.Status == "已取消" {
+			continue
+		}
+		for _, student := range item.Students {
+			if student.ID == studentID {
+				return item, true
+			}
+		}
+	}
+	return learning.ScheduleClass{}, false
+}
+
+func (s *MemoryStore) classroomFeedbackForStudent(studentID string) []learning.ClassroomFeedback {
+	out := make([]learning.ClassroomFeedback, 0)
+	for _, submission := range s.submissions {
+		if submission.StudentID != studentID || submission.Status != "已批改" {
+			continue
+		}
+		homework, ok := s.findHomework(submission.HomeworkID)
+		if !ok {
+			continue
+		}
+		out = append(out, learning.ClassroomFeedback{
+			ID:                  "feedback-" + submission.ID,
+			CourseName:          homework.Course,
+			LessonTitle:         homework.Title,
+			TeacherName:         homework.OwnerTeacherName,
+			Performance:         performanceForScore(submission.FinalScore),
+			Focus:               strings.TrimSpace(submission.TeacherComment),
+			NextStep:            nextStepForFeedback(submission.FinalScore, homework.Title),
+			Score:               submission.FinalScore,
+			CreatedAt:           submission.CreatedAt,
+			RelatedSubmissionID: submission.ID,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
+	if len(out) > 3 {
+		return out[:3]
+	}
+	return out
+}
+
+func (s *MemoryStore) subscriptionReminder(studentID string) learning.SubscriptionReminder {
+	templateIDs := compactStrings(s.miniProgramSubscribeTemplateIDs)
+	configured := len(templateIDs) > 0
+	enabled := false
+	if pref, ok := s.subscriptionPreferences[studentID]; ok && pref.Enabled {
+		enabled = true
+	}
+	summary := "开启后可接收上课、作业和批改完成提醒。"
+	actionText := "开启提醒"
+	if !configured {
+		summary = "提醒服务开通中，可先在通知消息查看学习安排。"
+		actionText = "查看通知"
+	}
+	if enabled {
+		summary = "已开启学习提醒，上课、作业和批改结果会及时通知你。"
+		actionText = "已开启"
+	}
+	return learning.SubscriptionReminder{
+		Enabled:            enabled,
+		TemplateConfigured: configured,
+		TemplateIDs:        templateIDs,
+		Title:              "学习提醒",
+		Summary:            summary,
+		ActionText:         actionText,
+	}
+}
+
+func compactStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func (s *MemoryStore) ConfirmStudentSubscription(operator string, principal learning.Principal, req learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error) {
+	if principal.StudentID == "" {
+		return learning.SubscriptionReminder{}, errors.New("student account is not bound")
+	}
+	student, ok := s.findStudent(principal.StudentID)
+	if !ok {
+		return learning.SubscriptionReminder{}, errors.New("学生不存在")
+	}
+	configuredIDs := compactStrings(s.miniProgramSubscribeTemplateIDs)
+	if len(configuredIDs) == 0 {
+		return learning.SubscriptionReminder{}, errors.New("学习提醒服务正在开通，请先查看通知消息")
+	}
+	acceptedIDs := compactStrings(req.TemplateIDs)
+	if len(acceptedIDs) == 0 {
+		return learning.SubscriptionReminder{}, errors.New("请先允许学习提醒")
+	}
+	configuredSet := map[string]bool{}
+	for _, id := range configuredIDs {
+		configuredSet[id] = true
+	}
+	for _, id := range acceptedIDs {
+		if !configuredSet[id] {
+			return learning.SubscriptionReminder{}, errors.New("订阅模板不匹配，请重新进入页面后再试")
+		}
+	}
+	preference := learning.StudentSubscriptionPreference{
+		StudentID:   student.ID,
+		Enabled:     true,
+		TemplateIDs: acceptedIDs,
+		UpdatedAt:   time.Now().Format("2006-01-02 15:04:05"),
+	}
+	s.subscriptionPreferences[student.ID] = preference
+	s.prependLog(operator, "开启小程序订阅消息", student.Name)
+	if s.db != nil {
+		_ = s.persistSubscriptionPreference(preference)
+	}
+	return s.subscriptionReminder(student.ID), nil
+}
+
+func performanceForScore(score int) string {
+	if score >= 90 {
+		return "本次掌握扎实，表达和准确率表现稳定。"
+	}
+	if score >= 75 {
+		return "本次完成情况良好，部分细节还需要巩固。"
+	}
+	return "本次基础点还需要加强，建议按老师反馈完成订正。"
+}
+
+func nextStepForFeedback(score int, title string) string {
+	if score >= 90 {
+		return "保持当前节奏，复盘 " + title + " 中的关键方法。"
+	}
+	if score >= 75 {
+		return "订正易错点，再完成一次同类题巩固。"
+	}
+	return "先回看本节重点，再请老师确认订正情况。"
 }
 
 // StudentStudy 返回学习页聚合数据：可学课程（带真实进度）与资料。
@@ -2057,19 +2805,26 @@ func (s *MemoryStore) StudentStudy(principal learning.Principal) (learning.Stude
 	if principal.StudentID == "" {
 		return learning.StudentStudyBoard{}, errors.New("student account is not bound")
 	}
-	courses := s.coursesForStudent(principal.StudentID)
+	student, ok := s.findStudent(principal.StudentID)
+	if !ok {
+		return learning.StudentStudyBoard{}, errors.New("student not found")
+	}
+	if student.AccountStatus == "停用" {
+		return learning.StudentStudyBoard{}, errors.New("账号已停用，请联系老师或管理员")
+	}
+	courses := s.coursesForStudent(student.ID)
 	cards := make([]learning.StudentCourseCard, 0, len(courses))
 	for _, course := range courses {
 		cards = append(cards, learning.StudentCourseCard{
 			Course:   course,
-			Progress: s.courseProgress(principal.StudentID, course.ID),
+			Progress: s.courseProgress(student.ID, course.ID),
 		})
 	}
-	materials := s.materialsForStudent(principal.StudentID)
+	materials := s.materialsForStudent(student.ID)
 	if len(materials) == 0 {
 		materials = []learning.Material{}
 	}
-	return learning.StudentStudyBoard{Courses: cards, Materials: materials}, nil
+	return learning.StudentStudyBoard{Student: student, Courses: cards, Materials: materials}, nil
 }
 
 // StudentTasks 返回任务列表，studentStatus 由提交记录派生（已完成/待完成）。
@@ -2093,6 +2848,18 @@ func (s *MemoryStore) StudentTasks(principal learning.Principal) ([]learning.Stu
 		tasks = append(tasks, task)
 	}
 	return tasks, nil
+}
+
+func (s *MemoryStore) pendingHomeworkForStudent(studentID string) []learning.Homework {
+	homework := s.homeworkForStudent(studentID)
+	out := make([]learning.Homework, 0, len(homework))
+	for _, item := range homework {
+		if _, ok := s.latestSubmission(studentID, item.ID); ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 // courseProgress 复用学习地图站点，计算某课程对当前学生的真实完成度。
@@ -2195,6 +2962,9 @@ func (s *MemoryStore) SaveAvailability(operator string, principal learning.Princ
 		if !ok || end <= start {
 			return nil, errors.New("结束时间必须晚于开始时间")
 		}
+		if err := validateDateRange(slot.StartDate, slot.EndDate); err != nil {
+			return nil, err
+		}
 		slot.ID = "av-" + req.OwnerType + "-" + req.OwnerID + "-" + strconv.Itoa(index+1)
 		slots = append(slots, slot)
 	}
@@ -2221,8 +2991,13 @@ func (s *MemoryStore) ScheduleCandidates(principal learning.Principal, req learn
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.TeacherID = strings.TrimSpace(req.TeacherID)
 	req.ClassType = strings.TrimSpace(req.ClassType)
+	req.StartDate = strings.TrimSpace(req.StartDate)
+	req.EndDate = strings.TrimSpace(req.EndDate)
 	if req.DurationMinutes <= 0 {
 		req.DurationMinutes = 90
+	}
+	if err := validateDateRange(req.StartDate, req.EndDate); err != nil {
+		return nil, err
 	}
 	capacity := classCapacity(req.ClassType)
 	if capacity <= 0 {
@@ -2297,16 +3072,19 @@ func (s *MemoryStore) ScheduleCandidates(principal learning.Principal, req learn
 		for _, teacherSlot := range s.ownerAvailability("teacher", teacher.ID) {
 			startMin, _ := parseClock(teacherSlot.StartTime)
 			endMin, _ := parseClock(teacherSlot.EndTime)
+			if !dateRangeContains(teacherSlot.StartDate, teacherSlot.EndDate, req.StartDate, req.EndDate) {
+				continue
+			}
 			for candidateStart := startMin; candidateStart+req.DurationMinutes <= endMin; candidateStart += 30 {
 				candidateEnd := candidateStart + req.DurationMinutes
-				if s.hasScheduleConflict("teacher", teacher.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd) {
+				if s.hasScheduleConflict("teacher", teacher.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd, req.StartDate, req.EndDate) {
 					continue
 				}
 				available := make([]learning.CandidateStudent, 0)
 				missing := make([]learning.CandidateStudent, 0)
 				for _, student := range eligible {
-					if !s.hasScheduleConflict("student", student.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd) &&
-						s.studentAvailable(student.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd) {
+					if !s.hasScheduleConflict("student", student.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd, req.StartDate, req.EndDate) &&
+						s.studentAvailable(student.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd, req.StartDate, req.EndDate) {
 						available = append(available, student)
 					} else {
 						missing = append(missing, student)
@@ -2377,6 +3155,7 @@ func (s *MemoryStore) CreateScheduleClass(operator string, principal learning.Pr
 		return learning.ScheduleClass{}, err
 	}
 	s.scheduleClasses = append([]learning.ScheduleClass{item}, s.scheduleClasses...)
+	s.notifyScheduleClass(item, "课程已安排", "已安排")
 	s.prependLog(operator, "确认排课", item.Name+" / "+item.TeacherName)
 	return item, nil
 }
@@ -2384,6 +3163,8 @@ func (s *MemoryStore) CreateScheduleClass(operator string, principal learning.Pr
 func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID string, req learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error) {
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.TeacherID = strings.TrimSpace(req.TeacherID)
+	req.CampusID = strings.TrimSpace(req.CampusID)
+	req.RoomName = strings.TrimSpace(req.RoomName)
 	req.ClassType = strings.TrimSpace(req.ClassType)
 	req.StartTime = strings.TrimSpace(req.StartTime)
 	req.EndTime = strings.TrimSpace(req.EndTime)
@@ -2391,6 +3172,12 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	req.EndDate = strings.TrimSpace(req.EndDate)
 	if req.DurationMinutes <= 0 {
 		req.DurationMinutes = 90
+	}
+	if req.CampusID == "" {
+		req.CampusID = principal.CampusID
+	}
+	if req.CampusID == "" {
+		req.CampusID = "campus-main"
 	}
 	course, err := s.courseForScheduling(principal, req.CourseID)
 	if err != nil {
@@ -2410,20 +3197,6 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	if len(req.StudentIDs) > capacity {
 		return learning.ScheduleClass{}, errors.New("学生人数超过班型容量")
 	}
-	startMin, ok := parseClock(req.StartTime)
-	if !ok {
-		return learning.ScheduleClass{}, errors.New("开始时间格式应为 HH:mm")
-	}
-	endMin, ok := parseClock(req.EndTime)
-	if !ok || endMin <= startMin {
-		return learning.ScheduleClass{}, errors.New("结束时间必须晚于开始时间")
-	}
-	if req.DayOfWeek < 1 || req.DayOfWeek > 7 {
-		return learning.ScheduleClass{}, errors.New("请选择星期")
-	}
-	if s.hasScheduleConflictExcept("teacher", teacher.ID, req.DayOfWeek, startMin, endMin, exceptID) {
-		return learning.ScheduleClass{}, errors.New("老师该时间已有课程")
-	}
 	students := make([]learning.CandidateStudent, 0, len(req.StudentIDs))
 	seen := map[string]bool{}
 	for _, studentID := range req.StudentIDs {
@@ -2442,13 +3215,40 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 		if !s.studentHasSubjectGrade(student.ID, course.Subject, course.Grade) {
 			return learning.ScheduleClass{}, errors.New(student.Name + " 未开通该学科，只有同学科才能排一起")
 		}
-		if !s.studentAvailable(student.ID, req.DayOfWeek, startMin, endMin) {
-			return learning.ScheduleClass{}, errors.New(student.Name + " 该时间不可上课")
-		}
-		if s.hasScheduleConflictExcept("student", student.ID, req.DayOfWeek, startMin, endMin, exceptID) {
+		students = append(students, learning.CandidateStudent{ID: student.ID, Name: student.Name, Grade: student.Grade, OpenedPackages: student.OpenedPackages})
+	}
+	if len(students) < minClassStudents(capacity) {
+		return learning.ScheduleClass{}, errors.New("学生人数不足，暂不能成班")
+	}
+	startMin, ok := parseClock(req.StartTime)
+	if !ok {
+		return learning.ScheduleClass{}, errors.New("开始时间格式应为 HH:mm")
+	}
+	endMin, ok := parseClock(req.EndTime)
+	if !ok || endMin <= startMin {
+		return learning.ScheduleClass{}, errors.New("结束时间必须晚于开始时间")
+	}
+	if err := validateDateRange(req.StartDate, req.EndDate); err != nil {
+		return learning.ScheduleClass{}, err
+	}
+	if req.DayOfWeek < 1 || req.DayOfWeek > 7 {
+		return learning.ScheduleClass{}, errors.New("请选择星期")
+	}
+	if s.hasScheduleConflictExcept("teacher", teacher.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate, exceptID) {
+		return learning.ScheduleClass{}, errors.New("老师该时间已有课程")
+	}
+	for _, student := range students {
+		if s.hasScheduleConflictExcept("student", student.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate, exceptID) {
 			return learning.ScheduleClass{}, errors.New(student.Name + " 该时间已有课程")
 		}
-		students = append(students, learning.CandidateStudent{ID: student.ID, Name: student.Name, Grade: student.Grade, OpenedPackages: student.OpenedPackages})
+	}
+	if !s.teacherAvailable(teacher.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate) {
+		return learning.ScheduleClass{}, errors.New("老师该时间不可授课")
+	}
+	for _, student := range students {
+		if !s.studentAvailable(student.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate) {
+			return learning.ScheduleClass{}, errors.New(student.Name + " 该时间不可上课")
+		}
 	}
 	return learning.ScheduleClass{
 		Name:            course.Subject + " " + req.ClassType + " 小班",
@@ -2456,6 +3256,8 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 		CourseName:      course.Name,
 		TeacherID:       teacher.ID,
 		TeacherName:     teacher.Name,
+		CampusID:        req.CampusID,
+		RoomName:        req.RoomName,
 		ClassType:       req.ClassType,
 		Capacity:        capacity,
 		DurationMinutes: req.DurationMinutes,
@@ -2497,6 +3299,7 @@ func (s *MemoryStore) UpdateScheduleClass(operator string, principal learning.Pr
 			return learning.ScheduleClass{}, err
 		}
 		s.scheduleClasses[index] = item
+		s.notifyScheduleClass(item, "课程调整提醒", "已调整")
 		s.prependLogDetail(operator, "调整排课", item.Name+" / "+item.TeacherName, auditChangeDetail(scheduleClassAuditSnapshot(existing), scheduleClassAuditSnapshot(item)))
 		return item, nil
 	}
@@ -2527,10 +3330,35 @@ func (s *MemoryStore) CancelScheduleClass(operator string, principal learning.Pr
 			return learning.ScheduleClass{}, err
 		}
 		s.scheduleClasses[index] = item
+		s.notifyScheduleClass(item, "课程取消提醒", "已取消")
 		s.prependLogDetail(operator, "取消排课", item.Name+" / "+item.TeacherName, auditChangeDetail(scheduleClassAuditSnapshot(before), scheduleClassAuditSnapshot(item)))
 		return item, nil
 	}
 	return learning.ScheduleClass{}, errors.New("课程不存在")
+}
+
+func (s *MemoryStore) notifyScheduleClass(item learning.ScheduleClass, title, action string) {
+	for _, candidate := range item.Students {
+		target := candidate.Name
+		openID := ""
+		if student, ok := s.findStudent(candidate.ID); ok {
+			target = student.Name
+			openID = student.OfficialAccountOpenID
+		}
+		notice := learning.Notice{
+			ID:              "notice-schedule-" + action + "-" + item.ID + "-" + candidate.ID + "-" + time.Now().Format("20060102150405.000000000"),
+			Type:            "课",
+			Title:           title,
+			Target:          target,
+			Summary:         scheduleNoticeSummary(item, action),
+			Channel:         "公众号模板消息",
+			RecipientOpenID: openID,
+			RelatedType:     "schedule",
+			RelatedID:       item.ID,
+		}
+		notice = s.deliverNotice(notice)
+		s.prependNoticeRecord(notice)
+	}
 }
 
 func (s *MemoryStore) StudentSchedule(principal learning.Principal) ([]learning.ScheduleClass, error) {
@@ -2594,8 +3422,15 @@ func (s *MemoryStore) StudentGrowth(principal learning.Principal) ([]learning.St
 		return nil, errors.New("student account is not bound")
 	}
 	records := make([]learning.StudentLearningRecord, 0)
+	visibleHomework := map[string]bool{}
+	for _, item := range s.homeworkForStudent(principal.StudentID) {
+		visibleHomework[item.ID] = true
+	}
 	for _, sub := range s.submissions {
 		if sub.StudentID != principal.StudentID {
+			continue
+		}
+		if !visibleHomework[sub.HomeworkID] {
 			continue
 		}
 		records = append(records, learning.StudentLearningRecord{
@@ -2608,6 +3443,16 @@ func (s *MemoryStore) StudentGrowth(principal learning.Principal) ([]learning.St
 		records = append(records, learning.StudentLearningRecord{
 			ID: "growth-mat-" + material.ID, Type: "资料", Title: material.Title, Course: material.Course,
 			Status: "已学习", OccurredAt: firstNonEmpty(student.LastStudyAt, "2026-05-22 18:20:00"), Description: "查看课件资料",
+		})
+	}
+	for _, summary := range s.scoreSummariesForStudent(principal.StudentID) {
+		if summary.LatestRecord == nil {
+			continue
+		}
+		score := *summary.LatestRecord
+		records = append(records, learning.StudentLearningRecord{
+			ID: "growth-score-" + score.ID, Type: "成绩", Title: score.ExamName, Course: score.Subject,
+			Status: "已记录", Score: score.Score, FullScore: score.FullScore, OccurredAt: score.ExamDate, Description: summary.Description,
 		})
 	}
 	sort.Slice(records, func(i, j int) bool { return records[i].OccurredAt > records[j].OccurredAt })
@@ -2636,7 +3481,7 @@ func (s *MemoryStore) StudentBadges(principal learning.Principal) ([]learning.Ba
 		{ID: "badge-reading", Icon: "⭐", Name: "阅读小星星", Desc: "完成第一次小挑战", Obtained: hasSubmission},
 		{ID: "badge-streak", Icon: "🔥", Name: "坚持不懈", Desc: "连续学习满 7 天", Obtained: student.StreakDays >= 7},
 		{ID: "badge-expert", Icon: "🏅", Name: "学习小达人", Desc: "平均分达到 90", Obtained: student.AverageScore >= 90},
-		{ID: "badge-explorer", Icon: "🧭", Name: "探索者", Desc: "学习满 5 份讲义", Obtained: materialCount >= 5},
+		{ID: "badge-explorer", Icon: "🧭", Name: "探索者", Desc: "学习满 5 份学习资料", Obtained: materialCount >= 5},
 		{ID: "badge-challenger", Icon: "🎯", Name: "挑战王", Desc: "提交满 3 次小挑战", Obtained: submissionCount >= 3},
 	}, nil
 }
@@ -2648,9 +3493,22 @@ func (s *MemoryStore) StudentFavorites(principal learning.Principal) ([]learning
 	}
 	out := make([]learning.Favorite, 0)
 	for _, fav := range s.favorites {
-		if fav.StudentID == principal.StudentID {
-			out = append(out, fav)
+		if fav.StudentID != principal.StudentID {
+			continue
 		}
+		switch fav.TargetType {
+		case "material":
+			if _, err := s.StudentMaterial(principal, fav.TargetID); err != nil {
+				continue
+			}
+		case "homework":
+			if _, err := s.StudentHomework(principal, fav.TargetID); err != nil {
+				continue
+			}
+		default:
+			continue
+		}
+		out = append(out, fav)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
 	return out, nil
@@ -2811,6 +3669,21 @@ func (s *MemoryStore) hasSubmission(studentID, homeworkID string) bool {
 	return false
 }
 
+func (s *MemoryStore) latestSubmissionForStudent(studentID, homeworkID string) (learning.Submission, bool) {
+	var latest learning.Submission
+	found := false
+	for _, submission := range s.submissions {
+		if submission.StudentID != studentID || submission.HomeworkID != homeworkID {
+			continue
+		}
+		if !found || submission.CreatedAt > latest.CreatedAt {
+			latest = submission
+			found = true
+		}
+	}
+	return latest, found
+}
+
 func (s *MemoryStore) buildStations(studentID string, materials []learning.Material, homework []learning.Homework) []learning.Station {
 	stations := make([]learning.Station, 0, len(materials)+len(homework))
 	for i, material := range materials {
@@ -2877,7 +3750,7 @@ func gradeSubmission(homework learning.Homework, answers []learning.SubmissionAn
 		}
 		totalScore += score
 		answer := answerForQuestion(answerMap, question.ID)
-		if question.Type == "single" {
+		if question.Type == "single" || question.Type == "judge" {
 			if strings.EqualFold(strings.TrimSpace(answer.Choice), strings.TrimSpace(question.Answer)) {
 				gotScore += score
 			}
@@ -2885,6 +3758,12 @@ func gradeSubmission(homework learning.Homework, answers []learning.SubmissionAn
 		}
 		if question.Type == "multiple" {
 			if sameChoiceSet(answer.Choices, normalizedQuestionAnswers(question)) {
+				gotScore += score
+			}
+			continue
+		}
+		if question.Type == "fill" {
+			if sameChoiceSet([]string{answer.Text}, normalizedQuestionAnswers(question)) {
 				gotScore += score
 			}
 			continue
@@ -2916,7 +3795,7 @@ func commentForScore(score int, title string) string {
 	case score >= 60:
 		return title + "整体不错，个别地方再细心一点就更好了。"
 	default:
-		return title + "已经迈出第一步啦，跟着讲义再复习一遍，下次一定更好。"
+		return title + "已经迈出第一步啦，跟着学习资料再复习一遍，下次一定更好。"
 	}
 }
 
@@ -2928,6 +3807,38 @@ func rewardForScore(score int) string {
 		return "获得 10 点能量值 ⚡"
 	}
 	return "完成即可获得 5 点能量值"
+}
+
+func normalizeReviewFinalStatus(status string) string {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return "已批改"
+	}
+	if status == "待复核" || status == "已批改" {
+		return status
+	}
+	return ""
+}
+
+func reviewNoticeTitle(status string) string {
+	if status == "待复核" {
+		return "批改反馈待复核"
+	}
+	return "批改完成提醒"
+}
+
+func reviewNoticeSummary(homeworkTitle, status string) string {
+	if status == "待复核" {
+		return homeworkTitle + "已有老师反馈，复核完成后会更新最终结果。"
+	}
+	return homeworkTitle + "已完成批改，快去查看老师反馈。"
+}
+
+func reviewLogAction(status string) string {
+	if status == "待复核" {
+		return "提交复核"
+	}
+	return "完成批改"
 }
 
 func (s *MemoryStore) findStudent(id string) (learning.Student, bool) {
@@ -2975,7 +3886,227 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	if len(packages) > 0 {
 		student.OpenedPackages = packages
 	}
+	if submission, ok := s.latestStudentSubmission(student.ID); ok {
+		student.LastSubmittedAt = submission.CreatedAt
+		student.LastSubmissionStatus = submission.Status
+	}
 	return student
+}
+
+func (s *MemoryStore) latestStudentSubmission(studentID string) (learning.Submission, bool) {
+	var latest learning.Submission
+	found := false
+	for _, submission := range s.submissions {
+		if submission.StudentID != studentID {
+			continue
+		}
+		if !found || submission.CreatedAt > latest.CreatedAt {
+			latest = submission
+			found = true
+		}
+	}
+	return latest, found
+}
+
+func (s *MemoryStore) normalizeScoreRequest(principal learning.Principal, student learning.Student, req learning.StudentScoreUpsertRequest) (learning.StudentScoreUpsertRequest, error) {
+	req.Subject = strings.TrimSpace(req.Subject)
+	req.ExamType = strings.TrimSpace(req.ExamType)
+	req.ExamName = strings.TrimSpace(req.ExamName)
+	req.ExamDate = strings.TrimSpace(req.ExamDate)
+	req.TeacherComment = sanitizeRichText(req.TeacherComment)
+	if req.Subject == "" {
+		return req, errors.New("请选择学科")
+	}
+	if req.ExamType == "" {
+		req.ExamType = "阶段测评"
+	}
+	if !validExamType(req.ExamType) {
+		return req, errors.New("考试类型只能为期中、期末、单元测、模拟考或阶段测评")
+	}
+	if req.ExamName == "" {
+		return req, errors.New("请输入考试或测评名称")
+	}
+	if req.ExamDate == "" {
+		return req, errors.New("请选择考试日期")
+	}
+	if _, err := time.Parse("2006-01-02", req.ExamDate); err != nil {
+		return req, errors.New("考试日期格式应为 YYYY-MM-DD")
+	}
+	if req.FullScore <= 0 {
+		return req, errors.New("满分必须大于 0")
+	}
+	if req.Score < 0 {
+		return req, errors.New("分数不能小于 0")
+	}
+	if req.Score > req.FullScore {
+		return req, errors.New("分数不能大于满分")
+	}
+	if req.AverageScore < 0 {
+		return req, errors.New("平均分不能小于 0")
+	}
+	if req.AverageScore > req.FullScore {
+		return req, errors.New("平均分不能大于满分")
+	}
+	if len([]rune(req.ExamName)) > 64 {
+		return req, errors.New("考试或测评名称最多 64 个字")
+	}
+	if len([]rune(req.TeacherComment)) > 1000 {
+		return req, errors.New("老师建议最多 1000 个字")
+	}
+	if !s.canWriteScoreSubject(principal, student, req.Subject) {
+		return req, errors.New("没有权限录入该学生这个学科的成绩")
+	}
+	return req, nil
+}
+
+func (s *MemoryStore) canWriteScoreSubject(principal learning.Principal, student learning.Student, subject string) bool {
+	if hasRole(principal.Roles, learning.RoleSuperAdmin) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleOpsStaff) {
+		return true
+	}
+	if !hasRole(principal.Roles, learning.RoleTeacher) {
+		return false
+	}
+	for _, space := range s.learningSpaces {
+		if containsString(principal.LearningSpaceIDs, space.ID) && space.Grade == student.Grade && space.Subject == subject && space.Status == learning.StatusEnabled {
+			return true
+		}
+	}
+	return false
+}
+
+func validExamType(value string) bool {
+	switch value {
+	case "期中", "期末", "单元测", "模拟考", "阶段测评":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *MemoryStore) scoreSummariesForStudent(studentID string) []learning.StudentScoreSummary {
+	bySubject := map[string][]learning.StudentScoreRecord{}
+	for _, item := range s.scoreRecords {
+		if item.StudentID != studentID {
+			continue
+		}
+		bySubject[item.Subject] = append(bySubject[item.Subject], item)
+	}
+	subjects := make([]string, 0, len(bySubject))
+	for subject := range bySubject {
+		subjects = append(subjects, subject)
+	}
+	sort.Strings(subjects)
+	out := make([]learning.StudentScoreSummary, 0, len(subjects))
+	for _, subject := range subjects {
+		records := append([]learning.StudentScoreRecord(nil), bySubject[subject]...)
+		sort.Slice(records, func(i, j int) bool {
+			if records[i].ExamDate == records[j].ExamDate {
+				return records[i].CreatedAt < records[j].CreatedAt
+			}
+			return records[i].ExamDate < records[j].ExamDate
+		})
+		summary := learning.StudentScoreSummary{Subject: subject, Records: records}
+		if len(records) > 0 {
+			first := records[0]
+			latest := records[len(records)-1]
+			summary.FirstRecord = &first
+			summary.LatestRecord = &latest
+			summary.Improvement = latest.Score - first.Score
+			if first.FullScore > 0 && latest.FullScore > 0 {
+				firstPct := first.Score * 100 / first.FullScore
+				latestPct := latest.Score * 100 / latest.FullScore
+				summary.ImprovementPct = latestPct - firstPct
+			}
+			summary.Description = scoreSummaryDescription(summary)
+			summary.ProblemPoint = scoreProblemPoint(summary)
+			summary.NextStep = scoreNextStep(summary)
+		}
+		sort.Slice(summary.Records, func(i, j int) bool {
+			if summary.Records[i].ExamDate == summary.Records[j].ExamDate {
+				return summary.Records[i].CreatedAt > summary.Records[j].CreatedAt
+			}
+			return summary.Records[i].ExamDate > summary.Records[j].ExamDate
+		})
+		out = append(out, summary)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		left, right := out[i].LatestRecord, out[j].LatestRecord
+		if left == nil || right == nil {
+			return left != nil
+		}
+		if left.ExamDate == right.ExamDate {
+			return left.CreatedAt > right.CreatedAt
+		}
+		return left.ExamDate > right.ExamDate
+	})
+	return out
+}
+
+func scoreSummaryDescription(summary learning.StudentScoreSummary) string {
+	if summary.LatestRecord == nil {
+		return ""
+	}
+	latest := *summary.LatestRecord
+	if summary.FirstRecord == nil || summary.FirstRecord.ID == latest.ID {
+		if latest.TeacherComment != "" {
+			return latest.Subject + "最近 " + itoa(latest.Score) + " 分。" + richTextPlainText(latest.TeacherComment)
+		}
+		return latest.Subject + "最近 " + itoa(latest.Score) + " 分。"
+	}
+	first := *summary.FirstRecord
+	change := summary.Improvement
+	changeText := "提升 " + itoa(change) + " 分"
+	if change < 0 {
+		changeText = "下降 " + itoa(0-change) + " 分"
+	} else if change == 0 {
+		changeText = "保持稳定"
+	}
+	text := latest.Subject + "最近 " + itoa(latest.Score) + " 分，比" + first.ExamName + changeText + "。"
+	if latest.TeacherComment != "" {
+		text += richTextPlainText(latest.TeacherComment)
+	}
+	return text
+}
+
+func scoreProblemPoint(summary learning.StudentScoreSummary) string {
+	if summary.LatestRecord == nil || summary.LatestRecord.FullScore <= 0 {
+		return ""
+	}
+	latest := *summary.LatestRecord
+	latestPct := latest.Score * 100 / latest.FullScore
+	if latest.AverageScore > 0 && latest.Score < latest.AverageScore {
+		return latest.Subject + "最近低于班级平均分，优先复盘失分集中的题型。"
+	}
+	if summary.FirstRecord != nil && summary.FirstRecord.ID != latest.ID && summary.Improvement < 0 {
+		return latest.Subject + "最近成绩有回落，需要检查基础题稳定性和考试节奏。"
+	}
+	if latestPct < 80 {
+		return latest.Subject + "基础掌握还不够稳，需要先补核心概念和常见题型。"
+	}
+	if latestPct < 90 {
+		return latest.Subject + "整体已达标，主要问题在准确率和细节失分。"
+	}
+	return latest.Subject + "表现稳定，下一步重点放在难题突破和表达完整度。"
+}
+
+func scoreNextStep(summary learning.StudentScoreSummary) string {
+	if summary.LatestRecord == nil {
+		return ""
+	}
+	latest := *summary.LatestRecord
+	if latest.TeacherComment != "" {
+		return latest.TeacherComment
+	}
+	if latest.FullScore > 0 {
+		latestPct := latest.Score * 100 / latest.FullScore
+		if latestPct < 80 {
+			return "先完成错题订正，再做同类基础题巩固。"
+		}
+		if latestPct < 90 {
+			return "保持当前节奏，每周集中处理易错题和审题问题。"
+		}
+	}
+	return "继续保持练习频率，增加综合题和限时训练。"
 }
 
 func (s *MemoryStore) findUserByStudentID(studentID string) (learning.User, bool) {
@@ -3007,7 +4138,9 @@ func (s *MemoryStore) syncStudentUser(student learning.Student) {
 			continue
 		}
 		s.users[i].Name = student.Name
-		s.users[i].Phone = student.Phone
+		if !strings.Contains(student.Phone, "*") {
+			s.users[i].Phone = student.Phone
+		}
 		s.users[i].AccountStatus = student.AccountStatus
 		return
 	}
@@ -3065,16 +4198,27 @@ func (s *MemoryStore) noticesForStudent(student learning.Student) []learning.Not
 	courses := s.coursesForStudent(student.ID)
 	subjects := subjectsForCourses(courses)
 	for _, notice := range s.notices {
-		if noticeMatchesStudent(notice, student, subjects) {
+		if studentNoticeVisible(notice) && noticeMatchesStudent(notice, student, subjects) {
 			out = append(out, notice)
 		}
 	}
 	return out
 }
 
+func studentNoticeVisible(notice learning.Notice) bool {
+	if notice.Channel == "公众号模板消息" {
+		return false
+	}
+	status := strings.TrimSpace(notice.Status)
+	return status == "已发送" || status == "自动发送"
+}
+
 func noticeMatchesStudent(notice learning.Notice, student learning.Student, subjects []string) bool {
 	target := notice.Target + " " + notice.Title + " " + notice.Summary
 	if strings.Contains(notice.Target, "全部") || strings.Contains(target, student.Name) || strings.Contains(target, student.Grade) {
+		return true
+	}
+	if student.Phone != "" && strings.Contains(target, student.Phone) {
 		return true
 	}
 	for _, pkg := range student.OpenedPackages {
@@ -3212,8 +4356,8 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		if !s.learningSpaceExists(spaceID) {
 			return learning.Package{}, errors.New("学习空间不存在：" + spaceID)
 		}
-		if !s.learningSpaceMatches(spaceID, req.Grade, req.Subject, req.Semester) {
-			return learning.Package{}, errors.New("学习空间需与套餐年级、学科和学期一致")
+		if !s.learningSpaceMatches(spaceID, req.AcademicYear, req.Grade, req.Subject, req.Semester) {
+			return learning.Package{}, errors.New("学习空间需与套餐学年、年级、学科和学期一致")
 		}
 	}
 	if len(req.ContentTypeCodes) == 0 {
@@ -3403,7 +4547,7 @@ func (s *MemoryStore) openContentForPackage(pkg learning.Package) ([]string, []s
 		courses = appendUnique(courses, course.Name)
 	}
 	for _, material := range s.materials {
-		if material.Status == learning.StatusEnabled && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
+		if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
 			materials = appendUnique(materials, material.Title)
 		}
 	}
@@ -3427,7 +4571,7 @@ func (s *MemoryStore) openContentForStudentGrant(grant packageGrant) ([]string, 
 		}
 	}
 	for _, material := range s.materials {
-		if material.Status == learning.StatusEnabled && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
+		if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
 			materials = appendUnique(materials, material.Title)
 		}
 	}
@@ -3549,8 +4693,8 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 		}
 		spaceIDs := s.learningSpaceIDsForGrant(grant.ID)
 		for _, material := range s.materials {
-			if material.Status == learning.StatusEnabled && containsString(spaceIDs, material.LearningSpaceID) {
-				out = appendMaterialUnique(out, material)
+			if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) {
+				out = appendMaterialUnique(out, s.decorateMaterial(material))
 			}
 		}
 	}
@@ -3652,6 +4796,16 @@ func (s *MemoryStore) learningSpaceName(id string) string {
 	return id
 }
 
+func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Material {
+	if space, ok := s.findLearningSpace(material.LearningSpaceID); ok {
+		material.AcademicYear = space.AcademicYear
+		material.Grade = space.Grade
+		material.Semester = space.Semester
+		material.Subject = space.Subject
+	}
+	return material
+}
+
 func (s *MemoryStore) learningSpaceEnabled(id string) bool {
 	for _, space := range s.learningSpaces {
 		if space.ID == id {
@@ -3679,10 +4833,10 @@ func (s *MemoryStore) findLearningSpace(id string) (learningSpace, bool) {
 	return learningSpace{}, false
 }
 
-func (s *MemoryStore) learningSpaceMatches(id, grade, subject, semester string) bool {
+func (s *MemoryStore) learningSpaceMatches(id, academicYear, grade, subject, semester string) bool {
 	for _, space := range s.learningSpaces {
 		if space.ID == id {
-			return space.Grade == grade && space.Subject == subject && space.Semester == semester
+			return space.AcademicYear == academicYear && space.Grade == grade && space.Subject == subject && space.Semester == semester
 		}
 	}
 	return false
@@ -3725,6 +4879,10 @@ func (s *MemoryStore) contentTypeLabelsForPackage(packageID string) []string {
 	return labels
 }
 
+func (s *MemoryStore) packageOpensContent(pkg learning.Package, learningSpaceID, contentType string) bool {
+	return containsString(s.learningSpaceIDsForPackage(pkg.ID), learningSpaceID) && containsString(s.contentTypesForPackage(pkg.ID), contentType)
+}
+
 func (s *MemoryStore) grantOpensSpace(grantID, learningSpaceID string) bool {
 	return containsString(s.learningSpaceIDsForGrant(grantID), learningSpaceID)
 }
@@ -3748,8 +4906,8 @@ func (s *MemoryStore) syncSpaceAccessForGrant(grant packageGrant) {
 func (s *MemoryStore) materialsForCourses(courses []string) []learning.Material {
 	out := make([]learning.Material, 0)
 	for _, material := range s.materials {
-		if material.Status == learning.StatusEnabled && containsString(courses, material.Course) {
-			out = append(out, material)
+		if containsString(courses, material.Course) {
+			out = append(out, s.decorateMaterial(material))
 		}
 	}
 	return out
@@ -3772,6 +4930,19 @@ func homeworkVisible(status string) bool {
 
 func isContentStatus(status learning.Status) bool {
 	return status == learning.StatusEnabled || status == learning.StatusDraft || status == learning.StatusDisabled
+}
+
+func normalizeMaterialStatus(status learning.Status) learning.Status {
+	switch strings.TrimSpace(string(status)) {
+	case "", "已发布":
+		return learning.StatusEnabled
+	default:
+		return learning.Status(strings.TrimSpace(string(status)))
+	}
+}
+
+func materialPublished(status learning.Status) bool {
+	return normalizeMaterialStatus(status) == learning.StatusEnabled
 }
 
 func publishStatus(status learning.Status) string {
@@ -3843,12 +5014,15 @@ func teacherAuditSnapshot(item learning.Teacher) map[string]any {
 
 func studentAuditSnapshot(item learning.Student) map[string]any {
 	return map[string]any{
-		"id":            item.ID,
-		"name":          item.Name,
-		"phone":         item.Phone,
-		"grade":         item.Grade,
-		"accountStatus": item.AccountStatus,
-		"remark":        item.Remark,
+		"id":                    item.ID,
+		"name":                  item.Name,
+		"phone":                 item.Phone,
+		"grade":                 item.Grade,
+		"schoolName":            item.SchoolName,
+		"guardianName":          item.GuardianName,
+		"officialAccountOpenId": item.OfficialAccountOpenID,
+		"accountStatus":         item.AccountStatus,
+		"remark":                item.Remark,
 	}
 }
 
@@ -3896,6 +5070,8 @@ func scheduleClassAuditSnapshot(item learning.ScheduleClass) map[string]any {
 		"name":            item.Name,
 		"courseId":        item.CourseID,
 		"teacherId":       item.TeacherID,
+		"campusId":        item.CampusID,
+		"roomName":        item.RoomName,
 		"classType":       item.ClassType,
 		"capacity":        item.Capacity,
 		"durationMinutes": item.DurationMinutes,
@@ -3963,6 +5139,8 @@ func normalizeStudentRequest(req learning.StudentUpsertRequest, allowStatus bool
 	req.Name = strings.TrimSpace(req.Name)
 	req.Phone = strings.TrimSpace(req.Phone)
 	req.Grade = strings.TrimSpace(req.Grade)
+	req.SchoolName = strings.TrimSpace(req.SchoolName)
+	req.OfficialAccountOpenID = strings.TrimSpace(req.OfficialAccountOpenID)
 	req.AccountStatus = strings.TrimSpace(req.AccountStatus)
 	req.Remark = strings.TrimSpace(req.Remark)
 	if req.Name == "" {
@@ -3973,6 +5151,9 @@ func normalizeStudentRequest(req learning.StudentUpsertRequest, allowStatus bool
 	}
 	if req.Grade == "" {
 		return req, errors.New("请选择年级")
+	}
+	if len([]rune(req.SchoolName)) > 64 {
+		return req, errors.New("学校名称最多 64 个字")
 	}
 	if !allowStatus || req.AccountStatus == "" {
 		req.AccountStatus = "正常"
@@ -4247,20 +5428,67 @@ func canBindByPhone(user learning.User) bool {
 	return hasRole(user.Roles, learning.RoleTeacher) || hasRole(user.Roles, learning.RoleStudent) || isAdminStaffUser(user)
 }
 
-func canRebindByPhone(user learning.User, realWechatLogin bool) bool {
+func canRebindByPhone(user learning.User, openID string, realWechatLogin bool) bool {
 	if !canBindByPhone(user) {
 		return false
 	}
-	openID := strings.TrimSpace(user.OpenID)
-	return openID == "" || (realWechatLogin && strings.HasPrefix(openID, "demo-"))
+	existingOpenID := strings.TrimSpace(user.OpenID)
+	nextOpenID := strings.TrimSpace(openID)
+	return existingOpenID == "" || existingOpenID == nextOpenID || (realWechatLogin && strings.HasPrefix(existingOpenID, "demo-"))
 }
 
-func displayPhone(phone string) string {
-	phone = strings.TrimSpace(phone)
-	if len(phone) == 11 {
-		return phone[:3] + "****" + phone[7:]
+func (s *MemoryStore) validateStudentWechatBinding(user learning.User, openID string, req learning.WechatLoginRequest) error {
+	student, ok := s.findRawStudent(user.StudentID)
+	if !ok {
+		return errors.New("学生档案不存在，请联系老师确认")
 	}
-	return phone
+	if req.StudentName == "" || req.SchoolName == "" || req.Grade == "" {
+		return errors.New("请填写学生姓名、学校和年级后再绑定")
+	}
+	if student.Name != "" && student.Name != req.StudentName {
+		return errors.New("学生姓名与后台档案不一致，请联系老师确认")
+	}
+	if student.Grade != "" && student.Grade != "待完善" && student.Grade != req.Grade {
+		return errors.New("年级与后台档案不一致，请联系老师确认")
+	}
+	if student.SchoolName != "" && req.SchoolName != "" && student.SchoolName != req.SchoolName {
+		return errors.New("学校与后台档案不一致，请联系老师确认")
+	}
+	existingOpenID := strings.TrimSpace(user.OpenID)
+	nextOpenID := strings.TrimSpace(openID)
+	if student.BindStatus == "已绑定" && existingOpenID != "" && existingOpenID != nextOpenID && !(s.wechatResolver != nil && strings.HasPrefix(existingOpenID, "demo-")) {
+		return errors.New("该学生已绑定其他微信，请联系老师处理")
+	}
+	return nil
+}
+
+func (s *MemoryStore) applyStudentBindingProfile(studentID string, req learning.WechatLoginRequest) {
+	for i := range s.students {
+		if s.students[i].ID != studentID {
+			continue
+		}
+		if req.StudentName != "" {
+			s.students[i].Name = req.StudentName
+		}
+		if req.Grade != "" {
+			s.students[i].Grade = req.Grade
+		}
+		if req.SchoolName != "" {
+			s.students[i].SchoolName = req.SchoolName
+		}
+		s.students[i].BindStatus = "已绑定"
+		s.syncStudentUser(s.students[i])
+		return
+	}
+}
+
+func (s *MemoryStore) findRawStudent(id string) (learning.Student, bool) {
+	for _, student := range s.students {
+		if student.ID == id {
+			return student, true
+		}
+	}
+	return learning.Student{}, false
 }
 
 func isAdminStaffUser(user learning.User) bool {
@@ -4310,6 +5538,16 @@ func settingLabel(key string) string {
 		return "水印规则"
 	case "downloadPolicy":
 		return "下载规则"
+	case "miniProgramDomainStatus":
+		return "小程序域名备案"
+	case "officialAccountBindingStatus":
+		return "微信公众号关联"
+	case "templateMessageStatus":
+		return "模板消息审核"
+	case "miniProgramSubscribeStatus":
+		return "小程序订阅消息"
+	case "productionApiDomain":
+		return "生产接口域名"
 	default:
 		return key
 	}
@@ -4496,6 +5734,35 @@ func (s *MemoryStore) canSendNoticeTo(principal learning.Principal, values ...st
 	return false
 }
 
+func (s *MemoryStore) officialAccountOpenIDForTarget(target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return ""
+	}
+	for _, student := range s.students {
+		if student.OfficialAccountOpenID == "" {
+			continue
+		}
+		if target == student.Name || target == student.Phone {
+			return student.OfficialAccountOpenID
+		}
+	}
+	return ""
+}
+
+func (s *MemoryStore) officialAccountOpenIDForStudent(studentID string) string {
+	studentID = strings.TrimSpace(studentID)
+	if studentID == "" {
+		return ""
+	}
+	for _, student := range s.students {
+		if student.ID == studentID {
+			return strings.TrimSpace(student.OfficialAccountOpenID)
+		}
+	}
+	return ""
+}
+
 func (s *MemoryStore) availabilityOwnerName(ownerType, ownerID string) (string, error) {
 	if ownerType == "teacher" {
 		user, ok := s.findUser(ownerID)
@@ -4525,24 +5792,38 @@ func (s *MemoryStore) ownerAvailability(ownerType, ownerID string) []learning.Av
 	return out
 }
 
-func (s *MemoryStore) studentAvailable(studentID string, dayOfWeek, startMin, endMin int) bool {
+func (s *MemoryStore) studentAvailable(studentID string, dayOfWeek, startMin, endMin int, startDate, endDate string) bool {
 	for _, slot := range s.ownerAvailability("student", studentID) {
 		slotStart, _ := parseClock(slot.StartTime)
 		slotEnd, _ := parseClock(slot.EndTime)
-		if slot.DayOfWeek == dayOfWeek && slotStart <= startMin && slotEnd >= endMin {
+		if slot.DayOfWeek == dayOfWeek && slotStart <= startMin && slotEnd >= endMin && dateRangeContains(slot.StartDate, slot.EndDate, startDate, endDate) {
 			return true
 		}
 	}
 	return false
 }
 
-func (s *MemoryStore) hasScheduleConflict(ownerType, ownerID string, dayOfWeek, startMin, endMin int) bool {
-	return s.hasScheduleConflictExcept(ownerType, ownerID, dayOfWeek, startMin, endMin, "")
+func (s *MemoryStore) teacherAvailable(teacherID string, dayOfWeek, startMin, endMin int, startDate, endDate string) bool {
+	for _, slot := range s.ownerAvailability("teacher", teacherID) {
+		slotStart, _ := parseClock(slot.StartTime)
+		slotEnd, _ := parseClock(slot.EndTime)
+		if slot.DayOfWeek == dayOfWeek && slotStart <= startMin && slotEnd >= endMin && dateRangeContains(slot.StartDate, slot.EndDate, startDate, endDate) {
+			return true
+		}
+	}
+	return false
 }
 
-func (s *MemoryStore) hasScheduleConflictExcept(ownerType, ownerID string, dayOfWeek, startMin, endMin int, exceptID string) bool {
+func (s *MemoryStore) hasScheduleConflict(ownerType, ownerID string, dayOfWeek, startMin, endMin int, startDate, endDate string) bool {
+	return s.hasScheduleConflictExcept(ownerType, ownerID, dayOfWeek, startMin, endMin, startDate, endDate, "")
+}
+
+func (s *MemoryStore) hasScheduleConflictExcept(ownerType, ownerID string, dayOfWeek, startMin, endMin int, startDate, endDate, exceptID string) bool {
 	for _, item := range s.scheduleClasses {
 		if item.ID == exceptID || item.DayOfWeek != dayOfWeek || item.Status == "已取消" {
+			continue
+		}
+		if !dateRangesOverlap(startDate, endDate, item.StartDate, item.EndDate) {
 			continue
 		}
 		itemStart, okStart := parseClock(item.StartTime)
@@ -4560,6 +5841,32 @@ func (s *MemoryStore) hasScheduleConflictExcept(ownerType, ownerID string, dayOf
 				}
 			}
 		}
+	}
+	return false
+}
+
+func (s *MemoryStore) hasRoomScheduleConflictExcept(campusID, roomName string, dayOfWeek, startMin, endMin int, startDate, endDate, exceptID string) bool {
+	campusID = strings.TrimSpace(campusID)
+	roomName = strings.TrimSpace(roomName)
+	if roomName == "" {
+		return false
+	}
+	for _, item := range s.scheduleClasses {
+		if item.ID == exceptID || item.DayOfWeek != dayOfWeek || item.Status == "已取消" {
+			continue
+		}
+		if !dateRangesOverlap(startDate, endDate, item.StartDate, item.EndDate) {
+			continue
+		}
+		if strings.TrimSpace(item.RoomName) == "" || strings.TrimSpace(item.RoomName) != roomName || strings.TrimSpace(item.CampusID) != campusID {
+			continue
+		}
+		itemStart, okStart := parseClock(item.StartTime)
+		itemEnd, okEnd := parseClock(item.EndTime)
+		if !okStart || !okEnd || endMin <= itemStart || startMin >= itemEnd {
+			continue
+		}
+		return true
 	}
 	return false
 }
@@ -4608,6 +5915,8 @@ func (s *MemoryStore) ensureSchedulingTables() error {
 			course_name VARCHAR(128) NOT NULL DEFAULT '',
 			teacher_id VARCHAR(64) NOT NULL,
 			teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			campus_id VARCHAR(64) NOT NULL DEFAULT '',
+			room_name VARCHAR(64) NOT NULL DEFAULT '',
 			class_type VARCHAR(16) NOT NULL,
 			capacity INT NOT NULL DEFAULT 1,
 			duration_minutes INT NOT NULL DEFAULT 90,
@@ -4619,6 +5928,7 @@ func (s *MemoryStore) ensureSchedulingTables() error {
 			status VARCHAR(32) NOT NULL DEFAULT '已确认',
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			KEY idx_schedule_teacher_time (teacher_id, day_of_week, start_time, end_time),
+			KEY idx_schedule_room_time (campus_id, room_name, day_of_week, start_time, end_time),
 			KEY idx_schedule_course (course_id, status)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS schedule_class_students (
@@ -4733,9 +6043,9 @@ func (s *MemoryStore) insertScheduleClass(item learning.ScheduleClass) error {
 		return err
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO schedule_classes (id, name, course_id, course_name, teacher_id, teacher_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		item.ID, item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.ClassType, item.Capacity, item.DurationMinutes, item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Status, item.CreatedAt,
+		`INSERT INTO schedule_classes (id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		item.ID, item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.CampusID, item.RoomName, item.ClassType, item.Capacity, item.DurationMinutes, item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Status, item.CreatedAt,
 	); err != nil {
 		tx.Rollback()
 		return err
@@ -4770,9 +6080,9 @@ func (s *MemoryStore) updateScheduleClass(item learning.ScheduleClass) error {
 	}
 	if _, err := tx.Exec(
 		`UPDATE schedule_classes
-		 SET name = ?, course_id = ?, course_name = ?, teacher_id = ?, teacher_name = ?, class_type = ?, capacity = ?, duration_minutes = ?, day_of_week = ?, start_time = ?, end_time = ?, start_date = ?, end_date = ?, status = ?
+		 SET name = ?, course_id = ?, course_name = ?, teacher_id = ?, teacher_name = ?, campus_id = ?, room_name = ?, class_type = ?, capacity = ?, duration_minutes = ?, day_of_week = ?, start_time = ?, end_time = ?, start_date = ?, end_date = ?, status = ?
 		 WHERE id = ?`,
-		item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.ClassType, item.Capacity, item.DurationMinutes, item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Status, item.ID,
+		item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.CampusID, item.RoomName, item.ClassType, item.Capacity, item.DurationMinutes, item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Status, item.ID,
 	); err != nil {
 		tx.Rollback()
 		return err
@@ -4794,7 +6104,7 @@ func (s *MemoryStore) updateScheduleClass(item learning.ScheduleClass) error {
 }
 
 func (s *MemoryStore) loadScheduleClasses() ([]learning.ScheduleClass, error) {
-	rows, err := s.db.Query(`SELECT id, name, course_id, course_name, teacher_id, teacher_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at FROM schedule_classes ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at FROM schedule_classes ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -4803,7 +6113,7 @@ func (s *MemoryStore) loadScheduleClasses() ([]learning.ScheduleClass, error) {
 	for rows.Next() {
 		var item learning.ScheduleClass
 		var startDate, endDate, createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.Name, &item.CourseID, &item.CourseName, &item.TeacherID, &item.TeacherName, &item.ClassType, &item.Capacity, &item.DurationMinutes, &item.DayOfWeek, &item.StartTime, &item.EndTime, &startDate, &endDate, &item.Status, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.CourseID, &item.CourseName, &item.TeacherID, &item.TeacherName, &item.CampusID, &item.RoomName, &item.ClassType, &item.Capacity, &item.DurationMinutes, &item.DayOfWeek, &item.StartTime, &item.EndTime, &startDate, &endDate, &item.Status, &createdAt); err != nil {
 			return nil, err
 		}
 		item.StartDate = dateString(startDate)
@@ -4883,6 +6193,85 @@ func parseClock(value string) (int, bool) {
 	return hour*60 + minute, true
 }
 
+func validateDateRange(startDate, endDate string) error {
+	start, hasStart, ok := parseDateBound(startDate)
+	if !ok {
+		return errors.New("开始日期格式应为 YYYY-MM-DD")
+	}
+	end, hasEnd, ok := parseDateBound(endDate)
+	if !ok {
+		return errors.New("结束日期格式应为 YYYY-MM-DD")
+	}
+	if hasStart && hasEnd && end.Before(start) {
+		return errors.New("结束日期不能早于开始日期")
+	}
+	return nil
+}
+
+func dateRangeContains(containerStart, containerEnd, targetStart, targetEnd string) bool {
+	if _, _, ok := parseDateBound(containerStart); !ok {
+		return true
+	}
+	if _, _, ok := parseDateBound(containerEnd); !ok {
+		return true
+	}
+	start, hasStart, ok := parseDateBound(targetStart)
+	if !ok {
+		return true
+	}
+	end, hasEnd, ok := parseDateBound(targetEnd)
+	if !ok {
+		return true
+	}
+	containerStartDate, hasContainerStart, _ := parseDateBound(containerStart)
+	containerEndDate, hasContainerEnd, _ := parseDateBound(containerEnd)
+	if hasStart && hasContainerStart && start.Before(containerStartDate) {
+		return false
+	}
+	if hasEnd && hasContainerEnd && end.After(containerEndDate) {
+		return false
+	}
+	return true
+}
+
+func dateRangesOverlap(startA, endA, startB, endB string) bool {
+	aStart, hasAStart, ok := parseDateBound(startA)
+	if !ok {
+		return true
+	}
+	aEnd, hasAEnd, ok := parseDateBound(endA)
+	if !ok {
+		return true
+	}
+	bStart, hasBStart, ok := parseDateBound(startB)
+	if !ok {
+		return true
+	}
+	bEnd, hasBEnd, ok := parseDateBound(endB)
+	if !ok {
+		return true
+	}
+	if hasAEnd && hasBStart && aEnd.Before(bStart) {
+		return false
+	}
+	if hasBEnd && hasAStart && bEnd.Before(aStart) {
+		return false
+	}
+	return true
+}
+
+func parseDateBound(value string) (time.Time, bool, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, false, true
+	}
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return time.Time{}, false, false
+	}
+	return parsed, true, true
+}
+
 func minutesToClock(value int) string {
 	hour := value / 60
 	minute := value % 60
@@ -4940,6 +6329,39 @@ func candidateReason(studentCount, capacity int) string {
 	return "人数不足成班线，需协调更多学生时间"
 }
 
+func scheduleNoticeSummary(item learning.ScheduleClass, action string) string {
+	parts := []string{
+		item.CourseName + action,
+		weekLabelCN(item.DayOfWeek) + " " + item.StartTime + "-" + item.EndTime,
+		"老师：" + item.TeacherName,
+	}
+	if strings.TrimSpace(item.RoomName) != "" {
+		parts = append(parts, "教室："+strings.TrimSpace(item.RoomName))
+	}
+	return strings.Join(parts, "，") + "。"
+}
+
+func weekLabelCN(day int) string {
+	switch day {
+	case 1:
+		return "周一"
+	case 2:
+		return "周二"
+	case 3:
+		return "周三"
+	case 4:
+		return "周四"
+	case 5:
+		return "周五"
+	case 6:
+		return "周六"
+	case 7:
+		return "周日"
+	default:
+		return "上课日"
+	}
+}
+
 // intersects 判断两个字符串集合是否存在交集。
 func intersects(a, b []string) bool {
 	for _, item := range a {
@@ -4966,6 +6388,83 @@ func containsString(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func countSubmittedStudents(students []learning.HomeworkSubmissionStudent) int {
+	count := 0
+	for _, student := range students {
+		if student.SubmissionID != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func (s *MemoryStore) deliverNotice(notice learning.Notice) learning.Notice {
+	if notice.Channel == "" {
+		notice.Channel = "站内通知"
+	}
+	if notice.Channel == "公众号模板消息" {
+		if notice.RecipientOpenID == "" {
+			notice.Status = "待配置"
+			notice.FailureReason = "需先关联公众号并填写接收人 openid。"
+			return notice
+		}
+		if s.officialNoticeSender == nil {
+			notice.Status = "待配置"
+			notice.FailureReason = "需配置 WECHAT_OFFICIAL_ACCOUNT_APPID、WECHAT_OFFICIAL_ACCOUNT_SECRET、WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID。"
+			return notice
+		}
+		if err := s.officialNoticeSender(notice); err != nil {
+			notice.Status = "发送失败"
+			notice.FailureReason = err.Error()
+			return notice
+		}
+		notice.Status = "已发送"
+		notice.FailureReason = ""
+		return notice
+	}
+	notice.Status = "已发送"
+	notice.FailureReason = ""
+	return notice
+}
+
+func (s *MemoryStore) prependNoticeRecord(notice learning.Notice) {
+	if notice.Channel == "公众号模板消息" {
+		station := stationNoticeForOfficialNotice(notice)
+		s.notices = append([]learning.Notice{notice, station}, s.notices...)
+		return
+	}
+	s.notices = append([]learning.Notice{notice}, s.notices...)
+}
+
+func (s *MemoryStore) ensureStationNoticeForOfficialNotice(notice learning.Notice) {
+	if notice.Channel != "公众号模板消息" {
+		return
+	}
+	stationID := stationNoticeID(notice.ID)
+	for _, item := range s.notices {
+		if item.ID == stationID {
+			return
+		}
+	}
+	station := stationNoticeForOfficialNotice(notice)
+	s.notices = append([]learning.Notice{station}, s.notices...)
+}
+
+func stationNoticeForOfficialNotice(notice learning.Notice) learning.Notice {
+	station := notice
+	station.ID = stationNoticeID(notice.ID)
+	station.Channel = "站内通知"
+	station.RecipientOpenID = ""
+	station.Status = "已发送"
+	station.FailureReason = ""
+	station.RetryCount = 0
+	return station
+}
+
+func stationNoticeID(id string) string {
+	return strings.TrimSpace(id) + "-station"
 }
 
 func appendCourseUnique(values []learning.Course, addition learning.Course) []learning.Course {
@@ -5002,9 +6501,103 @@ func bankItemQuestion(item learning.QuestionBankItem) learning.Question {
 		answer = answers[0]
 	}
 	return learning.Question{
-		ID: item.ID, Type: item.Type, Stem: item.Stem, Options: append([]string(nil), item.Options...),
+		ID: item.ID, Title: item.Title, Type: item.Type, Stem: item.Stem, Options: append([]string(nil), item.Options...),
 		Answer: answer, Answers: answers, Score: item.Score,
 	}
+}
+
+func shortQuestionTitle(stem string) string {
+	title := richTextPlainText(stem)
+	if len([]rune(title)) <= 24 {
+		return title
+	}
+	return string([]rune(title)[:24]) + "..."
+}
+
+func sanitizeRichText(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	value = richTextScriptPattern.ReplaceAllString(value, "")
+	value = richTextEventAttrPattern.ReplaceAllString(value, "")
+	value = richTextJSURLAttrPattern.ReplaceAllString(value, "")
+	return strings.TrimSpace(richTextTagPattern.ReplaceAllStringFunc(value, sanitizeRichTextTag))
+}
+
+func sanitizeRichTextTag(tag string) string {
+	match := richTextTagNamePattern.FindStringSubmatch(tag)
+	if len(match) < 2 {
+		return ""
+	}
+	name := strings.ToLower(match[1])
+	closing := strings.HasPrefix(strings.TrimSpace(tag), "</")
+	switch name {
+	case "strong", "b", "ul", "ol", "li", "p":
+		if closing {
+			return "</" + name + ">"
+		}
+		return "<" + name + ">"
+	case "br":
+		return "<br />"
+	case "span":
+		if closing {
+			return "</span>"
+		}
+		color := richTextColorPattern.FindStringSubmatch(tag)
+		if len(color) >= 2 {
+			return `<span style="color:` + color[1] + `">`
+		}
+		return "<span>"
+	case "img":
+		if closing {
+			return ""
+		}
+		src := richTextHTTPSImagePattern.FindStringSubmatch(tag)
+		if len(src) >= 2 {
+			return `<img src="` + html.EscapeString(src[1]) + `" alt="老师建议配图" />`
+		}
+		return ""
+	default:
+		return ""
+	}
+}
+
+func richTextPlainText(value string) string {
+	value = html.UnescapeString(value)
+	var builder strings.Builder
+	inTag := false
+	lastSpace := false
+	for _, char := range value {
+		switch char {
+		case '<':
+			inTag = true
+			if !lastSpace {
+				builder.WriteRune(' ')
+				lastSpace = true
+			}
+		case '>':
+			inTag = false
+		default:
+			if inTag {
+				continue
+			}
+			if char == '\n' || char == '\r' || char == '\t' || char == ' ' {
+				if !lastSpace {
+					builder.WriteRune(' ')
+					lastSpace = true
+				}
+				continue
+			}
+			builder.WriteRune(char)
+			lastSpace = false
+		}
+	}
+	title := strings.TrimSpace(builder.String())
+	if title == "" {
+		return "图片题"
+	}
+	return title
 }
 
 func questionIDs(questions []learning.Question) []string {
@@ -5064,7 +6657,7 @@ func contentTypeLabel(value string) string {
 	case "question":
 		return "题"
 	case "handout":
-		return "讲义"
+		return "学习资料"
 	default:
 		return value
 	}

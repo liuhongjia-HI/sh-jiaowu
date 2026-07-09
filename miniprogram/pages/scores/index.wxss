@@ -1,0 +1,23 @@
+.small-title {
+  font-size: 28rpx;
+}
+
+.score-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12rpx;
+  margin: 18rpx 0;
+  color: #8c7468;
+  font-size: 24rpx;
+}
+
+.advice-title {
+  margin: 18rpx 0 8rpx;
+  color: #5a3324;
+  font-size: 24rpx;
+  font-weight: 850;
+}
+
+.rich-text {
+  display: block;
+}

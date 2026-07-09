@@ -10,7 +10,7 @@
     <view class="card" bindtap="goPreview">
       <view class="cover">📄</view>
       <view class="title">学习资料</view>
-      <view class="sub">讲义、图片、PPT</view>
+      <view class="sub">学习资料、图片、PPT</view>
       <view class="badge">{{materialCountText}}</view>
     </view>
     <view class="card reward" bindtap="goAnswer">

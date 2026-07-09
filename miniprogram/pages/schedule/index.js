@@ -13,8 +13,10 @@ const weekOptions = [
 Page({
   data: {
     loading: true,
+    loadError: "",
     availability: [],
     classes: [],
+    nextClass: null,
     weekOptions,
     weekFallback: "选择星期"
   },
@@ -27,13 +29,19 @@ Page({
       request("/student/schedule")
     ])
       .then(([availability, classes]) => {
+        const confirmedClasses = classes.map(withClassDisplay).filter(isConfirmedClass);
         this.setData({
           availability: availability.map(withWeekLabel),
-          classes: classes.map(withClassWeekLabel),
+          classes: confirmedClasses,
+          nextClass: confirmedClasses[0] || null,
+          loadError: "",
           loading: false
         });
       })
-      .catch(() => this.setData({ loading: false }));
+      .catch(() => {
+        this.setData({ loading: false, loadError: "课表加载失败，请稍后重试" });
+        wx.showToast && wx.showToast({ title: "课表加载失败", icon: "none" });
+      });
   },
   addSlot() {
     const availability = this.data.availability.concat({
@@ -93,8 +101,32 @@ function withWeekLabel(slot) {
   return { ...slot, weekLabel: getWeekLabel(slot.dayOfWeek) || "选择星期" };
 }
 
-function withClassWeekLabel(item) {
-  return { ...item, weekLabel: getWeekLabel(item.dayOfWeek) };
+function withClassDisplay(item) {
+  const weekLabel = getWeekLabel(item.dayOfWeek);
+  return {
+    ...item,
+    weekLabel,
+    timeText: [weekLabel, `${item.startTime || ""}-${item.endTime || ""}`].filter(Boolean).join(" "),
+    periodText: formatPeriod(item.startDate, item.endDate),
+    statusText: item.status || "已确认"
+  };
+}
+
+function isConfirmedClass(item) {
+  return !item.status || item.status === "已确认";
+}
+
+function formatPeriod(startDate, endDate) {
+  if (startDate && endDate) {
+    return `${startDate} 至 ${endDate}`;
+  }
+  if (startDate) {
+    return `${startDate} 起`;
+  }
+  if (endDate) {
+    return `至 ${endDate}`;
+  }
+  return "固定课表";
 }
 
 function isValidTime(value) {

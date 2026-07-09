@@ -1,6 +1,6 @@
 <view class="hero">
-  <view class="eyebrow">小挑战</view>
-  <view class="hero-title">今天还有几个小挑战等你完成 🌟</view>
+  <view class="eyebrow">题库练习</view>
+  <view class="hero-title">今天还有几道题等你完成</view>
 </view>
 
 <view class="section">

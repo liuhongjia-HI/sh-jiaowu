@@ -1,4 +1,6 @@
 const PRODUCTION_API_BASE_URL = "https://gate.starlineeducation.com.cn/api";
+const LOCAL_API_BASE_URL = "http://127.0.0.1:8892/api";
+const SUBSCRIBE_TEMPLATE_IDS = [];
 
 function resolveEnvVersion() {
   try {
@@ -10,7 +12,7 @@ function resolveEnvVersion() {
 
 function resolveApiBaseUrl() {
   const urls = {
-    develop: PRODUCTION_API_BASE_URL,
+    develop: LOCAL_API_BASE_URL,
     trial: PRODUCTION_API_BASE_URL,
     release: PRODUCTION_API_BASE_URL
   };
@@ -77,6 +79,7 @@ App({
   },
   globalData: {
     apiBaseUrl: resolveApiBaseUrl(),
+    subscribeTemplateIds: SUBSCRIBE_TEMPLATE_IDS,
     // 登录时上送 wx.login() 真实 code，由后端 jscode2session 换取 openId。
     useRealWechatLogin: resolveUseRealWechatLogin()
   }

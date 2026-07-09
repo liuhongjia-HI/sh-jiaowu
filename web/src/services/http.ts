@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ApiResponse, AuthResult } from '../types/starline';
+import type { ApiResponse, AuthResult, CaptchaChallenge, PasswordResetResult } from '../types/starline';
 
 const TOKEN_KEY = 'starline_admin_token';
 const USER_KEY = 'starline_admin_user';
@@ -77,15 +77,38 @@ function getSavedUser(): AuthResult['user'] | null {
 export async function loginWithWechatCode(code: string) {
   const response = await http.post<ApiResponse<AuthResult>>('/auth/wechat-login', { code });
   saveToken(response.data.data.token);
-  saveUser(response.data.data.user);
+  saveUser({ ...response.data.data.user, authMethod: response.data.data.authMethod });
   return response.data.data;
 }
 
-export async function loginWithAdminPassword(phone: string, password: string) {
-  const response = await http.post<ApiResponse<AuthResult>>('/auth/admin-password-login', { phone, password });
+export async function loginWithAdminPassword(phone: string, password: string, captcha?: { captchaId?: string; captchaAnswer?: string }) {
+  const response = await http.post<ApiResponse<AuthResult>>('/auth/admin-password-login', { phone, password, ...captcha });
   saveToken(response.data.data.token);
-  saveUser(response.data.data.user);
+  saveUser({ ...response.data.data.user, authMethod: response.data.data.authMethod });
   return response.data.data;
+}
+
+export async function getCaptcha() {
+  const response = await http.get<ApiResponse<CaptchaChallenge>>('/auth/captcha');
+  return response.data.data;
+}
+
+export async function changePassword(oldPassword: string, newPassword: string) {
+  const response = await http.post<ApiResponse<{ changed: boolean }>>('/auth/change-password', { oldPassword, newPassword });
+  return response.data.data;
+}
+
+export async function logout() {
+  const response = await http.post<ApiResponse<{ loggedOut: boolean }>>('/auth/logout', {});
+  return response.data.data;
+}
+
+export async function resetTeacherPassword(id: string) {
+  return postData<PasswordResetResult>(`/teachers/${id}/reset-password`, {});
+}
+
+export async function resetAdminStaffPassword(id: string) {
+  return postData<PasswordResetResult>(`/admin-staff/${id}/reset-password`, {});
 }
 
 export async function getData<T>(url: string, params?: Record<string, string>) {

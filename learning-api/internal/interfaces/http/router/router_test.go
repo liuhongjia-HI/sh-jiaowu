@@ -32,8 +32,9 @@ type apiResponse struct {
 }
 
 type authResponse struct {
-	Token string             `json:"token"`
-	User  learning.Principal `json:"user"`
+	Token      string             `json:"token"`
+	User       learning.Principal `json:"user"`
+	AuthMethod string             `json:"authMethod"`
 }
 
 func newTestApp(t *testing.T) *testApp {
@@ -170,6 +171,21 @@ func TestAdminAuthAndPermissionBoundaries(t *testing.T) {
 	}, http.StatusForbidden, nil)
 }
 
+func TestSystemReadinessRequiresSystemAdmin(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	teacherToken := app.loginAdmin(t, "13800000004")
+	app.doJSON(t, http.MethodGet, "/api/system/readiness", teacherToken, nil, http.StatusForbidden, nil)
+
+	adminToken := app.loginAdmin(t, "13800000002")
+	var readiness learning.SystemReadiness
+	app.doJSON(t, http.MethodGet, "/api/system/readiness", adminToken, nil, http.StatusOK, &readiness)
+	if readiness.TotalCount == 0 || len(readiness.Items) != readiness.TotalCount {
+		t.Fatalf("expected readiness payload, got %#v", readiness)
+	}
+}
+
 func TestLoginFailureLockout(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
@@ -263,6 +279,16 @@ func TestResetPasswordForcesChangeAndRotatesTokens(t *testing.T) {
 	if reset.TemporaryPassword == "" || !reset.MustChangePassword {
 		t.Fatalf("unexpected reset response: %#v", reset)
 	}
+
+	wechatToken := app.login(t, "/api/auth/wechat-login", map[string]string{
+		"code": "teacher",
+	})
+	var wechatMe learning.Principal
+	app.doJSON(t, http.MethodGet, "/api/auth/me", wechatToken, nil, http.StatusOK, &wechatMe)
+	if wechatMe.AuthMethod != "wechat" || !wechatMe.MustChangePassword {
+		t.Fatalf("expected wechat login to keep auth method and account state: %#v", wechatMe)
+	}
+	app.doJSON(t, http.MethodGet, "/api/dashboard/overview", wechatToken, nil, http.StatusOK, nil)
 
 	tempToken := app.login(t, "/api/auth/admin-password-login", map[string]string{
 		"phone":    "13800000004",
@@ -378,6 +404,198 @@ func TestGrantPreviewAndCreateGrantThroughAPI(t *testing.T) {
 	}
 }
 
+func TestStudentLearningReviewClosedLoopThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	adminToken := app.loginAdmin(t, "13800000002")
+	teacherToken := app.loginAdmin(t, "13800000004")
+
+	var student learning.Student
+	app.doJSON(t, http.MethodPost, "/api/students", adminToken, learning.StudentUpsertRequest{
+		Name:                  "闭环测试学生",
+		Phone:                 "18600009999",
+		Grade:                 "五年级",
+		SchoolName:            "星线小学",
+		OfficialAccountOpenID: "oa-closed-loop",
+		AccountStatus:         "正常",
+		Remark:                "完整闭环接口测试",
+	}, http.StatusOK, &student)
+	if student.ID == "" || student.BindStatus != "待绑定" {
+		t.Fatalf("unexpected created student: %#v", student)
+	}
+
+	var pkg learning.Package
+	app.doJSON(t, http.MethodPost, "/api/packages", adminToken, learning.PackageUpsertRequest{
+		Name:             "五年级英语闭环测试套餐",
+		AcademicYear:     "2025.2026学年",
+		Grade:            "五年级",
+		Semester:         "S1",
+		Subject:          "英语",
+		PhaseScope:       "Q1",
+		PackageType:      "课程+题+学习资料",
+		Summary:          "闭环测试专用套餐。",
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+		ContentTypeCodes: []string{"course", "question"},
+		Status:           learning.StatusEnabled,
+	}, http.StatusOK, &pkg)
+	var grant learning.GrantPreview
+	app.doJSON(t, http.MethodPost, "/api/grants", adminToken, map[string]string{
+		"studentId": student.ID,
+		"packageId": pkg.ID,
+	}, http.StatusOK, &grant)
+	if grant.StudentID != student.ID || grant.PackageID != pkg.ID {
+		t.Fatalf("unexpected grant response: %#v", grant)
+	}
+
+	var singleQuestion learning.QuestionBankItem
+	app.doJSON(t, http.MethodPost, "/api/questions", teacherToken, learning.QuestionBankUpsertRequest{
+		Title:    "闭环单选题",
+		Grade:    "五年级",
+		Semester: "S1",
+		Subject:  "英语",
+		Type:     "single",
+		Stem:     "Which word means 苹果?",
+		Options:  []string{"apple", "book", "desk"},
+		Answer:   "apple",
+		Score:    10,
+		Status:   string(learning.StatusEnabled),
+	}, http.StatusOK, &singleQuestion)
+	var textQuestion learning.QuestionBankItem
+	app.doJSON(t, http.MethodPost, "/api/questions", teacherToken, learning.QuestionBankUpsertRequest{
+		Title:    "闭环简答题",
+		Grade:    "五年级",
+		Semester: "S1",
+		Subject:  "英语",
+		Type:     "text",
+		Stem:     "用一句话说说今天学到的阅读方法。",
+		Score:    20,
+		Status:   string(learning.StatusEnabled),
+	}, http.StatusOK, &textQuestion)
+
+	var homework learning.Homework
+	app.doJSON(t, http.MethodPost, "/api/homework", teacherToken, learning.HomeworkUploadRequest{
+		Title:           "闭环课后小挑战",
+		CourseID:        "course-g05-english-s1-q1",
+		LearningSpaceID: "space-g05-english-s1-q1",
+		Deadline:        "2026-12-31",
+		Status:          string(learning.StatusEnabled),
+		QuestionIDs:     []string{singleQuestion.ID, textQuestion.ID},
+	}, http.StatusOK, &homework)
+	if homework.ID == "" || homework.QuestionNum != 2 || homework.OwnerTeacherID == "" {
+		t.Fatalf("unexpected created homework: %#v", homework)
+	}
+
+	studentToken := app.login(t, "/api/auth/demo-student-login", map[string]string{"phone": student.Phone, "password": "123456"})
+	var updatedProfile learning.Student
+	app.doJSON(t, http.MethodPut, "/api/student/profile", studentToken, learning.StudentProfileUpdateRequest{
+		Nickname:     "星星",
+		StudentName:  "闭环测试学生",
+		Grade:        "五年级",
+		SchoolName:   "星线小学",
+		GuardianName: "闭环家长",
+	}, http.StatusOK, &updatedProfile)
+	if updatedProfile.Nickname != "星星" || updatedProfile.GuardianName != "闭环家长" {
+		t.Fatalf("unexpected profile update: %#v", updatedProfile)
+	}
+	app.store.UseMiniProgramSubscribeTemplates([]string{"vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0", "tpl-review"})
+
+	var home learning.StudentHome
+	app.doJSON(t, http.MethodGet, "/api/student/home", studentToken, nil, http.StatusOK, &home)
+	if home.Student.ID != student.ID || !homeworkVisible(home.PendingHomework, homework.ID) {
+		t.Fatalf("expected opened homework on student home, got %#v", home)
+	}
+	if _, ok := findStudentTodo(home.TodayTodos, "homework"); !ok {
+		t.Fatalf("expected student home to expose homework in today todos, got %#v", home.TodayTodos)
+	}
+	if _, ok := findStudentTodo(home.TodayTodos, "subscribe"); !ok || home.SubscriptionReminder.ActionText == "" {
+		t.Fatalf("expected student home to expose subscribe reminder, got todos=%#v reminder=%#v", home.TodayTodos, home.SubscriptionReminder)
+	}
+	var reminder learning.SubscriptionReminder
+	app.doJSON(t, http.MethodPost, "/api/student/subscription", studentToken, learning.StudentSubscriptionRequest{
+		TemplateIDs: []string{"vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0"},
+	}, http.StatusOK, &reminder)
+	if !reminder.Enabled || reminder.ActionText != "已开启" {
+		t.Fatalf("expected subscription reminder to be enabled, got %#v", reminder)
+	}
+	app.doJSON(t, http.MethodGet, "/api/student/home", studentToken, nil, http.StatusOK, &home)
+	if _, ok := findStudentTodo(home.TodayTodos, "subscribe"); ok || !home.SubscriptionReminder.Enabled {
+		t.Fatalf("expected subscribe todo removed after enabling reminder, got todos=%#v reminder=%#v", home.TodayTodos, home.SubscriptionReminder)
+	}
+	var study learning.StudentStudyBoard
+	app.doJSON(t, http.MethodGet, "/api/student/study", studentToken, nil, http.StatusOK, &study)
+	if len(study.Courses) == 0 {
+		t.Fatalf("expected opened course on study board, got %#v", study)
+	}
+	var homeworkDetail learning.Homework
+	app.doJSON(t, http.MethodGet, "/api/student/homework/"+homework.ID, studentToken, nil, http.StatusOK, &homeworkDetail)
+	if homeworkDetail.QuestionNum != 2 || len(homeworkDetail.Questions) != 2 {
+		t.Fatalf("expected homework questions for student, got %#v", homeworkDetail)
+	}
+
+	var submitted struct {
+		SubmissionID string `json:"submissionId"`
+		Status       string `json:"status"`
+		Score        int    `json:"score"`
+	}
+	app.doJSON(t, http.MethodPost, "/api/student/submissions", studentToken, learning.SubmissionRequest{
+		HomeworkID: homework.ID,
+		Answers: []learning.SubmissionAnswer{
+			{QuestionID: singleQuestion.ID, Choice: "apple"},
+			{QuestionID: textQuestion.ID, Text: "先找关键词，再检查答案。"},
+		},
+	}, http.StatusOK, &submitted)
+	if submitted.SubmissionID == "" || submitted.Status != "待批改" {
+		t.Fatalf("unexpected submission response: %#v", submitted)
+	}
+
+	var reviews []learning.Review
+	app.doJSON(t, http.MethodGet, "/api/reviews/pending", teacherToken, nil, http.StatusOK, &reviews)
+	review, ok := findReviewBySubmission(reviews, submitted.SubmissionID)
+	if !ok || review.Status != "待批改" {
+		t.Fatalf("expected pending review for submitted homework, got %#v", reviews)
+	}
+
+	var reviewed learning.Submission
+	app.doJSON(t, http.MethodPost, "/api/reviews/"+review.ID+"/complete", teacherToken, learning.ReviewCompleteRequest{
+		Score:          95,
+		TeacherComment: "关键词找得准确，表达清楚。",
+		Reward:         "阅读小达人",
+		FinalStatus:    "已批改",
+	}, http.StatusOK, &reviewed)
+	if reviewed.ID != submitted.SubmissionID || reviewed.Status != "已批改" || reviewed.FinalScore != 95 {
+		t.Fatalf("unexpected reviewed submission: %#v", reviewed)
+	}
+
+	var result learning.Submission
+	app.doJSON(t, http.MethodGet, "/api/student/submissions/"+submitted.SubmissionID, studentToken, nil, http.StatusOK, &result)
+	if result.Status != "已批改" || result.TeacherComment == "" || result.Reward != "阅读小达人" {
+		t.Fatalf("expected reviewed result visible to student, got %#v", result)
+	}
+	var homeAfterReview learning.StudentHome
+	app.doJSON(t, http.MethodGet, "/api/student/home", studentToken, nil, http.StatusOK, &homeAfterReview)
+	if homeworkVisible(homeAfterReview.PendingHomework, homework.ID) {
+		t.Fatalf("expected reviewed homework to leave student pending list, got %#v", homeAfterReview.PendingHomework)
+	}
+	feedback, ok := findClassroomFeedback(homeAfterReview.ClassroomFeedback, submitted.SubmissionID)
+	if !ok || feedback.Score != 95 || feedback.Focus == "" || feedback.NextStep == "" {
+		t.Fatalf("expected reviewed homework to create classroom feedback, got %#v", homeAfterReview.ClassroomFeedback)
+	}
+	if todo, ok := findStudentTodo(homeAfterReview.TodayTodos, "feedback"); !ok || todo.Path == "" || todo.ActionText != "查看反馈" {
+		t.Fatalf("expected student home to expose feedback todo, got %#v", homeAfterReview.TodayTodos)
+	}
+	var tasksAfterReview []learning.StudentTask
+	app.doJSON(t, http.MethodGet, "/api/student/tasks", studentToken, nil, http.StatusOK, &tasksAfterReview)
+	task, ok := findStudentTask(tasksAfterReview, homework.ID)
+	if !ok || task.StudentStatus != "已完成" || task.Score != 95 || task.SubmissionID != submitted.SubmissionID {
+		t.Fatalf("expected reviewed homework to be completed in student tasks, got %#v", tasksAfterReview)
+	}
+	var summary learning.HomeworkSubmissionSummary
+	app.doJSON(t, http.MethodGet, "/api/homework/"+homework.ID+"/submissions", teacherToken, nil, http.StatusOK, &summary)
+	if summary.SubmittedNum != 1 || !submissionSummaryContains(summary, student.ID, "已批改") {
+		t.Fatalf("expected teacher submission summary to include reviewed student, got %#v", summary)
+	}
+}
+
 func TestCommercialLifecycleThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
@@ -420,8 +638,22 @@ func TestCommercialLifecycleThroughAPI(t *testing.T) {
 	}
 	var afterPay learning.GrantPreview
 	app.doJSON(t, http.MethodGet, "/api/grants/preview?studentId=stu-001&packageId="+pkg.ID, token, nil, http.StatusOK, &afterPay)
-	if !afterPay.AlreadyOpened {
-		t.Fatalf("expected paid order to open package grant: %#v", afterPay)
+	if afterPay.AlreadyOpened {
+		t.Fatalf("payment should not open package grant automatically: %#v", afterPay)
+	}
+
+	var opened learning.GrantPreview
+	app.doJSON(t, http.MethodPost, "/api/grants", token, map[string]string{
+		"studentId": "stu-001",
+		"packageId": pkg.ID,
+	}, http.StatusOK, &opened)
+	if opened.StudentID != "stu-001" || opened.PackageID != pkg.ID {
+		t.Fatalf("expected manual grant to open package: %#v", opened)
+	}
+	var afterManualGrant learning.GrantPreview
+	app.doJSON(t, http.MethodGet, "/api/grants/preview?studentId=stu-001&packageId="+pkg.ID, token, nil, http.StatusOK, &afterManualGrant)
+	if !afterManualGrant.AlreadyOpened {
+		t.Fatalf("expected manual grant to be visible in follow-up preview: %#v", afterManualGrant)
 	}
 
 	var contract learning.ContractRecord
@@ -469,7 +701,7 @@ func TestCommercialLifecycleThroughAPI(t *testing.T) {
 		Title:   "续费提醒",
 		Content: "小明的英语课包快用完了，建议提前安排续费。",
 	}, http.StatusOK, &notice)
-	if notice.Status != "已发送" {
+	if notice.Status == "" || notice.NoticeID == "" || notice.Channel != "公众号模板消息" {
 		t.Fatalf("unexpected parent notice: %#v", notice)
 	}
 
@@ -517,6 +749,26 @@ func TestSchedulingCandidateAndCreateClassThroughAPI(t *testing.T) {
 	if class.ID == "" || len(class.Students) != 1 {
 		t.Fatalf("unexpected created class: %#v", class)
 	}
+	if class.Name != "英语 1V1 小班" || class.CourseName != "五年级英语S1Q1课程" || class.TeacherName != "英语老师" || class.Status != "已确认" {
+		t.Fatalf("unexpected class detail for student schedule: %#v", class)
+	}
+
+	studentToken := app.loginStudent(t)
+	var studentSchedule []learning.ScheduleClass
+	app.doJSON(t, http.MethodGet, "/api/student/schedule", studentToken, nil, http.StatusOK, &studentSchedule)
+	found := false
+	for _, item := range studentSchedule {
+		if item.ID != class.ID {
+			continue
+		}
+		found = true
+		if item.CourseName != class.CourseName || item.TeacherName != class.TeacherName || item.DayOfWeek != 3 || item.StartTime != "19:00" || item.EndTime != "20:30" || item.Status != "已确认" {
+			t.Fatalf("created class is not visible with expected student schedule fields: %#v", item)
+		}
+	}
+	if !found {
+		t.Fatalf("student schedule does not include created class %s: %#v", class.ID, studentSchedule)
+	}
 }
 
 func TestFileDownloadRequiresVisibleContent(t *testing.T) {
@@ -532,7 +784,7 @@ func TestFileDownloadRequiresVisibleContent(t *testing.T) {
 		t.Fatalf("teacher principal: %v", err)
 	}
 	material, err := app.store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
-		Title:    "接口测试讲义",
+		Title:    "接口测试学习资料",
 		CourseID: "course-g05-english-s1-q1",
 		File: learning.FileAsset{
 			ID:            "file-router-download",
@@ -593,4 +845,58 @@ func TestStudentSubmissionThroughAPI(t *testing.T) {
 	if detail.ObjectiveScore == 0 || detail.TeacherComment == "" {
 		t.Fatalf("expected pending review result to include objective score and hint: %#v", detail)
 	}
+}
+
+func homeworkVisible(homework []learning.Homework, homeworkID string) bool {
+	for _, item := range homework {
+		if item.ID == homeworkID {
+			return true
+		}
+	}
+	return false
+}
+
+func findReviewBySubmission(reviews []learning.Review, submissionID string) (learning.Review, bool) {
+	for _, review := range reviews {
+		if review.SubmissionID == submissionID {
+			return review, true
+		}
+	}
+	return learning.Review{}, false
+}
+
+func findStudentTask(tasks []learning.StudentTask, homeworkID string) (learning.StudentTask, bool) {
+	for _, task := range tasks {
+		if task.ID == homeworkID {
+			return task, true
+		}
+	}
+	return learning.StudentTask{}, false
+}
+
+func findStudentTodo(todos []learning.StudentTodo, todoType string) (learning.StudentTodo, bool) {
+	for _, todo := range todos {
+		if todo.Type == todoType {
+			return todo, true
+		}
+	}
+	return learning.StudentTodo{}, false
+}
+
+func findClassroomFeedback(feedback []learning.ClassroomFeedback, submissionID string) (learning.ClassroomFeedback, bool) {
+	for _, item := range feedback {
+		if item.RelatedSubmissionID == submissionID {
+			return item, true
+		}
+	}
+	return learning.ClassroomFeedback{}, false
+}
+
+func submissionSummaryContains(summary learning.HomeworkSubmissionSummary, studentID string, reviewStatus string) bool {
+	for _, item := range summary.Students {
+		if item.StudentID == studentID && item.ReviewStatus == reviewStatus {
+			return true
+		}
+	}
+	return false
 }
