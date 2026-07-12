@@ -70,6 +70,19 @@ func (s *MemoryStore) ConnectDatabase(dsn string) error {
 		s.db = nil
 		return err
 	}
+	if len(s.learningSpaces) == 0 {
+		s.seedBaseLearningSpaces()
+		if err := s.persistAll(); err != nil {
+			db.Close()
+			s.db = nil
+			return err
+		}
+		if err := s.loadAllFromDatabase(); err != nil {
+			db.Close()
+			s.db = nil
+			return err
+		}
+	}
 	return nil
 }
 
@@ -352,12 +365,6 @@ func (s *MemoryStore) ensureColumn(table, column, definition string) error {
 func (s *MemoryStore) needsDatabaseBootstrap() (bool, error) {
 	var count int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM users WHERE id = 'user-super'").Scan(&count); err != nil {
-		return false, err
-	}
-	if count == 0 {
-		return true, nil
-	}
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM study_packages").Scan(&count); err != nil {
 		return false, err
 	}
 	return count == 0, nil

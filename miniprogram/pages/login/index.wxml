@@ -13,11 +13,13 @@
     <view class="form-line">
       <input value="{{form.schoolName}}" data-field="schoolName" bindinput="onInput" placeholder="学校" />
     </view>
-    <view class="form-line">
-      <input value="{{form.grade}}" data-field="grade" bindinput="onInput" placeholder="年级，例如：五年级" />
-    </view>
+    <picker mode="selector" range="{{gradeOptions}}" value="{{gradeIndex}}" bindchange="onGradeChange">
+      <view class="form-line picker-line">
+        <view class="picker-value {{form.grade ? '' : 'placeholder'}}">{{form.grade || '请选择年级'}}</view>
+      </view>
+    </picker>
     <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">绑定手机号并登录</button>
-    <view class="login-tip">手机号会用于匹配已有课程权限；匹配不到时请联系老师确认开通状态。</view>
+    <view class="login-tip">手机号会用于登录绑定；课程权限由老师在后台开通后自动生效。</view>
   </view>
 </view>
 <view class="section">

@@ -15,8 +15,10 @@ function request(path, options = {}) {
 
 function doRequest(app, path, options = {}) {
   const baseUrl = app.globalData.apiBaseUrl;
-  let loading = true;
-  wx.showLoading({ title: "加载中" });
+  let loading = !options.silent;
+  if (loading) {
+    wx.showLoading({ title: "加载中" });
+  }
 
   function finishLoading() {
     if (!loading) {
@@ -44,14 +46,8 @@ function doRequest(app, path, options = {}) {
         }
         finishLoading();
         if (res.statusCode === 401 || body.code === 401) {
-          if (shouldEnsureAuth(path, options) && !options.__retried && app.ensureLogin) {
-            wx.removeStorageSync("starline_token");
-            app.ensureLogin({ force: true })
-              .then(() => doRequest(app, path, { ...options, __retried: true }).then(resolve).catch(reject))
-              .catch((error) => {
-                handleUnauthorized(error.message || body.message || "登录已过期，请重新登录");
-                reject(new Error(error.message || body.message || "登录已过期，请重新登录"));
-              });
+          if (!shouldEnsureAuth(path, options)) {
+            reject(new Error(body.message || "请求失败"));
             return;
           }
           handleUnauthorized(body.message || "登录已过期，请重新登录");
@@ -63,8 +59,11 @@ function doRequest(app, path, options = {}) {
       },
       fail(err) {
         finishLoading();
-        wx.showToast({ title: "网络连接失败", icon: "none" });
-        reject(err);
+        const error = new Error("网络连接失败，请检查网络后重试");
+        error.cause = err;
+        error.userNotified = true;
+        wx.showToast({ title: error.message, icon: "none" });
+        reject(error);
       },
       complete() {
         finishLoading();
@@ -80,10 +79,7 @@ function ensureRequestAuth(app, path, options = {}) {
   if (wx.getStorageSync("starline_token")) {
     return Promise.resolve();
   }
-  if (!app.ensureLogin) {
-    return Promise.resolve();
-  }
-  return app.ensureLogin();
+  return Promise.reject(new Error("请先完成登录绑定"));
 }
 
 function shouldEnsureAuth(path, options = {}) {

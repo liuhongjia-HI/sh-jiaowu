@@ -30,3 +30,18 @@
   font-size: 28rpx;
   color: #4f3428;
 }
+
+.picker-line {
+  justify-content: flex-start;
+}
+
+.picker-value {
+  width: 100%;
+  text-align: left;
+  font-size: 28rpx;
+  color: #4f3428;
+}
+
+.picker-value.placeholder {
+  color: #a89184;
+}

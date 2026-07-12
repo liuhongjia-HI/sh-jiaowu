@@ -22,14 +22,49 @@ function loadAppConfig(envVersion) {
 test("develop build uses real WeChat login", () => {
   const config = loadAppConfig("develop");
 
-  assert.equal(config.globalData.apiBaseUrl, "http://127.0.0.1:8892/api");
+  assert.equal(config.globalData.apiBaseUrl, "https://gate.starlineeducation.com.cn/api");
   assert.equal(config.globalData.useRealWechatLogin, true);
   assert.equal(config.globalData.demoLoginCode, undefined);
+  assert.deepEqual(config.globalData.subscribeTemplateIds, ["vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0"]);
 });
 
 test("trial and release builds use real WeChat login", () => {
-  assert.equal(loadAppConfig("trial").globalData.useRealWechatLogin, true);
-  assert.equal(loadAppConfig("release").globalData.useRealWechatLogin, true);
+  const trial = loadAppConfig("trial");
+  const release = loadAppConfig("release");
+  assert.equal(trial.globalData.useRealWechatLogin, true);
+  assert.equal(release.globalData.useRealWechatLogin, true);
+  assert.equal(trial.globalData.apiBaseUrl, "https://gate.starlineeducation.com.cn/api");
+  assert.equal(release.globalData.apiBaseUrl, "https://gate.starlineeducation.com.cn/api");
+});
+
+test("app launch does not call wechat login before phone binding", () => {
+  delete require.cache[require.resolve("../app")];
+  const calls = [];
+  let appConfig = null;
+  global.wx = {
+    getAccountInfoSync() {
+      return { miniProgram: { envVersion: "develop" } };
+    },
+    getStorageSync() {
+      calls.push(["getStorageSync"]);
+      return "";
+    },
+    login() {
+      calls.push(["login"]);
+    },
+    request() {
+      calls.push(["request"]);
+    }
+  };
+  global.App = (config) => {
+    appConfig = config;
+  };
+  require("../app");
+
+  appConfig.onLaunch();
+
+  assert.equal(calls.some((item) => item[0] === "login"), false);
+  assert.equal(calls.some((item) => item[0] === "request"), false);
 });
 
 test("ensureLogin exchanges wx.login code for token", async () => {
@@ -71,6 +106,6 @@ test("ensureLogin exchanges wx.login code for token", async () => {
   assert.deepEqual(calls.find((item) => item[0] === "login"), ["login"]);
   assert.deepEqual(
     calls.find((item) => item[0] === "request"),
-    ["request", "http://127.0.0.1:8892/api/auth/wechat-login", { code: "wx-code" }]
+    ["request", "https://gate.starlineeducation.com.cn/api/auth/wechat-login", { code: "wx-code" }]
   );
 });

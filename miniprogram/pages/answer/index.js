@@ -1,4 +1,5 @@
 const { request } = require("../../utils/request");
+const { activateContentSecurity } = require("../../utils/content-security");
 
 Page({
   data: {
@@ -7,6 +8,9 @@ Page({
     deadlineText: "",
     rewardText: "做完就能获得新徽章",
     questions: [],
+    watermarkText: "专属水印加载中",
+    watermarkTexts: ["专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中"],
+    securityNotice: "学习内容仅限本人查看，请勿外传。",
     favorited: false,
     favoriteId: "",
     saving: false
@@ -18,6 +22,11 @@ Page({
       return;
     }
     this.setData({ homeworkId: id });
+    this.stopContentSecurity = activateContentSecurity({
+      targetType: "homework",
+      targetId: id,
+      pagePath: "pages/answer/index"
+    });
     request(`/student/homework/${id}`).then((homework) => {
       const questions = (homework.questions || []).map((question, index) => ({
         ...question,
@@ -31,14 +40,29 @@ Page({
         choices: [],
         text: ""
       }));
+      const watermarkText = homework.watermarkText || "专属水印加载中";
       this.setData({
         taskTitle: homework.title || "课后小挑战",
         deadlineText: homework.deadline ? `${homework.deadline} 前完成` : "",
         rewardText: homework.course || "做完就能获得新徽章",
-        questions: restoreDraftAnswers(id, questions)
+        questions: restoreDraftAnswers(id, questions),
+        watermarkText,
+        watermarkTexts: buildWatermarks(watermarkText),
+        securityNotice: homework.securityNotice || "学习内容仅限本人查看，请勿外传。"
+      });
+    }).catch(() => {
+      this.setData({
+        rewardText: "题目加载失败",
+        securityNotice: "题目加载失败，请重新进入。"
       });
     });
     this.refreshFavorite(id);
+  },
+  onUnload() {
+    if (this.stopContentSecurity) {
+      this.stopContentSecurity();
+      this.stopContentSecurity = null;
+    }
   },
   refreshFavorite(homeworkId) {
     request("/student/favorites").then((favorites) => {
@@ -188,4 +212,8 @@ function restoreDraftAnswers(homeworkId, questions) {
       }))
     };
   });
+}
+
+function buildWatermarks(text) {
+  return Array.from({ length: 10 }).map(() => text);
 }

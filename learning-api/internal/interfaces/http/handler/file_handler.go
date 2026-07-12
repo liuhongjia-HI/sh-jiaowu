@@ -139,6 +139,21 @@ func (h *LearningHandler) PreviewFile(c *gin.Context) {
 	c.File(asset.PreviewPath)
 }
 
+func (h *LearningHandler) StudentMaterialPreview(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	if _, err := os.Stat(asset.PreviewPath); err != nil {
+		BadRequest(c, "资料正在生成安全预览，请稍后再试")
+		return
+	}
+	c.Header("Content-Disposition", "inline; filename=\"secure-preview.pdf\"")
+	c.File(asset.PreviewPath)
+}
+
 func (h *LearningHandler) DownloadFile(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	asset, err := h.service.ContentFile(principal, c.Param("id"))

@@ -116,14 +116,119 @@ func TestWechatStudentBindingValidatesProfile(t *testing.T) {
 	}
 }
 
-func TestWechatStudentBindingRejectsUnmatchedAndDuplicatePhone(t *testing.T) {
+func TestWechatStudentBindingCreatesStudentForUnmatchedPhone(t *testing.T) {
 	store := NewMemoryStore()
-	if _, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+	user, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
 		Code: "missing-phone", Phone: "19900000000", StudentName: "小明", SchoolName: "星河小学", Grade: "五年级",
-	}); err == nil || !strings.Contains(err.Error(), "手机号未匹配") {
-		t.Fatalf("expected unmatched phone to be rejected, got %v", err)
+	})
+	if err != nil {
+		t.Fatalf("expected unmatched phone to create a student account: %v", err)
 	}
+	if user.StudentID == "" || user.Phone != "19900000000" || !hasRole(user.Roles, learning.RoleStudent) {
+		t.Fatalf("unexpected principal for new wechat student: %#v", user)
+	}
+	stored, ok := store.findRawStudent(user.StudentID)
+	if !ok {
+		t.Fatalf("expected created student %q to be persisted in store", user.StudentID)
+	}
+	if stored.Name != "小明" || stored.SchoolName != "星河小学" || stored.Grade != "五年级" || stored.LearningStatus != "待开通" || stored.BindStatus != "已绑定" {
+		t.Fatalf("unexpected created student: %#v", stored)
+	}
+	home, err := store.StudentHome(user)
+	if err != nil {
+		t.Fatalf("expected newly authorized student to enter mini program home: %v", err)
+	}
+	if home.Student.ID != user.StudentID || len(home.Materials) != 0 || len(home.PendingHomework) != 0 {
+		t.Fatalf("new student should enter without learning permissions, got %#v", home)
+	}
+	again, err := store.LoginWithWechatCode(learning.WechatLoginRequest{Code: "missing-phone"})
+	if err != nil {
+		t.Fatalf("expected repeated login with same wechat to succeed: %v", err)
+	}
+	if again.StudentID != user.StudentID {
+		t.Fatalf("expected repeated login to return the same student, got %#v", again)
+	}
+}
 
+func TestWechatStudentBindingUsesExistingMaskedPhoneStudent(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	spaceID := "space-g05-english-s1-q1"
+	store.students = []learning.Student{{
+		ID:             "stu-acceptance",
+		Name:           "王同学",
+		Grade:          "五年级",
+		Phone:          "185****3993",
+		SchoolName:     "星河小学",
+		AccountStatus:  "正常",
+		LearningStatus: "已开通",
+		BindStatus:     "待绑定",
+	}}
+	store.packages = []learning.Package{{
+		ID: "pkg-acceptance", Name: "验收五年级英语套餐", AcademicYear: "2025.2026学年",
+		Grade: "五年级", Semester: "上学期", Subject: "英语", PhaseScope: "第一阶段",
+		PackageType: "课程+资料+练习", Status: learning.StatusEnabled,
+	}}
+	store.packageSpaces = []packageSpace{{PackageID: "pkg-acceptance", LearningSpaceID: spaceID}}
+	store.contentTypes = []packageContentType{
+		{PackageID: "pkg-acceptance", ContentType: "course"},
+		{PackageID: "pkg-acceptance", ContentType: "handout"},
+		{PackageID: "pkg-acceptance", ContentType: "question"},
+	}
+	store.grants = []packageGrant{{
+		ID: "grant-acceptance", StudentID: "stu-acceptance", PackageID: "pkg-acceptance",
+		StartsAt: "2026-07-01", EndsAt: "2027-07-01", Status: "active",
+	}}
+	store.syncSpaceAccessForGrant(store.grants[0])
+	store.courses = []learning.Course{{
+		ID: "course-acceptance", Name: "验收五年级英语课程-07110752", Grade: "五年级", Subject: "英语",
+		LearningSpaceID: spaceID, Status: learning.StatusEnabled,
+	}}
+	store.materials = []learning.Material{{
+		ID: "mat-acceptance", Title: "验收英语资料-07110806", CourseID: "course-acceptance",
+		LearningSpaceID: spaceID, PublishStatus: "已发布", Status: learning.StatusEnabled,
+	}}
+	store.homework = []learning.Homework{{
+		ID: "hw-acceptance", Title: "验收英语小练习-07110752", CourseID: "course-acceptance",
+		LearningSpaceID: spaceID, PublishStatus: "已发布", Status: string(learning.StatusEnabled),
+	}}
+	studentCount := len(store.students)
+
+	principal, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "acceptance-openid", Phone: "18500003993", StudentName: "王同学", SchoolName: "星河小学", Grade: "五年级",
+	})
+	if err != nil {
+		t.Fatalf("expected masked phone student to bind with real wechat phone: %v", err)
+	}
+	if principal.StudentID != "stu-acceptance" || principal.UserID != "user-stu-acceptance" || principal.Phone != "18500003993" {
+		t.Fatalf("expected original student principal with real phone, got %#v", principal)
+	}
+	if len(store.students) != studentCount {
+		t.Fatalf("masked phone binding should not create duplicate students, got %d want %d", len(store.students), studentCount)
+	}
+	stored, ok := store.findRawStudent("stu-acceptance")
+	if !ok || stored.BindStatus != "已绑定" || stored.Phone != "185****3993" {
+		t.Fatalf("expected original masked student to be bound without replacing archived phone, got %#v", stored)
+	}
+	user, ok := store.findUserByStudentID("stu-acceptance")
+	if !ok || user.OpenID != "demo-acceptance-openid" || user.Phone != "18500003993" {
+		t.Fatalf("expected user to be created with real phone and openid, got %#v", user)
+	}
+	home, err := store.StudentHome(principal)
+	if err != nil {
+		t.Fatalf("expected original opened student to enter home: %v", err)
+	}
+	if home.Student.ID != "stu-acceptance" || home.ContinueCourse.Name != "验收五年级英语课程-07110752" {
+		t.Fatalf("expected original opened package course on home, got %#v", home)
+	}
+	if len(home.Materials) != 1 || home.Materials[0].Title != "验收英语资料-07110806" {
+		t.Fatalf("expected original opened material on home, got %#v", home.Materials)
+	}
+	if len(home.PendingHomework) != 1 || home.PendingHomework[0].Title != "验收英语小练习-07110752" {
+		t.Fatalf("expected original opened homework on home, got %#v", home.PendingHomework)
+	}
+}
+
+func TestWechatStudentBindingRejectsDuplicatePhone(t *testing.T) {
 	duplicateStore := NewMemoryStore()
 	var duplicate learning.User
 	for _, user := range duplicateStore.users {
@@ -140,6 +245,20 @@ func TestWechatStudentBindingRejectsUnmatchedAndDuplicatePhone(t *testing.T) {
 		Code: "duplicate-phone", Phone: duplicate.Phone, StudentName: "任意学生", SchoolName: "星河小学", Grade: "五年级",
 	}); err == nil || !strings.Contains(err.Error(), "手机号匹配到多个账号") {
 		t.Fatalf("expected duplicate phone to be rejected, got %v", err)
+	}
+}
+
+func TestOperationLogIDsAreUniqueForRapidWrites(t *testing.T) {
+	ids := map[string]bool{}
+	for i := 0; i < 200; i++ {
+		id := newOperationLogID()
+		if ids[id] {
+			t.Fatalf("operation log id should be unique, got duplicate %q", id)
+		}
+		ids[id] = true
+		if !strings.HasPrefix(id, "log-") {
+			t.Fatalf("operation log id should keep log prefix, got %q", id)
+		}
 	}
 }
 
@@ -194,6 +313,21 @@ func TestUpdateStudentProfile(t *testing.T) {
 	}
 	if home.Student.Nickname != updated.Nickname || home.Student.AvatarURL != updated.AvatarURL {
 		t.Fatalf("expected student home to include profile, got %#v", home.Student)
+	}
+}
+
+func TestDashboardUsesRealProductionCounts(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	store.students = []learning.Student{{ID: "stu-prod", Name: "王同学", Grade: "五年级", Phone: "18500003993", AccountStatus: "正常"}}
+	store.packages = []learning.Package{{ID: "pkg-prod", Name: "验收套餐", Grade: "五年级", Status: learning.StatusEnabled}}
+	store.grants = []packageGrant{{ID: "grant-prod", StudentID: "stu-prod", PackageID: "pkg-prod", StartsAt: "2026-07-01", EndsAt: "2027-07-01", Status: "active"}}
+	store.materials = []learning.Material{{ID: "mat-prod", Title: "验收资料", ViewCount: 7, PublishStatus: "已发布", Status: learning.StatusEnabled}}
+	store.homework = []learning.Homework{{ID: "hw-prod", Title: "验收练习", PublishStatus: "已发布", Status: string(learning.StatusEnabled)}}
+	store.reviews = []learning.Review{{ID: "rev-prod", Status: "待批改"}}
+
+	overview := store.Dashboard()
+	if overview.OpenedStudents != 1 || overview.PackageCount != 1 || overview.PendingReviews != 1 || overview.MaterialViews != 7 || overview.UnpublishedFiles != 0 {
+		t.Fatalf("dashboard should use real counts, got %#v", overview)
 	}
 }
 

@@ -820,6 +820,73 @@ func TestFileDownloadRequiresVisibleContent(t *testing.T) {
 	app.doJSON(t, http.MethodGet, material.DownloadURL, studentToken, nil, http.StatusForbidden, nil)
 }
 
+func TestStudentMaterialDetailIncludesSecurityWatermark(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginStudent(t)
+
+	var material learning.Material
+	app.doJSON(t, http.MethodGet, "/api/student/materials/mat-g05-english-s1-q1", token, nil, http.StatusOK, &material)
+
+	if material.WatermarkText == "" || !strings.Contains(material.WatermarkText, "小明") || !strings.Contains(material.WatermarkText, "9069") {
+		t.Fatalf("expected student watermark with name and phone tail, got %#v", material.WatermarkText)
+	}
+	if material.SecurityNotice == "" {
+		t.Fatalf("expected security notice, got %#v", material)
+	}
+	if material.DownloadURL != "" {
+		t.Fatalf("student material should not expose download url, got %#v", material.DownloadURL)
+	}
+}
+
+func TestStudentMaterialSecurePreviewRequiresAccess(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginStudent(t)
+
+	app.doJSON(t, http.MethodGet, "/api/student/materials/mat-g05-math-s1-q1/preview", token, nil, http.StatusBadRequest, nil)
+}
+
+func TestStudentSecurityEventIsLogged(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginStudent(t)
+
+	app.doJSON(t, http.MethodPost, "/api/student/security/events", token, learning.SecurityEventRequest{
+		EventType:  "screenshot",
+		TargetType: "homework",
+		TargetID:   "hw-g05-english-s1-q1",
+		PagePath:   "pages/answer/index",
+		Detail:     "用户触发截屏事件",
+	}, http.StatusOK, nil)
+
+	logs := app.store.Logs()
+	if len(logs) == 0 || logs[0].Action != "内容防盗版风控" || !strings.Contains(logs[0].Detail, "eventType=screenshot") {
+		t.Fatalf("expected security event log, got %#v", logs)
+	}
+}
+
+func TestStudentHomeworkDetailIncludesSecurityWatermark(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginStudent(t)
+
+	var homework learning.Homework
+	app.doJSON(t, http.MethodGet, "/api/student/homework/hw-g05-english-s1-q1", token, nil, http.StatusOK, &homework)
+
+	if homework.WatermarkText == "" || !strings.Contains(homework.WatermarkText, "小明") {
+		t.Fatalf("expected homework watermark, got %#v", homework.WatermarkText)
+	}
+	if homework.SecurityNotice == "" {
+		t.Fatalf("expected homework security notice, got %#v", homework)
+	}
+	for _, question := range homework.Questions {
+		if question.Answer != "" || len(question.Answers) != 0 {
+			t.Fatalf("student question should not expose answers, got %#v", question)
+		}
+	}
+}
+
 func TestStudentSubmissionThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

@@ -504,6 +504,8 @@ type Material struct {
 	PreviewStatus    string `json:"previewStatus,omitempty"`
 	PreviewURL       string `json:"previewUrl,omitempty"`
 	DownloadURL      string `json:"downloadUrl,omitempty"`
+	WatermarkText    string `json:"watermarkText,omitempty"`
+	SecurityNotice   string `json:"securityNotice,omitempty"`
 	Status           Status `json:"status"`
 }
 
@@ -541,6 +543,8 @@ type Homework struct {
 	PreviewStatus    string     `json:"previewStatus,omitempty"`
 	PreviewURL       string     `json:"previewUrl,omitempty"`
 	DownloadURL      string     `json:"downloadUrl,omitempty"`
+	WatermarkText    string     `json:"watermarkText,omitempty"`
+	SecurityNotice   string     `json:"securityNotice,omitempty"`
 	Status           string     `json:"status"`
 }
 
@@ -551,6 +555,14 @@ type HomeworkUpdateRequest struct {
 	Deadline        string   `json:"deadline"`
 	Status          string   `json:"status"`
 	QuestionIDs     []string `json:"questionIds"`
+}
+
+type SecurityEventRequest struct {
+	EventType  string `json:"eventType"`
+	TargetType string `json:"targetType"`
+	TargetID   string `json:"targetId"`
+	PagePath   string `json:"pagePath"`
+	Detail     string `json:"detail"`
 }
 
 // Question 是小挑战中的单道题目。Answer 仅用于服务端自动判分，不下发给学生端。

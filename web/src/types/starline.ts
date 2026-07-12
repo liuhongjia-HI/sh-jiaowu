@@ -313,6 +313,8 @@ export type Material = {
   previewStatus?: string;
   previewUrl?: string;
   downloadUrl?: string;
+  watermarkText?: string;
+  securityNotice?: string;
   status: string;
 };
 
@@ -350,6 +352,8 @@ export type Homework = {
   previewStatus?: string;
   previewUrl?: string;
   downloadUrl?: string;
+  watermarkText?: string;
+  securityNotice?: string;
   status: string;
 };
 

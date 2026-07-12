@@ -1,4 +1,5 @@
 const { request } = require("../../utils/request");
+const { activateContentSecurity } = require("../../utils/content-security");
 
 Page({
   data: {
@@ -6,6 +7,9 @@ Page({
     pageTitle: "资料预览",
     paperTitle: "",
     readText: "",
+    watermarkText: "专属水印加载中",
+    watermarkTexts: ["专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中"],
+    securityNotice: "学习内容仅限本人查看，请勿外传。",
     favorited: false,
     favoriteId: ""
   },
@@ -16,15 +20,35 @@ Page({
       return;
     }
     this.materialId = id;
+    this.stopContentSecurity = activateContentSecurity({
+      targetType: "material",
+      targetId: id,
+      pagePath: "pages/material-preview/index"
+    });
     request(`/student/materials/${id}`).then((material) => {
+      const watermarkText = material.watermarkText || "专属水印加载中";
       this.setData({
         material,
         pageTitle: material.title,
         paperTitle: material.chapter || material.title,
-        readText: `${material.viewCount || 0} 人学过`
+        readText: `${material.viewCount || 0} 人学过`,
+        watermarkText,
+        watermarkTexts: buildWatermarks(watermarkText),
+        securityNotice: material.securityNotice || "学习内容仅限本人查看，请勿外传。"
+      });
+    }).catch(() => {
+      this.setData({
+        pageTitle: "资料加载失败",
+        securityNotice: "资料加载失败，请重新进入。"
       });
     });
     this.refreshFavorite(id);
+  },
+  onUnload() {
+    if (this.stopContentSecurity) {
+      this.stopContentSecurity();
+      this.stopContentSecurity = null;
+    }
   },
   refreshFavorite(materialId) {
     request("/student/favorites").then((favorites) => {
@@ -64,5 +88,43 @@ Page({
       return;
     }
     wx.navigateBack({ delta: 1, fail() {} });
+  },
+  openSecurePreview() {
+    const previewUrl = this.data.material.previewUrl;
+    if (!previewUrl) {
+      wx.showToast({ title: "资料正在生成安全预览，请稍后再试", icon: "none" });
+      return;
+    }
+    const app = getApp();
+    wx.showLoading({ title: "打开资料中" });
+    wx.downloadFile({
+      url: `${app.globalData.apiBaseUrl}${previewUrl}`,
+      header: {
+        Authorization: wx.getStorageSync("starline_token") ? `Bearer ${wx.getStorageSync("starline_token")}` : ""
+      },
+      success(res) {
+        if (res.statusCode !== 200) {
+          wx.showToast({ title: "资料正在生成安全预览，请稍后再试", icon: "none" });
+          return;
+        }
+        wx.openDocument({
+          filePath: res.tempFilePath,
+          fileType: "pdf",
+          fail() {
+            wx.showToast({ title: "资料打开失败，请稍后再试", icon: "none" });
+          }
+        });
+      },
+      fail() {
+        wx.showToast({ title: "资料打开失败，请稍后再试", icon: "none" });
+      },
+      complete() {
+        wx.hideLoading();
+      }
+    });
   }
 });
+
+function buildWatermarks(text) {
+  return Array.from({ length: 8 }).map(() => text);
+}

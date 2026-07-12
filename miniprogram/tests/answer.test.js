@@ -4,8 +4,10 @@ const test = require("node:test");
 function loadAnswerPage(requestImpl, wxMock) {
   const pages = [];
   const requestPath = require.resolve("../utils/request");
+  const securityPath = require.resolve("../utils/content-security");
   const pagePath = require.resolve("../pages/answer/index.js");
   delete require.cache[requestPath];
+  delete require.cache[securityPath];
   delete require.cache[pagePath];
   require.cache[requestPath] = {
     id: requestPath,
@@ -121,4 +123,58 @@ test("answer page blocks submission when any question is unanswered", () => {
     "showToast",
     { title: "还有题目没有完成哦", icon: "none" }
   ]);
+});
+
+test("answer page applies dynamic watermark and reports capture event", async () => {
+  const calls = [];
+  let captureHandler = null;
+  const wxMock = {
+    onUserCaptureScreen(handler) {
+      captureHandler = handler;
+      calls.push(["onUserCaptureScreen"]);
+    },
+    offUserCaptureScreen(handler) {
+      calls.push(["offUserCaptureScreen", handler === captureHandler]);
+    },
+    setVisualEffectOnCapture(options) {
+      calls.push(["setVisualEffectOnCapture", options.visualEffect]);
+      options.success && options.success();
+    },
+    showToast(args) {
+      calls.push(["showToast", args.title]);
+    },
+    getStorageSync() {
+      return "";
+    }
+  };
+  const page = loadAnswerPage((url, options = {}) => {
+    calls.push(["request", url, options.data || {}]);
+    if (url === "/student/homework/hw-secure") {
+      return Promise.resolve({
+        title: "安全题库",
+        course: "英语",
+        deadline: "2026-12-31",
+        watermarkText: "小明 · 尾号9069 · 2026-07-11 10:00 · IDstu001",
+        securityNotice: "请勿截屏录屏或外传。",
+        questions: [{ id: "q1", type: "single", stem: "题干", options: ["A"], answer: "A" }]
+      });
+    }
+    if (url === "/student/favorites") {
+      return Promise.resolve([]);
+    }
+    return Promise.resolve({});
+  }, wxMock);
+
+  page.onLoad({ id: "hw-secure" });
+  await flushPromises();
+  captureHandler && captureHandler();
+  page.onUnload();
+  await flushPromises();
+
+  assert.equal(page.data.watermarkText, "小明 · 尾号9069 · 2026-07-11 10:00 · IDstu001");
+  assert.equal(page.data.securityNotice, "请勿截屏录屏或外传。");
+  assert.equal(calls.some((item) => item[0] === "request" && item[1] === "/student/security/events"), true);
+  assert.equal(calls.some((item) => item[0] === "showToast" && item[1] === "学习内容已加专属水印，请勿外传"), true);
+  assert.equal(calls.some((item) => item[0] === "setVisualEffectOnCapture" && item[1] === "hidden"), true);
+  assert.equal(calls.some((item) => item[0] === "setVisualEffectOnCapture" && item[1] === "none"), true);
 });

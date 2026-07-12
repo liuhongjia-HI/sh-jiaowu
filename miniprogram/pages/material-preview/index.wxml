@@ -10,10 +10,11 @@
       <view class="sub">学习记录已保存</view>
       <view class="sub">带专属水印</view>
     </view>
+    <view class="security-notice">{{securityNotice}}</view>
     <view class="paper">
-      <view class="watermark">Gavin · 6235</view>
-      <view class="watermark second">Gavin · 6235</view>
-      <view class="watermark third">Gavin · 6235</view>
+      <view class="watermark-layer">
+        <view wx:for="{{watermarkTexts}}" wx:key="index" class="watermark">{{item}}</view>
+      </view>
       <view class="paper-title">{{paperTitle}}</view>
       <view class="paper-line"></view>
       <view class="paper-line short"></view>
@@ -27,6 +28,7 @@
     </view>
     <view class="button-row">
       <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
+      <button class="button light" bindtap="openSecurePreview">安全预览</button>
       <button class="button" bindtap="goAnswer">去做小挑战</button>
     </view>
   </view>

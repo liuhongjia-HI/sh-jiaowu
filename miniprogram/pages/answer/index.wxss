@@ -9,6 +9,50 @@ textarea {
   margin-top: 18rpx;
 }
 
+.secure-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.answer-watermark-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 70rpx 16rpx;
+  padding: 60rpx 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.answer-watermark {
+  transform: rotate(-24deg);
+  opacity: .09;
+  color: #5d4d45;
+  font-size: 24rpx;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.security-notice {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 18rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 22rpx;
+  background: #fff2ea;
+  color: #9a5b3d;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.secure-section .card,
+.secure-section .button-row {
+  position: relative;
+  z-index: 2;
+}
+
 .question-title {
   margin-top: 14rpx;
 }

@@ -1,6 +1,5 @@
 const PRODUCTION_API_BASE_URL = "https://gate.starlineeducation.com.cn/api";
-const LOCAL_API_BASE_URL = "http://127.0.0.1:8892/api";
-const SUBSCRIBE_TEMPLATE_IDS = [];
+const SUBSCRIBE_TEMPLATE_IDS = ["vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0"];
 
 function resolveEnvVersion() {
   try {
@@ -12,7 +11,7 @@ function resolveEnvVersion() {
 
 function resolveApiBaseUrl() {
   const urls = {
-    develop: LOCAL_API_BASE_URL,
+    develop: PRODUCTION_API_BASE_URL,
     trial: PRODUCTION_API_BASE_URL,
     release: PRODUCTION_API_BASE_URL
   };
@@ -25,11 +24,7 @@ function resolveUseRealWechatLogin() {
 }
 
 App({
-  onLaunch() {
-    if (this.globalData.useRealWechatLogin) {
-      this.ensureLogin().catch(() => {});
-    }
-  },
+  onLaunch() {},
   ensureLogin(options = {}) {
     const cachedToken = wx.getStorageSync("starline_token");
     if (cachedToken && !options.force) {

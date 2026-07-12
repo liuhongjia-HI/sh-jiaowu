@@ -922,6 +922,21 @@ func (h *LearningHandler) StudentMaterialDetail(c *gin.Context) {
 	OK(c, material)
 }
 
+func (h *LearningHandler) StudentSecurityEvent(c *gin.Context) {
+	var req learning.SecurityEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.RecordStudentSecurityEvent(operator.(string), principal, req); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"recorded": true})
+}
+
 func (h *LearningHandler) StudentHomeworkDetail(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	homework, err := h.service.StudentHomework(principal, c.Param("id"))

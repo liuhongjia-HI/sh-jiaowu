@@ -1,8 +1,9 @@
-import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
+import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { getData, postData, putData } from '../services/http';
 import { ActionButton } from '../components/ListViews';
 import { gradeOptions, subjectOptions } from '../utils/curriculum';
@@ -57,6 +58,36 @@ type ScheduleMoveTarget = {
 
 type CandidateLevel = 'full' | 'ready' | 'short';
 type CourseLookup = Record<string, Course>;
+type TimelineKind = 'class' | 'candidate' | 'availability';
+type TimelineItem = {
+  id: string;
+  kind: TimelineKind;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  subject: string;
+  title: string;
+  subtitle: string;
+  meta: string;
+  status?: string;
+  classType?: string;
+  countText?: string;
+  record: ScheduleClass | ScheduleCandidate | AvailabilitySlot;
+};
+type TimelineLayoutItem = TimelineItem & {
+  column: number;
+  columns: number;
+  leftPct?: number;
+  widthPct?: number;
+};
+type WeekDay = {
+  key: string;
+  date: Date;
+  day: number;
+  dayOfWeek: number;
+  weekLabel: string;
+  label: string;
+};
 
 const weekOptions = [
   { label: '周一', value: 1 },
@@ -69,6 +100,10 @@ const weekOptions = [
 ];
 
 const classTypeOptions = ['1V1', '1V2', '1V3', '1V4'].map((value) => ({ label: value, value }));
+const timelineSlotMinutes = 30;
+const timelineSlotHeight = 44;
+const defaultTimelineStart = 14 * 60;
+const defaultTimelineEnd = 22 * 60;
 
 export default function Scheduling({ user }: { user: CurrentUser }) {
   const [availabilityForm] = Form.useForm<AvailabilityFormValues>();
@@ -78,7 +113,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [selectedCandidate, setSelectedCandidate] = useState<ScheduleCandidate | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedCampusId, setSelectedCampusId] = useState(user.campusId || 'campus-main');
-  const [selectedRoomName, setSelectedRoomName] = useState('');
   const [editingClass, setEditingClass] = useState<ScheduleClass | null>(null);
   const [creatingClass, setCreatingClass] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
@@ -92,6 +126,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [classCourseFilter, setClassCourseFilter] = useState<string>();
   const [classTypeFilter, setClassTypeFilter] = useState<string>();
   const [statusFilter, setStatusFilter] = useState<string>('已确认');
+  const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const [hiddenSubjects, setHiddenSubjects] = useState<string[]>([]);
   const queryClient = useQueryClient();
   const canCreateClass = user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 
@@ -141,7 +178,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         courseId: selectedCandidate.courseId,
         teacherId: selectedCandidate.teacherId,
         campusId: selectedCampusId,
-        roomName: selectedRoomName,
+        roomName: '',
         classType: selectedCandidate.classType,
         durationMinutes: candidateRequest.durationMinutes,
         dayOfWeek: selectedCandidate.dayOfWeek,
@@ -156,7 +193,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       message.success('已确认成班，课表已生成');
       setSelectedCandidate(null);
       setSelectedStudentIds([]);
-      setSelectedRoomName('');
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
@@ -245,14 +281,24 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const allCandidates = candidates.data ?? [];
   const readyCandidates = useMemo(() => allCandidates.filter((item) => candidateLevel(item) !== 'short'), [allCandidates]);
   const shortCandidates = useMemo(() => allCandidates.filter((item) => candidateLevel(item) === 'short'), [allCandidates]);
-  const classesByDay = useMemo(() => groupScheduleItems(filteredClasses), [filteredClasses]);
+  const scheduleSubjects = useMemo(() => uniqueScheduleSubjects(classes.data ?? [], allCandidates, courseById), [classes.data, allCandidates, courseById]);
+  const subjectVisibleClasses = useMemo(
+    () => filteredClasses.filter((item) => !hiddenSubjects.includes(scheduleClassSubject(item, courseById) || '其他')),
+    [filteredClasses, hiddenSubjects, courseById]
+  );
+  const selectedWeekDays = useMemo(() => buildWeekDays(selectedWeekStart), [selectedWeekStart]);
+  const selectedWeekClasses = useMemo(
+    () => subjectVisibleClasses.filter((item) => selectedWeekDays.some((day) => scheduleClassOccursOn(item, day.date))),
+    [subjectVisibleClasses, selectedWeekDays]
+  );
+  const classesByDay = useMemo(() => groupScheduleItems(selectedWeekClasses), [selectedWeekClasses]);
   const candidatesByDay = useMemo(() => groupScheduleItems(readyCandidates), [readyCandidates]);
   const availabilityByDay = useMemo(() => groupScheduleItems(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const availabilitySummary = useMemo(() => availabilityStats(availabilityOverview.data ?? []), [availabilityOverview.data]);
-  const activeClassCount = filteredClasses.filter((item) => item.status !== '已取消').length;
+  const activeClassCount = subjectVisibleClasses.filter((item) => item.status !== '已取消').length;
   const totalConfirmedClassCount = (classes.data ?? []).filter((item) => item.status === '已确认').length;
-  const hasClassFilters = Boolean(classGradeFilter || classSubjectFilter || classTeacherFilter || classStudentFilter || classCampusFilter || classCourseFilter || classTypeFilter || statusFilter !== '已确认');
-  const classResultNote = scheduleResultNote(filteredClasses, totalConfirmedClassCount, hasClassFilters, classGradeFilter);
+  const hasClassFilters = Boolean(classGradeFilter || classSubjectFilter || classTeacherFilter || classStudentFilter || classCampusFilter || classCourseFilter || classTypeFilter || hiddenSubjects.length > 0 || statusFilter !== '已确认');
+  const classResultNote = scheduleResultNote(subjectVisibleClasses, totalConfirmedClassCount, hasClassFilters, classGradeFilter);
   const recommendedCount = readyCandidates.length;
   const emptyTips = candidateEmptyTips(candidateRequest, allCandidates);
 
@@ -294,7 +340,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       courseId: record.courseId,
       teacherId: record.teacherId,
       campusId: record.campusId || user.campusId || 'campus-main',
-      roomName: record.roomName || '',
+      roomName: '',
       classType: record.classType,
       durationMinutes: record.durationMinutes,
       dayOfWeek: record.dayOfWeek,
@@ -417,7 +463,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   setSelectedCandidate(candidate);
                   setSelectedStudentIds(candidate.availableStudents.slice(0, candidate.capacity).map((student) => student.id));
                   setSelectedCampusId(user.campusId || 'campus-main');
-                  setSelectedRoomName('');
                 }}
               />
             ))}
@@ -465,104 +510,171 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             </div>
           </div>
 
-          <div className="schedule-filterbar">
-            <Select allowClear showSearch optionFilterProp="label" placeholder="全部年级" options={gradeOptions()} value={classGradeFilter} onChange={setClassGradeFilter} />
-            <Select allowClear showSearch optionFilterProp="label" placeholder="全部学科" options={classSubjectOptions} value={classSubjectFilter} onChange={setClassSubjectFilter} />
-            <Select allowClear placeholder="全部老师" options={teacherOptions} value={classTeacherFilter} onChange={setClassTeacherFilter} />
-            <Select allowClear showSearch optionFilterProp="label" placeholder="全部学生" options={studentOptions} value={classStudentFilter} onChange={setClassStudentFilter} />
-            <Select allowClear showSearch optionFilterProp="label" placeholder="全部校区" options={campusOptions} value={classCampusFilter} onChange={setClassCampusFilter} />
-            <Select allowClear showSearch optionFilterProp="label" placeholder="全部课程" options={courseOptions} value={classCourseFilter} onChange={setClassCourseFilter} />
-            <Select allowClear placeholder="全部班型" options={classTypeOptions} value={classTypeFilter} onChange={setClassTypeFilter} />
-            <Select options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
-            {hasClassFilters && (
-              <Button
-                onClick={() => {
-                  setClassGradeFilter(undefined);
-                  setClassSubjectFilter(undefined);
-                  setClassTeacherFilter(undefined);
-                  setClassStudentFilter(undefined);
-                  setClassCourseFilter(undefined);
-                  setClassTypeFilter(undefined);
-                  setStatusFilter('已确认');
-                }}
-              >
-                清空筛选
-              </Button>
-            )}
-          </div>
-
-          <div className="schedule-result-note">
-            <Typography.Text type={filteredClasses.length === 0 && hasClassFilters ? 'warning' : 'secondary'}>
-              {classResultNote}
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              已收集 {availabilitySummary.teacherCount} 个老师时间、{availabilitySummary.studentCount} 个学生时间。
-            </Typography.Text>
-          </div>
-
-          <div className="schedule-legend">
-            <span><i className="legend-dot legend-available-teacher" />老师可授课</span>
-            <span><i className="legend-dot legend-available-student" />学生可上课</span>
-            <span><i className="legend-dot legend-candidate" />可排方案</span>
-            <span><i className="legend-dot legend-confirmed" />已确认</span>
-            <span><i className="legend-dot legend-canceled" />已取消</span>
-          </div>
-
-          {viewMode === 'week' ? (
-            <WeekScheduleBoard
-              loading={classes.isFetching || candidates.isFetching || availabilityOverview.isFetching}
-              availabilityByDay={availabilityByDay}
-              candidatesByDay={candidatesByDay}
-              classesByDay={classesByDay}
-              courseById={courseById}
-              teacherById={teacherById}
-              studentById={studentById}
-              candidateRequest={candidateRequest}
-              selectedCandidateId={selectedCandidate?.id}
-              emptyTips={emptyTips}
-              showCandidateEmptyTips={false}
-              canManage={canCreateClass}
-              onPickCandidate={(record) => {
-                setSelectedCandidate(record);
-                setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));
-                setSelectedCampusId(user.campusId || 'campus-main');
-                setSelectedRoomName('');
-              }}
-              onEditClass={openEdit}
-              onMoveClass={confirmMoveClass}
-              onCreateClass={openCreateClassForDay}
-            />
-          ) : viewMode === 'month' ? (
-            <MonthScheduleBoard
-              classes={filteredClasses}
-              courseById={courseById}
-              teacherById={teacherById}
-              canManage={canCreateClass}
-              onEditClass={openEdit}
-              onMoveClass={confirmMoveClass}
-            />
-          ) : (
-            filteredClasses.length === 0 ? (
-              <Empty
-                description={hasClassFilters ? '没有符合筛选条件的课程。' : '还没有已确认课程。'}
-              >
-                {hasClassFilters && (
-                  <Button onClick={() => {
-                    setClassTeacherFilter(undefined);
-                    setClassCourseFilter(undefined);
-                    setClassGradeFilter(undefined);
-                    setClassTypeFilter(undefined);
-                    setStatusFilter('已确认');
+          <div className="schedule-outlook-shell">
+            <aside className="schedule-outlook-sidebar">
+              <div className="schedule-sidebar-section">
+                <div className="schedule-sidebar-head">
+                  <strong>{calendarMonth.getFullYear()} 年 {calendarMonth.getMonth() + 1} 月</strong>
+                  <Space size={4}>
+                    <ActionButton tooltip="上个月" icon={<LeftOutlined />} onClick={() => setCalendarMonth(addMonths(calendarMonth, -1))} />
+                    <ActionButton tooltip="下个月" icon={<RightOutlined />} onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))} />
+                  </Space>
+                </div>
+                <MiniMonthCalendar
+                  month={calendarMonth}
+                  selectedWeekStart={selectedWeekStart}
+                  onPickDate={(date) => {
+                    setSelectedWeekStart(startOfWeek(date));
+                    setCalendarMonth(startOfMonth(date));
                   }}
+                />
+              </div>
+
+              <div className="schedule-sidebar-section">
+                <div className="schedule-sidebar-head">
+                  <strong>学科日历</strong>
+                  {hiddenSubjects.length > 0 && <Button type="link" size="small" onClick={() => setHiddenSubjects([])}>全部显示</Button>}
+                </div>
+                <div className="schedule-subject-list">
+                  {scheduleSubjects.map((subject) => {
+                    const color = subjectColor(subject);
+                    const hidden = hiddenSubjects.includes(subject);
+                    return (
+                      <button
+                        type="button"
+                        className={`schedule-subject-toggle ${hidden ? 'is-muted' : ''}`}
+                        key={subject}
+                        style={{ '--subject-color': color.accent } as CSSProperties}
+                        onClick={() => setHiddenSubjects((values) => values.includes(subject) ? values.filter((item) => item !== subject) : [...values, subject])}
+                      >
+                        <i />
+                        <span>{subject}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="schedule-sidebar-section">
+                <div className="schedule-sidebar-head">
+                  <strong>筛选</strong>
+                  {hasClassFilters && (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => {
+                        setClassGradeFilter(undefined);
+                        setClassSubjectFilter(undefined);
+                        setClassTeacherFilter(undefined);
+                        setClassStudentFilter(undefined);
+                        setClassCampusFilter(undefined);
+                        setClassCourseFilter(undefined);
+                        setClassTypeFilter(undefined);
+                        setHiddenSubjects([]);
+                        setStatusFilter('已确认');
+                      }}
+                    >
+                      清空
+                    </Button>
+                  )}
+                </div>
+                <div className="schedule-sidebar-filters">
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="全部年级" options={gradeOptions()} value={classGradeFilter} onChange={setClassGradeFilter} />
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="全部学科" options={classSubjectOptions} value={classSubjectFilter} onChange={setClassSubjectFilter} />
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="全部老师" options={teacherOptions} value={classTeacherFilter} onChange={setClassTeacherFilter} />
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="全部学生" options={studentOptions} value={classStudentFilter} onChange={setClassStudentFilter} />
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="全部校区" options={campusOptions} value={classCampusFilter} onChange={setClassCampusFilter} />
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="全部课程" options={courseOptions} value={classCourseFilter} onChange={setClassCourseFilter} />
+                  <Select allowClear placeholder="全部班型" options={classTypeOptions} value={classTypeFilter} onChange={setClassTypeFilter} />
+                  <Select options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
+                </div>
+              </div>
+            </aside>
+
+            <div className="schedule-outlook-main">
+              <div className="schedule-result-note">
+                <Typography.Text type={subjectVisibleClasses.length === 0 && hasClassFilters ? 'warning' : 'secondary'}>
+                  {classResultNote}
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  已收集 {availabilitySummary.teacherCount} 个老师时间、{availabilitySummary.studentCount} 个学生时间。
+                </Typography.Text>
+              </div>
+
+              <div className="schedule-legend">
+                <span><i className="legend-dot legend-available-teacher" />老师可授课</span>
+                <span><i className="legend-dot legend-available-student" />学生可上课</span>
+                <span><i className="legend-dot legend-candidate" />可排方案</span>
+                <span><i className="legend-dot legend-confirmed" />已确认</span>
+                <span><i className="legend-dot legend-canceled" />已取消</span>
+              </div>
+
+              {viewMode === 'week' ? (
+                <ScheduleWeekTimeline
+                  loading={classes.isFetching || candidates.isFetching || availabilityOverview.isFetching}
+                  weekDays={selectedWeekDays}
+                  selectedWeekStart={selectedWeekStart}
+                  availabilityByDay={availabilityByDay}
+                  candidatesByDay={candidatesByDay}
+                  classesByDay={classesByDay}
+                  courseById={courseById}
+                  teacherById={teacherById}
+                  studentById={studentById}
+                  candidateRequest={candidateRequest}
+                  selectedCandidateId={selectedCandidate?.id}
+                  emptyTips={emptyTips}
+                  canManage={canCreateClass}
+                  onPreviousWeek={() => setSelectedWeekStart(addDays(selectedWeekStart, -7))}
+                  onNextWeek={() => setSelectedWeekStart(addDays(selectedWeekStart, 7))}
+                  onToday={() => {
+                    const today = new Date();
+                    setSelectedWeekStart(startOfWeek(today));
+                    setCalendarMonth(startOfMonth(today));
+                  }}
+                  onPickCandidate={(record) => {
+                    setSelectedCandidate(record);
+                    setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));
+                    setSelectedCampusId(user.campusId || 'campus-main');
+                  }}
+                  onEditClass={openEdit}
+                  onMoveClass={confirmMoveClass}
+                  onCreateClass={openCreateClassForDay}
+                />
+              ) : viewMode === 'month' ? (
+                <MonthScheduleBoard
+                  classes={subjectVisibleClasses}
+                  courseById={courseById}
+                  teacherById={teacherById}
+                  canManage={canCreateClass}
+                  onEditClass={openEdit}
+                  onMoveClass={confirmMoveClass}
+                />
+              ) : (
+                subjectVisibleClasses.length === 0 ? (
+                  <Empty
+                    description={hasClassFilters ? '没有符合筛选条件的课程。' : '还没有已确认课程。'}
                   >
-                    清空筛选
-                  </Button>
-                )}
-              </Empty>
-            ) : (
-              <Table rowKey="id" dataSource={filteredClasses} pagination={false} columns={classColumns(courseById, teacherById, canCreateClass, openEdit, (id) => cancelClass.mutate(id), cancelClass.isPending)} />
-            )
-          )}
+                    {hasClassFilters && (
+                      <Button onClick={() => {
+                        setClassTeacherFilter(undefined);
+                        setClassCourseFilter(undefined);
+                        setClassGradeFilter(undefined);
+                        setClassSubjectFilter(undefined);
+                        setClassTypeFilter(undefined);
+                        setHiddenSubjects([]);
+                        setStatusFilter('已确认');
+                      }}
+                      >
+                        清空筛选
+                      </Button>
+                    )}
+                  </Empty>
+                ) : (
+                  <Table rowKey="id" dataSource={subjectVisibleClasses} pagination={false} columns={classColumns(courseById, teacherById, canCreateClass, openEdit, (id) => cancelClass.mutate(id), cancelClass.isPending)} />
+                )
+              )}
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -632,14 +744,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   style={{ width: '100%' }}
                 />
               </Form.Item>
-              <Space.Compact block>
-                <Form.Item label="校区" style={{ width: '45%' }}>
-                  <Input value={selectedCampusId} onChange={(event) => setSelectedCampusId(event.target.value)} placeholder="campus-main" />
-                </Form.Item>
-                <Form.Item label="教室/资源" style={{ width: '55%' }}>
-                  <Input value={selectedRoomName} onChange={(event) => setSelectedRoomName(event.target.value)} placeholder="例如：A101 / 线上会议室" />
-                </Form.Item>
-              </Space.Compact>
+              <Form.Item label="校区">
+                <Input value={selectedCampusId} onChange={(event) => setSelectedCampusId(event.target.value)} placeholder="campus-main" />
+              </Form.Item>
             </Form>
           </Space>
         )}
@@ -679,14 +786,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           <Form.Item name="teacherId" label="老师" rules={[{ required: true, message: '请选择老师' }]}>
             <Select showSearch optionFilterProp="label" options={teacherOptions} />
           </Form.Item>
-          <Space.Compact block>
-            <Form.Item name="campusId" label="校区" style={{ width: '45%' }}>
-              <Input placeholder="campus-main" />
-            </Form.Item>
-            <Form.Item name="roomName" label="教室/资源" style={{ width: '55%' }}>
-              <Input placeholder="例如：A101 / 线上会议室" />
-            </Form.Item>
-          </Space.Compact>
+          <Form.Item name="campusId" label="校区">
+            <Input placeholder="campus-main" />
+          </Form.Item>
           <Space.Compact block>
             <Form.Item name="classType" rules={[{ required: true, message: '请选择班型' }]} style={{ width: '32%' }}>
               <Select options={classTypeOptions} />
@@ -773,8 +875,10 @@ function CoordinationPanel({ candidates, teacherById, onCoordinate }: { candidat
   );
 }
 
-function WeekScheduleBoard({
+function ScheduleWeekTimeline({
   loading,
+  weekDays,
+  selectedWeekStart,
   availabilityByDay,
   candidatesByDay,
   classesByDay,
@@ -784,14 +888,18 @@ function WeekScheduleBoard({
   candidateRequest,
   selectedCandidateId,
   emptyTips,
-  showCandidateEmptyTips,
   canManage,
+  onPreviousWeek,
+  onNextWeek,
+  onToday,
   onPickCandidate,
   onEditClass,
   onMoveClass,
   onCreateClass
 }: {
   loading: boolean;
+  weekDays: WeekDay[];
+  selectedWeekStart: Date;
   availabilityByDay: Record<number, AvailabilitySlot[]>;
   candidatesByDay: Record<number, ScheduleCandidate[]>;
   classesByDay: Record<number, ScheduleClass[]>;
@@ -801,135 +909,108 @@ function WeekScheduleBoard({
   candidateRequest: CandidateFormValues | null;
   selectedCandidateId?: string;
   emptyTips: string[];
-  showCandidateEmptyTips: boolean;
   canManage: boolean;
+  onPreviousWeek: () => void;
+  onNextWeek: () => void;
+  onToday: () => void;
   onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
   onCreateClass: (dayOfWeek: number) => void;
 }) {
-  const hasAnyItem = weekOptions.some((day) =>
-    (availabilityByDay[day.value]?.length ?? 0) > 0 ||
-    (candidatesByDay[day.value]?.length ?? 0) > 0 ||
-    (classesByDay[day.value]?.length ?? 0) > 0
-  );
+  const timelineItems = useMemo(() => buildTimelineItems(weekDays, availabilityByDay, candidatesByDay, classesByDay, courseById, teacherById, studentById), [weekDays, availabilityByDay, candidatesByDay, classesByDay, courseById, teacherById, studentById]);
+  const hasAnyItem = timelineItems.length > 0;
+  const timelineRange = useMemo(() => buildTimelineRange(timelineItems), [timelineItems]);
+  const rows = useMemo(() => buildTimelineRows(timelineRange.start, timelineRange.end), [timelineRange]);
+  const boardHeight = ((timelineRange.end - timelineRange.start) / timelineSlotMinutes) * timelineSlotHeight;
+  const itemsByDay = useMemo(() => {
+    return weekDays.reduce<Record<number, TimelineLayoutItem[]>>((result, day) => {
+      result[day.dayOfWeek] = layoutOverlappingItems(timelineItems.filter((item) => item.dayOfWeek === day.dayOfWeek));
+      return result;
+    }, {});
+  }, [weekDays, timelineItems]);
 
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />;
-  if (!hasAnyItem) {
-    return (
-      <ScheduleEmptyTips
-        description={candidateRequest ? '暂时没有可展示的排课结果。' : '选择课程和老师后，查找可排时间。'}
-        tips={emptyTips}
-      />
-    );
-  }
 
   return (
-    <div className="week-board-wrap">
-      {showCandidateEmptyTips && candidateRequest && !hasGroupedItems(candidatesByDay) && (
+    <div className="schedule-timeline-wrap">
+      {!hasAnyItem && (
+        <ScheduleEmptyTips
+          description={candidateRequest ? '暂时没有可展示的排课结果。' : '选择课程和老师后，查找可排时间。'}
+          tips={emptyTips}
+          compact
+        />
+      )}
+      {candidateRequest && !hasGroupedItems(candidatesByDay) && (
         <ScheduleEmptyTips description="没有找到推荐时间。" tips={emptyTips} compact />
       )}
-      <div className="week-board">
-        {weekOptions.map((day) => {
-          const dayAvailability = availabilityByDay[day.value] ?? [];
-          const dayCandidates = candidatesByDay[day.value] ?? [];
-          const dayClasses = classesByDay[day.value] ?? [];
-          const isEmptyDay = dayAvailability.length === 0 && dayCandidates.length === 0 && dayClasses.length === 0;
+      <div className="schedule-timeline-toolbar">
+        <Space size={8}>
+          <Button icon={<LeftOutlined />} onClick={onPreviousWeek} />
+          <Button onClick={onToday}>今天</Button>
+          <Button icon={<RightOutlined />} onClick={onNextWeek} />
+        </Space>
+        <div>
+          <Typography.Title level={4}>{formatWeekRange(selectedWeekStart)}</Typography.Title>
+          <Typography.Text type="secondary">按时间查看本周课程、可排方案和师生可上课时间</Typography.Text>
+        </div>
+      </div>
 
-          return (
-            <div
-              className="week-day"
-              key={day.value}
-              onDragOver={(event) => canManage ? event.preventDefault() : undefined}
-              onDrop={(event) => {
-                const classID = event.dataTransfer.getData('text/schedule-class-id');
-                const record = Object.values(classesByDay).flat().find((item) => item.id === classID);
-                if (record) onMoveClass(record, { dayOfWeek: day.value, label: day.label });
-              }}
-            >
-              <div className="week-day-header">
-                <strong>{day.label}</strong>
-                <span>{dayClasses.filter((item) => item.status !== '已取消').length} 节课</span>
+      <div className="schedule-timeline-scroll">
+        <div className="schedule-timeline-grid" style={{ '--timeline-height': `${boardHeight}px` } as CSSProperties}>
+          <div className="schedule-time-gutter schedule-day-head-spacer" />
+          {weekDays.map((day) => (
+            <div className="schedule-day-head" key={day.key}>
+              <strong>{day.day}</strong>
+              <span>{day.weekLabel}</span>
+              <small>{(classesByDay[day.dayOfWeek] ?? []).filter((item) => item.status !== '已取消').length} 节课</small>
+            </div>
+          ))}
+          <div className="schedule-time-gutter schedule-time-axis" style={{ height: boardHeight }}>
+            {rows.map((row) => (
+              <div className="schedule-time-label" key={row.minute} style={{ top: row.top }}>
+                {row.label}
               </div>
+            ))}
+          </div>
+          {weekDays.map((day) => {
+            const dayItems = itemsByDay[day.dayOfWeek] ?? [];
+            return (
               <div
-                className="week-day-body"
+                className="schedule-day-column"
+                key={day.key}
+                style={{ height: boardHeight }}
+                onDragOver={(event) => canManage ? event.preventDefault() : undefined}
+                onDrop={(event) => {
+                  const classID = event.dataTransfer.getData('text/schedule-class-id');
+                  const record = Object.values(classesByDay).flat().find((item) => item.id === classID);
+                  if (record) onMoveClass(record, { dayOfWeek: day.dayOfWeek, label: day.label });
+                }}
                 onDoubleClick={(event) => {
-                  if (event.currentTarget === event.target && canManage) onCreateClass(day.value);
+                  if (event.currentTarget === event.target && canManage) onCreateClass(day.dayOfWeek);
                 }}
               >
-                {isEmptyDay ? (
-                  <button type="button" className="week-day-empty week-day-create" onClick={() => canManage ? onCreateClass(day.value) : undefined}>
-                    {canManage ? '点击新建课程' : '暂无安排'}
+                {rows.map((row) => <span className="schedule-time-line" key={row.minute} style={{ top: row.top }} />)}
+                {dayItems.length === 0 && (
+                  <button type="button" className="schedule-day-empty-slot" onClick={() => canManage ? onCreateClass(day.dayOfWeek) : undefined}>
+                    {canManage ? '新建课程' : '暂无安排'}
                   </button>
-                ) : (
-                  <>
-                    {dayAvailability.map((slot) => (
-                      <div className={`schedule-block schedule-block-available availability-${slot.ownerType}`} key={slot.id}>
-                        <div className="schedule-block-time">{slot.startTime}-{slot.endTime}</div>
-                        <div className="schedule-block-title">{slot.ownerType === 'teacher' ? '老师可授课' : '学生可上课'}</div>
-                        <div className="schedule-block-meta">{availabilityOwnerDisplayName(slot, teacherById, studentById)}</div>
-                      </div>
-                    ))}
-
-                    {sortByStartTime(dayCandidates).map((candidate) => {
-                      const level = candidateLevel(candidate);
-                      const levelMeta = candidateLevelMeta(level);
-                      const course = courseById[candidate.courseId];
-                      return (
-                        <div
-                          className={`schedule-block schedule-block-candidate candidate-${level} ${candidate.id === selectedCandidateId ? 'is-selected' : ''}`}
-                          key={candidate.id}
-                        >
-                          <div className="schedule-block-time">{candidate.startTime}-{candidate.endTime}</div>
-                          <div className="schedule-block-title">{courseSubjectGradeText(course, candidate.courseName)}</div>
-                          <div className="schedule-block-course">{candidate.courseName}</div>
-                          <div className="schedule-block-meta">{teacherDisplay(candidate.teacherName, course, teacherById[candidate.teacherId])}</div>
-                          <div className="schedule-block-students"><strong>学生：</strong>{studentDisplayNames(candidate.availableStudents)}</div>
-                          <div className="schedule-block-tags">
-                            <Tag>{candidate.classType}</Tag>
-                            <Tag color={levelMeta.color}>{levelMeta.label}</Tag>
-                            <Tag color={candidate.studentCount >= candidate.capacity ? 'green' : 'orange'}>{candidate.studentCount}/{candidate.capacity}</Tag>
-                          </div>
-                          <Button size="small" type={level === 'short' ? 'default' : 'primary'} disabled={level === 'short'} onClick={() => onPickCandidate(candidate)}>确认这个时间</Button>
-                        </div>
-                      );
-                    })}
-
-                    {sortByStartTime(dayClasses).map((item) => {
-                      const course = courseById[item.courseId];
-                      return (
-                        <button
-                          type="button"
-                          className={`schedule-block schedule-block-class ${item.status === '已取消' ? 'is-canceled' : ''}`}
-                          key={item.id}
-                          draggable={canManage && item.status !== '已取消'}
-                          onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
-                          onClick={() => canManage && item.status !== '已取消' ? onEditClass(item) : undefined}
-                        >
-                          <div className="schedule-block-time">{item.startTime}-{item.endTime}</div>
-                          <div className="schedule-block-title">{courseSubjectGradeText(course, item.courseName)}</div>
-                          <div className="schedule-block-course">{item.courseName}</div>
-                          <div className="schedule-block-meta">{teacherDisplay(item.teacherName, course, teacherById[item.teacherId])}</div>
-                          <div className="schedule-block-students"><strong>学生：</strong>{studentDisplayNames(item.students)}</div>
-                          <div className="schedule-block-tags">
-                            <Tag>{item.classType}</Tag>
-                            <Tag>{item.students.length}/{item.capacity}</Tag>
-                            <Tag color={item.status === '已取消' ? 'default' : 'green'}>{item.status}</Tag>
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {canManage && (
-                      <button type="button" className="week-day-add" onClick={() => onCreateClass(day.value)}>
-                        + 新建课程
-                      </button>
-                    )}
-                  </>
                 )}
+                {dayItems.map((item) => (
+                  <TimelineBlock
+                    key={`${item.kind}-${item.id}`}
+                    item={item}
+                    rangeStart={timelineRange.start}
+                    selectedCandidateId={selectedCandidateId}
+                    canManage={canManage}
+                    onPickCandidate={onPickCandidate}
+                    onEditClass={onEditClass}
+                  />
+                ))}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -944,6 +1025,123 @@ function ScheduleEmptyTips({ description, tips, compact = false }: { description
           {tips.map((tip) => <div key={tip}>{tip}</div>)}
         </div>
       )}
+    </div>
+  );
+}
+
+function MiniMonthCalendar({ month, selectedWeekStart, onPickDate }: { month: Date; selectedWeekStart: Date; onPickDate: (date: Date) => void }) {
+  const days = useMemo(() => buildMiniMonthDays(month), [month]);
+  const selectedKey = localDateText(selectedWeekStart);
+  return (
+    <div className="schedule-mini-calendar">
+      {['一', '二', '三', '四', '五', '六', '日'].map((item) => <span className="schedule-mini-week" key={item}>{item}</span>)}
+      {days.map((day) => {
+        const weekSelected = localDateText(startOfWeek(day.date)) === selectedKey;
+        return (
+          <button
+            type="button"
+            className={`schedule-mini-day ${day.inMonth ? '' : 'is-outside'} ${weekSelected ? 'is-week-selected' : ''} ${day.isToday ? 'is-today' : ''}`}
+            key={day.key}
+            onClick={() => onPickDate(day.date)}
+          >
+            {day.date.getDate()}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TimelineBlock({
+  item,
+  rangeStart,
+  selectedCandidateId,
+  canManage,
+  onPickCandidate,
+  onEditClass
+}: {
+  item: TimelineLayoutItem;
+  rangeStart: number;
+  selectedCandidateId?: string;
+  canManage: boolean;
+  onPickCandidate: (record: ScheduleCandidate) => void;
+  onEditClass: (record: ScheduleClass) => void;
+}) {
+  const start = timeToMinutes(item.startTime);
+  const end = Math.max(timeToMinutes(item.endTime), start + timelineSlotMinutes);
+  const color = subjectColor(item.subject);
+  const top = ((start - rangeStart) / timelineSlotMinutes) * timelineSlotHeight;
+  const height = Math.max(34, ((end - start) / timelineSlotMinutes) * timelineSlotHeight - 4);
+  const widthPct = item.widthPct ?? (100 / item.columns);
+  const leftPct = item.leftPct ?? ((100 / item.columns) * item.column);
+  const width = `calc(${widthPct}% - 4px)`;
+  const left = `calc(${leftPct}% + 2px)`;
+  const style = {
+    top,
+    height,
+    left,
+    width,
+    '--subject-bg': color.bg,
+    '--subject-border': color.border,
+    '--subject-accent': color.accent,
+    '--subject-text': color.text
+  } as CSSProperties;
+  const title = `${item.startTime}-${item.endTime} ${item.title} ${item.subtitle}`;
+  const className = [
+    'schedule-timeline-block',
+    `is-${item.kind}`,
+    item.status === '已取消' ? 'is-canceled' : '',
+    item.kind === 'candidate' && item.id === selectedCandidateId ? 'is-selected' : ''
+  ].filter(Boolean).join(' ');
+  const content = (
+    <>
+      <div className="schedule-timeline-time">{item.startTime}-{item.endTime}</div>
+      <strong>{item.title}</strong>
+      <span>{item.subtitle}</span>
+      <small>{item.meta}</small>
+      <div className="schedule-timeline-tags">
+        {item.classType && <Tag>{item.classType}</Tag>}
+        {item.countText && <Tag>{item.countText}</Tag>}
+        {item.status && <Tag color={item.status === '已取消' ? 'default' : 'green'}>{item.status}</Tag>}
+      </div>
+    </>
+  );
+
+  if (item.kind === 'class') {
+    const record = item.record as ScheduleClass;
+    return (
+      <button
+        type="button"
+        className={className}
+        style={style}
+        title={title}
+        draggable={canManage && record.status !== '已取消'}
+        onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', record.id)}
+        onClick={() => canManage && record.status !== '已取消' ? onEditClass(record) : undefined}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  if (item.kind === 'candidate') {
+    return (
+      <button
+        type="button"
+        className={className}
+        style={style}
+        title={title}
+        onClick={() => onPickCandidate(item.record as ScheduleCandidate)}
+      >
+        {content}
+        <span className="schedule-timeline-action">确认这个时间</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className={className} style={style} title={title}>
+      {content}
     </div>
   );
 }
@@ -1035,7 +1233,6 @@ function classColumns(courseById: CourseLookup, teacherById: Record<string, Teac
     { title: '课程', dataIndex: 'courseName', ellipsis: true },
     { title: '老师', width: 220, render: (_, record) => teacherDisplay(record.teacherName, courseById[record.courseId], teacherById[record.teacherId]) },
     { title: '时间', width: 160, render: (_, record) => `${weekLabel(record.dayOfWeek)} ${record.startTime}-${record.endTime}` },
-    { title: '教室/资源', width: 140, render: (_, record) => record.roomName ? `${record.campusId || 'campus-main'} · ${record.roomName}` : '-' },
     { title: '班型', dataIndex: 'classType', width: 90 },
     { title: '学生', render: (_, record) => tagList(record.students.map(studentDisplayName), 'blue') },
     { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '已取消' ? 'default' : 'green'}>{value}</Tag> }
@@ -1111,6 +1308,210 @@ function studentDisplayNames(students: { name: string; grade?: string }[]) {
   return `${values.slice(0, 3).join('、')} 等 ${values.length} 人`;
 }
 
+function buildTimelineItems(
+  weekDays: WeekDay[],
+  availabilityByDay: Record<number, AvailabilitySlot[]>,
+  candidatesByDay: Record<number, ScheduleCandidate[]>,
+  classesByDay: Record<number, ScheduleClass[]>,
+  courseById: CourseLookup,
+  teacherById: Record<string, Teacher>,
+  studentById: Record<string, Student>
+) {
+  return weekDays.flatMap<TimelineItem>((day) => {
+    const availabilityItems = aggregateAvailabilitySlots(availabilityByDay[day.dayOfWeek] ?? [], teacherById, studentById).map<TimelineItem>((group) => ({
+      id: group.id,
+      kind: 'availability',
+      dayOfWeek: day.dayOfWeek,
+      startTime: group.startTime,
+      endTime: group.endTime,
+      subject: group.ownerType === 'teacher' ? '老师可授课' : '学生可上课',
+      title: group.ownerType === 'teacher' ? '老师可授课' : '学生可上课',
+      subtitle: group.subtitle,
+      meta: '可排课时间',
+      countText: group.countText,
+      record: group.record
+    }));
+    const candidateItems = sortByStartTime(candidatesByDay[day.dayOfWeek] ?? []).map<TimelineItem>((candidate) => {
+      const course = courseById[candidate.courseId];
+      const level = candidateLevelMeta(candidateLevel(candidate));
+      return {
+        id: candidate.id,
+        kind: 'candidate',
+        dayOfWeek: day.dayOfWeek,
+        startTime: candidate.startTime,
+        endTime: candidate.endTime,
+        subject: candidate.subject || course?.subject || '其他',
+        title: courseSubjectGradeText(course, candidate.courseName),
+        subtitle: candidate.courseName,
+        meta: `${teacherDisplay(candidate.teacherName, course, teacherById[candidate.teacherId])} · 学生：${studentDisplayNames(candidate.availableStudents)}`,
+        classType: candidate.classType,
+        countText: `${candidate.studentCount}/${candidate.capacity}`,
+        status: level.label,
+        record: candidate
+      };
+    });
+    const classItems = sortByStartTime(classesByDay[day.dayOfWeek] ?? []).map<TimelineItem>((item) => {
+      const course = courseById[item.courseId];
+      return {
+        id: item.id,
+        kind: 'class',
+        dayOfWeek: day.dayOfWeek,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        subject: scheduleClassSubject(item, courseById) || '其他',
+        title: item.name || courseSubjectGradeText(course, item.courseName),
+        subtitle: courseSubjectGradeText(course, item.courseName),
+        meta: `${teacherDisplay(item.teacherName, course, teacherById[item.teacherId])} · 学生：${studentDisplayNames(item.students)}`,
+        classType: item.classType,
+        countText: `${item.students.length}/${item.capacity}`,
+        status: item.status,
+        record: item
+      };
+    });
+    return [...availabilityItems, ...candidateItems, ...classItems];
+  });
+}
+
+function aggregateAvailabilitySlots(slots: AvailabilitySlot[], teacherById: Record<string, Teacher>, studentById: Record<string, Student>) {
+  const groups = new Map<string, { slots: AvailabilitySlot[]; names: string[] }>();
+  slots.forEach((slot) => {
+    const key = `${slot.ownerType}-${slot.dayOfWeek}-${slot.startTime}-${slot.endTime}`;
+    const group = groups.get(key) ?? { slots: [], names: [] };
+    group.slots.push(slot);
+    group.names.push(availabilityOwnerDisplayName(slot, teacherById, studentById));
+    groups.set(key, group);
+  });
+  return Array.from(groups.values()).map((group) => {
+    const first = group.slots[0];
+    const names = group.names;
+    const shortNames = names.length <= 2 ? names.join('、') : `${names.slice(0, 2).join('、')} 等`;
+    return {
+      id: `${first.ownerType}-${first.dayOfWeek}-${first.startTime}-${first.endTime}`,
+      ownerType: first.ownerType,
+      startTime: first.startTime,
+      endTime: first.endTime,
+      subtitle: names.length === 1 ? shortNames : `${names.length} 人：${shortNames}`,
+      countText: names.length > 1 ? `${names.length}人` : undefined,
+      record: first
+    };
+  });
+}
+
+function layoutOverlappingItems(items: TimelineItem[]) {
+  const primary = items.filter((item) => item.kind !== 'availability');
+  const availability = items.filter((item) => item.kind === 'availability');
+  if (primary.length === 0) return layoutOverlappingGroup(availability);
+  const primaryItems = layoutOverlappingGroup(primary).map((item) => ({
+    ...item,
+    leftPct: (76 / item.columns) * item.column,
+    widthPct: 76 / item.columns
+  }));
+  const availabilityItems = layoutOverlappingGroup(availability).map((item) => ({
+    ...item,
+    leftPct: 78 + (20 / item.columns) * item.column,
+    widthPct: 20 / item.columns
+  }));
+  return [...availabilityItems, ...primaryItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
+}
+
+function layoutOverlappingGroup(items: TimelineItem[]) {
+  const sorted = [...items].sort((left, right) => {
+    const diff = timeToMinutes(left.startTime) - timeToMinutes(right.startTime);
+    return diff || timeToMinutes(left.endTime) - timeToMinutes(right.endTime);
+  });
+  const result: TimelineLayoutItem[] = [];
+  let group: TimelineItem[] = [];
+  let groupEnd = -1;
+
+  function flushGroup() {
+    if (group.length === 0) return;
+    const columnEnds: number[] = [];
+    const laidOut = group.map((item) => {
+      const start = timeToMinutes(item.startTime);
+      const end = Math.max(timeToMinutes(item.endTime), start + timelineSlotMinutes);
+      let column = columnEnds.findIndex((value) => value <= start);
+      if (column === -1) {
+        column = columnEnds.length;
+        columnEnds.push(end);
+      } else {
+        columnEnds[column] = end;
+      }
+      return { ...item, column, columns: 1 };
+    });
+    const columns = Math.max(1, columnEnds.length);
+    laidOut.forEach((item) => result.push({ ...item, columns }));
+    group = [];
+    groupEnd = -1;
+  }
+
+  sorted.forEach((item) => {
+    const start = timeToMinutes(item.startTime);
+    const end = Math.max(timeToMinutes(item.endTime), start + timelineSlotMinutes);
+    if (group.length > 0 && start >= groupEnd) flushGroup();
+    group.push(item);
+    groupEnd = Math.max(groupEnd, end);
+  });
+  flushGroup();
+  return result;
+}
+
+function buildTimelineRange(items: TimelineItem[]) {
+  const minutes = items.flatMap((item) => [timeToMinutes(item.startTime), timeToMinutes(item.endTime)]).filter((value) => Number.isFinite(value));
+  if (minutes.length === 0) return { start: defaultTimelineStart, end: defaultTimelineEnd };
+  const min = Math.min(defaultTimelineStart, ...minutes);
+  const max = Math.max(defaultTimelineEnd, ...minutes);
+  return {
+    start: Math.max(0, Math.floor(min / 60) * 60),
+    end: Math.min(24 * 60, Math.ceil(max / 60) * 60)
+  };
+}
+
+function buildTimelineRows(start: number, end: number) {
+  const rows = [];
+  for (let minute = start; minute <= end; minute += timelineSlotMinutes) {
+    rows.push({
+      minute,
+      top: ((minute - start) / timelineSlotMinutes) * timelineSlotHeight,
+      label: formatMinute(minute)
+    });
+  }
+  return rows;
+}
+
+function timeToMinutes(value: string) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value || '');
+  if (!match) return defaultTimelineStart;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return defaultTimelineStart;
+  return Math.max(0, Math.min(24 * 60, hour * 60 + minute));
+}
+
+function formatMinute(value: number) {
+  const hour = Math.floor(value / 60);
+  const minute = value % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function subjectColor(subject: string) {
+  const normalized = subject.toLowerCase();
+  if (normalized.includes('eng') || subject.includes('英语')) return { bg: '#d8ebfb', border: '#a9cdea', accent: '#2f7dcc', text: '#14395d' };
+  if (normalized.includes('math') || subject.includes('数学')) return { bg: '#fff5c9', border: '#f1d673', accent: '#d4a900', text: '#594700' };
+  if (normalized.includes('geo') || normalized.includes('his') || subject.includes('地理') || subject.includes('历史')) return { bg: '#d8f0f5', border: '#9ed4df', accent: '#32899b', text: '#164e59' };
+  if (normalized.includes('sci') || subject.includes('科学') || subject.includes('物理') || subject.includes('化学') || subject.includes('生物')) return { bg: '#dfe6ff', border: '#adbdf4', accent: '#3556c4', text: '#1e2d68' };
+  if (normalized.includes('chn') || subject.includes('语文') || subject.includes('中文')) return { bg: '#efd9f6', border: '#d7a9e6', accent: '#9b43bd', text: '#552066' };
+  if (subject.includes('老师')) return { bg: '#eef9f1', border: '#b8e2c4', accent: '#32975a', text: '#19542f' };
+  if (subject.includes('学生')) return { bg: '#eef6ff', border: '#b9d8fb', accent: '#347fc4', text: '#1e4d78' };
+  const palette = [
+    { bg: '#f1e9dc', border: '#d8c5a5', accent: '#9a6b2f', text: '#553712' },
+    { bg: '#e5f3e8', border: '#b8d9c1', accent: '#3d8d58', text: '#1f5130' },
+    { bg: '#f6e2e2', border: '#e5b5b5', accent: '#b24b4b', text: '#672323' },
+    { bg: '#e8edf4', border: '#c3ccd9', accent: '#5d6f89', text: '#2e3b4f' }
+  ];
+  const index = Math.abs([...subject].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % palette.length;
+  return palette[index];
+}
+
 function shortList(values: string[], limit = 2) {
   const cleaned = values.filter(Boolean);
   if (cleaned.length === 0) return '';
@@ -1146,6 +1547,22 @@ function uniqueScheduleCampuses(items: ScheduleClass[]) {
   return Array.from(new Set(values)).sort();
 }
 
+function uniqueScheduleSubjects(classes: ScheduleClass[], candidates: ScheduleCandidate[], courseById: CourseLookup) {
+  const values = [
+    ...classes.map((item) => scheduleClassSubject(item, courseById)),
+    ...candidates.map((item) => item.subject || courseById[item.courseId]?.subject),
+    '老师可授课',
+    '学生可上课'
+  ].map((value) => value || '其他');
+  return Array.from(new Set(values)).sort((left, right) => {
+    const priority = ['Eng', '英语', 'Math', '数学', 'Geo/His', 'Sci', '科学', 'CHN', '语文'];
+    const leftIndex = priority.findIndex((item) => left.includes(item));
+    const rightIndex = priority.findIndex((item) => right.includes(item));
+    if (leftIndex !== -1 || rightIndex !== -1) return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+    return left.localeCompare(right, 'zh-Hans-CN');
+  });
+}
+
 function filterClasses(items: ScheduleClass[], filters: ScheduleFilters, courseById: CourseLookup) {
   return items.filter((item) =>
     (!filters.grade || scheduleClassGrade(item, courseById) === filters.grade) &&
@@ -1179,7 +1596,7 @@ function scheduleClassPayload(record: ScheduleClass, target: ScheduleMoveTarget 
     courseId: record.courseId,
     teacherId: record.teacherId,
     campusId: record.campusId || 'campus-main',
-    roomName: record.roomName || '',
+    roomName: '',
     classType: record.classType,
     durationMinutes: record.durationMinutes,
     dayOfWeek: target.dayOfWeek,
@@ -1189,6 +1606,21 @@ function scheduleClassPayload(record: ScheduleClass, target: ScheduleMoveTarget 
     endDate: target.endDate ?? record.endDate,
     studentIds: record.students.map((student) => student.id)
   };
+}
+
+function buildWeekDays(weekStart: Date): WeekDay[] {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(weekStart, index);
+    const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
+    return {
+      key: localDateText(date),
+      date,
+      day: date.getDate(),
+      dayOfWeek,
+      weekLabel: weekLabel(dayOfWeek),
+      label: `${date.getMonth() + 1}月${date.getDate()}日 ${weekLabel(dayOfWeek)}`
+    };
+  });
 }
 
 function buildMonthDays(base: Date) {
@@ -1214,6 +1646,22 @@ function buildMonthDays(base: Date) {
   return days.filter((day) => day.inMonth || day.date >= first && day.date <= last);
 }
 
+function buildMiniMonthDays(base: Date) {
+  const first = new Date(base.getFullYear(), base.getMonth(), 1);
+  const start = startOfWeek(first);
+  const todayKey = localDateText(new Date());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = addDays(start, index);
+    const key = localDateText(date);
+    return {
+      key,
+      date,
+      inMonth: date.getMonth() === base.getMonth(),
+      isToday: key === todayKey
+    };
+  });
+}
+
 function scheduleClassOccursOn(item: ScheduleClass, date: Date) {
   const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
   if (item.dayOfWeek !== dayOfWeek) return false;
@@ -1227,6 +1675,35 @@ function localDateText(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function startOfWeek(date: Date) {
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const offset = (result.getDay() + 6) % 7;
+  result.setDate(result.getDate() - offset);
+  return result;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function addMonths(date: Date, months: number) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+function formatWeekRange(weekStart: Date) {
+  const weekEnd = addDays(weekStart, 6);
+  if (weekStart.getFullYear() === weekEnd.getFullYear()) {
+    return `${weekStart.getFullYear()} 年 ${weekStart.getMonth() + 1} 月 ${weekStart.getDate()} 日 - ${weekEnd.getMonth() + 1} 月 ${weekEnd.getDate()} 日`;
+  }
+  return `${weekStart.getFullYear()} 年 ${weekStart.getMonth() + 1} 月 ${weekStart.getDate()} 日 - ${weekEnd.getFullYear()} 年 ${weekEnd.getMonth() + 1} 月 ${weekEnd.getDate()} 日`;
 }
 
 function hasGroupedItems<T>(groups: Record<number, T[]>) {

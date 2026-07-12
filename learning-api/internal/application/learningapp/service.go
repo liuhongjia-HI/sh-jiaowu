@@ -84,7 +84,9 @@ type Repository interface {
 	StudentSchedule(principal learning.Principal) ([]learning.ScheduleClass, error)
 	StudentCourseDetail(principal learning.Principal, courseID string) (learning.StudentCourseDetail, error)
 	StudentMaterial(principal learning.Principal, materialID string) (learning.Material, error)
+	StudentMaterialPreviewFile(principal learning.Principal, materialID string) (learning.FileAsset, error)
 	StudentHomework(principal learning.Principal, homeworkID string) (learning.Homework, error)
+	RecordStudentSecurityEvent(operator string, principal learning.Principal, req learning.SecurityEventRequest) error
 	CreateSubmission(operator string, principal learning.Principal, req learning.SubmissionRequest) (learning.Submission, error)
 	StudentSubmission(principal learning.Principal, id string) (learning.Submission, error)
 	StudentStudy(principal learning.Principal) (learning.StudentStudyBoard, error)
@@ -340,8 +342,14 @@ func (s *Service) StudentCourseDetail(principal learning.Principal, courseID str
 func (s *Service) StudentMaterial(principal learning.Principal, materialID string) (learning.Material, error) {
 	return s.repo.StudentMaterial(principal, materialID)
 }
+func (s *Service) StudentMaterialPreviewFile(principal learning.Principal, materialID string) (learning.FileAsset, error) {
+	return s.repo.StudentMaterialPreviewFile(principal, materialID)
+}
 func (s *Service) StudentHomework(principal learning.Principal, homeworkID string) (learning.Homework, error) {
 	return s.repo.StudentHomework(principal, homeworkID)
+}
+func (s *Service) RecordStudentSecurityEvent(operator string, principal learning.Principal, req learning.SecurityEventRequest) error {
+	return s.repo.RecordStudentSecurityEvent(operator, principal, req)
 }
 func (s *Service) CreateSubmission(operator string, principal learning.Principal, req learning.SubmissionRequest) (learning.Submission, error) {
 	return s.repo.CreateSubmission(operator, principal, req)

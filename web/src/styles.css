@@ -177,6 +177,32 @@ body {
   box-shadow: 0 8px 20px rgba(15, 23, 42, .05);
 }
 
+.account-trigger {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.account-trigger:hover,
+.account-trigger:focus-visible {
+  background: #f8fbfd;
+  border-color: #cfdbe6;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .08);
+}
+
+.account-trigger:focus-visible {
+  outline: 2px solid rgba(7, 193, 96, .32);
+  outline-offset: 2px;
+}
+
+.account-chevron {
+  margin-left: auto;
+  color: #98a2b3;
+  font-size: 12px;
+}
+
 .user-avatar {
   width: 32px;
   height: 32px;
@@ -759,6 +785,380 @@ body {
 
 .legend-canceled {
   background: #9ca3af;
+}
+
+.schedule-outlook-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.schedule-outlook-sidebar {
+  display: grid;
+  gap: 12px;
+  position: sticky;
+  top: 76px;
+}
+
+.schedule-sidebar-section {
+  border: 1px solid #e4e9f1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.schedule-sidebar-head {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.schedule-sidebar-head strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.schedule-mini-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.schedule-mini-week,
+.schedule-mini-day {
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+.schedule-mini-week {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.schedule-mini-day {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+}
+
+.schedule-mini-day:hover {
+  background: #eef6ff;
+  color: #1d4ed8;
+}
+
+.schedule-mini-day.is-outside {
+  color: #cbd5e1;
+}
+
+.schedule-mini-day.is-week-selected {
+  background: #e8f2ff;
+  color: #1d4ed8;
+}
+
+.schedule-mini-day.is-today {
+  box-shadow: inset 0 0 0 1px #2563eb;
+  font-weight: 700;
+}
+
+.schedule-subject-list,
+.schedule-sidebar-filters {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-subject-toggle {
+  width: 100%;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e5eaf2;
+  border-radius: 7px;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+}
+
+.schedule-subject-toggle i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--subject-color);
+  flex: 0 0 auto;
+}
+
+.schedule-subject-toggle span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-subject-toggle:hover {
+  border-color: var(--subject-color);
+  background: #f8fafc;
+}
+
+.schedule-subject-toggle.is-muted {
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.schedule-subject-toggle.is-muted i {
+  opacity: .35;
+}
+
+.schedule-outlook-main {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-timeline-wrap {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-timeline-toolbar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e4e9f1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.schedule-timeline-toolbar .ant-typography {
+  margin: 0;
+}
+
+.schedule-timeline-toolbar > div:last-child {
+  min-width: 0;
+  text-align: right;
+}
+
+.schedule-timeline-scroll {
+  overflow: auto;
+  border: 1px solid #e1e7f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.schedule-timeline-grid {
+  min-width: 980px;
+  display: grid;
+  grid-template-columns: 64px repeat(7, minmax(128px, 1fr));
+  grid-template-rows: 74px var(--timeline-height);
+}
+
+.schedule-day-head-spacer,
+.schedule-day-head {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  border-bottom: 1px solid #e1e7f0;
+  background: #fff;
+}
+
+.schedule-day-head {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 10px 12px;
+  border-left: 1px solid #e9edf4;
+}
+
+.schedule-day-head strong {
+  color: #2563eb;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.schedule-day-head span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.schedule-day-head small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.schedule-time-gutter {
+  background: #fbfcff;
+}
+
+.schedule-time-axis {
+  position: relative;
+  border-right: 1px solid #e1e7f0;
+}
+
+.schedule-time-label {
+  position: absolute;
+  right: 10px;
+  transform: translateY(-9px);
+  color: #64748b;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.schedule-day-column {
+  position: relative;
+  border-left: 1px solid #e9edf4;
+  background: #fff;
+}
+
+.schedule-day-column:hover {
+  background: #fcfdff;
+}
+
+.schedule-time-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #edf1f6;
+}
+
+.schedule-time-line:nth-child(even) {
+  background: #f5f7fb;
+}
+
+.schedule-day-empty-slot {
+  position: absolute;
+  top: 16px;
+  left: 10px;
+  right: 10px;
+  height: 34px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #94a3b8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.schedule-day-empty-slot:hover {
+  border-color: #2563eb;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.schedule-timeline-block {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  overflow: hidden;
+  border: 1px solid var(--subject-border);
+  border-left: 5px solid var(--subject-accent);
+  border-radius: 6px;
+  background: var(--subject-bg);
+  color: var(--subject-text);
+  padding: 7px 8px;
+  text-align: left;
+  font: inherit;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+}
+
+button.schedule-timeline-block {
+  cursor: pointer;
+}
+
+button.schedule-timeline-block:hover {
+  z-index: 4;
+  border-color: var(--subject-accent);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .12);
+}
+
+.schedule-timeline-block strong,
+.schedule-timeline-block span,
+.schedule-timeline-block small,
+.schedule-timeline-time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-timeline-time {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schedule-timeline-block strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.schedule-timeline-block span {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.schedule-timeline-block small {
+  color: rgba(30, 41, 59, .72);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.schedule-timeline-tags {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  min-height: 18px;
+}
+
+.schedule-timeline-tags .ant-tag {
+  margin-inline-end: 0;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.schedule-timeline-block.is-availability {
+  opacity: .72;
+  border-style: dashed;
+}
+
+.schedule-timeline-block.is-candidate {
+  opacity: .86;
+}
+
+.schedule-timeline-block.is-selected {
+  box-shadow: inset 0 0 0 1px var(--subject-accent), 0 8px 18px rgba(15, 23, 42, .12);
+}
+
+.schedule-timeline-block.is-canceled {
+  border-color: #cbd5e1;
+  border-left-color: #94a3b8;
+  background: #f1f5f9;
+  color: #64748b;
+  text-decoration: line-through;
+}
+
+.schedule-timeline-action {
+  margin-top: 2px;
+  color: #1d4ed8;
+  font-weight: 700;
 }
 
 .week-board {
@@ -1597,6 +1997,31 @@ button.schedule-block:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .schedule-outlook-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-outlook-sidebar {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-outlook-sidebar .schedule-sidebar-section:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .schedule-sidebar-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-timeline-toolbar {
+    align-items: flex-start;
+  }
+
+  .schedule-timeline-toolbar > div:last-child {
+    text-align: left;
+  }
+
   .schedule-more-settings,
   .schedule-summary-grid {
     grid-template-columns: 1fr;
@@ -1654,6 +2079,15 @@ button.schedule-block:hover {
   .health-panel {
     grid-template-columns: 1fr;
     justify-items: start;
+  }
+
+  .schedule-outlook-sidebar,
+  .schedule-sidebar-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-timeline-toolbar {
+    display: grid;
   }
 
   .todo-item {

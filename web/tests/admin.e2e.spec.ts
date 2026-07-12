@@ -168,8 +168,17 @@ test('校区管理员可以从周历入口新建排课', async ({ page }) => {
 
   await expectPageHeading(page, '/scheduling', '排课管理');
   await expect(page.getByText('周排班工作台')).toBeVisible();
-  await page.getByText(/新建课程/).first().click();
+  await expect(page.locator('.schedule-timeline-grid')).toBeVisible();
+  await expect(page.locator('.schedule-day-head')).toHaveCount(7);
+  await expect(page.getByText('学科日历')).toBeVisible();
+  await expect(page.getByText('老师可授课').first()).toBeVisible();
+  await expect(page.getByText('学生可上课').first()).toBeVisible();
+  await expect(page.locator('.schedule-timeline-grid')).toContainText('19:00-21:00');
+  await expect(page.locator('.schedule-timeline-grid')).toContainText('英语老师');
+  await expect(page.getByText('教室/资源')).toHaveCount(0);
+  await page.locator('.schedule-day-empty-slot').first().click();
   await expect(page.getByRole('dialog', { name: '新建课程' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '新建课程' }).getByText('教室/资源')).toHaveCount(0);
 });
 
 test('退出登录会清理后台访问态', async ({ page }) => {

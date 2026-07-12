@@ -2,11 +2,13 @@ import {
   BookOutlined,
   CheckCircleOutlined,
   DashboardOutlined,
+  DownOutlined,
   DollarOutlined,
   LogoutOutlined,
   FileTextOutlined,
   FormOutlined,
   HistoryOutlined,
+  KeyOutlined,
   NotificationOutlined,
   ReadOutlined,
   ScheduleOutlined,
@@ -20,7 +22,7 @@ import {
 } from '@ant-design/icons';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { Alert, Button, Form, Input, Layout, Menu, Result, Space, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Dropdown, Form, Input, Layout, Menu, Modal, Result, Space, Typography, message } from 'antd';
 import type { MenuProps } from 'antd';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -259,12 +261,102 @@ function MustChangePasswordPage({ user }: { user: CurrentUser }) {
   );
 }
 
+function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [form] = Form.useForm<PasswordFormValues>();
+  const [saving, setSaving] = useState(false);
+
+  async function submit(values: PasswordFormValues) {
+    setSaving(true);
+    try {
+      await changePassword(values.oldPassword, values.newPassword);
+      message.success('密码已修改，请用新密码重新登录。');
+      clearToken();
+      window.location.href = '/login';
+    } catch (error: any) {
+      message.error(error.response?.data?.message || error.message || '修改失败，请检查原密码。');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      title="修改密码"
+      open={open}
+      okText="保存并重新登录"
+      cancelText="取消"
+      confirmLoading={saving}
+      onOk={() => form.submit()}
+      onCancel={() => {
+        if (saving) return;
+        form.resetFields();
+        onClose();
+      }}
+      destroyOnClose
+    >
+      <Alert type="info" showIcon message="修改后当前登录会失效，需要使用新密码重新登录。" style={{ marginBottom: 16 }} />
+      <Form form={form} layout="vertical" requiredMark={false} preserve={false} onFinish={submit}>
+        <Form.Item name="oldPassword" label="当前密码" rules={[{ required: true, message: '请输入当前密码' }]}>
+          <Input.Password autoComplete="current-password" />
+        </Form.Item>
+        <Form.Item
+          name="newPassword"
+          label="新密码"
+          rules={[
+            { required: true, message: '请输入新密码' },
+            { min: 8, message: '新密码至少 8 位' },
+            { pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/, message: '新密码需同时包含字母和数字' }
+          ]}
+        >
+          <Input.Password autoComplete="new-password" />
+        </Form.Item>
+        <Form.Item
+          name="confirmPassword"
+          label="确认新密码"
+          dependencies={['newPassword']}
+          rules={[
+            { required: true, message: '请再次输入新密码' },
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                if (!value || getFieldValue('newPassword') === value) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(new Error('两次输入的新密码不一致。'));
+              }
+            })
+          ]}
+        >
+          <Input.Password autoComplete="new-password" />
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+}
+
 function Shell({ user }: { user: CurrentUser }) {
   const location = useLocation();
   const items = useMemo(() => buildMenuItems(user), [user]);
   const activeOpenKeys = useMemo(() => findOpenKeys(location.pathname), [location.pathname]);
   const currentItem = useMemo(() => findCurrentItem(location.pathname), [location.pathname]);
   const [openKeys, setOpenKeys] = useState(activeOpenKeys);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const canChangePassword = user.authMethod === 'password';
+
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch {
+      message.warning('本机已退出，服务端登录状态稍后自动过期。');
+    } finally {
+      clearToken();
+      window.location.href = '/login';
+    }
+  }
+
+  const accountMenuItems: MenuProps['items'] = [
+    ...(canChangePassword ? [{ key: 'change-password', icon: <KeyOutlined />, label: '修改密码' }] : []),
+    { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true }
+  ];
 
   useEffect(() => {
     setOpenKeys((current) => Array.from(new Set([...current, ...activeOpenKeys])));
@@ -288,29 +380,31 @@ function Shell({ user }: { user: CurrentUser }) {
             <Typography.Text className="app-header-title">{currentItem.label}</Typography.Text>
           </div>
           <Space size={12}>
-            <div className="user-pill">
-              <span className="user-avatar"><UserOutlined /></span>
-              <div>
-                <strong>{user.name}</strong>
-                <span>{roleLabel(user)}</span>
-              </div>
-            </div>
-            <Tooltip title="退出登录">
-              <Button
-                aria-label="退出登录"
-                icon={<LogoutOutlined />}
-                onClick={async () => {
-                  try {
-                    await logout();
-                  } catch {
-                    message.warning('本机已退出，服务端登录状态稍后自动过期。');
-                  } finally {
-                    clearToken();
-                    window.location.href = '/login';
+            <Dropdown
+              menu={{
+                items: accountMenuItems,
+                onClick: ({ key }) => {
+                  if (key === 'change-password') {
+                    setPasswordModalOpen(true);
+                    return;
                   }
-                }}
-              />
-            </Tooltip>
+                  if (key === 'logout') {
+                    void handleLogout();
+                  }
+                }
+              }}
+              trigger={['click']}
+              placement="bottomRight"
+            >
+              <button type="button" className="user-pill account-trigger" aria-label="账号菜单">
+                <span className="user-avatar"><UserOutlined /></span>
+                <span>
+                  <strong>{user.name}</strong>
+                  <span>{roleLabel(user)}</span>
+                </span>
+                <DownOutlined className="account-chevron" />
+              </button>
+            </Dropdown>
           </Space>
         </Header>
         <Content className="app-content">
@@ -338,6 +432,7 @@ function Shell({ user }: { user: CurrentUser }) {
           </Suspense>
         </Content>
       </Layout>
+      <ChangePasswordModal open={passwordModalOpen} onClose={() => setPasswordModalOpen(false)} />
     </Layout>
   );
 }

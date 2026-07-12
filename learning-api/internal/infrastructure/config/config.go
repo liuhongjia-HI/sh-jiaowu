@@ -119,14 +119,19 @@ func (c *Config) Validate() error {
 	if strings.TrimSpace(c.Wechat.Secret) == "" {
 		missing = append(missing, "WECHAT_SECRET")
 	}
-	if strings.TrimSpace(c.OfficialAccount.AppID) == "" {
-		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_APPID")
+	officialAccountValues := []string{
+		strings.TrimSpace(c.OfficialAccount.AppID),
+		strings.TrimSpace(c.OfficialAccount.Secret),
+		strings.TrimSpace(c.OfficialAccount.TemplateID),
 	}
-	if strings.TrimSpace(c.OfficialAccount.Secret) == "" {
-		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_SECRET")
+	officialAccountConfigured := 0
+	for _, value := range officialAccountValues {
+		if value != "" {
+			officialAccountConfigured++
+		}
 	}
-	if strings.TrimSpace(c.OfficialAccount.TemplateID) == "" {
-		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID")
+	if officialAccountConfigured > 0 && officialAccountConfigured < len(officialAccountValues) {
+		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_APPID/SECRET/TEMPLATE_ID must be configured together")
 	}
 	if len(c.MiniProgramSubscribe.TemplateIDs) == 0 {
 		missing = append(missing, "WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS")

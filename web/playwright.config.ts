@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const apiPort = process.env.HTTP_PORT ?? '8892';
-const webPort = process.env.WEB_PORT ?? '5173';
+const webPort = process.env.WEB_PORT ?? '5174';
 
 export default defineConfig({
   testDir: './tests',
@@ -22,13 +22,13 @@ export default defineConfig({
       command: `HTTP_PORT=${apiPort} ../scripts/e2e-api.sh`,
       url: `http://127.0.0.1:${apiPort}/api/health`,
       timeout: 120_000,
-      reuseExistingServer: true
+      reuseExistingServer: false
     },
     {
       command: `HTTP_PORT=${apiPort} node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${webPort} --strictPort`,
       url: `http://127.0.0.1:${webPort}`,
       timeout: 120_000,
-      reuseExistingServer: true
+      reuseExistingServer: false
     }
   ],
   projects: [

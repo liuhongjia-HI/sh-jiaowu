@@ -3,7 +3,11 @@
   <view class="hero-title">{{rewardText}}</view>
   <view class="badge">{{deadlineText}}</view>
 </view>
-<view class="section">
+<view class="section secure-section">
+  <view class="answer-watermark-layer">
+    <view wx:for="{{watermarkTexts}}" wx:key="index" class="answer-watermark">{{item}}</view>
+  </view>
+  <view class="security-notice">{{securityNotice}}</view>
   <block wx:for="{{questions}}" wx:key="id" wx:for-item="question" wx:for-index="qindex">
     <view class="card">
       <view class="badge">{{question.type === 'single' ? '单选题' : question.type === 'multiple' ? '多选题' : question.type === 'judge' ? '判断题' : question.type === 'fill' ? '填空题' : '简答题'}}</view>

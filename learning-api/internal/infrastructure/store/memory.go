@@ -173,6 +173,7 @@ func (s *MemoryStore) seedBootstrapAdmin(options Options) {
 
 func (s *MemoryStore) seedBaseDictionaries() {
 	s.settings = defaultSettings()
+	s.seedBaseLearningSpaces()
 }
 
 func defaultSettings() map[string]string {
@@ -180,8 +181,8 @@ func defaultSettings() map[string]string {
 		"academicYear":                 "2025.2026学年",
 		"grades":                       "G1-G12",
 		"semesters":                    "S1 / S2",
-		"watermarkRule":                "昵称 + 手机尾号 + 时间",
-		"downloadPolicy":               "默认不可下载",
+		"watermarkRule":                "姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀",
+		"downloadPolicy":               "学生端仅安全预览，不提供下载",
 		"miniProgramDomainStatus":      "待确认",
 		"officialAccountBindingStatus": "待确认",
 		"templateMessageStatus":        "待确认",
@@ -197,6 +198,35 @@ func (s *MemoryStore) ensureDefaultSettings() {
 	for key, value := range defaultSettings() {
 		if strings.TrimSpace(s.settings[key]) == "" {
 			s.settings[key] = value
+		}
+	}
+}
+
+func (s *MemoryStore) seedBaseLearningSpaces() {
+	const academicYear = "2025.2026学年"
+	exists := map[string]bool{}
+	for _, space := range s.learningSpaces {
+		exists[space.ID] = true
+	}
+	for gradeIndex, grade := range demoGrades {
+		for _, subject := range demoSubjects {
+			if !subjectAppliesToGrade(gradeIndex, subject) {
+				continue
+			}
+			for semesterIndex, semester := range demoSemesters {
+				for phaseIndex, phase := range demoPhases {
+					spaceID := learningSpaceID(gradeIndex, subject, semesterIndex, phaseIndex)
+					if exists[spaceID] {
+						continue
+					}
+					spaceName := grade + subject + semester + phase
+					s.learningSpaces = append(s.learningSpaces, learningSpace{
+						ID: spaceID, AcademicYear: academicYear, Grade: grade, Subject: subject,
+						Semester: semester, Phase: phase, Name: spaceName, Status: learning.StatusEnabled,
+					})
+					exists[spaceID] = true
+				}
+			}
 		}
 	}
 }
@@ -301,6 +331,7 @@ var demoPackageTypes = []packageTypeSpec{
 
 func seedPermissionDemoData(s *MemoryStore) {
 	const academicYear = "2025.2026学年"
+	s.seedBaseLearningSpaces()
 	for gradeIndex, grade := range demoGrades {
 		for _, subject := range demoSubjects {
 			if !subjectAppliesToGrade(gradeIndex, subject) {
@@ -311,10 +342,6 @@ func seedPermissionDemoData(s *MemoryStore) {
 					spaceID := learningSpaceID(gradeIndex, subject, semesterIndex, phaseIndex)
 					spaceName := grade + subject + semester + phase
 					courseName := spaceName + "课程"
-					s.learningSpaces = append(s.learningSpaces, learningSpace{
-						ID: spaceID, AcademicYear: academicYear, Grade: grade, Subject: subject,
-						Semester: semester, Phase: phase, Name: spaceName, Status: learning.StatusEnabled,
-					})
 					s.courses = append(s.courses, learning.Course{
 						ID: courseID(spaceID), Name: courseName, Subject: subject, Grade: grade, LearningSpaceID: spaceID,
 						ChapterCount: 8, MaterialNum: 1, HomeworkNum: 1, Status: learning.StatusEnabled,
@@ -506,14 +533,56 @@ func (s *MemoryStore) Dashboard() learning.DashboardOverview {
 	for _, material := range s.materials {
 		views += material.ViewCount
 	}
-	return learning.DashboardOverview{
-		OpenedStudents:   286,
-		PackageCount:     len(s.packages),
-		PendingReviews:   len(s.reviews),
-		MaterialViews:    views,
-		ExpiringStudents: 3,
-		UnpublishedFiles: 2,
+	openedStudents := map[string]bool{}
+	for _, grant := range s.grants {
+		if grantActive(grant) {
+			openedStudents[grant.StudentID] = true
+		}
 	}
+	pendingReviews := 0
+	for _, review := range s.reviews {
+		if review.Status != "已批改" {
+			pendingReviews++
+		}
+	}
+	unpublishedFiles := 0
+	for _, material := range s.materials {
+		if material.PublishStatus != "已发布" && material.Status != learning.StatusEnabled {
+			unpublishedFiles++
+		}
+	}
+	for _, homework := range s.homework {
+		if homework.PublishStatus != "已发布" && homework.Status != string(learning.StatusEnabled) {
+			unpublishedFiles++
+		}
+	}
+	return learning.DashboardOverview{
+		OpenedStudents:   len(openedStudents),
+		PackageCount:     len(s.packages),
+		PendingReviews:   pendingReviews,
+		MaterialViews:    views,
+		ExpiringStudents: s.expiringStudentCount(30),
+		UnpublishedFiles: unpublishedFiles,
+	}
+}
+
+func (s *MemoryStore) expiringStudentCount(days int) int {
+	today := time.Now()
+	deadline := today.AddDate(0, 0, days)
+	students := map[string]bool{}
+	for _, grant := range s.grants {
+		if !grantActive(grant) {
+			continue
+		}
+		endsAt, err := time.Parse("2006-01-02", grantEndsAt(grant))
+		if err != nil {
+			continue
+		}
+		if !endsAt.Before(today) && !endsAt.After(deadline) {
+			students[grant.StudentID] = true
+		}
+	}
+	return len(students)
 }
 
 func (s *MemoryStore) SystemReadiness() learning.SystemReadiness {
@@ -644,7 +713,10 @@ func (s *MemoryStore) LoginWithWechatCode(req learning.WechatLoginRequest) (lear
 			matches = append(matches, i)
 		}
 		if len(matches) == 0 {
-			return learning.Principal{}, errors.New("手机号未匹配到后台账号，请联系老师确认学生档案和套餐开通状态")
+			if principal, ok, err := s.bindExistingStudentByMaskedPhone(openID, req); ok || err != nil {
+				return principal, err
+			}
+			return s.createWechatStudentAccount(openID, req)
 		}
 		if len(matches) > 1 {
 			return learning.Principal{}, errors.New("手机号匹配到多个账号，请联系老师确认后再绑定")
@@ -687,6 +759,99 @@ func (s *MemoryStore) LoginWithWechatCode(req learning.WechatLoginRequest) (lear
 		return principalFromUser(user), nil
 	}
 	return learning.Principal{}, errors.New("微信账号未绑定，请先填写学生信息并授权手机号完成身份绑定")
+}
+
+func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learning.WechatLoginRequest) (learning.Principal, bool, error) {
+	matches := make([]int, 0, 1)
+	for i, student := range s.students {
+		if phoneSame(student.Phone, req.Phone) {
+			matches = append(matches, i)
+		}
+	}
+	if len(matches) == 0 {
+		return learning.Principal{}, false, nil
+	}
+	if len(matches) > 1 {
+		return learning.Principal{}, true, errors.New("手机号匹配到多个学生档案，请联系老师确认后再绑定")
+	}
+	student := s.students[matches[0]]
+	userIndex := s.findUserIndexByStudentID(student.ID)
+	user := learning.User{
+		ID:            "user-" + student.ID,
+		Name:          firstNonEmpty(student.Name, req.StudentName),
+		Phone:         req.Phone,
+		AccountStatus: firstNonEmpty(student.AccountStatus, "正常"),
+		Roles:         []learning.Role{learning.RoleStudent},
+		StudentID:     student.ID,
+	}
+	if userIndex >= 0 {
+		user = s.users[userIndex]
+		if strings.TrimSpace(user.Phone) == "" || strings.Contains(user.Phone, "*") {
+			user.Phone = req.Phone
+		}
+	}
+	if user.AccountStatus != "正常" {
+		return learning.Principal{}, true, errors.New("账号已停用，请联系管理员")
+	}
+	if err := s.validateStudentWechatBinding(user, openID, req); err != nil {
+		return learning.Principal{}, true, err
+	}
+	user.OpenID = openID
+	user.Name = firstNonEmpty(req.StudentName, user.Name)
+	user.Phone = req.Phone
+	user.AccountStatus = "正常"
+	user.Roles = appendUniqueRoles(user.Roles, learning.RoleStudent)
+	user.StudentID = student.ID
+	if userIndex >= 0 {
+		s.users[userIndex] = user
+	} else {
+		s.users = append(s.users, user)
+	}
+	s.applyStudentBindingProfile(student.ID, req)
+	s.removeWechatOnlyStudent(openID, student.ID)
+	s.prependLog(user.Name, "绑定学生微信", user.Name)
+	return principalFromUser(user), true, nil
+}
+
+func (s *MemoryStore) createWechatStudentAccount(openID string, req learning.WechatLoginRequest) (learning.Principal, error) {
+	if req.StudentName == "" || req.SchoolName == "" || req.Grade == "" {
+		return learning.Principal{}, errors.New("请填写学生姓名、学校和年级后再绑定")
+	}
+	if req.Phone == "" {
+		return learning.Principal{}, errors.New("请授权手机号后再登录")
+	}
+	if s.phoneExists("", req.Phone) {
+		return learning.Principal{}, errors.New("手机号已存在，请联系老师确认学生档案")
+	}
+	nowID := time.Now().Format("20060102150405.000000000")
+	studentID := "stu-wx-" + nowID
+	student := learning.Student{
+		ID:             studentID,
+		Name:           req.StudentName,
+		Grade:          req.Grade,
+		Phone:          req.Phone,
+		SchoolName:     req.SchoolName,
+		OpenedPackages: []string{},
+		LearningStatus: "待开通",
+		AccountStatus:  "正常",
+		Remark:         "微信授权自动创建，待后台开通学习权限",
+		BindStatus:     "已绑定",
+	}
+	user := learning.User{
+		ID:            "user-" + studentID,
+		Name:          req.StudentName,
+		Phone:         req.Phone,
+		OpenID:        openID,
+		AccountStatus: "正常",
+		Remark:        student.Remark,
+		Roles:         []learning.Role{learning.RoleStudent},
+		StudentID:     studentID,
+	}
+	s.students = append([]learning.Student{student}, s.students...)
+	s.users = append(s.users, user)
+	s.removeWechatOnlyStudent(openID, studentID)
+	s.prependLogDetail("微信登录", "微信授权创建学生", student.Name, "手机号未匹配后台档案，已创建待开通学生账号")
+	return principalFromUser(user), nil
 }
 
 func (s *MemoryStore) removeWechatOnlyStudent(openID, keepStudentID string) {
@@ -2550,8 +2715,8 @@ func (s *MemoryStore) StudentHome(principal learning.Principal) (learning.Studen
 		return learning.StudentHome{}, errors.New("账号已停用，请联系老师或管理员")
 	}
 	courses := s.coursesForStudent(student.ID)
-	materials := s.materialsForStudent(student.ID)
-	pendingHomework := s.pendingHomeworkForStudent(student.ID)
+	materials := s.studentMaterialsForPrincipal(principal)
+	pendingHomework := s.pendingHomeworkForPrincipal(principal)
 	continueCourse := learning.Course{}
 	if len(courses) > 0 {
 		continueCourse = courses[0]
@@ -2820,7 +2985,7 @@ func (s *MemoryStore) StudentStudy(principal learning.Principal) (learning.Stude
 			Progress: s.courseProgress(student.ID, course.ID),
 		})
 	}
-	materials := s.materialsForStudent(student.ID)
+	materials := s.studentMaterialsForPrincipal(principal)
 	if len(materials) == 0 {
 		materials = []learning.Material{}
 	}
@@ -2832,7 +2997,7 @@ func (s *MemoryStore) StudentTasks(principal learning.Principal) ([]learning.Stu
 	if principal.StudentID == "" {
 		return nil, errors.New("student account is not bound")
 	}
-	homework := s.homeworkForStudent(principal.StudentID)
+	homework := s.studentHomeworkForPrincipal(principal)
 	tasks := make([]learning.StudentTask, 0, len(homework))
 	for _, item := range homework {
 		task := learning.StudentTask{Homework: item, StudentStatus: "待完成"}
@@ -2855,6 +3020,18 @@ func (s *MemoryStore) pendingHomeworkForStudent(studentID string) []learning.Hom
 	out := make([]learning.Homework, 0, len(homework))
 	for _, item := range homework {
 		if _, ok := s.latestSubmission(studentID, item.ID); ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func (s *MemoryStore) pendingHomeworkForPrincipal(principal learning.Principal) []learning.Homework {
+	homework := s.studentHomeworkForPrincipal(principal)
+	out := make([]learning.Homework, 0, len(homework))
+	for _, item := range homework {
+		if _, ok := s.latestSubmission(principal.StudentID, item.ID); ok {
 			continue
 		}
 		out = append(out, item)
@@ -3395,13 +3572,13 @@ func (s *MemoryStore) StudentCourseDetail(principal learning.Principal, courseID
 		return learning.StudentCourseDetail{}, errors.New("课程不存在或未开通")
 	}
 	materials := make([]learning.Material, 0)
-	for _, material := range s.materialsForStudent(principal.StudentID) {
+	for _, material := range s.studentMaterialsForPrincipal(principal) {
 		if material.CourseID == courseID {
 			materials = append(materials, material)
 		}
 	}
 	homework := make([]learning.Homework, 0)
-	for _, item := range s.homeworkForStudent(principal.StudentID) {
+	for _, item := range s.studentHomeworkForPrincipal(principal) {
 		if item.CourseID == courseID {
 			homework = append(homework, item)
 		}
@@ -3582,10 +3759,29 @@ func (s *MemoryStore) StudentMaterial(principal learning.Principal, materialID s
 	materialID = strings.TrimSpace(materialID)
 	for _, material := range s.materialsForStudent(principal.StudentID) {
 		if material.ID == materialID {
-			return material, nil
+			return s.decorateStudentMaterial(principal, material), nil
 		}
 	}
 	return learning.Material{}, errors.New("资料不存在或未开通")
+}
+
+func (s *MemoryStore) StudentMaterialPreviewFile(principal learning.Principal, materialID string) (learning.FileAsset, error) {
+	material, err := s.StudentMaterial(principal, materialID)
+	if err != nil {
+		return learning.FileAsset{}, err
+	}
+	if strings.TrimSpace(material.FileID) == "" {
+		return learning.FileAsset{}, errors.New("资料暂未上传预览文件")
+	}
+	asset, ok := s.fileAssets[material.FileID]
+	if !ok {
+		return learning.FileAsset{}, errors.New("资料预览文件不存在")
+	}
+	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
+		return learning.FileAsset{}, errors.New("资料正在生成安全预览，请稍后再试")
+	}
+	s.prependLogDetail(studentAuditOperator(principal), "内容防盗版风控", material.Title, "eventType=material_preview; targetType=material; targetId="+material.ID)
+	return asset, nil
 }
 
 func (s *MemoryStore) StudentHomework(principal learning.Principal, homeworkID string) (learning.Homework, error) {
@@ -3595,10 +3791,48 @@ func (s *MemoryStore) StudentHomework(principal learning.Principal, homeworkID s
 	homeworkID = strings.TrimSpace(homeworkID)
 	for _, item := range s.homeworkForStudent(principal.StudentID) {
 		if item.ID == homeworkID {
-			return item, nil
+			return s.decorateStudentHomework(principal, item), nil
 		}
 	}
 	return learning.Homework{}, errors.New("题目不存在或未开通")
+}
+
+func (s *MemoryStore) RecordStudentSecurityEvent(operator string, principal learning.Principal, req learning.SecurityEventRequest) error {
+	if principal.StudentID == "" {
+		return errors.New("student account is not bound")
+	}
+	req.EventType = strings.TrimSpace(req.EventType)
+	req.TargetType = strings.TrimSpace(req.TargetType)
+	req.TargetID = strings.TrimSpace(req.TargetID)
+	req.PagePath = strings.TrimSpace(req.PagePath)
+	req.Detail = strings.TrimSpace(req.Detail)
+	if req.EventType == "" {
+		return errors.New("请选择风控事件类型")
+	}
+	target := studentSecurityTarget(principal, req)
+	if req.TargetType == "material" && req.TargetID != "" {
+		material, err := s.StudentMaterial(principal, req.TargetID)
+		if err != nil {
+			return err
+		}
+		target = material.Title
+	}
+	if req.TargetType == "homework" && req.TargetID != "" {
+		homework, err := s.StudentHomework(principal, req.TargetID)
+		if err != nil {
+			return err
+		}
+		target = homework.Title
+	}
+	detail := "eventType=" + req.EventType + "; targetType=" + req.TargetType + "; targetId=" + req.TargetID + "; pagePath=" + req.PagePath
+	if req.Detail != "" {
+		detail += "; detail=" + req.Detail
+	}
+	if operator == "" {
+		operator = studentAuditOperator(principal)
+	}
+	s.prependLogDetail(operator, "内容防盗版风控", target, detail)
+	return nil
 }
 
 func (s *MemoryStore) CreateSubmission(operator string, principal learning.Principal, req learning.SubmissionRequest) (learning.Submission, error) {
@@ -4118,18 +4352,59 @@ func (s *MemoryStore) findUserByStudentID(studentID string) (learning.User, bool
 	return learning.User{}, false
 }
 
+func (s *MemoryStore) findUserIndexByStudentID(studentID string) int {
+	for i, user := range s.users {
+		if user.StudentID == studentID {
+			return i
+		}
+	}
+	return -1
+}
+
 func (s *MemoryStore) phoneExists(currentStudentID, phone string) bool {
 	for _, student := range s.students {
-		if student.ID != currentStudentID && student.Phone == phone {
+		if student.ID != currentStudentID && phoneSame(student.Phone, phone) {
 			return true
 		}
 	}
 	for _, user := range s.users {
-		if user.StudentID != currentStudentID && user.Phone == phone {
+		if user.StudentID != currentStudentID && phoneSame(user.Phone, phone) {
 			return true
 		}
 	}
 	return false
+}
+
+func phoneSame(left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return false
+	}
+	return left == right || left == maskPhone(right) || maskPhone(left) == right
+}
+
+func maskPhone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	if len([]rune(phone)) != 11 || strings.Contains(phone, "*") {
+		return phone
+	}
+	return phone[:3] + "****" + phone[7:]
+}
+
+func appendUniqueRoles(values []learning.Role, additions ...learning.Role) []learning.Role {
+	seen := make(map[learning.Role]bool, len(values)+len(additions))
+	for _, value := range values {
+		seen[value] = true
+	}
+	for _, value := range additions {
+		if value == "" || seen[value] {
+			continue
+		}
+		values = append(values, value)
+		seen[value] = true
+	}
+	return values
 }
 
 func (s *MemoryStore) syncStudentUser(student learning.Student) {
@@ -4701,6 +4976,14 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 	return out
 }
 
+func (s *MemoryStore) studentMaterialsForPrincipal(principal learning.Principal) []learning.Material {
+	materials := s.materialsForStudent(principal.StudentID)
+	for index := range materials {
+		materials[index] = s.decorateStudentMaterial(principal, materials[index])
+	}
+	return materials
+}
+
 func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 	out := make([]learning.Homework, 0)
 	for _, grant := range s.grants {
@@ -4715,6 +4998,14 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 		}
 	}
 	return out
+}
+
+func (s *MemoryStore) studentHomeworkForPrincipal(principal learning.Principal) []learning.Homework {
+	homework := s.homeworkForStudent(principal.StudentID)
+	for index := range homework {
+		homework[index] = s.decorateStudentHomework(principal, homework[index])
+	}
+	return homework
 }
 
 func (s *MemoryStore) learningSpaceIDsForPackage(packageID string) []string {
@@ -4804,6 +5095,110 @@ func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Mate
 		material.Subject = space.Subject
 	}
 	return material
+}
+
+func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, material learning.Material) learning.Material {
+	material = s.decorateMaterial(material)
+	material.WatermarkText = s.studentWatermarkText(principal)
+	material.SecurityNotice = studentSecurityNotice()
+	if material.FileID != "" {
+		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
+	}
+	material.DownloadURL = ""
+	return material
+}
+
+func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, homework learning.Homework) learning.Homework {
+	homework.WatermarkText = s.studentWatermarkText(principal)
+	homework.SecurityNotice = studentSecurityNotice()
+	homework.DownloadURL = ""
+	return homework
+}
+
+func (s *MemoryStore) studentWatermarkText(principal learning.Principal) string {
+	name := strings.TrimSpace(principal.Name)
+	phone := strings.TrimSpace(principal.Phone)
+	studentID := strings.TrimSpace(principal.StudentID)
+	if student, ok := s.findStudent(principal.StudentID); ok {
+		if strings.TrimSpace(student.Nickname) != "" {
+			name = strings.TrimSpace(student.Nickname)
+		} else if strings.TrimSpace(student.Name) != "" {
+			name = strings.TrimSpace(student.Name)
+		}
+		if strings.TrimSpace(student.Phone) != "" {
+			phone = strings.TrimSpace(student.Phone)
+		}
+	}
+	if name == "" {
+		name = "Starline学员"
+	}
+	parts := []string{name}
+	if tail := phoneTail(phone); tail != "" {
+		parts = append(parts, tail)
+	}
+	parts = append(parts, time.Now().Format("2006-01-02 15:04"))
+	if suffix := idSuffix(studentID); suffix != "" {
+		parts = append(parts, suffix)
+	}
+	return strings.Join(parts, " · ")
+}
+
+func studentSecurityNotice() string {
+	return "内容仅限本人学习使用，页面已添加专属水印，请勿截屏、录屏或外传。"
+}
+
+func phoneTail(phone string) string {
+	digits := make([]rune, 0, 4)
+	for _, value := range phone {
+		if value >= '0' && value <= '9' {
+			digits = append(digits, value)
+		}
+	}
+	if len(digits) == 0 {
+		return ""
+	}
+	if len(digits) > 4 {
+		digits = digits[len(digits)-4:]
+	}
+	return "尾号" + string(digits)
+}
+
+func idSuffix(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ""
+	}
+	runes := []rune(id)
+	if len(runes) > 6 {
+		runes = runes[len(runes)-6:]
+	}
+	return "ID" + string(runes)
+}
+
+func studentAuditOperator(principal learning.Principal) string {
+	return middlewareAuditLabel(principal.Name, principal.UserID)
+}
+
+func studentSecurityTarget(principal learning.Principal, req learning.SecurityEventRequest) string {
+	target := strings.TrimSpace(req.TargetType)
+	if req.TargetID != "" {
+		target += ":" + req.TargetID
+	}
+	if target == "" || target == ":" {
+		target = principal.Name
+	}
+	return target
+}
+
+func middlewareAuditLabel(name, id string) string {
+	payload, err := json.Marshal(struct {
+		Name string `json:"name"`
+		ID   string `json:"id"`
+	}{Name: strings.TrimSpace(name), ID: strings.TrimSpace(id)})
+	if err != nil {
+		return strings.TrimSpace(name)
+	}
+	return "audit:" + base64.RawURLEncoding.EncodeToString(payload)
 }
 
 func (s *MemoryStore) learningSpaceEnabled(id string) bool {
@@ -5091,7 +5486,7 @@ func (s *MemoryStore) prependLogDetail(operator, action, target, detail string) 
 		audit.Detail = strings.TrimSpace(detail)
 	}
 	s.logs = append([]learning.OperationLog{{
-		ID:         "log-" + time.Now().Format("20060102150405"),
+		ID:         newOperationLogID(),
 		Operator:   audit.Name,
 		OperatorID: audit.ID,
 		IP:         audit.IP,
@@ -5104,6 +5499,19 @@ func (s *MemoryStore) prependLogDetail(operator, action, target, detail string) 
 	if s.db != nil {
 		_ = s.persistAll()
 	}
+}
+
+func newOperationLogID() string {
+	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+	raw := make([]byte, 4)
+	if _, err := rand.Read(raw); err != nil {
+		return "log-" + time.Now().Format("20060102150405.000000000")
+	}
+	suffix := make([]byte, len(raw))
+	for i, b := range raw {
+		suffix[i] = alphabet[int(b)%len(alphabet)]
+	}
+	return "log-" + time.Now().Format("20060102150405.000000000") + "-" + string(suffix)
 }
 
 type auditOperatorInfo struct {
