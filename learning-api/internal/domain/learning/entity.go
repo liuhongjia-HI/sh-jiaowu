@@ -174,6 +174,24 @@ type PackageUpsertRequest struct {
 	Status           Status   `json:"status"`
 }
 
+// StudentPackageRecommendation 是学生端可见的未开通套餐摘要。
+// 仅返回用于了解套餐的信息，不授予课程或资料访问权限。
+type StudentPackageRecommendation struct {
+	PackageID            string   `json:"packageId"`
+	PackageName          string   `json:"packageName"`
+	AcademicYear         string   `json:"academicYear"`
+	Grade                string   `json:"grade"`
+	Semester             string   `json:"semester"`
+	Subject              string   `json:"subject"`
+	Summary              string   `json:"summary"`
+	LearningSpaces       []string `json:"learningSpaces"`
+	CourseCount          int      `json:"courseCount"`
+	MaterialCount        int      `json:"materialCount"`
+	ContentSamples       []string `json:"contentSamples"`
+	RecommendationReason string   `json:"recommendationReason"`
+	SameLearningSpace    bool     `json:"sameLearningSpace"`
+}
+
 type Student struct {
 	ID                    string   `json:"id"`
 	Name                  string   `json:"name"`

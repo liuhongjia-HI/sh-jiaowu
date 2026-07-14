@@ -24,8 +24,10 @@ Page({
     courseMeta: "",
     bannerTag: "继续学习",
     shortcuts: buildShortcuts(),
-    contentItems: [],
-    visibleItems: []
+    recommendations: [],
+    visibleRecommendations: [],
+    recommendationsLoading: true,
+    recommendationError: ""
   },
   onLoad() {
     this.loadHome();
@@ -57,7 +59,6 @@ Page({
         const hasContent = !!continueCourse.id || pendingHomework.length > 0 || materials.length > 0;
         const hasOpenedPackage = openedPackages.length > 0;
         const progressPercent = Number(home.continueProgress) || 0;
-        const contentItems = buildContentItems(pendingHomework, materials, continueCourse);
         this.setData({
           home,
           hasContent,
@@ -77,17 +78,17 @@ Page({
           courseTitle: continueCourse.name || "待解锁学习星球",
           courseMeta: `${continueCourse.grade || ""} · ${continueCourse.subject || ""} · ${continueCourse.chapterCount || 0} 个章节`,
           bannerTag: pendingTask ? "今日题目" : "继续学习",
-          contentItems,
           loading: false
-        }, () => this.applySearch());
+        }, () => this.loadRecommendations());
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
         emptyMessage: error.message || "请先登录绑定，或联系老师开通学习套餐。",
         hasContent: false,
         hasOpenedPackage: false,
-        contentItems: [],
-        visibleItems: [],
+        recommendations: [],
+        visibleRecommendations: [],
+        recommendationsLoading: false,
         todoItems: [],
         feedbackItems: [],
         loading: false
@@ -101,13 +102,35 @@ Page({
   },
   applySearch() {
     const keyword = (this.data.keyword || "").trim().toLowerCase();
-    const visibleItems = this.data.contentItems.filter((item) => {
+    const visibleRecommendations = this.data.recommendations.filter((item) => {
       if (!keyword) {
         return true;
       }
-      return [item.title, item.meta, item.tag, item.typeName].join(" ").toLowerCase().includes(keyword);
+      return [item.packageName, item.subject, item.grade, item.semester, item.summary, ...(item.contentSamples || [])]
+        .join(" ")
+        .toLowerCase()
+        .includes(keyword);
     });
-    this.setData({ visibleItems });
+    this.setData({ visibleRecommendations });
+  },
+  loadRecommendations() {
+    this.setData({ recommendationsLoading: true, recommendationError: "" });
+    request("/student/recommendations", { silent: true })
+      .then((recommendations) => {
+        this.setData({
+          recommendations: (Array.isArray(recommendations) ? recommendations : []).map((item) => ({
+            ...item,
+            contentSampleText: (item.contentSamples || []).join("、")
+          })),
+          recommendationsLoading: false
+        }, () => this.applySearch());
+      })
+      .catch((error) => this.setData({
+        recommendations: [],
+        visibleRecommendations: [],
+        recommendationError: error.message || "推荐套餐加载失败，请稍后重试。",
+        recommendationsLoading: false
+      }));
   },
   goStudyDetail() {
     if (!this.data.continueCourse || !this.data.continueCourse.id) {
@@ -236,23 +259,28 @@ Page({
     }
     wx.navigateTo({ url: `/pages/result/index?id=${id}` });
   },
-  goContent(event) {
-    const { type, id } = event.currentTarget.dataset;
-    if (!id) {
-      wx.showToast({ title: "内容信息缺失", icon: "none" });
+  showRecommendation(event) {
+    const packageId = event.currentTarget.dataset.packageId;
+    const recommendation = this.data.recommendations.find((item) => item.packageId === packageId);
+    if (!recommendation) {
+      wx.showToast({ title: "套餐信息缺失", icon: "none" });
       return;
     }
-    if (type === "task") {
-      wx.navigateTo({ url: `/pages/answer/index?id=${id}` });
-      return;
-    }
-    if (type === "material") {
-      wx.navigateTo({ url: `/pages/material-preview/index?id=${id}` });
-      return;
-    }
-    if (type === "course") {
-      wx.navigateTo({ url: `/pages/study-detail/index?id=${id}` });
-    }
+    wx.showModal({
+      title: recommendation.packageName,
+      content: recommendation.summary || "该套餐包含课程和学习资料，开通后即可学习。",
+      showCancel: false,
+      confirmText: "我知道了"
+    });
+  },
+  contactTeacher(event) {
+    const name = event.currentTarget.dataset.name || "该套餐";
+    wx.showModal({
+      title: "联系老师开通",
+      content: `请联系老师或教务开通“${name}”。开通后，课程和学习资料会自动出现在学习中心。`,
+      showCancel: false,
+      confirmText: "我知道了"
+    });
   }
 });
 
@@ -352,40 +380,6 @@ function buildShortcuts() {
     { label: "上次练习", action: "last", icon: "/assets/icons/shortcut-last.png" },
     { label: "通知消息", action: "notices", icon: "/assets/icons/shortcut-notice.png" }
   ];
-}
-
-function buildContentItems(homework, materials, course) {
-  const taskItems = (homework || []).map((item) => ({
-    id: item.id,
-    type: "task",
-    typeName: "题库练习",
-    title: item.title || "课后题目",
-    meta: [item.course, item.packageName, item.deadline ? `截止 ${item.deadline}` : ""].filter(Boolean).join(" · "),
-    tag: item.studentStatus || "待完成",
-    icon: "题",
-    className: "task"
-  }));
-  const materialItems = (materials || []).map((item) => ({
-    id: item.id,
-    type: "material",
-    typeName: "学习资料",
-    title: item.title || "学习资料",
-    meta: [item.course, item.chapter, item.viewCount ? `${item.viewCount} 人学过` : ""].filter(Boolean).join(" · "),
-    tag: item.type || "资料",
-    icon: "资",
-    className: "material"
-  }));
-  const courseItems = course && course.id ? [{
-    id: course.id,
-    type: "course",
-    typeName: "学习中心",
-    title: course.name || "继续学习",
-    meta: [course.grade, course.subject, course.chapterCount ? `${course.chapterCount} 个章节` : ""].filter(Boolean).join(" · "),
-    tag: "继续学习",
-    icon: "课",
-    className: "course"
-  }] : [];
-  return taskItems.concat(materialItems).concat(courseItems);
 }
 
 function homeEmptyMessage(hasOpenedPackage) {

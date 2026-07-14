@@ -68,6 +68,25 @@ func (a *testApp) loginStudent(t *testing.T) string {
 	return a.login(t, "/api/auth/demo-student-login", map[string]string{"phone": "18500009069", "password": "123456"})
 }
 
+func TestStudentRecommendations(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	var recommendations []learning.StudentPackageRecommendation
+	app.doJSON(t, http.MethodGet, "/api/student/recommendations", app.loginStudent(t), nil, http.StatusOK, &recommendations)
+	if len(recommendations) == 0 {
+		t.Fatal("expected student recommendations")
+	}
+	for _, item := range recommendations {
+		if item.PackageID == "pkg-g05-english-s1-full" {
+			t.Fatalf("opened package should not be returned: %#v", item)
+		}
+		if item.CourseCount+item.MaterialCount == 0 {
+			t.Fatalf("recommendation should contain learning content: %#v", item)
+		}
+	}
+}
+
 func (a *testApp) login(t *testing.T, path string, body any) string {
 	t.Helper()
 	var auth authResponse

@@ -2,7 +2,7 @@
   <view class="home-top">
     <view class="search-panel">
       <view class="search-icon">⌕</view>
-      <input class="search-input" value="{{keyword}}" placeholder="搜索课程、资料、题目" confirm-type="search" bindinput="changeKeyword" />
+      <input class="search-input" value="{{keyword}}" placeholder="搜索推荐套餐、课程、资料" confirm-type="search" bindinput="changeKeyword" />
       <view wx:if="{{keyword}}" class="search-clear" bindtap="clearKeyword">清除</view>
     </view>
   </view>
@@ -113,32 +113,40 @@
     <view class="section">
       <view class="section-head">
         <view>
-          <view class="section-title tight">推荐内容</view>
-          <view class="section-sub">{{keyword ? "按搜索结果展示" : "先做题，再看资料和课程"}}</view>
+          <view class="section-title tight">推荐套餐</view>
+          <view class="section-sub">{{keyword ? "按搜索结果展示" : "发现还未开通的课程和学习资料"}}</view>
         </view>
-        <view class="section-link" bindtap="goStudy">更多</view>
       </view>
 
-      <view wx:if="{{!hasContent}}" class="empty-card home-empty">
-        <view class="title">{{hasOpenedPackage ? "等待老师发布内容" : "待开通学习套餐"}}</view>
-        <view class="sub">{{emptyMessage}}</view>
-        <button wx:if="{{!hasOpenedPackage}}" class="button" bindtap="goOpen">查看开通方式</button>
+      <view wx:if="{{recommendationsLoading}}" class="empty-card home-empty">
+        <view class="sub">正在为你寻找合适的学习套餐...</view>
       </view>
-      <view wx:elif="{{visibleItems.length === 0}}" class="empty-card home-empty">
-        <view class="title">没有找到相关内容</view>
-        <view class="sub">换个关键词，或清除搜索后查看全部学习内容。</view>
+      <view wx:elif="{{recommendationError}}" class="empty-card home-empty">
+        <view class="title">推荐套餐加载失败</view>
+        <view class="sub">{{recommendationError}}</view>
+        <button class="button light" bindtap="loadRecommendations">重新加载</button>
+      </view>
+      <view wx:elif="{{recommendations.length === 0}}" class="empty-card home-empty">
+        <view class="title">暂时没有合适的推荐套餐</view>
+        <view class="sub">老师发布同年级、同学期的课程或讲义套餐后，会显示在这里。</view>
+      </view>
+      <view wx:elif="{{visibleRecommendations.length === 0}}" class="empty-card home-empty">
+        <view class="title">没有找到相关套餐</view>
+        <view class="sub">换个关键词，或清除搜索后查看全部推荐。</view>
         <button class="button light" bindtap="clearKeyword">清除搜索</button>
       </view>
-      <view wx:else class="content-list">
-        <view wx:for="{{visibleItems}}" wx:key="id" class="content-card {{item.className}}" data-type="{{item.type}}" data-id="{{item.id}}" bindtap="goContent">
-          <view class="content-icon">{{item.icon}}</view>
+      <view wx:else class="recommendation-list">
+        <view wx:for="{{visibleRecommendations}}" wx:key="packageId" class="recommendation-card" data-package-id="{{item.packageId}}" bindtap="showRecommendation">
           <view class="content-main">
             <view class="content-top">
-              <view class="content-type">{{item.typeName}}</view>
-              <view class="content-tag">{{item.tag}}</view>
+              <view class="content-type">{{item.recommendationReason}}</view>
+              <view class="content-tag">{{item.subject}}</view>
             </view>
-            <view class="content-title">{{item.title}}</view>
-            <view class="content-meta">{{item.meta || "学习内容已准备好"}}</view>
+            <view class="content-title">{{item.packageName}}</view>
+            <view class="content-meta">{{item.grade}} · {{item.semester}} · {{item.courseCount}} 门课程 · {{item.materialCount}} 份资料</view>
+            <view wx:if="{{item.contentSamples.length}}" class="recommendation-samples">{{item.contentSampleText}}</view>
+            <view wx:if="{{item.summary}}" class="recommendation-summary">{{item.summary}}</view>
+            <button class="recommendation-action" data-name="{{item.packageName}}" catchtap="contactTeacher">联系老师开通</button>
           </view>
         </view>
       </view>

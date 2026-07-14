@@ -670,6 +670,16 @@ func (h *LearningHandler) StudentHome(c *gin.Context) {
 	OK(c, home)
 }
 
+func (h *LearningHandler) StudentRecommendations(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	recommendations, err := h.service.StudentRecommendations(principal)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, recommendations)
+}
+
 func (h *LearningHandler) ConfirmStudentSubscription(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)

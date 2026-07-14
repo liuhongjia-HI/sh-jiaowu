@@ -27,6 +27,85 @@ func TestLoginWithDemoStudentPassword(t *testing.T) {
 	}
 }
 
+func TestStudentRecommendationsExcludeOpenedAndRankEligiblePackages(t *testing.T) {
+	store := NewMemoryStore()
+	principal, err := store.PrincipalByUserID("user-student-003")
+	if err != nil {
+		t.Fatalf("load student principal: %v", err)
+	}
+
+	activePackageID := packageID(4, "数学", 0, "full")
+	store.grants = append(store.grants, packageGrant{
+		ID: "grant-recommendation-active", StudentID: "stu-003", PackageID: activePackageID,
+		StartsAt: "2026-01-01", EndsAt: "2027-01-01", EffectiveUntil: "2027-01-01", Status: "active",
+	})
+	store.syncSpaceAccessForGrant(store.grants[len(store.grants)-1])
+	store.packages = append(store.packages,
+		learning.Package{ID: "pkg-recommend-disabled", Name: "停用课程套餐", AcademicYear: "2025.2026学年", Grade: "五年级", Semester: "S1", Subject: "英语", Status: learning.StatusDisabled},
+		learning.Package{ID: "pkg-recommend-empty", Name: "空课程套餐", AcademicYear: "2025.2026学年", Grade: "五年级", Semester: "S1", Subject: "科学", Status: learning.StatusEnabled},
+	)
+	store.learningSpaces = append(store.learningSpaces, learningSpace{ID: "space-g05-science-s1-q1", AcademicYear: "2025.2026学年", Grade: "五年级", Semester: "S1", Subject: "科学", Phase: "Q1 期中", Name: "五年级科学S1Q1期中", Status: learning.StatusEnabled})
+	store.packageSpaces = append(store.packageSpaces,
+		packageSpace{PackageID: "pkg-recommend-disabled", LearningSpaceID: "space-g05-english-s1-q1"},
+		packageSpace{PackageID: "pkg-recommend-empty", LearningSpaceID: "space-g05-science-s1-q1"},
+	)
+	store.contentTypes = append(store.contentTypes,
+		packageContentType{PackageID: "pkg-recommend-disabled", ContentType: "course"},
+		packageContentType{PackageID: "pkg-recommend-empty", ContentType: "course"},
+	)
+
+	recommendations, err := store.StudentRecommendations(principal)
+	if err != nil {
+		t.Fatalf("student recommendations: %v", err)
+	}
+	if len(recommendations) == 0 {
+		t.Fatal("expected recommendations")
+	}
+	if len(recommendations) > 3 {
+		t.Fatalf("expected at most 3 recommendations, got %d", len(recommendations))
+	}
+	if !recommendations[0].SameLearningSpace {
+		t.Fatalf("expected same-space recommendation first, got %#v", recommendations[0])
+	}
+	for _, item := range recommendations {
+		if item.PackageID == packageID(4, "英语", 0, "question_handout") || item.PackageID == activePackageID {
+			t.Fatalf("active package must not be recommended: %#v", item)
+		}
+		if item.PackageID == packageID(4, "语文", 0, "question") {
+			t.Fatalf("question-only package must not be recommended: %#v", item)
+		}
+		if item.PackageID == "pkg-recommend-disabled" || item.PackageID == "pkg-recommend-empty" {
+			t.Fatalf("disabled or empty package must not be recommended: %#v", item)
+		}
+		if item.CourseCount+item.MaterialCount == 0 {
+			t.Fatalf("empty package must not be recommended: %#v", item)
+		}
+	}
+
+	for index := range store.grants {
+		if store.grants[index].ID == "grant-recommendation-active" {
+			store.grants[index].EndsAt = "2025-01-01"
+			store.grants[index].EffectiveUntil = "2025-01-01"
+		}
+	}
+	recommendations, err = store.StudentRecommendations(principal)
+	if err != nil {
+		t.Fatalf("student recommendations after expiry: %v", err)
+	}
+	if !hasRecommendation(recommendations, activePackageID) {
+		t.Fatalf("expired package should be recommendable again, got %#v", recommendations)
+	}
+}
+
+func hasRecommendation(items []learning.StudentPackageRecommendation, packageID string) bool {
+	for _, item := range items {
+		if item.PackageID == packageID {
+			return true
+		}
+	}
+	return false
+}
+
 func TestLoginWithWechatCodeBindsStudentByPhone(t *testing.T) {
 	store := NewMemoryStore()
 

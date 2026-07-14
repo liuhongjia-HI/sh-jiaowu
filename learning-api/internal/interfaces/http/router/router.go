@@ -135,6 +135,7 @@ func New(dep Dependencies) *gin.Engine {
 		student := api.Group("/student", middleware.AuthRequired(tokens, dep.Service, learning.RoleStudent))
 		{
 			student.GET("/home", h.StudentHome)
+			student.GET("/recommendations", h.StudentRecommendations)
 			student.POST("/subscription", h.ConfirmStudentSubscription)
 			student.GET("/study", h.StudentStudy)
 			student.GET("/study/:id", h.StudentCourseDetail)

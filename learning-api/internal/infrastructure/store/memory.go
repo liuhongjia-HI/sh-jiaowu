@@ -2743,6 +2743,148 @@ func (s *MemoryStore) StudentHome(principal learning.Principal) (learning.Studen
 	}, nil
 }
 
+// StudentRecommendations 返回学生当前可了解、但尚未有效开通的套餐。
+func (s *MemoryStore) StudentRecommendations(principal learning.Principal) ([]learning.StudentPackageRecommendation, error) {
+	if principal.StudentID == "" {
+		return nil, errors.New("student account is not bound")
+	}
+	student, ok := s.findStudent(principal.StudentID)
+	if !ok {
+		return nil, errors.New("student not found")
+	}
+	if student.AccountStatus == "停用" {
+		return nil, errors.New("账号已停用，请联系老师或管理员")
+	}
+
+	activeSpaceIDs := s.studentAccessibleSpaceIDs(student.ID)
+	activeSpaces := make([]learningSpace, 0, len(activeSpaceIDs))
+	for _, spaceID := range activeSpaceIDs {
+		for _, space := range s.learningSpaces {
+			if space.ID == spaceID {
+				activeSpaces = append(activeSpaces, space)
+				break
+			}
+		}
+	}
+	if len(activeSpaces) == 0 {
+		return []learning.StudentPackageRecommendation{}, nil
+	}
+	openedCourseIDs := map[string]bool{}
+	for _, course := range s.coursesForStudent(student.ID) {
+		openedCourseIDs[course.ID] = true
+	}
+	openedMaterialIDs := map[string]bool{}
+	for _, material := range s.materialsForStudent(student.ID) {
+		openedMaterialIDs[material.ID] = true
+	}
+
+	out := make([]learning.StudentPackageRecommendation, 0)
+	for _, pkg := range s.packages {
+		if pkg.Status != learning.StatusEnabled || !containsRecommendationContent(s.contentTypesForPackage(pkg.ID)) {
+			continue
+		}
+		if opened, _ := s.activeGrantState(student.ID, pkg.ID); opened {
+			continue
+		}
+		courses, materials := s.recommendationContentForPackage(pkg, openedCourseIDs, openedMaterialIDs)
+		if len(courses) == 0 && len(materials) == 0 {
+			continue
+		}
+		sameSpace := overlaps(s.learningSpaceIDsForPackage(pkg.ID), activeSpaceIDs)
+		sameTerm := sameRecommendationTerm(pkg, activeSpaces)
+		if !sameSpace && !sameTerm {
+			continue
+		}
+		reason := "同年级同学期推荐"
+		if sameSpace {
+			reason = "同学习空间推荐"
+		}
+		out = append(out, learning.StudentPackageRecommendation{
+			PackageID:            pkg.ID,
+			PackageName:          pkg.Name,
+			AcademicYear:         pkg.AcademicYear,
+			Grade:                pkg.Grade,
+			Semester:             pkg.Semester,
+			Subject:              pkg.Subject,
+			Summary:              pkg.Summary,
+			LearningSpaces:       s.learningSpaceNamesForPackage(pkg.ID),
+			CourseCount:          len(courses),
+			MaterialCount:        len(materials),
+			ContentSamples:       recommendationSamples(courses, materials),
+			RecommendationReason: reason,
+			SameLearningSpace:    sameSpace,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].SameLearningSpace != out[j].SameLearningSpace {
+			return out[i].SameLearningSpace
+		}
+		leftCount := out[i].CourseCount + out[i].MaterialCount
+		rightCount := out[j].CourseCount + out[j].MaterialCount
+		if leftCount != rightCount {
+			return leftCount > rightCount
+		}
+		return out[i].PackageName < out[j].PackageName
+	})
+	if len(out) > 3 {
+		out = out[:3]
+	}
+	return out, nil
+}
+
+func (s *MemoryStore) recommendationContentForPackage(pkg learning.Package, openedCourseIDs, openedMaterialIDs map[string]bool) ([]string, []string) {
+	courses := make([]string, 0)
+	materials := make([]string, 0)
+	spaceIDs := s.learningSpaceIDsForPackage(pkg.ID)
+	contentTypes := s.contentTypesForPackage(pkg.ID)
+	if containsString(contentTypes, "course") {
+		for _, course := range s.courses {
+			if course.Status == learning.StatusEnabled && containsString(spaceIDs, course.LearningSpaceID) && !openedCourseIDs[course.ID] {
+				courses = appendUnique(courses, course.Name)
+			}
+		}
+	}
+	if containsString(contentTypes, "handout") {
+		for _, material := range s.materials {
+			if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) && !openedMaterialIDs[material.ID] {
+				materials = appendUnique(materials, material.Title)
+			}
+		}
+	}
+	return courses, materials
+}
+
+func containsRecommendationContent(contentTypes []string) bool {
+	return containsString(contentTypes, "course") || containsString(contentTypes, "handout")
+}
+
+func sameRecommendationTerm(pkg learning.Package, spaces []learningSpace) bool {
+	for _, space := range spaces {
+		if space.AcademicYear == pkg.AcademicYear && space.Grade == pkg.Grade && space.Semester == pkg.Semester {
+			return true
+		}
+	}
+	return false
+}
+
+func overlaps(left, right []string) bool {
+	for _, value := range left {
+		if containsString(right, value) {
+			return true
+		}
+	}
+	return false
+}
+
+func recommendationSamples(courses, materials []string) []string {
+	samples := append([]string{}, courses...)
+	samples = append(samples, materials...)
+	if len(samples) > 3 {
+		return samples[:3]
+	}
+	return samples
+}
+
 func (s *MemoryStore) todayTodosForStudent(student learning.Student, pendingHomework []learning.Homework, feedback []learning.ClassroomFeedback, subscriptionReminder learning.SubscriptionReminder) []learning.StudentTodo {
 	out := make([]learning.StudentTodo, 0)
 	for index, item := range pendingHomework {

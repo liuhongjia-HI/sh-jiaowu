@@ -97,6 +97,58 @@ test("home page shortcut labels use commercial learning actions", () => {
   assert.equal(labels.includes("快捷开通"), false);
 });
 
+test("home page displays unopened package recommendations", async () => {
+  const page = loadHomePage((path) => {
+    if (path === "/student/recommendations") {
+      return Promise.resolve([{
+        packageId: "pkg-english-reading",
+        packageName: "五年级英语阅读提升",
+        grade: "五年级",
+        semester: "S1",
+        subject: "英语",
+        courseCount: 2,
+        materialCount: 3,
+        contentSamples: ["阅读课程", "阅读讲义"],
+        recommendationReason: "同学习空间推荐",
+        summary: "提升阅读理解能力"
+      }]);
+    }
+    return Promise.resolve({
+      student: { id: "stu-001", grade: "五年级", openedPackages: ["英语套餐"] },
+      continueCourse: {}, pendingHomework: [], materials: [], notices: []
+    });
+  }, {
+    getStorageSync() {
+      return "";
+    }
+  });
+
+  page.loadHome();
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(page.data.recommendations.length, 1);
+  assert.equal(page.data.visibleRecommendations[0].contentSampleText, "阅读课程、阅读讲义");
+  assert.equal(page.data.visibleRecommendations[0].recommendationReason, "同学习空间推荐");
+});
+
+test("home page guides student to contact teacher for recommendation", () => {
+  const calls = [];
+  const page = loadHomePage(() => Promise.resolve({}), {
+    getStorageSync() {
+      return "";
+    },
+    showModal(args) {
+      calls.push(args);
+    }
+  });
+
+  page.contactTeacher({ currentTarget: { dataset: { name: "英语阅读提升" } } });
+
+  assert.equal(calls[0].title, "联系老师开通");
+  assert.match(calls[0].content, /英语阅读提升/);
+});
+
 test("home page feedback shortcut opens latest classroom feedback", () => {
   const calls = [];
   const page = loadHomePage(() => Promise.resolve({}), {

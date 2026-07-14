@@ -71,6 +71,7 @@ type Repository interface {
 	GrantPreview(studentID, packageID string) (learning.GrantPreview, error)
 	CreateGrant(operator, studentID, packageID string) (learning.GrantPreview, error)
 	StudentHome(principal learning.Principal) (learning.StudentHome, error)
+	StudentRecommendations(principal learning.Principal) ([]learning.StudentPackageRecommendation, error)
 	ConfirmStudentSubscription(operator string, principal learning.Principal, req learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error)
 	UpdateStudentProfile(operator string, principal learning.Principal, req learning.StudentProfileUpdateRequest) (learning.Student, error)
 	Availability(principal learning.Principal, ownerType, ownerID string) ([]learning.AvailabilitySlot, error)
@@ -302,6 +303,9 @@ func (s *Service) CreateGrant(operator, studentID, packageID string) (learning.G
 }
 func (s *Service) StudentHome(principal learning.Principal) (learning.StudentHome, error) {
 	return s.repo.StudentHome(principal)
+}
+func (s *Service) StudentRecommendations(principal learning.Principal) ([]learning.StudentPackageRecommendation, error) {
+	return s.repo.StudentRecommendations(principal)
 }
 func (s *Service) ConfirmStudentSubscription(operator string, principal learning.Principal, req learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error) {
 	return s.repo.ConfirmStudentSubscription(operator, principal, req)
