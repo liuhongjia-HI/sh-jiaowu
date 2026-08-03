@@ -167,6 +167,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       message.success('可上课时间已保存');
       queryClient.invalidateQueries({ queryKey: ['availability'] });
       queryClient.invalidateQueries({ queryKey: ['availability-overview'] });
+      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
     onError: () => message.error('保存失败，请检查星期和时间段。')
   });

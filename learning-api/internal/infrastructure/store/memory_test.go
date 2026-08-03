@@ -34,7 +34,7 @@ func TestStudentRecommendationsExcludeOpenedAndRankEligiblePackages(t *testing.T
 		t.Fatalf("load student principal: %v", err)
 	}
 
-	activePackageID := packageID(4, "数学", 0, "full")
+	activePackageID := packageID(4, "语文", 0, "full")
 	store.grants = append(store.grants, packageGrant{
 		ID: "grant-recommendation-active", StudentID: "stu-003", PackageID: activePackageID,
 		StartsAt: "2026-01-01", EndsAt: "2027-01-01", EffectiveUntil: "2027-01-01", Status: "active",
@@ -694,6 +694,75 @@ func TestAvailabilityOverviewRespectsVisibleOwners(t *testing.T) {
 		if slot.OwnerType != "teacher" || slot.OwnerID != teacher.UserID {
 			t.Fatalf("teacher should only see own availability: %#v", slot)
 		}
+	}
+
+	for index := range store.users {
+		if store.users[index].ID == "user-teacher" {
+			store.users[index].AccountStatus = "停用"
+		}
+	}
+	for _, slot := range store.AvailabilityOverview(ops) {
+		if slot.OwnerType == "teacher" && slot.OwnerID == "user-teacher" {
+			t.Fatalf("disabled teacher availability should be hidden: %#v", slot)
+		}
+	}
+}
+
+func TestSchedulingRejectsDisabledTeacher(t *testing.T) {
+	store := NewMemoryStore()
+	for index := range store.users {
+		if store.users[index].ID == "user-teacher" {
+			store.users[index].AccountStatus = "停用"
+		}
+	}
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	candidates, err := store.ScheduleCandidates(ops, learning.ScheduleCandidateRequest{
+		Subject: "英语", Grade: "五年级", ClassType: "1V1", DurationMinutes: 90,
+		StartDate: "2026-06-01", EndDate: "2026-08-31",
+	})
+	if err != nil {
+		t.Fatalf("expected candidate query to succeed: %v", err)
+	}
+	if len(candidates) != 0 {
+		t.Fatalf("disabled teacher must not produce schedule candidates: %#v", candidates)
+	}
+
+	_, err = store.CreateScheduleClass("运营教务", ops, learning.ScheduleClassCreateRequest{
+		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
+		ClassType: "1V1", DurationMinutes: 90, DayOfWeek: 3, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-01", EndDate: "2026-08-31", StudentIDs: []string{"stu-001"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "教师账号已停用") {
+		t.Fatalf("expected disabled teacher class creation to be rejected, got %v", err)
+	}
+
+	for index := range store.users {
+		if store.users[index].ID == "user-teacher" {
+			store.users[index].AccountStatus = "正常"
+		}
+	}
+	existing, err := store.CreateScheduleClass("运营教务", ops, learning.ScheduleClassCreateRequest{
+		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
+		ClassType: "1V1", DurationMinutes: 90, DayOfWeek: 3, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-01", EndDate: "2026-08-31", StudentIDs: []string{"stu-001"},
+	})
+	if err != nil {
+		t.Fatalf("expected active teacher class creation to succeed: %v", err)
+	}
+	for index := range store.users {
+		if store.users[index].ID == "user-teacher" {
+			store.users[index].AccountStatus = "停用"
+		}
+	}
+	if _, err := store.UpdateScheduleClass("运营教务", ops, existing.ID, learning.ScheduleClassCreateRequest{
+		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
+		ClassType: "1V1", DurationMinutes: 90, DayOfWeek: 3, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-01", EndDate: "2026-08-31", StudentIDs: []string{"stu-001"},
+	}); err == nil || !strings.Contains(err.Error(), "教师账号已停用") {
+		t.Fatalf("expected disabled teacher schedule update to be rejected, got %v", err)
 	}
 }
 

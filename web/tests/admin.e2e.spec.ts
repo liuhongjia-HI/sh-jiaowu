@@ -183,7 +183,8 @@ test('校区管理员可以从周历入口新建排课', async ({ page }) => {
 
 test('退出登录会清理后台访问态', async ({ page }) => {
   await login(page, '13800000002');
-  await page.getByLabel('退出登录').click();
+  await page.getByRole('button', { name: '账号菜单' }).click();
+  await page.getByRole('menuitem', { name: /退出登录/ }).click();
   await expect(page.getByRole('heading', { name: 'Starline 教务后台' })).toBeVisible();
 
   await page.goto('/dashboard');

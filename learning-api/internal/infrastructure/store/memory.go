@@ -3239,6 +3239,12 @@ func (s *MemoryStore) Availability(principal learning.Principal, ownerType, owne
 func (s *MemoryStore) AvailabilityOverview(principal learning.Principal) []learning.AvailabilitySlot {
 	out := make([]learning.AvailabilitySlot, 0)
 	for _, slot := range s.availability {
+		if slot.OwnerType == "teacher" {
+			teacher, ok := s.findUser(slot.OwnerID)
+			if !ok || !isActiveTeacher(teacher) {
+				continue
+			}
+		}
 		if s.canManageAvailability(principal, slot.OwnerType, slot.OwnerID) {
 			out = append(out, slot)
 		}
@@ -3356,7 +3362,7 @@ func (s *MemoryStore) ScheduleCandidates(principal learning.Principal, req learn
 	// 可授课老师：teacher 角色、当前账号有权管理、且授课范围覆盖该学科 + 年级。
 	teachers := make([]learning.User, 0)
 	for _, user := range s.users {
-		if !hasRole(user.Roles, learning.RoleTeacher) {
+		if !isActiveTeacher(user) {
 			continue
 		}
 		if req.TeacherID != "" && user.ID != req.TeacherID {
@@ -3505,6 +3511,9 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	teacher, ok := s.findUser(req.TeacherID)
 	if !ok || !hasRole(teacher.Roles, learning.RoleTeacher) {
 		return learning.ScheduleClass{}, errors.New("请选择老师")
+	}
+	if teacher.AccountStatus != "正常" {
+		return learning.ScheduleClass{}, errors.New("该教师账号已停用，不能排课")
 	}
 	capacity := classCapacity(req.ClassType)
 	if capacity <= 0 {
@@ -6111,6 +6120,10 @@ func canManageTeacher(principal learning.Principal, user learning.User) bool {
 		return false
 	}
 	return principal.CampusID != "" && user.CampusID == principal.CampusID
+}
+
+func isActiveTeacher(user learning.User) bool {
+	return hasRole(user.Roles, learning.RoleTeacher) && user.AccountStatus == "正常"
 }
 
 func canResetPassword(principal learning.Principal, user learning.User) bool {

@@ -115,7 +115,8 @@ async function run() {
   });
 
   await step('退出登录会清理后台访问态', async () => {
-    await page.getByLabel('退出登录').click();
+    await page.getByRole('button', { name: '账号菜单' }).click();
+    await page.getByRole('menuitem', { name: /退出登录/ }).click();
     await waitForText(page, 'Starline 教务后台');
     await page.goto(`${baseURL}/dashboard`, { waitUntil: 'domcontentloaded' });
     await waitForText(page, 'Starline 教务后台');
