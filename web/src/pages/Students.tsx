@@ -173,7 +173,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   const accountOptions = useMemo(() => uniqueOptions(rows.map((item) => item.accountStatus)), [rows]);
   const stats = useMemo(() => ({
     total: rows.length,
-    opened: rows.filter((item) => item.openedPackages.length > 0).length,
+    opened: rows.filter((item) => (item.openedPackages?.length ?? 0) > 0).length,
     waiting: rows.filter((item) => item.accountStatus.includes('待') || item.learningStatus.includes('未')).length,
     disabled: rows.filter((item) => item.accountStatus === '停用').length
   }), [rows]);

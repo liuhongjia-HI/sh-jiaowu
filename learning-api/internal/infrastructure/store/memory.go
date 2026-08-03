@@ -4268,9 +4268,7 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	if effectiveUntil != "" {
 		student.EffectiveUntil = effectiveUntil
 	}
-	if len(packages) > 0 {
-		student.OpenedPackages = packages
-	}
+	student.OpenedPackages = packages
 	if submission, ok := s.latestStudentSubmission(student.ID); ok {
 		student.LastSubmittedAt = submission.CreatedAt
 		student.LastSubmissionStatus = submission.Status
