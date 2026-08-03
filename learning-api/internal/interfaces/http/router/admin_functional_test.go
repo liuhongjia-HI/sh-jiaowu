@@ -89,7 +89,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		ChapterCount:    6,
 		Status:          learning.StatusEnabled,
 	}, http.StatusOK, &course)
-	if course.ID == "" || course.Grade != "五年级" || course.Subject != "英语" {
+	if course.ID == "" || course.Grade != "五年级" || course.Subject != "英文" {
 		t.Fatalf("unexpected course: %#v", course)
 	}
 

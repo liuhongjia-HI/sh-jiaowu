@@ -476,20 +476,25 @@ INSERT IGNORE INTO roles (code, name, description) VALUES
   ('campus_admin', '校区管理员', '校区管理'),
   ('super_admin', '超级管理员', '全部后台权限');
 
-INSERT IGNORE INTO subjects (id, name, status) VALUES
-  ('chinese', '语文', '启用'),
+INSERT INTO subjects (id, name, status) VALUES
   ('math', '数学', '启用'),
-  ('english', '英语', '启用'),
-  ('physics', '物理', '启用'),
-  ('chemistry', '化学', '启用'),
+  ('english', '英文', '启用'),
+  ('chinese', '语文', '启用'),
+  ('integrated-science', '综合科学', '启用'),
+  ('science', '科学', '启用'),
   ('geography', '地理', '启用'),
   ('history', '历史', '启用'),
-  ('politics', '政治', '启用'),
-  ('biology', '生物', '启用');
+  ('physics', '物理', '启用'),
+  ('chemistry', '化学', '启用')
+ON DUPLICATE KEY UPDATE
+  name = VALUES(name),
+  status = VALUES(status);
+
+DELETE FROM subjects WHERE id IN ('politics', 'biology');
 
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('academicYear', '2025.2026学年'),
-  ('grades', 'G1-G12'),
+  ('grades', 'G1-G9'),
   ('semesters', 'S1 / S2'),
   ('watermarkRule', '姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀'),
   ('downloadPolicy', '学生端仅安全预览，不提供下载'),
@@ -497,11 +502,45 @@ INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('officialAccountBindingStatus', '待确认'),
   ('templateMessageStatus', '待确认'),
   ('productionApiDomain', '待配置');
+UPDATE system_settings SET setting_value = 'G1-G9' WHERE setting_key = 'grades';
 
 DROP PROCEDURE IF EXISTS seed_starline_demo_data;
 DELIMITER //
 CREATE PROCEDURE seed_starline_demo_data()
 BEGIN
+DECLARE EXIT HANDLER FOR SQLEXCEPTION
+BEGIN
+  ROLLBACK;
+  RESIGNAL;
+END;
+START TRANSACTION;
+
+-- 该过程可重复执行：只清理本过程生成的 demo ID，避免旧年级/学科矩阵残留。
+DELETE FROM schedule_class_students
+WHERE schedule_class_id IN (
+  SELECT id FROM schedule_classes WHERE course_id LIKE 'course-g%'
+);
+DELETE FROM schedule_classes WHERE course_id LIKE 'course-g%';
+DELETE FROM student_learning_space_access WHERE learning_space_id LIKE 'space-g%';
+DELETE FROM student_package_grants WHERE package_id LIKE 'pkg-g%';
+DELETE FROM package_content_types WHERE package_id LIKE 'pkg-g%';
+DELETE FROM package_spaces
+WHERE package_id LIKE 'pkg-g%' OR learning_space_id LIKE 'space-g%';
+DELETE FROM learning_contents WHERE learning_space_id LIKE 'space-g%';
+DELETE FROM material_access_logs WHERE material_id LIKE 'mat-g%';
+DELETE FROM review_feedbacks
+WHERE submission_id IN (
+  SELECT id FROM homework_submissions WHERE homework_id LIKE 'hw-g%'
+);
+DELETE FROM homework_submissions WHERE homework_id LIKE 'hw-g%';
+DELETE FROM question_bank_items WHERE id LIKE 'qb-g%';
+DELETE FROM materials WHERE id LIKE 'mat-g%' OR learning_space_id LIKE 'space-g%';
+DELETE FROM homework_tasks WHERE id LIKE 'hw-g%' OR learning_space_id LIKE 'space-g%';
+DELETE FROM courses WHERE id LIKE 'course-g%' OR learning_space_id LIKE 'space-g%';
+DELETE FROM study_packages WHERE id LIKE 'pkg-g%';
+DELETE FROM teacher_learning_space_access WHERE learning_space_id LIKE 'space-g%';
+DELETE FROM learning_spaces WHERE id LIKE 'space-g%';
+
 DROP TEMPORARY TABLE IF EXISTS seed_grades;
 CREATE TEMPORARY TABLE seed_grades (
   grade_no INT NOT NULL,
@@ -511,7 +550,7 @@ CREATE TEMPORARY TABLE seed_grades (
 INSERT INTO seed_grades (grade_no, grade_name) VALUES
   (1, '一年级'), (2, '二年级'), (3, '三年级'), (4, '四年级'),
   (5, '五年级'), (6, '六年级'), (7, '七年级'), (8, '八年级'),
-  (9, '九年级'), (10, '十年级'), (11, '十一年级'), (12, '十二年级');
+  (9, '九年级');
 
 DROP TEMPORARY TABLE IF EXISTS seed_subjects;
 CREATE TEMPORARY TABLE seed_subjects (
@@ -520,25 +559,32 @@ CREATE TEMPORARY TABLE seed_subjects (
   PRIMARY KEY (subject_code)
 );
 INSERT INTO seed_subjects (subject_code, subject_name) VALUES
-  ('chinese', '语文'), ('math', '数学'), ('english', '英语'),
-  ('physics', '物理'), ('chemistry', '化学'), ('geography', '地理'),
-  ('history', '历史'), ('politics', '政治'), ('biology', '生物');
+  ('math', '数学'), ('english', '英文'), ('chinese', '语文'),
+  ('integrated-science', '综合科学'), ('science', '科学'), ('geography', '地理'),
+  ('history', '历史'), ('physics', '物理'), ('chemistry', '化学');
 
--- 年级与学科的开设关系：小学阶段（1-6 年级）只开设语文、数学、英语，
--- 物理、化学、生物、地理、政治、历史等学科从初中（七年级）才开始，
--- 借此避免生成「一年级物理」这类不存在的组合，减少空间与数据量。
+-- 年级与学科的开设关系按业务课程矩阵显式维护：
+-- G1-G3：数学、英文、语文、综合科学；
+-- G4-G5：数学、英文、语文、科学、地理；
+-- G6-G7：数学、英文、语文、科学、历史；
+-- G8：数学、英文、语文、科学、地理、物理；
+-- G9：数学、英文、语文、科学、历史、物理、化学。
 DROP TEMPORARY TABLE IF EXISTS seed_grade_subjects;
 CREATE TEMPORARY TABLE seed_grade_subjects (
   grade_no INT NOT NULL,
   subject_code VARCHAR(32) NOT NULL,
   PRIMARY KEY (grade_no, subject_code)
 );
-INSERT INTO seed_grade_subjects (grade_no, subject_code)
-SELECT g.grade_no, s.subject_code
-FROM seed_grades g
-CROSS JOIN seed_subjects s
-WHERE g.grade_no >= 7
-   OR s.subject_code IN ('chinese', 'math', 'english');
+INSERT INTO seed_grade_subjects (grade_no, subject_code) VALUES
+  (1, 'math'), (1, 'english'), (1, 'chinese'), (1, 'integrated-science'),
+  (2, 'math'), (2, 'english'), (2, 'chinese'), (2, 'integrated-science'),
+  (3, 'math'), (3, 'english'), (3, 'chinese'), (3, 'integrated-science'),
+  (4, 'math'), (4, 'english'), (4, 'chinese'), (4, 'science'), (4, 'geography'),
+  (5, 'math'), (5, 'english'), (5, 'chinese'), (5, 'science'), (5, 'geography'),
+  (6, 'math'), (6, 'english'), (6, 'chinese'), (6, 'science'), (6, 'history'),
+  (7, 'math'), (7, 'english'), (7, 'chinese'), (7, 'science'), (7, 'history'),
+  (8, 'math'), (8, 'english'), (8, 'chinese'), (8, 'science'), (8, 'geography'), (8, 'physics'),
+  (9, 'math'), (9, 'english'), (9, 'chinese'), (9, 'science'), (9, 'history'), (9, 'physics'), (9, 'chemistry');
 
 DROP TEMPORARY TABLE IF EXISTS seed_semesters;
 CREATE TEMPORARY TABLE seed_semesters (
@@ -739,7 +785,9 @@ VALUES
 INSERT IGNORE INTO student_package_grants (student_id, package_id, starts_at, ends_at, status, operator_id, operator_name) VALUES
   ('stu-001', 'pkg-g05-english-s1-full', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
   ('stu-002', 'pkg-g05-math-s1-question_handout', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
-  ('stu-003', 'pkg-g05-chinese-s1-question', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化');
+  ('stu-003', 'pkg-g05-chinese-s1-question', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
+  ('stu-002', 'pkg-g05-english-s1-full', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
+  ('stu-003', 'pkg-g05-english-s1-question_handout', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化');
 
 INSERT IGNORE INTO student_learning_space_access (student_id, learning_space_id, package_grant_id, starts_at, ends_at, status)
 SELECT
@@ -751,7 +799,13 @@ SELECT
   g.status
 FROM student_package_grants g
 JOIN package_spaces ps ON ps.package_id = g.package_id
-WHERE g.package_id IN ('pkg-g05-english-s1-full', 'pkg-g05-math-s1-question_handout', 'pkg-g05-chinese-s1-question')
+WHERE g.package_id IN (
+  'pkg-g05-english-s1-full',
+  'pkg-g05-math-s1-question_handout',
+  'pkg-g05-chinese-s1-question',
+  'pkg-g05-english-s1-question_handout'
+)
   AND g.status = 'active';
+COMMIT;
 END//
 DELIMITER ;

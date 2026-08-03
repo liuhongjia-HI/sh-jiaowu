@@ -179,7 +179,7 @@ func (s *MemoryStore) seedBaseDictionaries() {
 func defaultSettings() map[string]string {
 	return map[string]string{
 		"academicYear":                 "2025.2026学年",
-		"grades":                       "G1-G12",
+		"grades":                       "G1-G9",
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀",
 		"downloadPolicy":               "学生端仅安全预览，不提供下载",
@@ -302,21 +302,35 @@ type packageTypeSpec struct {
 	ContentTypes []string
 }
 
-var demoGrades = []string{"一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级"}
+var demoGrades = []string{"一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级"}
 
-var demoSubjects = []string{"语文", "数学", "英语", "物理", "化学", "地理", "历史", "政治", "生物"}
+var demoSubjects = []string{"数学", "英文", "语文", "综合科学", "科学", "地理", "历史", "物理", "化学"}
 
-// elementarySubjects 小学阶段（1-6 年级）实际开设的学科，只有语文、数学、英语。
-var elementarySubjects = map[string]bool{"语文": true, "数学": true, "英语": true}
+// demoGradeSubjects 是基础空间初始化使用的年级—学科矩阵。
+// 年级使用现有业务数据格式（一年级至九年级），学科名称按课程配置原文保留。
+var demoGradeSubjects = [][]string{
+	{"数学", "英文", "语文", "综合科学"},
+	{"数学", "英文", "语文", "综合科学"},
+	{"数学", "英文", "语文", "综合科学"},
+	{"数学", "英文", "语文", "科学", "地理"},
+	{"数学", "英文", "语文", "科学", "地理"},
+	{"数学", "英文", "语文", "科学", "历史"},
+	{"数学", "英文", "语文", "科学", "历史"},
+	{"数学", "英文", "语文", "科学", "地理", "物理"},
+	{"数学", "英文", "语文", "科学", "历史", "物理", "化学"},
+}
 
-// subjectAppliesToGrade 判断某年级是否开设该学科。小学没有物理、化学、生物、
-// 地理、政治、历史，这些学科从初中（七年级，gradeIndex 6）才开始，借此避免
-// 生成「一年级物理」这类无效组合，减少数据量与存储空间。
+// subjectAppliesToGrade 判断某年级是否开设该学科，避免生成矩阵外的无效空间。
 func subjectAppliesToGrade(gradeIndex int, subject string) bool {
-	if gradeIndex < 6 { // 一年级到六年级
-		return elementarySubjects[subject]
+	if gradeIndex < 0 || gradeIndex >= len(demoGradeSubjects) {
+		return false
 	}
-	return true
+	for _, allowed := range demoGradeSubjects[gradeIndex] {
+		if allowed == subject {
+			return true
+		}
+	}
+	return false
 }
 
 var demoSemesters = []string{"S1", "S2"}
@@ -383,12 +397,12 @@ func seedPermissionDemoData(s *MemoryStore) {
 	}
 
 	s.grants = []packageGrant{
-		{ID: "grant-001", StudentID: "stu-001", PackageID: packageID(4, "英语", 0, "full"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
+		{ID: "grant-001", StudentID: "stu-001", PackageID: packageID(4, "英文", 0, "full"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
 		{ID: "grant-002", StudentID: "stu-002", PackageID: packageID(4, "数学", 0, "question_handout"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
 		{ID: "grant-003", StudentID: "stu-003", PackageID: packageID(4, "语文", 0, "question"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
-		// Lucy、小航 同时开通 五年级英语，用于演示「同年级同学科」成班与协调。
-		{ID: "grant-004", StudentID: "stu-002", PackageID: packageID(4, "英语", 0, "full"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
-		{ID: "grant-005", StudentID: "stu-003", PackageID: packageID(4, "英语", 0, "question_handout"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
+		// Lucy、小航 同时开通 五年级英文，用于演示「同年级同学科」成班与协调。
+		{ID: "grant-004", StudentID: "stu-002", PackageID: packageID(4, "英文", 0, "full"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
+		{ID: "grant-005", StudentID: "stu-003", PackageID: packageID(4, "英文", 0, "question_handout"), StartsAt: "2026-05-22", EndsAt: "2027-05-22", Status: "active", EffectiveUntil: "2027-05-22"},
 	}
 	for _, grant := range s.grants {
 		s.syncSpaceAccessForGrant(grant)
@@ -431,8 +445,12 @@ func subjectSlug(subject string) string {
 		return "chinese"
 	case "数学":
 		return "math"
-	case "英语":
+	case "英文", "英语":
 		return "english"
+	case "综合科学":
+		return "integrated-science"
+	case "科学":
+		return "science"
 	case "物理":
 		return "physics"
 	case "化学":
@@ -448,6 +466,30 @@ func subjectSlug(subject string) string {
 	default:
 		return strings.ToLower(subject)
 	}
+}
+
+// subjectsMatch 保持旧数据中的“英语”和新课程字典中的“英文”兼容。
+// 两者共享 english slug，历史套餐、课程和教师范围不应因字典名称调整而失效。
+func subjectsMatch(left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == right {
+		return true
+	}
+	return (left == "英文" && right == "英语") || (left == "英语" && right == "英文")
+}
+
+func subjectTextContains(value, subject string) bool {
+	if strings.Contains(value, subject) {
+		return true
+	}
+	if subject == "英文" {
+		return strings.Contains(value, "英语")
+	}
+	if subject == "英语" {
+		return strings.Contains(value, "英文")
+	}
+	return false
 }
 
 func phaseSlug(phaseIndex int) string {
@@ -3345,7 +3387,7 @@ func (s *MemoryStore) ScheduleCandidates(principal learning.Principal, req learn
 			return nil, errors.New("请选择学科和年级")
 		}
 		for _, course := range s.courses {
-			if course.Status == learning.StatusEnabled && course.Subject == req.Subject && course.Grade == req.Grade && canSeeCourse(principal, course) {
+			if course.Status == learning.StatusEnabled && subjectsMatch(course.Subject, req.Subject) && course.Grade == req.Grade && canSeeCourse(principal, course) {
 				targetCourses = append(targetCourses, course)
 			}
 		}
@@ -4357,7 +4399,7 @@ func (s *MemoryStore) canWriteScoreSubject(principal learning.Principal, student
 		return false
 	}
 	for _, space := range s.learningSpaces {
-		if containsString(principal.LearningSpaceIDs, space.ID) && space.Grade == student.Grade && space.Subject == subject && space.Status == learning.StatusEnabled {
+		if containsString(principal.LearningSpaceIDs, space.ID) && space.Grade == student.Grade && subjectsMatch(space.Subject, subject) && space.Status == learning.StatusEnabled {
 			return true
 		}
 	}
@@ -4658,7 +4700,7 @@ func noticeMatchesStudent(notice learning.Notice, student learning.Student, subj
 		}
 	}
 	for _, subject := range subjects {
-		if subject != "" && strings.Contains(target, subject) {
+		if subject != "" && subjectTextContains(target, subject) {
 			return true
 		}
 	}
@@ -4710,7 +4752,7 @@ func (s *MemoryStore) questionsForHomework(course learning.Course, ids []string)
 		if item.Status != string(learning.StatusEnabled) {
 			return nil, errors.New("只能选择启用的题库题目")
 		}
-		if item.Grade != space.Grade || item.Semester != space.Semester || item.Subject != space.Subject {
+		if item.Grade != space.Grade || item.Semester != space.Semester || !subjectsMatch(item.Subject, space.Subject) {
 			return nil, errors.New("题目范围必须和发布课程范围一致")
 		}
 		out = append(out, bankItemQuestion(item))
@@ -5111,7 +5153,7 @@ func (s *MemoryStore) studentAccessibleSpaceIDs(studentID string) []string {
 func (s *MemoryStore) studentHasSubjectGrade(studentID, subject, grade string) bool {
 	for _, id := range s.studentAccessibleSpaceIDs(studentID) {
 		for _, space := range s.learningSpaces {
-			if space.ID == id && space.Grade == grade && space.Subject == subject {
+			if space.ID == id && space.Grade == grade && subjectsMatch(space.Subject, subject) {
 				return true
 			}
 		}
@@ -5390,7 +5432,7 @@ func (s *MemoryStore) findLearningSpace(id string) (learningSpace, bool) {
 func (s *MemoryStore) learningSpaceMatches(id, academicYear, grade, subject, semester string) bool {
 	for _, space := range s.learningSpaces {
 		if space.ID == id {
-			return space.AcademicYear == academicYear && space.Grade == grade && space.Subject == subject && space.Semester == semester
+			return space.AcademicYear == academicYear && space.Grade == grade && subjectsMatch(space.Subject, subject) && space.Semester == semester
 		}
 	}
 	return false
@@ -6217,7 +6259,7 @@ func canSeeQuestionScope(principal learning.Principal, grade, semester, subject 
 		return false
 	}
 	for _, space := range spaces {
-		if containsString(principal.LearningSpaceIDs, space.ID) && space.Grade == grade && space.Semester == semester && space.Subject == subject && space.Status == learning.StatusEnabled {
+		if containsString(principal.LearningSpaceIDs, space.ID) && space.Grade == grade && space.Semester == semester && subjectsMatch(space.Subject, subject) && space.Status == learning.StatusEnabled {
 			return true
 		}
 	}
@@ -6257,7 +6299,7 @@ func canSeeSubject(principal learning.Principal, subjects []string, value string
 		return true
 	}
 	for _, subject := range subjects {
-		if strings.Contains(value, subject) {
+		if subjectTextContains(value, subject) {
 			return true
 		}
 	}
@@ -6298,7 +6340,7 @@ func (s *MemoryStore) canSendNoticeTo(principal learning.Principal, values ...st
 		return false
 	}
 	for _, subject := range s.learningSpaceSubjects(principal.LearningSpaceIDs) {
-		if subject != "" && strings.Contains(joined, subject) {
+		if subject != "" && subjectTextContains(joined, subject) {
 			return true
 		}
 	}

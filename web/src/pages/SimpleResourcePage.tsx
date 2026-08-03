@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
-import { DEFAULT_ACADEMIC_YEAR, formatLearningSpace, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../utils/curriculum';
+import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -301,7 +301,10 @@ function subjectColor(subject: string) {
   const colors: Record<string, string> = {
     语文: '#ef4444',
     数学: '#2563eb',
+    英文: '#16a34a',
     英语: '#16a34a',
+    综合科学: '#15803d',
+    科学: '#15803d',
     物理: '#7c3aed',
     化学: '#0891b2',
     生物: '#65a30d',
@@ -529,12 +532,13 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
     enabled: kind === 'packages' || kind === 'questions' || kind === 'materials',
     queryFn: () => getData<Record<string, string>>('/settings')
   });
-  const currentAcademicYear = settings.data?.academicYear || DEFAULT_ACADEMIC_YEAR;
+  const currentAcademicYear = academicYearForDate();
   const academicYearOptions = useMemo(() => {
     const packageYears = kind === 'packages'
       ? ((data ?? []) as Record<string, unknown>[]).map((item) => item.academicYear)
       : [];
     const years = [
+      currentAcademicYear,
       settings.data?.academicYear,
       ...packageYears,
       ...(learningSpaces.data ?? []).map((space) => space.academicYear),
@@ -544,7 +548,7 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
       .filter(Boolean);
 
     return Array.from(new Set(years)).map((value) => ({ label: value, value }));
-  }, [data, kind, learningSpaces.data, settings.data?.academicYear]);
+  }, [currentAcademicYear, data, kind, learningSpaces.data, settings.data?.academicYear]);
   const currentSemesterOptions = semesterOptions(settings.data?.semesters);
   const questionScope = useMemo(() => {
     const unrestricted = hasAdminContentScope(user);
@@ -821,19 +825,6 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
 
   function openCreatePackage() {
     setEditingPackage(null);
-    packageForm.setFieldsValue({
-      name: '',
-      academicYear: currentAcademicYear,
-      grade: undefined as unknown as string,
-      subject: undefined as unknown as string,
-      semester: currentSemesterOptions[0]?.value || 'S1',
-      phaseScope: '全学期',
-      packageType: '',
-      summary: '',
-      learningSpaceIds: [],
-      contentTypeCodes: ['question', 'handout'],
-      status: '启用'
-    });
     setPackageOpen(true);
   }
 
@@ -922,19 +913,6 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
   function openEditPackage(record: Record<string, unknown>) {
     const item = record as StudyPackage;
     setEditingPackage(item);
-    packageForm.setFieldsValue({
-      name: item.name,
-      academicYear: item.academicYear,
-      grade: item.grade,
-      subject: item.subject,
-      semester: item.semester,
-      phaseScope: item.phaseScope,
-      packageType: item.packageType,
-      summary: item.summary,
-      learningSpaceIds: item.learningSpaceIds ?? [],
-      contentTypeCodes: item.contentTypeCodes ?? contentCodesFromLabels(item.contentTypes ?? []),
-      status: item.status
-    });
     setPackageOpen(true);
   }
 
@@ -1206,6 +1184,31 @@ export default function SimpleResourcePage({ kind, user }: { kind: Kind; user?: 
           learningSpaces={learningSpaces.data ?? []}
           academicYearOptions={academicYearOptions}
           semesterOptions={currentSemesterOptions}
+          initialValues={editingPackage ? {
+            name: editingPackage.name,
+            academicYear: editingPackage.academicYear,
+            grade: editingPackage.grade,
+            subject: editingPackage.subject,
+            semester: editingPackage.semester,
+            phaseScope: editingPackage.phaseScope,
+            packageType: editingPackage.packageType,
+            summary: editingPackage.summary,
+            learningSpaceIds: editingPackage.learningSpaceIds ?? [],
+            contentTypeCodes: editingPackage.contentTypeCodes ?? contentCodesFromLabels(editingPackage.contentTypes ?? []),
+            status: editingPackage.status
+          } : {
+            name: '',
+            academicYear: currentAcademicYear,
+            grade: undefined as unknown as string,
+            subject: undefined as unknown as string,
+            semester: currentSemesterOptions[0]?.value || 'S1',
+            phaseScope: '全学期',
+            packageType: '',
+            summary: '',
+            learningSpaceIds: [],
+            contentTypeCodes: ['question', 'handout'],
+            status: '启用'
+          }}
           onCancel={() => setPackageOpen(false)}
           onSubmit={(values) => savePackage.mutate(values)}
         />
@@ -1545,6 +1548,7 @@ function PackageDialog({
   learningSpaces,
   academicYearOptions,
   semesterOptions,
+  initialValues,
   onCancel,
   onSubmit
 }: {
@@ -1555,6 +1559,7 @@ function PackageDialog({
   learningSpaces: LearningSpace[];
   academicYearOptions: Array<{ label: string; value: string }>;
   semesterOptions: Array<{ label: string; value: string }>;
+  initialValues: PackageFormValues;
   onCancel: () => void;
   onSubmit: (values: PackageFormValues) => void;
 }) {
@@ -1574,6 +1579,9 @@ function PackageDialog({
       confirmLoading={loading}
       onCancel={onCancel}
       onOk={() => form.submit()}
+      afterOpenChange={(visible) => {
+        if (visible) form.setFieldsValue(initialValues);
+      }}
       destroyOnHidden
       width={720}
     >

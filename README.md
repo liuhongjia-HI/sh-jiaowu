@@ -82,4 +82,4 @@ ADMIN_PASSWORD_LOGIN_ENABLED=true
 
 - 正式迁移：`learning-api/deploy/mysql/init.sql` 只创建业务表、补基础角色/学科/系统设置，并注册可选演示数据过程。
 - 基础字典：后端启动时默认保留系统设置等基础字典；`DEMO_SEED_DATA=false` 不会写入演示学生、套餐、课程和内容。
-- 可选演示数据：本地开发可通过 `DEMO_SEED_DATA=true` 由后端初始化；如需纯 SQL 演示数据，先执行 `init.sql`，再手动执行 `learning-api/deploy/mysql/demo_seed.sql`。
+- 可选演示数据：本地开发可通过 `DEMO_SEED_DATA=true` 由后端初始化；如需纯 SQL 演示数据，先执行 `init.sql`，再用 `utf8mb4` 连接执行 `learning-api/deploy/mysql/demo_seed.sql`。该过程会按当前课程矩阵重建 `space-g%`、`pkg-g%` 等演示数据，适用于本地/演示库，不要直接对生产库执行。

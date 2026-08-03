@@ -35,7 +35,7 @@ async function createQuestion(page: Page, title: string, typeText: string, stem:
 
   await ensureCompactOption(page, dialog, 0, '五年级');
   await ensureCompactOption(page, dialog, 1, 'S1');
-  await ensureCompactOption(page, dialog, 2, '英语');
+  await ensureCompactOption(page, dialog, 2, '英文');
   await dialog.getByLabel('题目名称').fill(title);
   await selectOption(page, dialog, '题型', typeText);
   await dialog.getByPlaceholder('请输入学生看到的题目内容，可添加重点、列表或图片 URL。').fill(stem);
@@ -89,6 +89,16 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
   for (const [path, heading] of pages) {
     await expectPageHeading(page, path, heading);
   }
+});
+
+test('新增学习套餐默认带出当前学年', async ({ page }) => {
+  await login(page, '13800000001');
+  await expectPageHeading(page, '/packages', '学习套餐');
+
+  await page.getByRole('button', { name: '新增套餐' }).click();
+  const dialog = page.getByRole('dialog', { name: '新增学习套餐' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
 
 test('教师账号不能进入运营和系统高权限功能', async ({ page }) => {

@@ -791,8 +791,8 @@ func TestTeachersIncludesGradeSubjectSummary(t *testing.T) {
 	if !containsString(demo.Grades, "五年级") {
 		t.Fatalf("expected teacher grades to include 五年级, got %#v", demo.Grades)
 	}
-	if !containsString(demo.Subjects, "英语") {
-		t.Fatalf("expected teacher subjects to include 英语, got %#v", demo.Subjects)
+	if !containsString(demo.Subjects, "英文") {
+		t.Fatalf("expected teacher subjects to include 英文, got %#v", demo.Subjects)
 	}
 }
 
@@ -1162,7 +1162,7 @@ func TestCreateCourseRespectsTeacherScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected teacher to create course in own scope: %v", err)
 	}
-	if course.Subject != "英语" || course.Grade != "五年级" || course.MaterialNum != 0 || course.HomeworkNum != 0 {
+	if course.Subject != "英文" || course.Grade != "五年级" || course.MaterialNum != 0 || course.HomeworkNum != 0 {
 		t.Fatalf("unexpected course: %#v", course)
 	}
 
@@ -2047,7 +2047,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected material creation to succeed: %v", err)
 	}
-	if created.AcademicYear == "" || created.Grade != "五年级" || created.Semester != "S1" || created.Subject != "英语" {
+	if created.AcademicYear == "" || created.Grade != "五年级" || created.Semester != "S1" || created.Subject != "英文" {
 		t.Fatalf("expected created material to include learning dimensions, got %#v", created)
 	}
 	if created.Type != "学习资料" {

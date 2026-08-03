@@ -52,6 +52,8 @@ type ScheduleFilters = {
 type ScheduleMoveTarget = {
   dayOfWeek: number;
   label: string;
+  startTime?: string;
+  endTime?: string;
   startDate?: string;
   endDate?: string;
 };
@@ -140,6 +142,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
   const ownerKey = Form.useWatch('ownerKey', availabilityForm);
   const gradeWatch = Form.useWatch('grade', candidateForm);
+  const editingClassType = Form.useWatch('classType', editForm);
+  const editingStudentIDs = Form.useWatch('studentIds', editForm) ?? [];
   const owner = parseOwnerKey(ownerKey);
   const availability = useQuery({
     queryKey: ['availability', owner?.ownerType, owner?.ownerId],
@@ -375,11 +379,12 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
   function confirmMoveClass(record: ScheduleClass, target: ScheduleMoveTarget) {
     const isSameTarget = record.dayOfWeek === target.dayOfWeek &&
+      (!target.startTime || (record.startTime === target.startTime && record.endTime === target.endTime)) &&
       (!target.startDate || (record.startDate === target.startDate && record.endDate === (target.endDate || target.startDate)));
     if (!canCreateClass || record.status === '已取消' || isSameTarget) return;
     Modal.confirm({
       title: '确认调课',
-      content: `将「${record.name}」调整到${target.label}，时间保持 ${record.startTime}-${record.endTime}。`,
+      content: `将「${record.name}」调整到${target.label}。`,
       okText: '确认调整',
       cancelText: '取消',
       onOk: () => moveClass.mutate({ record, target })
@@ -817,9 +822,20 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Input placeholder="结束日期" />
             </Form.Item>
           </Space.Compact>
-          <Form.Item name="studentIds" label="学生" rules={[{ required: true, message: '请选择学生' }]}>
-            <Select mode="multiple" showSearch optionFilterProp="label" options={studentOptions} />
+          <Form.Item
+            name="studentIds"
+            label={`学生（已选 ${editingStudentIDs.length}/${classCapacity(editingClassType)}）`}
+            rules={[{ required: true, message: '请选择学生' }]}
+          >
+            <Select
+              mode="multiple"
+              showSearch
+              optionFilterProp="label"
+              maxCount={classCapacity(editingClassType)}
+              options={studentOptions}
+            />
           </Form.Item>
+          <Typography.Text type="secondary">可直接搜索并增减学生；保存时会校验同年级、开通学科、可上课时间和冲突。</Typography.Text>
         </Form>
       </Drawer>
     </div>
@@ -953,7 +969,7 @@ function ScheduleWeekTimeline({
         </Space>
         <div>
           <Typography.Title level={4}>{formatWeekRange(selectedWeekStart)}</Typography.Title>
-          <Typography.Text type="secondary">按时间查看本周课程、可排方案和师生可上课时间</Typography.Text>
+          <Typography.Text type="secondary">拖动已确认课程到目标时间，松开后确认保存；点击课程可快捷调整学生。</Typography.Text>
         </div>
       </div>
 
@@ -985,7 +1001,18 @@ function ScheduleWeekTimeline({
                 onDrop={(event) => {
                   const classID = event.dataTransfer.getData('text/schedule-class-id');
                   const record = Object.values(classesByDay).flat().find((item) => item.id === classID);
-                  if (record) onMoveClass(record, { dayOfWeek: day.dayOfWeek, label: day.label });
+                  if (!record) return;
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const offsetMinutes = Math.round((event.clientY - bounds.top) / timelineSlotHeight) * timelineSlotMinutes;
+                  const startMinute = clampTimelineStart(timelineRange.start + offsetMinutes, record.durationMinutes);
+                  const startTime = formatMinute(startMinute);
+                  const endTime = formatMinute(startMinute + record.durationMinutes);
+                  onMoveClass(record, {
+                    dayOfWeek: day.dayOfWeek,
+                    startTime,
+                    endTime,
+                    label: `${day.label} ${startTime}-${endTime}`
+                  });
                 }}
                 onDoubleClick={(event) => {
                   if (event.currentTarget === event.target && canManage) onCreateClass(day.dayOfWeek);
@@ -1488,6 +1515,16 @@ function timeToMinutes(value: string) {
   return Math.max(0, Math.min(24 * 60, hour * 60 + minute));
 }
 
+function clampTimelineStart(startMinute: number, durationMinutes: number) {
+  const maxStart = Math.max(0, 23 * 60 + 30 - durationMinutes);
+  return Math.max(0, Math.min(maxStart, startMinute));
+}
+
+function classCapacity(classType?: string) {
+  const match = /1V([1-4])/.exec(classType || '');
+  return match ? Number(match[1]) : 4;
+}
+
 function formatMinute(value: number) {
   const hour = Math.floor(value / 60);
   const minute = value % 60;
@@ -1496,7 +1533,7 @@ function formatMinute(value: number) {
 
 function subjectColor(subject: string) {
   const normalized = subject.toLowerCase();
-  if (normalized.includes('eng') || subject.includes('英语')) return { bg: '#d8ebfb', border: '#a9cdea', accent: '#2f7dcc', text: '#14395d' };
+  if (normalized.includes('eng') || subject.includes('英文') || subject.includes('英语')) return { bg: '#d8ebfb', border: '#a9cdea', accent: '#2f7dcc', text: '#14395d' };
   if (normalized.includes('math') || subject.includes('数学')) return { bg: '#fff5c9', border: '#f1d673', accent: '#d4a900', text: '#594700' };
   if (normalized.includes('geo') || normalized.includes('his') || subject.includes('地理') || subject.includes('历史')) return { bg: '#d8f0f5', border: '#9ed4df', accent: '#32899b', text: '#164e59' };
   if (normalized.includes('sci') || subject.includes('科学') || subject.includes('物理') || subject.includes('化学') || subject.includes('生物')) return { bg: '#dfe6ff', border: '#adbdf4', accent: '#3556c4', text: '#1e2d68' };
@@ -1556,7 +1593,7 @@ function uniqueScheduleSubjects(classes: ScheduleClass[], candidates: ScheduleCa
     '学生可上课'
   ].map((value) => value || '其他');
   return Array.from(new Set(values)).sort((left, right) => {
-    const priority = ['Eng', '英语', 'Math', '数学', 'Geo/His', 'Sci', '科学', 'CHN', '语文'];
+    const priority = ['Eng', '英文', '英语', 'Math', '数学', 'Geo/His', 'Sci', '科学', '综合科学', 'CHN', '语文'];
     const leftIndex = priority.findIndex((item) => left.includes(item));
     const rightIndex = priority.findIndex((item) => right.includes(item));
     if (leftIndex !== -1 || rightIndex !== -1) return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
@@ -1601,8 +1638,8 @@ function scheduleClassPayload(record: ScheduleClass, target: ScheduleMoveTarget 
     classType: record.classType,
     durationMinutes: record.durationMinutes,
     dayOfWeek: target.dayOfWeek,
-    startTime: record.startTime,
-    endTime: record.endTime,
+    startTime: target.startTime ?? record.startTime,
+    endTime: target.endTime ?? record.endTime,
     startDate: target.startDate ?? record.startDate,
     endDate: target.endDate ?? record.endDate,
     studentIds: record.students.map((student) => student.id)

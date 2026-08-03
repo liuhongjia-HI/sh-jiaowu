@@ -22,13 +22,60 @@ func TestNewMemoryStoreCanStartWithoutDemoData(t *testing.T) {
 	}
 	foundEnglish := false
 	for _, space := range store.learningSpaces {
-		if space.Grade == "五年级" && space.Subject == "英语" && space.Semester == "S1" {
+		if space.Grade == "五年级" && space.Subject == "英文" && space.Semester == "S1" {
 			foundEnglish = true
 			break
 		}
 	}
 	if !foundEnglish {
-		t.Fatal("expected base learning spaces to include 五年级英语 S1")
+		t.Fatal("expected base learning spaces to include 五年级英文 S1")
+	}
+}
+
+func TestBaseLearningSpacesFollowGradeSubjectMatrix(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	want := map[string][]string{
+		"一年级": {"数学", "英文", "语文", "综合科学"},
+		"二年级": {"数学", "英文", "语文", "综合科学"},
+		"三年级": {"数学", "英文", "语文", "综合科学"},
+		"四年级": {"数学", "英文", "语文", "科学", "地理"},
+		"五年级": {"数学", "英文", "语文", "科学", "地理"},
+		"六年级": {"数学", "英文", "语文", "科学", "历史"},
+		"七年级": {"数学", "英文", "语文", "科学", "历史"},
+		"八年级": {"数学", "英文", "语文", "科学", "地理", "物理"},
+		"九年级": {"数学", "英文", "语文", "科学", "历史", "物理", "化学"},
+	}
+	if len(store.learningSpaces) != 180 {
+		t.Fatalf("expected 180 learning spaces, got %d", len(store.learningSpaces))
+	}
+
+	counts := map[string]map[string]int{}
+	for _, space := range store.learningSpaces {
+		if _, ok := want[space.Grade]; !ok {
+			t.Fatalf("unexpected seeded grade %q", space.Grade)
+		}
+		allowed := false
+		for _, subject := range want[space.Grade] {
+			if subject == space.Subject {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			t.Fatalf("unexpected subject %q for %s", space.Subject, space.Grade)
+		}
+		if counts[space.Grade] == nil {
+			counts[space.Grade] = map[string]int{}
+		}
+		counts[space.Grade][space.Subject]++
+	}
+
+	for grade, subjects := range want {
+		for _, subject := range subjects {
+			if counts[grade][subject] != 4 {
+				t.Fatalf("expected %s %s to have 4 semester/phase spaces, got %d", grade, subject, counts[grade][subject])
+			}
+		}
 	}
 }
 
