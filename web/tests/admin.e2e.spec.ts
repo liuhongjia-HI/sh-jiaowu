@@ -164,7 +164,7 @@ test('教师可以新增题目并手动组卷发布小挑战', async ({ page }) 
   const dialog = page.getByRole('dialog', { name: '组卷发布小挑战' });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('练习标题').fill(homeworkTitle);
-  await selectOption(page, dialog, '课程范围', '五年级英语S1Q1课程');
+  await selectOption(page, dialog, '课程范围', '五年级英文S1Q1课程');
   await dialog.getByLabel('截止时间').fill('2026-12-31');
   await selectOption(page, dialog, '选择题目', singleTitle);
   await selectOption(page, dialog, '选择题目', textTitle);
