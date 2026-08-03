@@ -948,6 +948,27 @@ func TestCreatePackageSupportsGrantPreview(t *testing.T) {
 	if len(preview.OpenCourses) != 0 || len(preview.OpenMaterials) != 0 {
 		t.Fatalf("question-only package should not open courses/materials: %#v", preview)
 	}
+	for index := range store.students {
+		if store.students[index].ID == "stu-001" {
+			store.students[index].LearningStatus = "待开通"
+		}
+	}
+	if _, err := store.CreateGrant("运营教务", "stu-001", pkg.ID); err != nil {
+		t.Fatalf("expected grant creation to succeed: %v", err)
+	}
+	student, ok := store.findRawStudent("stu-001")
+	if !ok || student.LearningStatus != "已开通" {
+		t.Fatalf("grant should update pending student status, got %#v", student)
+	}
+	for index := range store.students {
+		if store.students[index].ID == "stu-001" {
+			store.students[index].LearningStatus = "待开通"
+		}
+	}
+	student, ok = store.findStudent("stu-001")
+	if !ok || student.LearningStatus != "已开通" {
+		t.Fatalf("active grant should correct stale pending status in student view, got %#v", student)
+	}
 }
 
 func TestCreatePackageRejectsCrossAcademicYearSpace(t *testing.T) {

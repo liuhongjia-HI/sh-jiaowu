@@ -4254,9 +4254,13 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	}
 	effectiveUntil := ""
 	packages := make([]string, 0)
+	hasActiveGrant := false
 	for _, grant := range s.grants {
 		if grant.StudentID != student.ID {
 			continue
+		}
+		if grantActive(grant) {
+			hasActiveGrant = true
 		}
 		if grantEndsAt(grant) > effectiveUntil {
 			effectiveUntil = grantEndsAt(grant)
@@ -4269,6 +4273,9 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 		student.EffectiveUntil = effectiveUntil
 	}
 	student.OpenedPackages = packages
+	if hasActiveGrant && student.LearningStatus == "待开通" {
+		student.LearningStatus = "已开通"
+	}
 	if submission, ok := s.latestStudentSubmission(student.ID); ok {
 		student.LastSubmittedAt = submission.CreatedAt
 		student.LastSubmissionStatus = submission.Status
@@ -5064,6 +5071,9 @@ func (s *MemoryStore) addStudentOpenedPackage(studentID, packageName string) {
 	for i := range s.students {
 		if s.students[i].ID == studentID {
 			s.students[i].OpenedPackages = appendUnique(s.students[i].OpenedPackages, packageName)
+			if s.students[i].LearningStatus == "" || s.students[i].LearningStatus == "待开通" {
+				s.students[i].LearningStatus = "已开通"
+			}
 			return
 		}
 	}
