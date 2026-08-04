@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestNewMemoryStoreCanStartWithoutDemoData(t *testing.T) {
 	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
@@ -75,6 +78,29 @@ func TestBaseLearningSpacesFollowGradeSubjectMatrix(t *testing.T) {
 			if counts[grade][subject] != 4 {
 				t.Fatalf("expected %s %s to have 4 semester/phase spaces, got %d", grade, subject, counts[grade][subject])
 			}
+		}
+	}
+}
+
+func TestAcademicYearForDateUsesJulyFirstBoundary(t *testing.T) {
+	beforeBoundary := time.Date(2026, time.June, 30, 23, 59, 59, 0, time.Local)
+	afterBoundary := time.Date(2026, time.July, 1, 0, 0, 0, 0, time.Local)
+	if got := academicYearForDate(beforeBoundary); got != "2025.2026学年" {
+		t.Fatalf("expected school year before July to be 2025.2026学年, got %s", got)
+	}
+	if got := academicYearForDate(afterBoundary); got != "2026.2027学年" {
+		t.Fatalf("expected school year from July to be 2026.2027学年, got %s", got)
+	}
+}
+
+func TestBaseLearningSpacesUsesRequestedAcademicYear(t *testing.T) {
+	spaces := baseLearningSpaces("2026.2027学年")
+	if len(spaces) != 180 {
+		t.Fatalf("expected 180 base learning spaces, got %d", len(spaces))
+	}
+	for _, space := range spaces {
+		if space.AcademicYear != "2026.2027学年" {
+			t.Fatalf("expected current academic year on %s, got %s", space.ID, space.AcademicYear)
 		}
 	}
 }

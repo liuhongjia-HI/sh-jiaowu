@@ -191,6 +191,19 @@ func defaultSettings() map[string]string {
 	}
 }
 
+// academicYearForDate 与后台套餐默认学年保持一致：每年 7 月 1 日进入下一学年。
+func academicYearForDate(value time.Time) string {
+	startYear := value.Year()
+	if value.Month() < time.July {
+		startYear--
+	}
+	return fmt.Sprintf("%d.%d学年", startYear, startYear+1)
+}
+
+func currentAcademicYear() string {
+	return academicYearForDate(time.Now())
+}
+
 func (s *MemoryStore) ensureDefaultSettings() {
 	if s.settings == nil {
 		s.settings = map[string]string{}
@@ -208,6 +221,17 @@ func (s *MemoryStore) seedBaseLearningSpaces() {
 	for _, space := range s.learningSpaces {
 		exists[space.ID] = true
 	}
+	for _, space := range baseLearningSpaces(academicYear) {
+		if exists[space.ID] {
+			continue
+		}
+		s.learningSpaces = append(s.learningSpaces, space)
+		exists[space.ID] = true
+	}
+}
+
+func baseLearningSpaces(academicYear string) []learningSpace {
+	spaces := make([]learningSpace, 0, 180)
 	for gradeIndex, grade := range demoGrades {
 		for _, subject := range demoSubjects {
 			if !subjectAppliesToGrade(gradeIndex, subject) {
@@ -215,20 +239,16 @@ func (s *MemoryStore) seedBaseLearningSpaces() {
 			}
 			for semesterIndex, semester := range demoSemesters {
 				for phaseIndex, phase := range demoPhases {
-					spaceID := learningSpaceID(gradeIndex, subject, semesterIndex, phaseIndex)
-					if exists[spaceID] {
-						continue
-					}
-					spaceName := grade + subject + semester + phase
-					s.learningSpaces = append(s.learningSpaces, learningSpace{
-						ID: spaceID, AcademicYear: academicYear, Grade: grade, Subject: subject,
-						Semester: semester, Phase: phase, Name: spaceName, Status: learning.StatusEnabled,
+					spaces = append(spaces, learningSpace{
+						ID: learningSpaceID(gradeIndex, subject, semesterIndex, phaseIndex), AcademicYear: academicYear,
+						Grade: grade, Subject: subject, Semester: semester, Phase: phase,
+						Name: grade + subject + semester + phase, Status: learning.StatusEnabled,
 					})
-					exists[spaceID] = true
 				}
 			}
 		}
 	}
+	return spaces
 }
 
 func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {

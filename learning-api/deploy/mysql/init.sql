@@ -492,8 +492,16 @@ ON DUPLICATE KEY UPDATE
 
 DELETE FROM subjects WHERE id IN ('politics', 'biology');
 
+-- 每年 7 月 1 日进入下一学年，与后台表单默认值保持一致。
+SET @seed_academic_year = CONCAT(
+  IF(MONTH(CURDATE()) >= 7, YEAR(CURDATE()), YEAR(CURDATE()) - 1),
+  '.',
+  IF(MONTH(CURDATE()) >= 7, YEAR(CURDATE()) + 1, YEAR(CURDATE())),
+  '学年'
+);
+
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
-  ('academicYear', '2025.2026学年'),
+  ('academicYear', @seed_academic_year),
   ('grades', 'G1-G9'),
   ('semesters', 'S1 / S2'),
   ('watermarkRule', '姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀'),
@@ -629,7 +637,7 @@ FROM seed_subjects;
 INSERT IGNORE INTO learning_spaces (id, academic_year, grade, subject, semester, phase, name, status)
 SELECT
   CONCAT('space-g', LPAD(g.grade_no, 2, '0'), '-', s.subject_code, '-s', sem.semester_no, '-', p.phase_code),
-  '2025.2026学年',
+  @seed_academic_year,
   g.grade_name,
   s.subject_name,
   sem.semester_name,
@@ -645,8 +653,8 @@ CROSS JOIN seed_phases p;
 INSERT IGNORE INTO study_packages (id, name, academic_year, grade, semester, subject, phase_scope, package_type, status)
 SELECT
   CONCAT('pkg-g', LPAD(g.grade_no, 2, '0'), '-', s.subject_code, '-s', sem.semester_no, '-', pt.package_type),
-  CONCAT('2025.2026学年 ', g.grade_name, ' ', sem.semester_name, ' ', s.subject_name, ' ', pt.package_label),
-  '2025.2026学年',
+  CONCAT(@seed_academic_year, ' ', g.grade_name, ' ', sem.semester_name, ' ', s.subject_name, ' ', pt.package_label),
+  @seed_academic_year,
   g.grade_name,
   sem.semester_name,
   s.subject_name,
