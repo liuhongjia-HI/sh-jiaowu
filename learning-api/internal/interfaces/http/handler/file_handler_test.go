@@ -1,0 +1,63 @@
+package handler
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestBuildPreviewNeverReusesOriginalPathForPDF(t *testing.T) {
+	dir := t.TempDir()
+	originalDir := filepath.Join(dir, "original")
+	previewDir := filepath.Join(dir, "preview")
+	if err := os.MkdirAll(originalDir, 0755); err != nil {
+		t.Fatalf("mkdir original: %v", err)
+	}
+	if err := os.MkdirAll(previewDir, 0755); err != nil {
+		t.Fatalf("mkdir preview: %v", err)
+	}
+	originalPath := filepath.Join(originalDir, "file-001.pdf")
+	want := []byte("%PDF-1.4 original bytes")
+	if err := os.WriteFile(originalPath, want, 0644); err != nil {
+		t.Fatalf("write original: %v", err)
+	}
+
+	previewPath, status := buildPreview(originalPath, previewDir, ".pdf")
+
+	if status != "可预览" {
+		t.Fatalf("status = %q, want 可预览", status)
+	}
+	if previewPath == originalPath {
+		t.Fatalf("previewPath must never equal originalPath, got the same path %q", previewPath)
+	}
+	if !filepathHasPrefix(previewPath, previewDir) {
+		t.Fatalf("previewPath %q should live under previewDir %q", previewPath, previewDir)
+	}
+	got, err := os.ReadFile(previewPath)
+	if err != nil {
+		t.Fatalf("read preview copy: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("preview copy content = %q, want %q", got, want)
+	}
+
+	// 修改原文件不应影响已经生成的预览副本——两者是物理独立的文件。
+	if err := os.WriteFile(originalPath, []byte("mutated"), 0644); err != nil {
+		t.Fatalf("mutate original: %v", err)
+	}
+	stillOriginalCopy, err := os.ReadFile(previewPath)
+	if err != nil {
+		t.Fatalf("re-read preview copy: %v", err)
+	}
+	if string(stillOriginalCopy) != string(want) {
+		t.Fatalf("preview copy changed after mutating original, physical separation is broken")
+	}
+}
+
+func filepathHasPrefix(path, prefix string) bool {
+	rel, err := filepath.Rel(prefix, path)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && len(rel) > 0 && rel[0] != '.'
+}

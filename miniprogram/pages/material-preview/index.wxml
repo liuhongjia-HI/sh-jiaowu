@@ -11,7 +11,25 @@
       <view class="sub">带专属水印</view>
     </view>
     <view class="security-notice">{{securityNotice}}</view>
-    <view class="paper">
+
+    <view wx:if="{{recordingBlocked}}" class="recording-guard">
+      <view class="recording-guard-icon">🚫</view>
+      <view class="recording-guard-text">检测到系统录屏，内容已暂时隐藏</view>
+      <view class="recording-guard-sub">停止录屏后会自动恢复</view>
+    </view>
+
+    <view wx:elif="{{previewMode === 'image'}}" class="paged-preview">
+      <view wx:for="{{pageImages}}" wx:key="index" class="page-wrap">
+        <image class="page-image" src="{{item.path}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
+        <view class="watermark-layer">
+          <view wx:for="{{watermarkTexts}}" wx:for-item="mark" wx:key="mark" class="watermark">{{mark}}</view>
+        </view>
+        <view class="page-index">第 {{item.index}}/{{pageCount}} 页</view>
+      </view>
+      <view wx:if="{{pagesLoading}}" class="page-loading">正在加载第 {{loadedPageCount}}/{{pageCount}} 页…</view>
+    </view>
+
+    <view wx:else class="paper">
       <view class="watermark-layer">
         <view wx:for="{{watermarkTexts}}" wx:key="index" class="watermark">{{item}}</view>
       </view>
@@ -22,13 +40,14 @@
       <view class="paper-line"></view>
       <view class="paper-line tiny"></view>
     </view>
+
     <view class="badges">
       <view class="badge">{{readText}}</view>
       <view class="badge">距离小徽章还差一步</view>
     </view>
     <view class="button-row">
       <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
-      <button class="button light" bindtap="openSecurePreview">安全预览</button>
+      <button wx:if="{{previewMode !== 'image'}}" class="button light" bindtap="openSecurePreview">安全预览</button>
       <button class="button" bindtap="goAnswer">去做小挑战</button>
     </view>
   </view>

@@ -1,4 +1,4 @@
-<view class="me-page">
+<view class="me-page" style="padding-top: {{statusBarHeight}}px;">
   <view wx:if="{{loading}}" class="page-state">正在同步学习状态...</view>
 
   <view wx:elif="{{!me}}" class="login-state">
@@ -7,75 +7,94 @@
     <button class="primary-button" bindtap="goLogin">去登录绑定</button>
   </view>
 
-  <view wx:else class="learning-shell">
-    <view class="learning-header">
-      <button class="avatar-control" bindtap="authorizeProfile" disabled="{{savingProfile}}" aria-label="补充头像昵称">
-        <image wx:if="{{studentProfile.avatarUrl}}" class="avatar-image" src="{{studentProfile.avatarUrl}}" mode="aspectFill"></image>
-        <view wx:else class="avatar-text">{{studentProfile.avatarText}}</view>
-      </button>
-      <view class="student-copy">
-        <view class="student-name">{{studentProfile.displayName}}</view>
-        <view class="student-meta">{{studentProfile.meta}}</view>
-        <view class="student-status">{{studentProfile.status}}</view>
-      </view>
-      <view class="profile-sync">{{studentProfile.profileHint}}</view>
+  <view wx:else class="me-shell">
+    <view class="me-toolbar">
+      <view class="me-toolbar-icon settings-icon" bindtap="toggleProfileEdit" aria-label="账号设置">⚙</view>
     </view>
 
-    <view class="primary-panel {{primaryTask.tone}}">
-      <view class="task-label">{{primaryTask.label}}</view>
-      <view class="task-title">{{primaryTask.title}}</view>
-      <view class="task-desc">{{primaryTask.desc}}</view>
-      <button class="primary-button task-button" bindtap="handlePrimaryAction">{{primaryTask.buttonText}}</button>
+    <view class="profile-card">
+      <button class="profile-avatar" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" disabled="{{savingProfile}}" aria-label="选择微信头像">
+        <image wx:if="{{studentProfile.avatarUrl}}" class="profile-avatar-image" src="{{studentProfile.avatarUrl}}" mode="aspectFill"></image>
+        <view wx:else class="profile-avatar-fallback" aria-hidden="true">
+          <view class="avatar-illustration-body"></view>
+          <view class="avatar-illustration-hair"></view>
+          <view class="avatar-illustration-face"></view>
+          <view class="avatar-illustration-eye avatar-eye-left"></view>
+          <view class="avatar-illustration-eye avatar-eye-right"></view>
+        </view>
+      </button>
+      <view class="profile-copy">
+        <input class="profile-nickname" type="nickname" value="{{profileForm.nickname}}" placeholder="微信用户" bindinput="onNicknameInput" bindblur="commitNickname" confirm-type="done" aria-label="微信昵称" />
+        <button class="profile-phone-action {{studentProfile.phoneAuthorized ? 'authorized' : 'pending'}}" open-type="getPhoneNumber" bindgetphonenumber="authorizePhone" loading="{{savingProfile}}" disabled="{{savingProfile}}" aria-label="授权手机号">
+          <text>{{studentProfile.phoneHint}}</text>
+        </button>
+      </view>
+      <view class="profile-arrow" bindtap="toggleProfileEdit">›</view>
+    </view>
+
+    <view class="me-section recent-section">
+      <view class="me-section-head">
+        <view class="me-section-title">最近学习</view>
+        <view class="me-section-more" bindtap="goStudy">查看更多 ›</view>
+      </view>
+      <view wx:if="{{recentLearning}}" class="recent-card" bindtap="goStudyDetail">
+        <view class="recent-cover">
+          <view class="recent-cover-circle"></view>
+          <view class="recent-cover-art">{{recentLearning.coverIcon || "📖"}}</view>
+        </view>
+        <view class="recent-copy">
+          <view class="recent-title">{{recentLearning.name}}</view>
+          <view class="recent-date">最近学习：{{recentLearning.lastStudyAt || "今天"}}</view>
+          <view class="recent-progress-row"><text>已学 {{recentLearning.completedLessons}}/{{recentLearning.chapterCount}} 节</text><text>{{recentLearning.progress}}%</text></view>
+          <view class="recent-progress"><view class="recent-progress-bar" style="width: {{recentLearning.progress}}%;"></view></view>
+        </view>
+      </view>
+      <view wx:else class="recent-empty">还没有最近学习记录，去学习中心看看吧。</view>
     </view>
 
     <view class="metric-strip">
       <view wx:for="{{overviewMetrics}}" wx:key="label" class="metric-item">
-        <view class="metric-value">{{item.value}}</view>
+        <view class="metric-value {{item.emphasis ? 'metric-emphasis' : ''}}">{{item.value}}</view>
         <view class="metric-label">{{item.label}}</view>
-        <view class="metric-hint">{{item.hint}}</view>
       </view>
     </view>
 
-    <view class="content-section">
-      <view class="section-title">常用学习</view>
+    <view class="me-section function-section">
+      <view class="me-section-title">常用功能</view>
       <view class="quick-grid">
-        <view wx:for="{{quickActions}}" wx:key="action" class="quick-action" data-action="{{item.action}}" bindtap="handleQuickAction">
+        <view wx:for="{{quickActions}}" wx:key="action" class="quick-action quick-action-{{item.tone}}" data-action="{{item.action}}" bindtap="handleQuickAction">
           <view class="quick-symbol">{{item.symbol}}</view>
-          <view class="quick-copy">
-            <view class="quick-title">{{item.title}}</view>
-            <view class="quick-desc">{{item.desc}}</view>
+          <view class="quick-title">{{item.title}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{profileEditing}}" class="profile-modal-mask" bindtap="toggleProfileEdit">
+      <view class="profile-modal" catchtap="stopModalTap">
+        <view class="profile-modal-head">
+          <view>
+            <view class="profile-modal-title">编辑我的资料</view>
+            <view class="profile-modal-subtitle">完善信息，老师才能更准确地记录学习反馈</view>
           </view>
-          <view wx:if="{{item.badge}}" class="quick-badge">{{item.badge}}</view>
+          <view class="profile-modal-close" bindtap="toggleProfileEdit">×</view>
+        </view>
+
+        <view class="profile-modal-status-row">
+          <view class="profile-modal-status {{profileCompleteness.statusClass}}">{{profileCompleteness.status}}</view>
+          <view class="profile-modal-status-desc">{{profileCompleteness.summary}}</view>
+        </view>
+
+        <view class="profile-form">
+          <input class="form-input" value="{{profileForm.studentName}}" data-field="studentName" bindinput="onBasicInput" placeholder="学生姓名" />
+          <view class="form-readonly">
+            <view class="form-readonly-value">{{profileForm.grade || "年级待补全"}}</view>
+            <view class="form-readonly-hint">年级按学年自动升级，如有误差请联系老师订正</view>
+          </view>
+          <input class="form-input" value="{{profileForm.schoolName}}" data-field="schoolName" bindinput="onBasicInput" placeholder="学校" />
+          <input class="form-input" value="{{profileForm.guardianName}}" data-field="guardianName" bindinput="onBasicInput" placeholder="家长称呼（选填）" />
+          <button class="profile-save" bindtap="submitBasicProfile" loading="{{savingBasicProfile}}" disabled="{{savingBasicProfile}}">保存资料</button>
         </view>
       </view>
-    </view>
-
-    <view class="support-card">
-      <view class="support-main" bindtap="toggleProfileEdit">
-        <view class="support-title-row">
-          <view class="support-title">我的资料</view>
-          <view class="support-status {{profileCompleteness.statusClass}}">{{profileCompleteness.status}}</view>
-        </view>
-        <view class="support-desc">{{profileCompleteness.summary}}</view>
-        <view class="support-note">{{profileCompleteness.detail}}</view>
-      </view>
-      <button class="secondary-button" bindtap="toggleProfileEdit">{{profileEditText}}</button>
-
-      <view wx:if="{{profileEditing}}" class="profile-form">
-        <input class="form-input" value="{{profileForm.studentName}}" data-field="studentName" bindinput="onBasicInput" placeholder="学生姓名" />
-        <input class="form-input" value="{{profileForm.grade}}" data-field="grade" bindinput="onBasicInput" placeholder="年级，例如：五年级" />
-        <input class="form-input" value="{{profileForm.schoolName}}" data-field="schoolName" bindinput="onBasicInput" placeholder="学校" />
-        <input class="form-input" value="{{profileForm.guardianName}}" data-field="guardianName" bindinput="onBasicInput" placeholder="家长称呼（选填）" />
-        <button class="profile-save" bindtap="submitBasicProfile" loading="{{savingBasicProfile}}" disabled="{{savingBasicProfile}}">保存资料</button>
-      </view>
-    </view>
-
-    <view class="notice-line" bindtap="handleSupportTap">
-      <view>
-        <view class="notice-title">{{supportNotice.title}}</view>
-        <view class="notice-desc">{{supportNotice.desc}}</view>
-      </view>
-      <view class="notice-action">{{supportNotice.actionText}}</view>
     </view>
   </view>
 </view>

@@ -1,38 +1,57 @@
-<view class="hero">
-  <view class="eyebrow">学习星球详情</view>
-  <view class="hero-title">{{course.name}}</view>
-  <view class="sub">{{teacherText}} · {{course.grade}} · 成长进度 {{progress}}%</view>
-  <view class="progress"><view class="progress-bar" style="width: {{progress}}%;"></view></view>
-</view>
+<view class="detail-page">
+  <view class="detail-topbar">
+    <view class="detail-back" bindtap="goBack">‹</view>
+    <view class="detail-topbar-title">{{course.name || "课程详情"}}</view>
+    <view class="detail-share">↗</view>
+  </view>
 
-<view class="section">
-  <view class="grid2">
-    <view class="card" bindtap="goPreview">
-      <view class="cover">📄</view>
-      <view class="title">学习资料</view>
-      <view class="sub">学习资料、图片、PPT</view>
-      <view class="badge">{{materialCountText}}</view>
+  <view class="detail-summary">
+    <view class="detail-summary-copy">
+      <view class="detail-status"><text>●</text> 正在学习</view>
+      <view class="detail-title">{{course.name || "学习课程"}}</view>
+      <view class="detail-meta">讲师：{{teacherText}} <text>｜</text> 时长：{{course.duration || "持续学习"}}</view>
+      <view class="detail-progress-row"><text>已学 {{progress}}%</text><text>{{progress >= 100 ? "已完成" : "继续加油"}}</text></view>
+      <view class="detail-progress"><view class="detail-progress-bar" style="width: {{progress}}%;"></view></view>
     </view>
-    <view class="card reward" bindtap="goAnswer">
-      <view class="cover">📝</view>
-      <view class="title">课后小挑战</view>
-      <view class="sub">做完就能看反馈</view>
-      <view class="badge">{{homeworkText}}</view>
+    <view class="detail-book-art">📖</view>
+  </view>
+
+  <view class="detail-section-head">
+    <view class="detail-section-title">课程目录 <text>（共 {{stations.length}} 节）</text></view>
+  </view>
+  <view class="lesson-list">
+    <view wx:for="{{stations}}" wx:key="title" class="lesson-row {{item.statusClass}}" data-status="{{item.status}}" data-material-id="{{item.materialId}}" data-homework-id="{{item.homeworkId}}" bindtap="tapStation">
+      <view class="lesson-line"></view>
+      <view class="lesson-state">{{item.icon}}</view>
+      <view class="lesson-copy">
+        <view class="lesson-title">{{item.title}}</view>
+        <view class="lesson-desc">{{item.desc}}</view>
+      </view>
+      <view class="lesson-status">{{item.status}}</view>
     </view>
   </view>
-</view>
 
-<view class="section">
-  <view class="section-title">学习小地图</view>
-  <view class="card">
-    <view class="bubble">完成第 3 站后，可以获得一枚“阅读小星星”徽章。</view>
-    <view wx:for="{{stations}}" wx:key="title" class="map-item" data-status="{{item.status}}" data-material-id="{{item.materialId}}" data-homework-id="{{item.homeworkId}}" bindtap="tapStation">
-      <view class="dot">{{item.icon}}</view>
-      <view class="map-text">
-        <view class="title small-title">{{item.title}}</view>
-        <view class="sub">{{item.desc}}</view>
+  <view class="detail-section-head material-head">
+    <view class="detail-section-title">学习资料 <text>（{{materials.length}} 份）</text></view>
+    <view class="detail-section-link" bindtap="goPreview">全部资料 ›</view>
+  </view>
+  <view wx:if="{{materials.length}}" class="material-list">
+    <view wx:for="{{materials}}" wx:key="id" class="material-row" data-id="{{item.id}}" bindtap="previewMaterial">
+      <view class="material-icon">{{item.fileType || "PDF"}}</view>
+      <view class="material-copy">
+        <view class="material-title">{{item.title}}</view>
+        <view class="material-meta">{{item.fileType || item.type || "学习资料"}} · {{item.fileSize || "资料"}}</view>
       </view>
-      <view class="tag">{{item.status}}</view>
+      <view class="material-arrow">↓</view>
     </view>
+  </view>
+  <view wx:else class="detail-empty-line">老师发布资料后会显示在这里</view>
+
+  <view class="detail-feedback">
+    <view class="detail-section-head">
+      <view class="detail-section-title">课堂反馈</view>
+      <view class="detail-section-link">去反馈 ›</view>
+    </view>
+    <view class="detail-feedback-copy">对本节课有什么收获或疑问？快来反馈吧～</view>
   </view>
 </view>

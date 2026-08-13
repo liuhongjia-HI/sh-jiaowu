@@ -38,7 +38,7 @@ func (s *MemoryStore) resolvePhoneNumber(phoneCode string) (string, error) {
 }
 
 // UseWechatAPI 启用真实微信登录：用 AppID/Secret 调用 jscode2session 换取 openId，并支持手机号授权绑定。
-func (s *MemoryStore) UseWechatAPI(appID, secret string) {
+func (s *MemoryStore) useWechatAPIUnlocked(appID, secret string) {
 	appID = strings.TrimSpace(appID)
 	secret = strings.TrimSpace(secret)
 	if appID == "" || secret == "" {
@@ -53,7 +53,7 @@ func (s *MemoryStore) UseWechatAPI(appID, secret string) {
 	}
 }
 
-func (s *MemoryStore) UseOfficialAccountAPI(appID, secret, templateID string) {
+func (s *MemoryStore) useOfficialAccountAPIUnlocked(appID, secret, templateID string) {
 	appID = strings.TrimSpace(appID)
 	secret = strings.TrimSpace(secret)
 	templateID = strings.TrimSpace(templateID)
@@ -67,7 +67,7 @@ func (s *MemoryStore) UseOfficialAccountAPI(appID, secret, templateID string) {
 	}
 }
 
-func (s *MemoryStore) UseMiniProgramSubscribeTemplates(templateIDs []string) {
+func (s *MemoryStore) useMiniProgramSubscribeTemplatesUnlocked(templateIDs []string) {
 	ids := compactStrings(templateIDs)
 	if len(ids) == 0 {
 		return

@@ -81,3 +81,67 @@
   font-size: 64rpx;
   margin: 36rpx 0;
 }
+
+.recording-guard {
+  margin-top: 24rpx;
+  min-height: 400rpx;
+  border-radius: 28rpx;
+  background: #2a2320;
+  color: #fff2ea;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.recording-guard-icon {
+  font-size: 56rpx;
+  margin-bottom: 16rpx;
+}
+
+.recording-guard-text {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.recording-guard-sub {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  opacity: .7;
+}
+
+.paged-preview {
+  margin-top: 24rpx;
+}
+
+.page-wrap {
+  position: relative;
+  border-radius: 20rpx;
+  overflow: hidden;
+  margin-bottom: 20rpx;
+  border: 1rpx solid #f1dfd4;
+  background: #fffaf6;
+}
+
+.page-image {
+  width: 100%;
+  display: block;
+}
+
+.page-index {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 12rpx 0;
+  font-size: 22rpx;
+  color: #9a5b3d;
+  background: #fff2ea;
+}
+
+.page-loading {
+  text-align: center;
+  padding: 24rpx 0;
+  font-size: 24rpx;
+  color: #9a5b3d;
+}

@@ -18,13 +18,13 @@
   ],
   "window": {
     "navigationBarTitleText": "Starline 学习",
-    "navigationBarBackgroundColor": "#ffb79d",
+    "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#fff8f1"
+    "backgroundColor": "#f7f7f8"
   },
   "tabBar": {
-    "color": "#8e99a8",
-    "selectedColor": "#2f7de1",
+    "color": "#9699a2",
+    "selectedColor": "#ff5a1f",
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "list": [
@@ -36,19 +36,19 @@
       },
       {
         "pagePath": "pages/study/index",
-        "text": "学习中心",
+        "text": "学习",
         "iconPath": "assets/icons/tab-study.png",
         "selectedIconPath": "assets/icons/tab-study-active.png"
       },
       {
         "pagePath": "pages/notices/index",
-        "text": "通知消息",
+        "text": "消息",
         "iconPath": "assets/icons/tab-notice.png",
         "selectedIconPath": "assets/icons/tab-notice-active.png"
       },
       {
         "pagePath": "pages/me/index",
-        "text": "个人中心",
+        "text": "我的",
         "iconPath": "assets/icons/tab-me.png",
         "selectedIconPath": "assets/icons/tab-me-active.png"
       }

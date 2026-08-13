@@ -95,6 +95,10 @@ jobs:
           npm ci
           npm run build
 
+      - name: Validate web assets
+        if: steps.changes.outputs.web == 'true'
+        run: bash deploy/production/validate-web-assets.sh web/dist
+
       - name: Package release
         run: |
           set -euo pipefail
@@ -108,7 +112,7 @@ jobs:
             cp -R web/dist "$RELEASE_DIR/web/dist"
           fi
           cp -R deploy/production "$RELEASE_DIR/deploy/production"
-          chmod +x "$RELEASE_DIR/deploy/production/activate-release.sh"
+          chmod +x "$RELEASE_DIR/deploy/production/"*.sh
 
       - name: Configure SSH
         env:

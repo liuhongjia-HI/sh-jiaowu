@@ -45,6 +45,40 @@ if [ ! -f "$RELEASE_DIR/web/dist/index.html" ]; then
   exit 1
 fi
 
+WEB_DIST="$RELEASE_DIR/web/dist"
+WEB_ASSET_VALIDATOR="$RELEASE_DIR/deploy/production/validate-web-assets.sh"
+if [ ! -f "$WEB_ASSET_VALIDATOR" ]; then
+  echo "Missing web asset validator: $WEB_ASSET_VALIDATOR" >&2
+  exit 1
+fi
+
+# 先验证发布包自身，避免入口和本次构建产物不一致时切换 current。
+bash "$WEB_ASSET_VALIDATOR" "$WEB_DIST"
+
+# hash 资源不会覆盖旧文件。把历史发布中的资源合并到当前 dist，保证已打开页面
+# 仍能加载旧版本的 lazy chunk；清理旧 release 后这些资源仍由 current 提供。
+TARGET_ASSETS="$WEB_DIST/assets"
+mkdir -p "$TARGET_ASSETS"
+shopt -s nullglob
+for SOURCE_ASSETS in "$APP_ROOT"/releases/*/web/dist/assets; do
+  if [ "$SOURCE_ASSETS" = "$TARGET_ASSETS" ] || [ ! -d "$SOURCE_ASSETS" ]; then
+    continue
+  fi
+  for SOURCE_FILE in "$SOURCE_ASSETS"/*; do
+    if [ ! -f "$SOURCE_FILE" ]; then
+      continue
+    fi
+    ASSET_NAME="${SOURCE_FILE##*/}"
+    if [ ! -e "$TARGET_ASSETS/$ASSET_NAME" ]; then
+      cp -a "$SOURCE_FILE" "$TARGET_ASSETS/$ASSET_NAME"
+    fi
+  done
+done
+shopt -u nullglob
+
+# 再验证合并后的 current 目录，确保 Nginx 切换后所有资源引用都可用。
+bash "$WEB_ASSET_VALIDATOR" "$WEB_DIST"
+
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
 if [ ! -f "$CURRENT_LINK/web/dist/index.html" ]; then

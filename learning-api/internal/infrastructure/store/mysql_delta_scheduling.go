@@ -1,0 +1,15 @@
+package store
+
+func schedulingRows(s *MemoryStore) []persistenceRow {
+	rows := make([]persistenceRow, 0, len(s.availability)+len(s.scheduleClasses)*2)
+	for _, item := range s.availability {
+		rows = append(rows, simpleRow("availability_slots", "id", item.ID, `INSERT INTO availability_slots (id, owner_type, owner_id, owner_name, day_of_week, start_time, end_time, start_date, end_date, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE owner_type=VALUES(owner_type), owner_id=VALUES(owner_id), owner_name=VALUES(owner_name), day_of_week=VALUES(day_of_week), start_time=VALUES(start_time), end_time=VALUES(end_time), start_date=VALUES(start_date), end_date=VALUES(end_date), remark=VALUES(remark)`, item.ID, item.OwnerType, item.OwnerID, item.OwnerName, item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Remark))
+	}
+	for _, item := range s.scheduleClasses {
+		rows = append(rows, simpleRow("schedule_classes", "id", item.ID, `INSERT INTO schedule_classes (id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), course_id=VALUES(course_id), course_name=VALUES(course_name), teacher_id=VALUES(teacher_id), teacher_name=VALUES(teacher_name), campus_id=VALUES(campus_id), room_name=VALUES(room_name), class_type=VALUES(class_type), capacity=VALUES(capacity), duration_minutes=VALUES(duration_minutes), day_of_week=VALUES(day_of_week), start_time=VALUES(start_time), end_time=VALUES(end_time), start_date=VALUES(start_date), end_date=VALUES(end_date), status=VALUES(status)`, item.ID, item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.CampusID, item.RoomName, item.ClassType, item.Capacity, item.DurationMinutes, item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Status, nullableDateTime(item.CreatedAt)))
+		for _, student := range item.Students {
+			rows = append(rows, relationRow("schedule_class_students", []string{"schedule_class_id", "student_id"}, []any{item.ID, student.ID}, `INSERT INTO schedule_class_students (schedule_class_id, student_id, student_name) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE student_name=VALUES(student_name)`, item.ID, student.ID, student.Name))
+		}
+	}
+	return rows
+}

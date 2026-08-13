@@ -2,6 +2,7 @@ package router_test
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -84,6 +85,37 @@ func TestStudentRecommendations(t *testing.T) {
 		if item.CourseCount+item.MaterialCount == 0 {
 			t.Fatalf("recommendation should contain learning content: %#v", item)
 		}
+	}
+}
+
+func TestStudentAvatarUploadAndPublicReadThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	defer os.RemoveAll(filepath.Join("uploads"))
+
+	// 1x1 PNG，验证服务端按真实图片内容校验，而不是只看文件扩展名。
+	pngData, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatalf("decode png fixture: %v", err)
+	}
+	var updated learning.Student
+	doMultipart(t, app, http.MethodPost, "/api/student/profile/avatar", app.loginStudent(t), nil, "file", "avatar.png", pngData, http.StatusOK, &updated)
+	if !strings.HasPrefix(updated.AvatarURL, "/api/student/avatars/avatar-") || !strings.HasSuffix(updated.AvatarURL, ".png") {
+		t.Fatalf("expected persisted avatar URL, got %#v", updated)
+	}
+
+	request, err := http.NewRequest(http.MethodGet, app.server.URL+updated.AvatarURL, nil)
+	if err != nil {
+		t.Fatalf("new avatar request: %v", err)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("read public avatar: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "image/png" {
+		raw, _ := io.ReadAll(response.Body)
+		t.Fatalf("unexpected avatar response status=%d content-type=%q body=%q", response.StatusCode, response.Header.Get("Content-Type"), raw)
 	}
 }
 

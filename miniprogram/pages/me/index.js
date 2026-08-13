@@ -1,7 +1,9 @@
 const { request } = require("../../utils/request");
+const { showPhoneAuthFailed, isCancel } = require("../../utils/phone-auth");
 
 Page({
   data: {
+    statusBarHeight: 0,
     loading: true,
     savingProfile: false,
     savingBasicProfile: false,
@@ -11,6 +13,7 @@ Page({
     me: null,
     home: null,
     continueCourse: null,
+    recentLearning: null,
     pendingTask: null,
     studentProfile: buildStudentProfile({}),
     primaryTask: buildPrimaryTask(null, null, null),
@@ -28,7 +31,19 @@ Page({
     }
   },
   onLoad() {
+    this.syncStatusBarHeight();
     this.loadMe();
+  },
+  syncStatusBarHeight() {
+    try {
+      const systemInfo = wx.getWindowInfo ? wx.getWindowInfo() : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : null);
+      const statusBarHeight = systemInfo && Number(systemInfo.statusBarHeight);
+      if (statusBarHeight > 0) {
+        this.setData({ statusBarHeight });
+      }
+    } catch (error) {
+      // 部分旧版基础库没有窗口信息 API，保留 0 让页面按默认安全区渲染。
+    }
   },
   onShow() {
     if (!this.data.loading) {
@@ -102,48 +117,136 @@ Page({
       this.goNotices();
       return;
     }
+    if (action === "feedback") {
+      this.goLatestFeedback();
+      return;
+    }
+    if (action === "profile") {
+      this.toggleProfileEdit();
+      return;
+    }
     this.goStudy();
   },
-  authorizeProfile() {
+  onChooseAvatar(event) {
+    const avatarUrl = event.detail && event.detail.avatarUrl;
+    if (!avatarUrl) {
+      wx.showToast({ title: "没有获取到头像，请重试", icon: "none" });
+      return;
+    }
     if (this.data.savingProfile) {
       return;
     }
-    if (!wx.getUserProfile) {
-      wx.showToast({ title: "当前微信版本不支持资料授权", icon: "none" });
-      return;
-    }
-    wx.getUserProfile({
-      desc: "用于完善学生头像和昵称",
-      success: (res) => {
-        const userInfo = res.userInfo || {};
-        this.submitProfile((userInfo.nickName || "").trim(), userInfo.avatarUrl || "");
-      },
-      fail: () => wx.showToast({ title: "已取消头像昵称授权", icon: "none" })
+    this.setData({
+      "profileForm.avatarUrl": avatarUrl,
+      "studentProfile.avatarUrl": avatarUrl
     });
+    this.uploadAvatar(avatarUrl);
   },
-  submitProfile(nickname, avatarUrl) {
-    if (!avatarUrl) {
-      wx.showToast({ title: "请授权微信头像", icon: "none" });
-      return;
-    }
-    if (!nickname) {
-      wx.showToast({ title: "请授权微信昵称", icon: "none" });
+  uploadAvatar(filePath) {
+    const app = getApp();
+    const baseUrl = app && app.globalData ? app.globalData.apiBaseUrl : "";
+    if (!baseUrl || !wx.uploadFile) {
+      wx.showToast({ title: "当前环境不支持头像上传", icon: "none" });
       return;
     }
     this.setData({ savingProfile: true });
-    const form = this.data.profileForm;
-    request("/student/profile", {
-      method: "PUT",
-      data: {
-        nickname,
-        avatarUrl,
-        studentName: form.studentName || this.data.me.name || "",
-        grade: form.grade || this.data.me.grade || "",
-        schoolName: form.schoolName || this.data.me.schoolName || "",
-        guardianName: form.guardianName || ""
+    wx.uploadFile({
+      url: `${baseUrl}/student/profile/avatar`,
+      filePath,
+      name: "file",
+      header: {
+        Authorization: wx.getStorageSync("starline_token") ? `Bearer ${wx.getStorageSync("starline_token")}` : ""
+      },
+      success: (response) => {
+        let body = {};
+        try {
+          body = JSON.parse(response.data || "{}");
+        } catch (error) {
+          body = {};
+        }
+        if (response.statusCode !== 200 || body.code !== 0 || !body.data) {
+          this.restoreProfileAvatar();
+          wx.showToast({ title: body.message || "头像保存失败，请重试", icon: "none" });
+          return;
+        }
+        this.applyUpdatedStudent(body.data, "头像已更新");
+      },
+      fail: () => {
+        this.restoreProfileAvatar();
+        wx.showToast({ title: "头像上传失败，请重试", icon: "none" });
+      },
+      complete: () => this.setData({ savingProfile: false })
+    });
+  },
+  restoreProfileAvatar() {
+    if (!this.data.me) {
+      this.setData({ "studentProfile.avatarUrl": "" });
+      return;
+    }
+    this.setData({
+      studentProfile: buildStudentProfile(this.data.me),
+      "profileForm.avatarUrl": this.data.me.avatarUrl || ""
+    });
+  },
+  onNicknameInput(event) {
+    const nickname = event.detail && event.detail.value ? event.detail.value : "";
+    this.setData({
+      "profileForm.nickname": nickname,
+      "studentProfile.displayName": nickname || "微信用户"
+    });
+  },
+  commitNickname() {
+    const nickname = (this.data.profileForm.nickname || "").trim();
+    if (!nickname) {
+      wx.showToast({ title: "昵称不能为空", icon: "none" });
+      return;
+    }
+    if (nickname === ((this.data.me && this.data.me.nickname) || "")) {
+      return;
+    }
+    this.saveProfileChanges({ nickname }, "昵称已更新");
+  },
+  authorizePhone(event) {
+    if (this.data.savingProfile) {
+      return;
+    }
+    const detail = event.detail || {};
+    if (isCancel(detail)) {
+      wx.showToast({ title: "已取消手机号授权", icon: "none" });
+      return;
+    }
+    if (!detail.code) {
+      showPhoneAuthFailed();
+      return;
+    }
+    this.saveProfileChanges({ phoneCode: detail.code }, "手机号已授权");
+  },
+  saveProfileChanges(changes = {}, toastTitle = "资料已更新") {
+    if (this.data.savingProfile) {
+      return;
+    }
+    const form = { ...this.data.profileForm, ...changes };
+    const data = {};
+    if (Object.prototype.hasOwnProperty.call(changes, "nickname")) {
+      data.nickname = (form.nickname || "").trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(changes, "avatarUrl")) {
+      data.avatarUrl = form.avatarUrl || "";
+    }
+    if (Object.prototype.hasOwnProperty.call(changes, "phoneCode")) {
+      data.phoneCode = form.phoneCode || "";
+    }
+    ["studentName", "grade", "schoolName", "guardianName"].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(changes, field)) {
+        data[field] = (form[field] || "").trim();
       }
-    })
-      .then((student) => this.applyUpdatedStudent(student, "已更新头像"))
+    });
+    if (Object.keys(data).length === 0) {
+      return;
+    }
+    this.setData({ savingProfile: true });
+    request("/student/profile", { method: "PUT", data })
+      .then((student) => this.applyUpdatedStudent(student, toastTitle))
       .catch((error) => wx.showToast({ title: error.message || "保存失败", icon: "none" }))
       .then(() => this.setData({ savingProfile: false }));
   },
@@ -155,17 +258,13 @@ Page({
     const profileEditing = !this.data.profileEditing;
     this.setData({ profileEditing, profileEditText: profileEditing ? "收起" : "编辑" });
   },
+  stopModalTap() {},
   submitBasicProfile() {
     const form = this.data.profileForm;
     const studentName = (form.studentName || "").trim();
-    const grade = (form.grade || "").trim();
     const schoolName = (form.schoolName || "").trim();
     if (!studentName) {
       wx.showToast({ title: "请输入学生姓名", icon: "none" });
-      return;
-    }
-    if (!grade) {
-      wx.showToast({ title: "请输入年级", icon: "none" });
       return;
     }
     if (!schoolName) {
@@ -179,7 +278,6 @@ Page({
         nickname: form.nickname || "",
         avatarUrl: form.avatarUrl || "",
         studentName,
-        grade,
         schoolName,
         guardianName: (form.guardianName || "").trim()
       }
@@ -200,6 +298,14 @@ Page({
       return;
     }
     wx.navigateTo({ url: `/pages/study-detail/index?id=${this.data.continueCourse.id}` });
+  },
+  goLatestFeedback() {
+    const feedback = (this.data.home && this.data.home.classroomFeedback || [])[0];
+    if (!feedback || !feedback.relatedSubmissionId) {
+      wx.showToast({ title: "老师完成批改后会显示课堂反馈", icon: "none" });
+      return;
+    }
+    wx.navigateTo({ url: `/pages/result/index?id=${feedback.relatedSubmissionId}` });
   },
   goAnswer() {
     if (!this.data.pendingTask || !this.data.pendingTask.id) {
@@ -245,14 +351,36 @@ function buildPageState(home = {}) {
     home,
     continueCourse,
     pendingTask,
+    recentLearning: buildRecentLearning(home, continueCourse),
     studentProfile: buildStudentProfile(student),
     primaryTask: buildPrimaryTask(home, pendingTask, continueCourse),
-    overviewMetrics: buildOverviewMetrics(student),
-    quickActions: buildQuickActions(student, pendingHomework),
+    overviewMetrics: buildOverviewMetrics(student, home, continueCourse, pendingHomework),
+    quickActions: buildQuickActions(),
     profileCompleteness: buildProfileCompleteness(student),
     supportNotice: buildSupportNotice(notices, pendingHomework),
     profileForm: profileFormFromStudent(student)
   };
+}
+
+function buildRecentLearning(home, continueCourse) {
+  if (!continueCourse || !continueCourse.id) {
+    return null;
+  }
+  const progress = Math.max(0, Math.min(100, Number(home.continueProgress) || 0));
+  const chapterCount = Number(continueCourse.chapterCount) || 0;
+  return {
+    ...continueCourse,
+    progress,
+    chapterCount,
+    completedLessons: chapterCount > 0 ? Math.round(chapterCount * progress / 100) : 0,
+    lastStudyAt: formatRecentDate((home.student && (home.student.lastStudyAt || home.student.lastSubmittedAt)) || "")
+  };
+}
+
+function formatRecentDate(value) {
+  const text = String(value || "");
+  const match = text.match(/^\d{4}-(\d{1,2})-(\d{1,2})/);
+  return match ? `${Number(match[1])}月${Number(match[2])}日` : text;
 }
 
 function profileFormFromStudent(student) {
@@ -267,18 +395,50 @@ function profileFormFromStudent(student) {
 }
 
 function buildStudentProfile(student = {}) {
-  const name = student.nickname || student.name || "同学";
+  const name = student.nickname || student.name || "学员";
   const grade = student.grade || "年级待补全";
   const school = student.schoolName || "学校待补全";
   const latest = student.lastStudyAt || student.lastSubmittedAt || "";
+  const avatarUrl = normalizeAvatarUrl(student.avatarUrl);
+  const phoneAuthorized = isAuthorizedPhone(student.phone, student.bindStatus);
   return {
-    displayName: `${name} 同学`,
-    avatarUrl: student.avatarUrl || "",
+    displayName: name,
+    avatarUrl,
     avatarText: shortAvatarText(name),
     meta: `${grade} · ${school}`,
     status: latest ? `最近学习 ${latest}` : "准备开始今天的学习",
-    profileHint: student.nickname && student.avatarUrl ? "资料已同步" : "可补充头像昵称"
+    phoneAuthorized,
+    phoneHint: phoneAuthorized ? maskPhone(student.phone) : "授权手机号"
   };
+}
+
+function normalizeAvatarUrl(value) {
+  const text = String(value || "").trim();
+  if (!text || /^https?:\/\//i.test(text) || text.indexOf("wxfile://") === 0) {
+    return text;
+  }
+  if (text.indexOf("/api/") === 0) {
+    const app = typeof getApp === "function" ? getApp() : null;
+    const baseUrl = app && app.globalData ? String(app.globalData.apiBaseUrl || "").replace(/\/$/, "") : "";
+    if (baseUrl.endsWith("/api")) {
+      return `${baseUrl.slice(0, -4)}${text}`;
+    }
+    return baseUrl ? `${baseUrl}${text}` : text;
+  }
+  return text;
+}
+
+function isAuthorizedPhone(value, bindStatus) {
+  const text = String(value || "").trim();
+  return !!text && (bindStatus === "已绑定" || !text.includes("*"));
+}
+
+function maskPhone(value) {
+  const text = String(value || "").trim();
+  if (text.length === 11 && !text.includes("*")) {
+    return `${text.slice(0, 3)}****${text.slice(-4)}`;
+  }
+  return text || "授权手机号";
 }
 
 function buildPrimaryTask(home, pendingTask, continueCourse) {
@@ -325,27 +485,27 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
   };
 }
 
-function buildOverviewMetrics(student = {}) {
-  const averageScore = Number(student.averageScore) || 0;
-  const streakDays = Number(student.streakDays) || 0;
-  const badgeCount = Number(student.badgeCount) || 0;
+function buildOverviewMetrics(student = {}, home = {}, continueCourse = null, pendingHomework = []) {
+  const chapterCount = Number(continueCourse && continueCourse.chapterCount) || 0;
+  const progress = Math.max(0, Math.min(100, Number(home.continueProgress) || 0));
+  const completedLessons = chapterCount > 0 ? Math.round(chapterCount * progress / 100) : 0;
+  const courseCount = continueCourse && continueCourse.id ? 1 : 0;
+  const pendingCount = Array.isArray(pendingHomework) ? pendingHomework.length : 0;
   return [
-    { label: "平均分", value: averageScore > 0 ? `${averageScore}` : "--", hint: averageScore > 0 ? "近期练习" : "完成后生成" },
-    { label: "连续学习", value: streakDays > 0 ? `${streakDays}天` : "今天开始", hint: streakDays > 0 ? "保持节奏" : "完成一次点亮" },
-    { label: "徽章", value: badgeCount > 0 ? `${badgeCount}枚` : "待点亮", hint: badgeCount > 0 ? "已获得" : "挑战后获得" }
+    { label: "学习课程", value: `${courseCount}` },
+    { label: "完成课时", value: `${completedLessons}` },
+    { label: "待办", value: `${pendingCount}`, emphasis: pendingCount > 0 }
   ];
 }
 
-function buildQuickActions(student = {}, pendingHomework = []) {
-  const pendingCount = Array.isArray(pendingHomework) ? pendingHomework.length : 0;
-  const hasScore = Number(student.averageScore) > 0;
+function buildQuickActions() {
   return [
-    { title: "学习中心", desc: "课程与资料", action: "study", symbol: "学", badge: "" },
-    { title: "小挑战", desc: "练习任务", action: "tasks", symbol: "练", badge: pendingCount > 0 ? "待完成" : "" },
-    { title: "成绩反馈", desc: "分数与建议", action: "scores", symbol: "绩", badge: hasScore ? "可查看" : "" },
-    { title: "学习记录", desc: "进度记录", action: "growth", symbol: "记", badge: "" },
-    { title: "我的课表", desc: "上课安排", action: "schedule", symbol: "课", badge: "" },
-    { title: "收藏", desc: "资料重点", action: "favorites", symbol: "藏", badge: "" }
+    { title: "我的课表", action: "schedule", symbol: "▣", tone: "schedule" },
+    { title: "学习资料", action: "study", symbol: "▰", tone: "materials" },
+    { title: "课堂反馈", action: "feedback", symbol: "▤", tone: "feedback" },
+    { title: "收藏课程", action: "favorites", symbol: "★", tone: "favorites" },
+    { title: "学习提醒", action: "notices", symbol: "🔔", tone: "notice" },
+    { title: "账号设置", action: "profile", symbol: "⚙", tone: "settings" }
   ];
 }
 

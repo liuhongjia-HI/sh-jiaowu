@@ -24,6 +24,19 @@ systemctl enable starline-api
 nginx -t && systemctl reload nginx
 ```
 
+### 文件处理依赖的外部命令行工具
+
+后端不依赖这些工具就能启动，但缺少时对应功能会安静降级（接口返回“预览生成失败”或分页图片模式不可用），不会报 500。生产环境建议装齐：
+
+- `soffice`（LibreOffice headless）：把学生上传的 PPT/Word 转成 PDF 预览。
+  ```bash
+  apt-get install -y libreoffice
+  ```
+- `gs`（Ghostscript）：学生端资料预览的防盗版能力全靠它——把当前学生的姓名/手机尾号/时间水印烧录进 PDF 内容本身（而不是前端盖一层可以被跳过的图层），并把烧录后的 PDF 逐页栅格化成图片下发，避免学生端拿到可复制、可转发的完整 PDF 文件。没装 `gs` 时会退回到“物理隔离但没有动态水印”的干净 PDF 预览，仍然比改动前安全，但达不到设计的防盗版效果。
+  ```bash
+  apt-get install -y ghostscript
+  ```
+
 再创建 `/etc/starline/learning-api.env`，写入生产环境变量：
 
 ```bash

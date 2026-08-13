@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,8 +151,99 @@ func (h *LearningHandler) StudentMaterialPreview(c *gin.Context) {
 		BadRequest(c, "资料正在生成安全预览，请稍后再试")
 		return
 	}
+	servePath := asset.PreviewPath
+	// 优先下发烧录了本次访问学生水印的临时文件；Ghostscript 不可用时，
+	// 降级为下发干净的预览副本——依然与原始文件物理隔离，只是没有动态水印。
+	if strings.TrimSpace(asset.WatermarkText) != "" {
+		if stampedPath, err := stampStudentPreviewCopy(c.Request.Context(), asset.PreviewPath, asset.WatermarkText); err == nil {
+			defer os.Remove(stampedPath)
+			servePath = stampedPath
+		} else if err != errGhostscriptUnavailable {
+			h.recordSecurityEvent(c, "水印烧录失败", asset.ID, err.Error())
+		}
+	}
 	c.Header("Content-Disposition", "inline; filename=\"secure-preview.pdf\"")
-	c.File(asset.PreviewPath)
+	c.File(servePath)
+}
+
+// StudentMaterialPreviewPages 返回分页预览的元信息。图片模式依赖服务器安装 Ghostscript；
+// 不可用时前端应当回退到 StudentMaterialPreview 的整份 PDF 预览。
+func (h *LearningHandler) StudentMaterialPreviewPages(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	if _, err := os.Stat(asset.PreviewPath); err != nil {
+		BadRequest(c, "资料正在生成安全预览，请稍后再试")
+		return
+	}
+	pageCount, err := countPDFPages(c.Request.Context(), asset.PreviewPath)
+	if err != nil {
+		OK(c, gin.H{"imageMode": false, "pageCount": 0})
+		return
+	}
+	OK(c, gin.H{"imageMode": true, "pageCount": pageCount})
+}
+
+// StudentMaterialPreviewPage 返回单页栅格化图片，水印已经烧进像素点，
+// 不是覆盖层，无法通过复制文本或去掉某一层的方式剥离。
+func (h *LearningHandler) StudentMaterialPreviewPage(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	page, err := strconv.Atoi(c.Param("page"))
+	if err != nil || page < 1 {
+		BadRequest(c, "页码不正确")
+		return
+	}
+	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	if _, err := os.Stat(asset.PreviewPath); err != nil {
+		BadRequest(c, "资料正在生成安全预览，请稍后再试")
+		return
+	}
+	sourcePath := asset.PreviewPath
+	if strings.TrimSpace(asset.WatermarkText) != "" {
+		if stampedPath, stampErr := stampStudentPreviewCopy(c.Request.Context(), asset.PreviewPath, asset.WatermarkText); stampErr == nil {
+			defer os.Remove(stampedPath)
+			sourcePath = stampedPath
+		}
+	}
+	imagePath, err := studentPreviewPageImage(c.Request.Context(), sourcePath, asset.ID, page)
+	if err != nil {
+		BadRequest(c, "该页图片生成失败，请稍后再试")
+		return
+	}
+	defer os.Remove(imagePath)
+	c.Header("Cache-Control", "no-store")
+	c.File(imagePath)
+}
+
+func stampStudentPreviewCopy(ctx context.Context, previewPath, watermarkText string) (string, error) {
+	stampedDir := filepath.Join(filepath.Dir(filepath.Dir(previewPath)), "preview-stamped")
+	if err := os.MkdirAll(stampedDir, 0755); err != nil {
+		return "", err
+	}
+	target := filepath.Join(stampedDir, "stamp-"+time.Now().Format("20060102150405.000000000")+".pdf")
+	if err := stampWatermarkPDF(ctx, previewPath, target, watermarkText); err != nil {
+		return "", err
+	}
+	return target, nil
+}
+
+func studentPreviewPageImage(ctx context.Context, sourcePath, assetID string, page int) (string, error) {
+	stampedDir := filepath.Join(filepath.Dir(filepath.Dir(sourcePath)), "preview-stamped")
+	if err := os.MkdirAll(stampedDir, 0755); err != nil {
+		return "", err
+	}
+	target := filepath.Join(stampedDir, "page-"+assetID+"-"+strconv.Itoa(page)+"-"+time.Now().Format("150405.000000000")+".jpg")
+	if err := rasterizePDFPage(ctx, sourcePath, target, page); err != nil {
+		return "", err
+	}
+	return target, nil
 }
 
 func (h *LearningHandler) DownloadFile(c *gin.Context) {
@@ -239,9 +331,31 @@ func copyUpload(file *multipart.FileHeader, target string) error {
 	return err
 }
 
+func copyFile(sourcePath, targetPath string) error {
+	src, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	dst, err := os.Create(targetPath)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, src)
+	return err
+}
+
 func buildPreview(originalPath, previewDir, ext string) (string, string) {
 	if ext == ".pdf" {
-		return originalPath, "可预览"
+		// 预览文件必须与原始文件在磁盘上物理分离：即使内容一开始相同，
+		// 学生端也永远只可能拿到 preview/ 目录下的文件路径，任何代码路径的
+		// 疏漏都不会意外把 original/ 目录下的原文件暴露出去。
+		previewPath := filepath.Join(previewDir, filepath.Base(originalPath))
+		if err := copyFile(originalPath, previewPath); err != nil {
+			return "", "预览生成失败"
+		}
+		return previewPath, "可预览"
 	}
 	if _, err := exec.LookPath("soffice"); err != nil {
 		return "", "预览生成失败"

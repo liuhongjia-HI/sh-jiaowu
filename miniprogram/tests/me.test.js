@@ -14,6 +14,7 @@ function loadMePage(requestImpl, wxMock) {
     exports: { request: requestImpl }
   };
   global.wx = wxMock;
+  global.getApp = () => ({ globalData: { apiBaseUrl: "https://api.example.com/api" } });
   global.Page = (definition) => pages.push(definition);
   require(pagePath);
   const definition = pages[0];
@@ -111,7 +112,6 @@ test("me page submits student profile information from the mini program form", a
       nickname: "Star",
       avatarUrl: "https://example.com/avatar.png",
       studentName: "小星",
-      grade: "五年级",
       schoolName: "星线小学",
       guardianName: "星星家长"
     }
@@ -153,4 +153,119 @@ test("me page blocks profile submission when required fields are missing", () =>
     "showToast",
     { title: "请输入学生姓名", icon: "none" }
   ]);
+});
+
+test("me page commits nickname independently from basic student profile", async () => {
+  const calls = [];
+  const page = loadMePage((url, options = {}) => {
+    calls.push(["request", url, options]);
+    return Promise.resolve({
+      id: "stu-nickname",
+      name: "小星",
+      nickname: "星星",
+      avatarUrl: "",
+      phone: "",
+      grade: "五年级",
+      schoolName: "星线小学"
+    });
+  }, {
+    showToast(args) {
+      calls.push(["showToast", args]);
+    }
+  });
+  page.setData({
+    me: { id: "stu-nickname", name: "小星", nickname: "", schoolName: "" },
+    profileForm: { nickname: "", avatarUrl: "", studentName: "小星", schoolName: "", guardianName: "" }
+  });
+
+  page.onNicknameInput({ detail: { value: " 星星 " } });
+  page.commitNickname();
+  await flushPromises();
+
+  const requestCall = calls.find((item) => item[0] === "request");
+  assert.deepEqual(requestCall[2], { method: "PUT", data: { nickname: "星星" } });
+  assert.equal(page.data.me.nickname, "星星");
+  assert.equal(page.data.savingProfile, false);
+});
+
+test("me page submits the WeChat phone authorization code", async () => {
+  const calls = [];
+  const page = loadMePage((url, options = {}) => {
+    calls.push(["request", url, options]);
+    return Promise.resolve({
+      id: "stu-phone",
+      name: "小星",
+      nickname: "星星",
+      avatarUrl: "",
+      phone: "19900000000",
+      grade: "五年级",
+      schoolName: "星线小学"
+    });
+  }, {
+    getStorageSync() {
+      return "student-token";
+    },
+    showToast(args) {
+      calls.push(["showToast", args]);
+    },
+    showModal(args) {
+      calls.push(["showModal", args]);
+    }
+  });
+  page.setData({
+    me: { id: "stu-phone", name: "小星", nickname: "星星", schoolName: "" },
+    profileForm: { nickname: "星星", avatarUrl: "", studentName: "小星", schoolName: "", guardianName: "" }
+  });
+
+  page.authorizePhone({ detail: { code: "wechat-phone-code" } });
+  await flushPromises();
+
+  const requestCall = calls.find((item) => item[0] === "request");
+  assert.deepEqual(requestCall[2], { method: "PUT", data: { phoneCode: "wechat-phone-code" } });
+  assert.equal(page.data.studentProfile.phoneHint, "199****0000");
+});
+
+test("me page uploads the temporary chooseAvatar file and applies the persisted URL", () => {
+  const calls = [];
+  let uploadOptions;
+  const page = loadMePage(() => Promise.reject(new Error("unexpected request")), {
+    getStorageSync() {
+      return "student-token";
+    },
+    uploadFile(options) {
+      uploadOptions = options;
+      options.success({
+        statusCode: 200,
+        data: JSON.stringify({
+          code: 0,
+          data: {
+            id: "stu-avatar",
+            name: "小星",
+            nickname: "星星",
+            avatarUrl: "/api/student/avatars/avatar-test.png",
+            phone: "",
+            grade: "五年级",
+            schoolName: "星线小学"
+          }
+        })
+      });
+      options.complete();
+    },
+    showToast(args) {
+      calls.push(["showToast", args]);
+    }
+  });
+
+  page.setData({
+    me: { id: "stu-avatar", name: "小星", nickname: "星星", avatarUrl: "", schoolName: "" },
+    profileForm: { nickname: "星星", avatarUrl: "", studentName: "小星", schoolName: "", guardianName: "" }
+  });
+  page.onChooseAvatar({ detail: { avatarUrl: "wxfile://tmp/avatar.jpg" } });
+
+  assert.equal(uploadOptions.url, "https://api.example.com/api/student/profile/avatar");
+  assert.equal(uploadOptions.filePath, "wxfile://tmp/avatar.jpg");
+  assert.equal(uploadOptions.name, "file");
+  assert.equal(uploadOptions.header.Authorization, "Bearer student-token");
+  assert.equal(page.data.studentProfile.avatarUrl, "https://api.example.com/api/student/avatars/avatar-test.png");
+  assert.equal(page.data.savingProfile, false);
 });

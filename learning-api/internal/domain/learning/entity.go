@@ -193,27 +193,32 @@ type StudentPackageRecommendation struct {
 }
 
 type Student struct {
-	ID                    string   `json:"id"`
-	Name                  string   `json:"name"`
-	Nickname              string   `json:"nickname,omitempty"`
-	AvatarURL             string   `json:"avatarUrl,omitempty"`
-	Grade                 string   `json:"grade"`
-	Phone                 string   `json:"phone"`
-	SchoolName            string   `json:"schoolName,omitempty"`
-	GuardianName          string   `json:"guardianName,omitempty"`
-	OfficialAccountOpenID string   `json:"officialAccountOpenId,omitempty"`
-	OpenedPackages        []string `json:"openedPackages"`
-	LearningStatus        string   `json:"learningStatus"`
-	AccountStatus         string   `json:"accountStatus"`
-	StreakDays            int      `json:"streakDays"`
-	AverageScore          int      `json:"averageScore"`
-	BadgeCount            int      `json:"badgeCount"`
-	Remark                string   `json:"remark,omitempty"`
-	BindStatus            string   `json:"bindStatus"`
-	LastStudyAt           string   `json:"lastStudyAt,omitempty"`
-	LastSubmittedAt       string   `json:"lastSubmittedAt,omitempty"`
-	LastSubmissionStatus  string   `json:"lastSubmissionStatus,omitempty"`
-	EffectiveUntil        string   `json:"effectiveUntil,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Nickname  string `json:"nickname,omitempty"`
+	AvatarURL string `json:"avatarUrl,omitempty"`
+	// Grade 是按入学基准推导出的当前年级，不直接持久化，也不接受前端写入。
+	Grade string `json:"grade"`
+	// EnrollmentAcademicYear 与 EnrollmentGrade 是年级推导的基准，入学后不再变化。
+	EnrollmentAcademicYear string   `json:"enrollmentAcademicYear,omitempty"`
+	EnrollmentGrade        string   `json:"enrollmentGrade,omitempty"`
+	Graduated              bool     `json:"graduated,omitempty"`
+	Phone                  string   `json:"phone"`
+	SchoolName             string   `json:"schoolName,omitempty"`
+	GuardianName           string   `json:"guardianName,omitempty"`
+	OfficialAccountOpenID  string   `json:"officialAccountOpenId,omitempty"`
+	OpenedPackages         []string `json:"openedPackages"`
+	LearningStatus         string   `json:"learningStatus"`
+	AccountStatus          string   `json:"accountStatus"`
+	StreakDays             int      `json:"streakDays"`
+	AverageScore           int      `json:"averageScore"`
+	BadgeCount             int      `json:"badgeCount"`
+	Remark                 string   `json:"remark,omitempty"`
+	BindStatus             string   `json:"bindStatus"`
+	LastStudyAt            string   `json:"lastStudyAt,omitempty"`
+	LastSubmittedAt        string   `json:"lastSubmittedAt,omitempty"`
+	LastSubmissionStatus   string   `json:"lastSubmissionStatus,omitempty"`
+	EffectiveUntil         string   `json:"effectiveUntil,omitempty"`
 }
 
 type StudentUpsertRequest struct {
@@ -233,6 +238,9 @@ type StudentProfileUpdateRequest struct {
 	Grade        string `json:"grade"`
 	SchoolName   string `json:"schoolName"`
 	GuardianName string `json:"guardianName"`
+	// PhoneCode 只能是微信 getPhoneNumber 返回的一次性授权码，后端负责换取真实手机号。
+	// 不接受前端直接提交明文手机号，避免客户端伪造绑定关系。
+	PhoneCode string `json:"phoneCode,omitempty"`
 }
 
 type StudentQuery struct {
@@ -794,6 +802,8 @@ type FileAsset struct {
 	OriginalPath  string
 	PreviewPath   string
 	PreviewStatus string
+	// WatermarkText 仅在学生端预览场景下填充，用于在下发前把水印烧录进 PDF 内容本身。
+	WatermarkText string
 }
 
 type MaterialUploadRequest struct {

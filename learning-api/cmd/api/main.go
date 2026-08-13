@@ -32,19 +32,28 @@ func main() {
 		BootstrapAdminPassword: cfg.BootstrapAdmin.Password,
 	})
 	if cfg.Wechat.AppID != "" && cfg.Wechat.Secret != "" {
-		repo.UseWechatAPI(cfg.Wechat.AppID, cfg.Wechat.Secret)
+		if err := repo.UseWechatAPI(cfg.Wechat.AppID, cfg.Wechat.Secret); err != nil {
+			log.Errorf("wechat login configuration failed: %v", err)
+			return
+		}
 		log.Infof("wechat login enabled via jscode2session")
 	} else {
 		log.Infof("wechat login running in demo mode (no WECHAT_APPID/WECHAT_SECRET)")
 	}
 	if cfg.OfficialAccount.AppID != "" && cfg.OfficialAccount.Secret != "" && cfg.OfficialAccount.TemplateID != "" {
-		repo.UseOfficialAccountAPI(cfg.OfficialAccount.AppID, cfg.OfficialAccount.Secret, cfg.OfficialAccount.TemplateID)
+		if err := repo.UseOfficialAccountAPI(cfg.OfficialAccount.AppID, cfg.OfficialAccount.Secret, cfg.OfficialAccount.TemplateID); err != nil {
+			log.Errorf("official account configuration failed: %v", err)
+			return
+		}
 		log.Infof("wechat official account template messages enabled")
 	} else {
 		log.Infof("wechat official account template messages not configured")
 	}
 	if len(cfg.MiniProgramSubscribe.TemplateIDs) > 0 {
-		repo.UseMiniProgramSubscribeTemplates(cfg.MiniProgramSubscribe.TemplateIDs)
+		if err := repo.UseMiniProgramSubscribeTemplates(cfg.MiniProgramSubscribe.TemplateIDs); err != nil {
+			log.Errorf("mini program subscribe configuration failed: %v", err)
+			return
+		}
 		log.Infof("wechat mini program subscribe templates enabled")
 	} else {
 		log.Infof("wechat mini program subscribe templates not configured")

@@ -1,45 +1,58 @@
-<view class="hero">
-  <view class="eyebrow">学习中心</view>
-  <view class="hero-title">选一门课继续学</view>
-</view>
-
-<view class="section">
-  <input class="search-box" value="{{keyword}}" placeholder="搜索学习星球 / 老师 / 章节" bindinput="changeKeyword" />
-</view>
-
-<view class="section">
-  <view class="filter-row">
-    <view wx:for="{{filters}}" wx:key="label" class="tag {{item.className}}" data-filter="{{item.label}}" bindtap="changeFilter">{{item.label}}</view>
+<view class="study-page">
+  <view class="study-heading">
+    <view class="study-heading-title">学习中心</view>
+    <view class="study-heading-sub">把每一次学习，都变成看得见的进步</view>
   </view>
-</view>
 
-<view wx:if="{{loading}}" class="empty">正在加载学习内容...</view>
-<view wx:elif="{{courses.length === 0}}" class="section">
-  <view class="empty-card">
-    <view class="title">还没有开通课程</view>
-    <view class="sub">{{emptyMessage}}</view>
+  <view class="study-search">
+    <view class="study-search-icon">⌕</view>
+    <input class="study-search-input" value="{{keyword}}" placeholder="搜索课程名称" bindinput="changeKeyword" confirm-type="search" />
   </view>
-</view>
-<view wx:elif="{{visibleCourses.length === 0}}" class="section">
-  <view class="empty-card">
-    <view class="title">没有找到匹配内容</view>
-    <view class="sub">换个关键词，或切回“全部”看看。</view>
+
+  <view class="study-tabs">
+    <view wx:for="{{filters}}" wx:key="label" class="study-tab {{item.className}}" data-filter="{{item.label}}" bindtap="changeFilter">{{item.label}}</view>
   </view>
-</view>
-<view wx:else class="section">
-  <view wx:for="{{visibleCourses}}" wx:key="id" class="card {{item.cardClass}}" bindtap="goDetail" data-id="{{item.id}}">
-    <view class="row">
-      <view class="cover">{{item.coverIcon}}</view>
-      <view>
-        <view class="title">{{item.name}}</view>
-        <view class="sub">{{item.chapterCount}} 个章节 · {{item.materialNum}} 份资料 · {{item.homeworkNum}} 个小挑战</view>
+
+  <view wx:if="{{loading}}" class="study-state">正在加载学习内容...</view>
+  <view wx:elif="{{courses.length === 0}}" class="study-section">
+    <view class="study-empty">
+      <view class="study-empty-art">📚</view>
+      <view class="study-empty-title">还没有开通课程</view>
+      <view class="study-empty-sub">{{emptyMessage}}</view>
+    </view>
+  </view>
+  <view wx:elif="{{visibleCourses.length === 0}}" class="study-section">
+    <view class="study-empty">
+      <view class="study-empty-art">⌕</view>
+      <view class="study-empty-title">没有找到匹配内容</view>
+      <view class="study-empty-sub">换个关键词，或切回“全部”看看。</view>
+    </view>
+  </view>
+  <view wx:else class="study-section course-list">
+    <view wx:for="{{visibleCourses}}" wx:key="id" class="course-card" bindtap="goDetail" data-id="{{item.id}}">
+      <view class="course-cover course-cover-{{index}}">
+        <view class="course-cover-glow"></view>
+        <view class="course-cover-emoji">{{item.coverIcon}}</view>
       </view>
-      <view class="badge">{{item.status}}</view>
+      <view class="course-content">
+        <view class="course-title-row">
+          <view class="course-title">{{item.name}}</view>
+          <view class="course-status">{{item.status}}</view>
+        </view>
+        <view class="course-meta">{{item.grade || "学习课程"}} · {{item.subject || "综合学习"}}</view>
+        <view class="course-code">{{item.chapterCount}} 节课程 · {{item.materialNum}} 份资料</view>
+        <view class="course-progress-row">
+          <text>已学 {{item.progress}}%</text>
+          <text>{{item.progress >= 100 ? "已完成" : "继续学习"}}</text>
+        </view>
+        <view class="course-progress"><view class="course-progress-bar" style="width: {{item.progress}}%;"></view></view>
+        <view class="course-action">继续学习 <text class="course-action-arrow">›</text></view>
+      </view>
     </view>
-    <view class="badges">
-      <view class="badge">{{item.badgeText}}</view>
-      <view class="badge">已解锁 {{item.chapterCount}} 节</view>
-    </view>
-    <view class="progress"><view class="progress-bar" style="width: {{item.progress}}%;"></view></view>
+  </view>
+
+  <view wx:if="{{materials.length}}" class="study-section study-material-hint">
+    <view class="study-section-title">学习资料</view>
+    <view class="study-section-link">已为你准备 {{materials.length}} 份</view>
   </view>
 </view>

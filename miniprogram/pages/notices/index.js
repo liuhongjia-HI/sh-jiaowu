@@ -16,12 +16,16 @@ Page({
         emptyMessage: error.message || "有新小挑战、批改结果或资料更新时，会提醒你。",
         loading: false
       }));
+  },
+  goStudy() {
+    wx.switchTab({ url: "/pages/study/index" });
   }
 });
 
 function decorateNotices(notices) {
   return notices.map((notice) => ({
     ...notice,
-    icon: notice.type || "新"
+    icon: notice.type || "新",
+    iconClass: notice.type === "评" ? "review" : "default"
   }));
 }

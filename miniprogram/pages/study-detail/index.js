@@ -25,6 +25,9 @@ Page({
       this.loadDetail();
     }
   },
+  goBack() {
+    wx.navigateBack({ delta: 1 });
+  },
   loadDetail() {
     request(`/student/study/${this.courseId}`).then((data) => {
       const course = data.course || {};
@@ -35,7 +38,7 @@ Page({
         course,
         materials,
         homework,
-        stations: data.stations || [],
+        stations: (data.stations || []).map(decorateStation),
         progress: data.progress || 0,
         teacherText:
           (materials[0] && materials[0].ownerTeacherName) ||
@@ -53,6 +56,14 @@ Page({
       return;
     }
     wx.navigateTo({ url: `/pages/material-preview/index?id=${material.id}` });
+  },
+  previewMaterial(event) {
+    const id = event.currentTarget.dataset.id;
+    if (!id) {
+      this.goPreview();
+      return;
+    }
+    wx.navigateTo({ url: `/pages/material-preview/index?id=${id}` });
   },
   goAnswer() {
     const homework = this.data.homework[0];
@@ -73,3 +84,11 @@ Page({
     }
   }
 });
+
+function decorateStation(item) {
+  const status = item.status || "未解锁";
+  return {
+    ...item,
+    statusClass: status === "已完成" ? "is-done" : status === "学习中" ? "is-active" : "is-locked"
+  };
+}

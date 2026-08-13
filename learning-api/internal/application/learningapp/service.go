@@ -8,7 +8,7 @@ type Repository interface {
 	LoginWithDemoStudentPassword(phone, password string) (learning.Principal, error)
 	ChangePassword(operator string, principal learning.Principal, req learning.PasswordChangeRequest) error
 	ResetPassword(operator string, principal learning.Principal, userID string) (learning.PasswordResetResult, error)
-	RecordSecurityEvent(operator, action, target, detail string)
+	RecordSecurityEvent(operator, action, target, detail string) error
 	PrincipalByUserID(userID string) (learning.Principal, error)
 	AdminStaff() []learning.AdminStaff
 	CreateAdminStaff(operator string, req learning.AdminStaffUpsertRequest) (learning.AdminStaff, error)
@@ -27,7 +27,7 @@ type Repository interface {
 	CreateStudent(operator string, principal learning.Principal, req learning.StudentUpsertRequest) (learning.Student, error)
 	UpdateStudent(operator string, principal learning.Principal, id string, req learning.StudentUpsertRequest) (learning.Student, error)
 	RemindStudent(operator string, principal learning.Principal, id string) (learning.StudentRemindResult, error)
-	ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) learning.StudentImportResult
+	ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) (learning.StudentImportResult, error)
 	StudentGrants(principal learning.Principal, id string) ([]learning.StudentGrant, error)
 	StudentLearningRecords(principal learning.Principal, id string) ([]learning.StudentLearningRecord, error)
 	StudentScores(principal learning.Principal, id string) ([]learning.StudentScoreSummary, error)
@@ -123,8 +123,8 @@ func (s *Service) ChangePassword(operator string, principal learning.Principal, 
 func (s *Service) ResetPassword(operator string, principal learning.Principal, userID string) (learning.PasswordResetResult, error) {
 	return s.repo.ResetPassword(operator, principal, userID)
 }
-func (s *Service) RecordSecurityEvent(operator, action, target, detail string) {
-	s.repo.RecordSecurityEvent(operator, action, target, detail)
+func (s *Service) RecordSecurityEvent(operator, action, target, detail string) error {
+	return s.repo.RecordSecurityEvent(operator, action, target, detail)
 }
 func (s *Service) PrincipalByUserID(userID string) (learning.Principal, error) {
 	return s.repo.PrincipalByUserID(userID)
@@ -176,7 +176,7 @@ func (s *Service) UpdateStudent(operator string, principal learning.Principal, i
 func (s *Service) RemindStudent(operator string, principal learning.Principal, id string) (learning.StudentRemindResult, error) {
 	return s.repo.RemindStudent(operator, principal, id)
 }
-func (s *Service) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) learning.StudentImportResult {
+func (s *Service) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) (learning.StudentImportResult, error) {
 	return s.repo.ImportStudents(operator, principal, rows)
 }
 func (s *Service) StudentGrants(principal learning.Principal, id string) ([]learning.StudentGrant, error) {

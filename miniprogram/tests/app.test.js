@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 function loadAppConfig(envVersion) {
@@ -18,6 +20,20 @@ function loadAppConfig(envVersion) {
   require("../app");
   return appConfig;
 }
+
+test("schedule remains an inner page instead of occupying a tab bar slot", () => {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, "../app.json"), "utf8"));
+  const tabPages = config.tabBar.list.map((item) => item.pagePath);
+
+  assert.equal(config.pages.includes("pages/schedule/index"), true);
+  assert.equal(tabPages.includes("pages/schedule/index"), false);
+  assert.deepEqual(tabPages, [
+    "pages/home/index",
+    "pages/study/index",
+    "pages/notices/index",
+    "pages/me/index"
+  ]);
+});
 
 test("develop build uses real WeChat login", () => {
   const config = loadAppConfig("develop");

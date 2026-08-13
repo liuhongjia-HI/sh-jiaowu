@@ -1,5 +1,12 @@
 <view class="home-page">
   <view class="home-top">
+    <view class="home-greeting-row">
+      <view>
+        <view class="home-greeting">晚上好，学员 <text class="home-greeting-wave">👋</text></view>
+        <view class="home-greeting-sub">坚持学习，遇见更好的自己</view>
+      </view>
+      <view class="home-search-mark">⌕</view>
+    </view>
     <view class="search-panel">
       <view class="search-icon">⌕</view>
       <input class="search-input" value="{{keyword}}" placeholder="搜索推荐套餐、课程、资料" confirm-type="search" bindinput="changeKeyword" />
@@ -19,9 +26,11 @@
     <view class="section">
       <view class="home-banner" bindtap="goStudyDetail">
         <view class="banner-copy">
-          <view class="banner-year">{{home.student.grade || "学习计划"}}</view>
+          <view class="banner-year">{{bannerTag}}</view>
           <view class="banner-title">{{courseTitle}}</view>
           <view class="banner-sub">{{hasContent ? courseMeta : emptyMessage}}</view>
+          <view class="banner-progress-row"><text>已学 {{progressPercent}}%</text><text>{{progressPercent >= 100 ? "已完成" : "继续保持"}}</text></view>
+          <view class="progress banner-progress"><view class="progress-bar" style="width: {{progressPercent}}%;"></view></view>
           <view class="banner-action">{{hasContent ? "继续学习" : "查看学习中心"}}</view>
         </view>
         <view class="banner-visual">

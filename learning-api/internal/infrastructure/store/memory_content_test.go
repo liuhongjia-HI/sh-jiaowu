@@ -1,0 +1,224 @@
+package store
+
+import (
+	"strings"
+	"testing"
+
+	"starline/learning-api/internal/domain/learning"
+)
+
+func TestUpdateHomeworkRejectsTeacherOutsideScope(t *testing.T) {
+	store := NewMemoryStore()
+
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	courses := store.Courses(teacher)
+	if len(courses) == 0 {
+		t.Fatal("expected teacher to see courses")
+	}
+	var outside learning.Homework
+	for _, item := range store.homework {
+		if !containsString(teacher.LearningSpaceIDs, item.LearningSpaceID) {
+			outside = item
+			break
+		}
+	}
+	if outside.ID == "" {
+		t.Fatal("expected seeded homework outside teacher scope")
+	}
+	if _, err := store.UpdateHomework("英语老师", teacher, outside.ID, learning.HomeworkUpdateRequest{
+		Title:    "跨范围题目",
+		CourseID: courses[0].ID,
+		Status:   string(learning.StatusEnabled),
+	}); err == nil {
+		t.Fatal("expected cross-scope homework update to fail")
+	}
+}
+
+func TestDisabledHomeworkIsHiddenFromStudent(t *testing.T) {
+	store := NewMemoryStore()
+
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	store.submissions["sub-hidden-homework"] = learning.Submission{
+		ID:             "sub-hidden-homework",
+		HomeworkID:     "hw-g05-english-s1-q1",
+		StudentID:      "stu-001",
+		TaskTitle:      "停用前已提交练习",
+		Score:          88,
+		TeacherComment: "继续保持。",
+		Status:         "已批改",
+		CreatedAt:      "2026-06-24 20:00:00",
+	}
+	beforeGrowth, err := store.StudentGrowth(student)
+	if err != nil {
+		t.Fatalf("expected growth before homework disable: %v", err)
+	}
+	if !learningRecordContains(beforeGrowth, "growth-sub-hidden-homework") {
+		t.Fatalf("expected visible homework submission in growth before disable, got %#v", beforeGrowth)
+	}
+
+	if _, err := store.UpdateHomework("英语老师", teacher, "hw-g05-english-s1-q1", learning.HomeworkUpdateRequest{
+		Title:    "停用练习",
+		CourseID: "course-g05-english-s1-q1",
+		Deadline: "2026-10-30",
+		Status:   string(learning.StatusDisabled),
+	}); err != nil {
+		t.Fatalf("expected homework update to succeed: %v", err)
+	}
+
+	tasks, err := store.StudentTasks(student)
+	if err != nil {
+		t.Fatalf("expected student tasks: %v", err)
+	}
+	for _, task := range tasks {
+		if task.ID == "hw-g05-english-s1-q1" {
+			t.Fatalf("disabled homework should be hidden from student tasks: %#v", task)
+		}
+	}
+	afterGrowth, err := store.StudentGrowth(student)
+	if err != nil {
+		t.Fatalf("expected growth after homework disable: %v", err)
+	}
+	if learningRecordContains(afterGrowth, "growth-sub-hidden-homework") {
+		t.Fatalf("disabled homework submission should be hidden from student growth: %#v", afterGrowth)
+	}
+}
+
+func TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+
+	item, err := store.CreateQuestion("英语老师", teacher, learning.QuestionBankUpsertRequest{
+		Grade: "五年级", Semester: "S1", Subject: "英语", Type: "multiple",
+		Stem: "哪些做法有助于英语阅读？", Options: []string{"圈关键词", "完全不读题", "复查答案"},
+		Answers: []string{"圈关键词", "复查答案"}, Score: 10, Status: string(learning.StatusEnabled),
+	})
+	if err != nil {
+		t.Fatalf("expected question creation to succeed: %v", err)
+	}
+	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
+		Title: "题库组卷练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1",
+		Deadline: "2026-11-01", Status: string(learning.StatusEnabled), QuestionIDs: []string{item.ID},
+	})
+	if err != nil {
+		t.Fatalf("expected homework creation to succeed: %v", err)
+	}
+	if created.QuestionNum != 1 || created.Questions[0].ID != item.ID {
+		t.Fatalf("unexpected homework questions: %#v", created)
+	}
+	submission, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{
+		HomeworkID: created.ID,
+		Answers:    []learning.SubmissionAnswer{{QuestionID: item.ID, Choices: []string{"复查答案", "圈关键词"}}},
+	})
+	if err != nil {
+		t.Fatalf("expected submission to succeed: %v", err)
+	}
+	if submission.Status != "已批改" || submission.Score != 100 {
+		t.Fatalf("expected all-objective homework to auto grade: %#v", submission)
+	}
+}
+
+func TestQuestionBankSupportsRichTextStem(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+
+	item, err := store.CreateQuestion("英语老师", teacher, learning.QuestionBankUpsertRequest{
+		Grade: "五年级", Semester: "S1", Subject: "英语", Type: "single",
+		Stem:    `<strong onclick="bad()">阅读图片</strong><img src="https://example.com/q.png" /><script>alert(1)</script><iframe src="https://example.com"></iframe>选择正确答案`,
+		Options: []string{"A", "B"}, Answer: "A", Score: 10, Status: string(learning.StatusEnabled),
+	})
+	if err != nil {
+		t.Fatalf("expected rich text question creation to succeed: %v", err)
+	}
+	if !strings.Contains(item.Stem, "<img") {
+		t.Fatalf("expected rich text stem to be preserved, got %q", item.Stem)
+	}
+	if strings.Contains(item.Stem, "script") || strings.Contains(item.Stem, "onclick") || strings.Contains(item.Stem, "iframe") {
+		t.Fatalf("expected unsafe rich text to be removed, got %q", item.Stem)
+	}
+	if strings.Contains(item.Title, "<") || !strings.Contains(item.Title, "阅读图片") {
+		t.Fatalf("expected generated title to use plain text, got %q", item.Title)
+	}
+}
+
+func TestTeacherQuestionBankScopeLimitedByLearningSpaces(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+
+	if _, err := store.CreateQuestion("英语老师", teacher, learning.QuestionBankUpsertRequest{
+		Grade: "五年级", Semester: "S1", Subject: "英语", Type: "single",
+		Stem: "Which one is an English word?", Options: []string{"apple", "数学"},
+		Answer: "apple", Score: 10, Status: string(learning.StatusEnabled),
+	}); err != nil {
+		t.Fatalf("expected teacher to create question in own scope: %v", err)
+	}
+
+	cases := []struct {
+		name     string
+		grade    string
+		semester string
+		subject  string
+	}{
+		{name: "another subject", grade: "五年级", semester: "S1", subject: "数学"},
+		{name: "another grade", grade: "六年级", semester: "S1", subject: "英语"},
+		{name: "another semester", grade: "五年级", semester: "S2", subject: "英语"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := store.CreateQuestion("英语老师", teacher, learning.QuestionBankUpsertRequest{
+				Grade: tt.grade, Semester: tt.semester, Subject: tt.subject, Type: "single",
+				Stem: "超出老师负责范围的题目", Options: []string{"A", "B"},
+				Answer: "A", Score: 10, Status: string(learning.StatusEnabled),
+			})
+			if err == nil || !strings.Contains(err.Error(), "不能维护未负责范围的题库") {
+				t.Fatalf("expected scope error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestTextQuestionSubmissionCreatesPendingReview(t *testing.T) {
+	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	submission, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{
+		HomeworkID: "hw-g05-english-s1-q1",
+		Answers: []learning.SubmissionAnswer{
+			{QuestionID: "q1", Choice: "A"},
+			{QuestionID: "q2", Text: "今天学会了抓中心句。"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected submission to succeed: %v", err)
+	}
+	if submission.Status != "待批改" || submission.ObjectiveScore == 0 {
+		t.Fatalf("expected text homework to be pending review with objective score: %#v", submission)
+	}
+	if len(store.reviews) == 0 || store.reviews[0].SubmissionID != submission.ID {
+		t.Fatalf("expected pending review for submission, reviews=%#v", store.reviews)
+	}
+}
