@@ -284,6 +284,19 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		`UPDATE student_package_grants SET external_id = CONCAT('grant-', id) WHERE external_id = ''`,
 		`UPDATE notices SET external_id = CONCAT('notice-', id) WHERE external_id = ''`,
 		`UPDATE operation_logs SET external_id = CONCAT('log-', id) WHERE external_id = ''`,
+		`UPDATE operation_logs log_row
+JOIN (
+	SELECT duplicate_rows.id
+	FROM operation_logs duplicate_rows
+	JOIN (
+		SELECT external_id, MIN(id) AS keep_id
+		FROM operation_logs
+		WHERE external_id <> ''
+		GROUP BY external_id
+		HAVING COUNT(*) > 1
+	) duplicate_groups ON duplicate_groups.external_id = duplicate_rows.external_id AND duplicate_rows.id <> duplicate_groups.keep_id
+) duplicate_keys ON duplicate_keys.id = log_row.id
+SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 		`UPDATE student_learning_space_access access_row JOIN student_package_grants grant_row ON grant_row.id = access_row.package_grant_id SET access_row.external_grant_id = grant_row.external_id WHERE access_row.external_grant_id = ''`,
 	}
 	for _, statement := range backfills {
