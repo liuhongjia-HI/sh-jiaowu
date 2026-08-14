@@ -159,7 +159,7 @@ func TestMemoryStoreConcurrentGrantNoticeAndReads(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			if _, err := store.CreateGrant("并发测试", student.ID, packageID); err != nil {
+			if _, err := store.CreateGrant("并发测试", learning.GrantCreateRequest{StudentID: student.ID, PackageID: packageID}); err != nil {
 				errs <- err
 			}
 		}()

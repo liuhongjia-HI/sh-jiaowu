@@ -282,6 +282,6 @@ function tagList(values: string[], color: string, emptyText: string) {
 }
 
 function tagStatus(value: string) {
-  const color = value === '生效中' || value === '启用' || value === '已发布' || value === '进行中' ? 'green' : value === '草稿' || value === '待提醒' ? 'orange' : 'default';
+  const color = value === '生效中' || value === '启用' || value === '已发布' || value === '进行中' ? 'green' : value === '未开始' || value === '草稿' || value === '待提醒' ? 'orange' : 'default';
   return <Tag color={color}>{value || '-'}</Tag>;
 }

@@ -94,6 +94,17 @@ func (s *MemoryStore) syncSpaceAccessForGrant(grant packageGrant) {
 	}
 }
 
+func (s *MemoryStore) replaceSpaceAccessForGrant(grant packageGrant) {
+	next := make([]learningSpaceAccess, 0, len(s.spaceAccess))
+	for _, access := range s.spaceAccess {
+		if access.PackageGrantID != grant.ID {
+			next = append(next, access)
+		}
+	}
+	s.spaceAccess = next
+	s.syncSpaceAccessForGrant(grant)
+}
+
 func (s *MemoryStore) materialsForCourses(courses []string) []learning.Material {
 	out := make([]learning.Material, 0)
 	for _, material := range s.materials {

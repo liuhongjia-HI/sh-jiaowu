@@ -423,6 +423,13 @@ func TestCreateHomeworkPublishesOfficialAccountNotices(t *testing.T) {
 		if notice.RelatedType != "homework" || notice.RelatedID != homework.ID || notice.Status != "已发送" {
 			t.Fatalf("expected published homework notice, got %#v", notice)
 		}
+		if len(notice.ID) > mysqlIndexedExternalIDLength {
+			t.Fatalf("official homework notice ID is too long for notices.external_id: length=%d id=%q", len(notice.ID), notice.ID)
+		}
+		stationID := stationNoticeID(notice.ID)
+		if len(stationID) > mysqlIndexedExternalIDLength {
+			t.Fatalf("station homework notice ID is too long for notices.external_id: length=%d id=%q", len(stationID), stationID)
+		}
 	}
 }
 

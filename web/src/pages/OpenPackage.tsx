@@ -1,16 +1,24 @@
 import { Alert, Button, Card, Col, Form, message, Row, Select, Skeleton, Space, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { getData, postData } from '../services/http';
-import type { GrantPreview, Student, StudyPackage } from '../types/starline';
+import type { GrantCreateRequest, GrantPreview, Student, StudyPackage } from '../types/starline';
+
+type GrantFormValues = {
+  studentId: string;
+  packageId: string;
+  startsAt?: string;
+  endsAt?: string;
+};
 
 export default function OpenPackage() {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<GrantFormValues>();
   const queryClient = useQueryClient();
   const students = useQuery({ queryKey: ['students'], queryFn: () => getData<Student[]>('/students') });
   const packages = useQuery({ queryKey: ['packages'], queryFn: () => getData<StudyPackage[]>('/packages') });
   const studentId = Form.useWatch('studentId', form);
   const packageId = Form.useWatch('packageId', form);
+  const startsAt = Form.useWatch('startsAt', form);
   const selectedStudent = useMemo(() => (students.data ?? []).find((item) => item.id === studentId), [students.data, studentId]);
   const availablePackages = useMemo(
     () => (packages.data ?? []).filter((item) => item.status === '启用' && item.grade === selectedStudent?.grade),
@@ -21,8 +29,13 @@ export default function OpenPackage() {
     enabled: Boolean(studentId && packageId),
     queryFn: () => getData<GrantPreview>('/grants/preview', { studentId, packageId })
   });
+  useEffect(() => {
+    if (!preview.data || preview.data.alreadyOpened) return;
+    if (!form.getFieldValue('startsAt')) form.setFieldValue('startsAt', preview.data.startsAtDefault);
+    if (!form.getFieldValue('endsAt')) form.setFieldValue('endsAt', preview.data.endsAtDefault);
+  }, [form, preview.data]);
   const createGrant = useMutation({
-    mutationFn: () => postData<GrantPreview>('/grants', { studentId, packageId }),
+    mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', grantBody(values)),
     onSuccess: (result) => {
       message.success(result.alreadyOpened ? '该学生已开通过这个套餐，学习权限保持有效。' : '学习套餐已开通，学习权限已同步。');
       queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -45,14 +58,14 @@ export default function OpenPackage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={10}>
           <Card title="选择学生和套餐">
-            <Form form={form} layout="vertical">
+            <Form form={form} layout="vertical" onFinish={(values) => createGrant.mutate(values)}>
               <Form.Item name="studentId" label="学生" rules={[{ required: true, message: '请选择学生' }]}>
                 <Select
                   showSearch
                   optionFilterProp="label"
                   placeholder="选择学生"
                   options={(students.data ?? []).map((item) => ({ label: `${item.name} · ${item.grade}`, value: item.id }))}
-                  onChange={() => form.setFieldValue('packageId', undefined)}
+                  onChange={() => form.setFieldsValue({ packageId: undefined, startsAt: undefined, endsAt: undefined })}
                 />
               </Form.Item>
               <Form.Item name="packageId" label="学习套餐" rules={[{ required: true, message: '请选择套餐' }]}>
@@ -63,12 +76,39 @@ export default function OpenPackage() {
                   disabled={!selectedStudent}
                   options={availablePackages.map((item) => ({ label: packageOptionLabel(item), value: item.id }))}
                   notFoundContent={selectedStudent ? '该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。' : '请先选择学生，再选择该年级可用套餐。'}
+                  onChange={() => form.setFieldsValue({ startsAt: undefined, endsAt: undefined })}
                 />
               </Form.Item>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item name="startsAt" label="开始日期" rules={[{ required: true, message: '请选择开始日期' }]}>
+                    <InputDate disabled={!packageId || preview.data?.alreadyOpened} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="endsAt"
+                    label="结束日期"
+                    dependencies={['startsAt']}
+                    rules={[
+                      { required: true, message: '请选择结束日期' },
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          const start = getFieldValue('startsAt');
+                          if (!value || !start || value >= start) return Promise.resolve();
+                          return Promise.reject(new Error('结束日期不能早于开始日期'));
+                        }
+                      })
+                    ]}
+                  >
+                    <InputDate disabled={!packageId || preview.data?.alreadyOpened} min={startsAt} />
+                  </Form.Item>
+                </Col>
+              </Row>
               {selectedStudent && availablePackages.length === 0 && (
                 <Alert type="warning" showIcon message="该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。" style={{ marginBottom: 16 }} />
               )}
-              <Button type="primary" block loading={createGrant.isPending} disabled={!preview.data || preview.data.alreadyOpened || !packageId} onClick={() => createGrant.mutate()}>
+              <Button type="primary" block loading={createGrant.isPending} disabled={!preview.data || preview.data.alreadyOpened || !packageId} onClick={() => form.submit()}>
                 {preview.data?.alreadyOpened ? '已开通' : '确认开通'}
               </Button>
             </Form>
@@ -84,7 +124,7 @@ export default function OpenPackage() {
                   type={preview.data.alreadyOpened ? 'info' : 'success'}
                   showIcon
                   message={preview.data.alreadyOpened ? `${preview.data.studentName} 已开通：${preview.data.packageName}` : `${preview.data.studentName} 将开通：${preview.data.packageName}`}
-                  description={preview.data.alreadyOpened ? `当前有效期至：${preview.data.existingUntil || '暂无'}` : `默认有效期：${preview.data.effectiveDefault}`}
+                  description={preview.data.alreadyOpened ? `当前有效期：${preview.data.existingStartsAt || '-'} 至 ${preview.data.existingUntil || '-'}` : `默认有效期：${preview.data.effectiveDefault}`}
                 />
                 <PreviewTags title="适用课程范围" values={preview.data.learningSpaces} color="cyan" />
                 <PreviewTags title="包含学习内容" values={preview.data.contentTypes} color="geekblue" />
@@ -99,6 +139,19 @@ export default function OpenPackage() {
       </Row>
     </div>
   );
+}
+
+function grantBody(values: GrantFormValues): GrantCreateRequest {
+  return {
+    studentId: values.studentId,
+    packageId: values.packageId,
+    startsAt: values.startsAt,
+    endsAt: values.endsAt
+  };
+}
+
+function InputDate(props: { disabled?: boolean; min?: string; value?: string; onChange?: (event: any) => void }) {
+  return <input className="ant-input" type="date" disabled={props.disabled} min={props.min} value={props.value || ''} onChange={props.onChange} />;
 }
 
 function packageOptionLabel(item: StudyPackage) {

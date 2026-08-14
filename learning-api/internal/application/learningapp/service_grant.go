@@ -1,0 +1,20 @@
+package learningapp
+
+import "starline/learning-api/internal/domain/learning"
+
+func (s *Service) Dashboard() learning.DashboardOverview     { return s.system.Dashboard() }
+func (s *Service) SystemReadiness() learning.SystemReadiness { return s.system.SystemReadiness() }
+func (s *Service) Packages() []learning.Package              { return s.grant.Packages() }
+func (s *Service) CreatePackage(o string, r learning.PackageUpsertRequest) (learning.Package, error) {
+	return s.grant.CreatePackage(o, r)
+}
+func (s *Service) UpdatePackage(o, id string, r learning.PackageUpsertRequest) (learning.Package, error) {
+	return s.grant.UpdatePackage(o, id, r)
+}
+func (s *Service) LearningSpaces() []learning.LearningSpace { return s.grant.LearningSpaces() }
+func (s *Service) GrantPreview(studentID, packageID string) (learning.GrantPreview, error) {
+	return s.grant.GrantPreview(studentID, packageID)
+}
+func (s *Service) CreateGrant(operator string, req learning.GrantCreateRequest) (learning.GrantPreview, error) {
+	return s.grant.CreateGrant(operator, req)
+}

@@ -1,6 +1,10 @@
 package store
 
-import "starline/learning-api/internal/domain/learning"
+import (
+	"fmt"
+
+	"starline/learning-api/internal/domain/learning"
+)
 
 type noticeDeliveryOutcome struct {
 	id     string
@@ -16,11 +20,28 @@ func noticeMutation[T any](s *MemoryStore, change func(*MemoryStore) (T, error),
 	s.mu.Lock()
 	result, err := change(s)
 	if err != nil {
-		s.pendingNoticeDeliveries = nil
 		s.mu.Unlock()
 		var zero T
 		return zero, err
 	}
+	s.mu.Unlock()
+
+	s.drainPendingNoticeDeliveries()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if refresh != nil {
+		result = refresh(s, result)
+	}
+	return result, nil
+}
+
+// drainPendingNoticeDeliveries performs the external side effect after the
+// "发送中" outbox record is committed. It never holds s.mu while invoking a
+// sender, and a second persistence failure leaves the durable outbox state
+// unchanged so a later retry or process restart can safely try again.
+func (s *MemoryStore) drainPendingNoticeDeliveries() {
+	s.mu.Lock()
 	jobs := append([]learning.Notice(nil), s.pendingNoticeDeliveries...)
 	s.pendingNoticeDeliveries = nil
 	sender := s.officialNoticeSender
@@ -28,15 +49,7 @@ func noticeMutation[T any](s *MemoryStore, change func(*MemoryStore) (T, error),
 
 	outcomes := make([]noticeDeliveryOutcome, 0, len(jobs))
 	for _, notice := range jobs {
-		outcome := noticeDeliveryOutcome{id: notice.ID, status: "已发送"}
-		if sender == nil {
-			outcome.status = "待配置"
-			outcome.reason = "需配置 WECHAT_OFFICIAL_ACCOUNT_APPID、WECHAT_OFFICIAL_ACCOUNT_SECRET、WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID。"
-		} else if err := sender(notice); err != nil {
-			outcome.status = "发送失败"
-			outcome.reason = err.Error()
-		}
-		outcomes = append(outcomes, outcome)
+		outcomes = append(outcomes, sendNoticeSafely(sender, notice))
 	}
 
 	s.mu.Lock()
@@ -46,14 +59,66 @@ func noticeMutation[T any](s *MemoryStore, change func(*MemoryStore) (T, error),
 			work.applyNoticeDeliveryOutcomes(outcomes)
 			return nil
 		}); err != nil {
-			var zero T
-			return zero, err
+			// The business transaction has already committed. Keep every delivery
+			// job for an at-least-once retry instead of making callers repeat the
+			// business request (which could create duplicate data).
+			s.pendingNoticeDeliveries = mergePendingNoticeDeliveries(s.pendingNoticeDeliveries, jobs)
+			return
 		}
 	}
-	if refresh != nil {
-		result = refresh(s, result)
+}
+
+// restorePendingNoticeDeliveries turns persisted "发送中" official-account
+// notices back into the in-memory outbox during startup. A process has one
+// ConnectDatabase lifecycle, so this cannot create concurrent startup senders.
+func (s *MemoryStore) restorePendingNoticeDeliveries() {
+	if s.officialNoticeSender == nil {
+		return
 	}
-	return result, nil
+	recovered := make([]learning.Notice, 0)
+	for _, notice := range s.notices {
+		if notice.Status == "发送中" && notice.Channel == "公众号模板消息" && notice.RecipientOpenID != "" {
+			recovered = append(recovered, notice)
+		}
+	}
+	s.pendingNoticeDeliveries = mergePendingNoticeDeliveries(s.pendingNoticeDeliveries, recovered)
+}
+
+// sendNoticeSafely converts an integration panic into a normal failed delivery
+// outcome, so one bad sender implementation cannot lose the rest of the outbox.
+func sendNoticeSafely(sender func(learning.Notice) error, notice learning.Notice) (outcome noticeDeliveryOutcome) {
+	outcome = noticeDeliveryOutcome{id: notice.ID, status: "已发送"}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			outcome.status = "发送失败"
+			outcome.reason = fmt.Sprintf("通知发送异常：%v", recovered)
+		}
+	}()
+	if sender == nil {
+		outcome.status = "待配置"
+		outcome.reason = "需配置 WECHAT_OFFICIAL_ACCOUNT_APPID、WECHAT_OFFICIAL_ACCOUNT_SECRET、WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID。"
+		return outcome
+	}
+	if err := sender(notice); err != nil {
+		outcome.status = "发送失败"
+		outcome.reason = err.Error()
+	}
+	return outcome
+}
+
+func mergePendingNoticeDeliveries(existing, additions []learning.Notice) []learning.Notice {
+	seen := make(map[string]bool, len(existing)+len(additions))
+	merged := make([]learning.Notice, 0, len(existing)+len(additions))
+	for _, notices := range [][]learning.Notice{existing, additions} {
+		for _, notice := range notices {
+			if notice.ID == "" || seen[notice.ID] {
+				continue
+			}
+			seen[notice.ID] = true
+			merged = append(merged, notice)
+		}
+	}
+	return merged
 }
 
 func (s *MemoryStore) applyNoticeDeliveryOutcomes(outcomes []noticeDeliveryOutcome) {

@@ -88,10 +88,10 @@ func (s *MemoryStore) GrantPreview(studentID, packageID string) (learning.GrantP
 	return result1, err
 }
 
-func (s *MemoryStore) CreateGrant(operator, studentID, packageID string) (learning.GrantPreview, error) {
+func (s *MemoryStore) CreateGrant(operator string, req learning.GrantCreateRequest) (learning.GrantPreview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result1, err := s.createGrantUnlocked(operator, studentID, packageID)
+	result1, err := s.createGrantUnlocked(operator, req)
 	return result1, err
 }
 

@@ -91,7 +91,7 @@ func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principa
 		if pkg.Status != learning.StatusEnabled || !containsRecommendationContent(s.contentTypesForPackage(pkg.ID)) {
 			continue
 		}
-		if opened, _ := s.activeGrantState(student.ID, pkg.ID); opened {
+		if opened, _, _ := s.activeGrantState(student.ID, pkg.ID); opened {
 			continue
 		}
 		courses, materials := s.recommendationContentForPackage(pkg, openedCourseIDs, openedMaterialIDs)

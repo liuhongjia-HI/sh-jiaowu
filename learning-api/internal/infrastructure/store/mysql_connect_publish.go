@@ -25,12 +25,16 @@ func (s *MemoryStore) connectPrepared(dsn string, schedulingOnly bool) error {
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.db != nil {
 		_ = work.db.Close()
+		s.mu.Unlock()
 		return errors.New("database was connected concurrently")
 	}
 	s.publishMutation(work)
 	s.db = work.db
+	s.mu.Unlock()
+	if !schedulingOnly {
+		s.drainPendingNoticeDeliveries()
+	}
 	return nil
 }

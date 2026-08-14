@@ -21,6 +21,11 @@ Page({
   onLoad() {
     this.loadStudy();
   },
+  onShow() {
+    if (!this.data.loading) {
+      this.loadStudy();
+    }
+  },
   loadStudy() {
     this.setData({ loading: true, error: "" });
     Promise.all([request("/student/study"), request("/student/favorites").catch(() => [])])

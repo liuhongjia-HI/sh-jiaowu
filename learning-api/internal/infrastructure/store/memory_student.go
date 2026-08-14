@@ -268,7 +268,6 @@ func (s *MemoryStore) studentGrantsUnlocked(principal learning.Principal, id str
 		return nil, err
 	}
 	grants := make([]learning.StudentGrant, 0)
-	today := time.Now().Format("2006-01-02")
 	for _, grant := range s.grants {
 		if grant.StudentID != id {
 			continue
@@ -277,12 +276,9 @@ func (s *MemoryStore) studentGrantsUnlocked(principal learning.Principal, id str
 		if !ok {
 			continue
 		}
-		state := "生效中"
-		if grantEndsAt(grant) < today || grant.Status == "revoked" {
-			state = "已到期"
-		}
 		grants = append(grants, learning.StudentGrant{
-			StudentID: id, PackageID: pkg.ID, PackageName: pkg.Name, EffectiveUntil: grantEndsAt(grant), PermissionState: state,
+			StudentID: id, PackageID: pkg.ID, PackageName: pkg.Name, StartsAt: grant.StartsAt,
+			EffectiveUntil: grantEndsAt(grant), PermissionState: grantPermissionState(grant),
 		})
 	}
 	return grants, nil

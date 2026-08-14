@@ -191,6 +191,7 @@ export type StudentGrant = {
   studentId: string;
   packageId: string;
   packageName: string;
+  startsAt: string;
   effectiveUntil: string;
   permissionState: string;
 };
@@ -560,6 +561,7 @@ export type GrantPreview = {
   studentName: string;
   packageName: string;
   alreadyOpened: boolean;
+  existingStartsAt?: string;
   existingUntil?: string;
   learningSpaces: string[];
   contentTypes: string[];
@@ -568,6 +570,15 @@ export type GrantPreview = {
   openHomework: string[];
   blockedContent: string[];
   effectiveDefault: string;
+  startsAtDefault: string;
+  endsAtDefault: string;
+};
+
+export type GrantCreateRequest = {
+  studentId?: string;
+  packageId: string;
+  startsAt?: string;
+  endsAt?: string;
 };
 
 export type StudentPermissionSummary = {

@@ -104,7 +104,7 @@ export default function Teachers() {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <Typography.Title level={3}>教师管理</Typography.Title>
+          <Typography.Title level={3}>老师管理</Typography.Title>
           <Typography.Text type="secondary">维护教师账号、课程范围和批改权限。</Typography.Text>
         </div>
         <div className="page-heading-actions">

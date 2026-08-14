@@ -402,8 +402,11 @@ func (s *MemoryStore) permissionForStudent(student learning.Student) learning.St
 	learningSpaces := make([]string, 0)
 	contentTypes := make([]string, 0)
 	effectiveUntil := ""
+	hasActive := false
+	hasUpcoming := false
+	today := time.Now().Format("2006-01-02")
 	for _, grant := range s.grants {
-		if grant.StudentID != student.ID || !grantActive(grant) {
+		if grant.StudentID != student.ID || grant.Status == "revoked" || grantEndsAt(grant) < today {
 			continue
 		}
 		pkg, ok := s.findPackage(grant.PackageID)
@@ -411,19 +414,27 @@ func (s *MemoryStore) permissionForStudent(student learning.Student) learning.St
 			continue
 		}
 		packages = appendUnique(packages, pkg.Name)
-		learningSpaces = appendUnique(learningSpaces, s.learningSpaceNamesForGrant(grant.ID)...)
 		contentTypes = appendUnique(contentTypes, s.contentTypeLabelsForPackage(pkg.ID)...)
-		pkgCourses, pkgMaterials, pkgHomework := s.openContentForStudentGrant(grant)
-		courses = appendUnique(courses, pkgCourses...)
-		materials = appendUnique(materials, pkgMaterials...)
-		homework = appendUnique(homework, pkgHomework...)
+		if grantActive(grant) {
+			hasActive = true
+			learningSpaces = appendUnique(learningSpaces, s.learningSpaceNamesForGrant(grant.ID)...)
+			pkgCourses, pkgMaterials, pkgHomework := s.openContentForStudentGrant(grant)
+			courses = appendUnique(courses, pkgCourses...)
+			materials = appendUnique(materials, pkgMaterials...)
+			homework = appendUnique(homework, pkgHomework...)
+		} else if grantPermissionState(grant) == "未开始" {
+			hasUpcoming = true
+			learningSpaces = appendUnique(learningSpaces, s.learningSpaceNamesForPackage(pkg.ID)...)
+		}
 		if grantEndsAt(grant) > effectiveUntil {
 			effectiveUntil = grantEndsAt(grant)
 		}
 	}
 	state := "未开通"
-	if len(packages) > 0 {
+	if hasActive {
 		state = "生效中"
+	} else if hasUpcoming {
+		state = "未开始"
 	}
 	return learning.StudentPermissionSummary{
 		StudentID: student.ID, StudentName: student.Name, Grade: student.Grade, AccountStatus: student.AccountStatus,
@@ -858,22 +869,22 @@ func (s *MemoryStore) audienceForContent(learningSpaceID, contentType string) ([
 	return packages, students
 }
 
-func (s *MemoryStore) hasGrant(studentID, packageID string) bool {
-	for _, grant := range s.grants {
+func (s *MemoryStore) findGrantIndex(studentID, packageID string) (int, bool) {
+	for index, grant := range s.grants {
 		if grant.StudentID == studentID && grant.PackageID == packageID && grant.Status != "revoked" {
-			return true
+			return index, true
 		}
 	}
-	return false
+	return -1, false
 }
 
-func (s *MemoryStore) activeGrantState(studentID, packageID string) (bool, string) {
+func (s *MemoryStore) activeGrantState(studentID, packageID string) (bool, string, string) {
 	for _, grant := range s.grants {
 		if grant.StudentID == studentID && grant.PackageID == packageID && grantActive(grant) {
-			return true, grantEndsAt(grant)
+			return true, grant.StartsAt, grantEndsAt(grant)
 		}
 	}
-	return false, ""
+	return false, "", ""
 }
 
 func (s *MemoryStore) addStudentOpenedPackage(studentID, packageName string) {
@@ -988,8 +999,9 @@ func (s *MemoryStore) learningSpaceIDsForPackage(packageID string) []string {
 
 func (s *MemoryStore) learningSpaceIDsForGrant(grantID string) []string {
 	out := make([]string, 0)
+	today := time.Now().Format("2006-01-02")
 	for _, access := range s.spaceAccess {
-		if access.PackageGrantID == grantID && access.Status == "active" && access.EndsAt >= time.Now().Format("2006-01-02") && s.learningSpaceEnabled(access.LearningSpaceID) {
+		if access.PackageGrantID == grantID && access.Status == "active" && (access.StartsAt == "" || access.StartsAt <= today) && access.EndsAt >= today && s.learningSpaceEnabled(access.LearningSpaceID) {
 			out = appendUnique(out, access.LearningSpaceID)
 		}
 	}

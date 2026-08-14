@@ -38,7 +38,7 @@ func (s *MemoryStore) deliverNotice(notice learning.Notice) learning.Notice {
 		}
 		notice.Status = "发送中"
 		notice.FailureReason = ""
-		s.pendingNoticeDeliveries = append(s.pendingNoticeDeliveries, notice)
+		s.pendingNoticeDeliveries = mergePendingNoticeDeliveries(s.pendingNoticeDeliveries, []learning.Notice{notice})
 		return notice
 	}
 	notice.Status = "已发送"
@@ -264,7 +264,18 @@ func grantActive(grant packageGrant) bool {
 	if status == "" {
 		status = "active"
 	}
-	return status == "active" && grantEndsAt(grant) >= today
+	return status == "active" && (grant.StartsAt == "" || grant.StartsAt <= today) && grantEndsAt(grant) >= today
+}
+
+func grantPermissionState(grant packageGrant) string {
+	today := time.Now().Format("2006-01-02")
+	if grant.Status == "revoked" || grantEndsAt(grant) < today {
+		return "已到期"
+	}
+	if grant.StartsAt != "" && grant.StartsAt > today {
+		return "未开始"
+	}
+	return "生效中"
 }
 
 func contentTypeLabel(value string) string {

@@ -1,8 +1,17 @@
 package store
 
 import (
+	"database/sql"
 	"errors"
+	"strings"
 )
+
+// mysqlIndexedExternalIDLength stays within the utf8mb4 index limit on both
+// current and older MySQL deployments while allowing composite, generated IDs
+// such as notice-homework-<homework>-<student>-station.
+const mysqlIndexedExternalIDLength = 191
+
+const mysqlNoticeExternalIDDefinition = "VARCHAR(191) NOT NULL DEFAULT ''"
 
 func (s *MemoryStore) ensurePersistenceSchema() error {
 	if s.db == nil {
@@ -238,7 +247,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"schedule_classes", "room_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
-		{"notices", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"notices", "external_id", mysqlNoticeExternalIDDefinition},
 		{"notices", "channel", "VARCHAR(32) NOT NULL DEFAULT '站内通知'"},
 		{"notices", "recipient_open_id", "VARCHAR(128) NOT NULL DEFAULT ''"},
 		{"notices", "failure_reason", "TEXT NOT NULL"},
@@ -262,6 +271,12 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		if err := s.ensureColumn(column.table, column.name, column.def); err != nil {
 			return err
 		}
+	}
+	// ensureColumn only adds missing columns. Existing deployments created the
+	// notices key as VARCHAR(64), so explicitly normalize it before upserts
+	// write generated station-notice IDs and before validating its unique index.
+	if err := s.ensureColumnDefinition("notices", "external_id", mysqlNoticeExternalIDDefinition); err != nil {
+		return err
 	}
 	// Stable external keys are required for request-time keyed upserts. Backfill
 	// legacy rows using the same IDs the loader historically synthesized.
@@ -314,6 +329,34 @@ func (s *MemoryStore) ensureColumn(table, column, definition string) error {
 	}
 	_, err = s.db.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition)
 	return err
+}
+
+// ensureColumnDefinition applies an idempotent in-place migration for a
+// column whose definition has changed. It intentionally runs before the
+// unique-index check: widening an indexed VARCHAR preserves existing values
+// and indexes, while allowing the subsequent keyed notice upsert to succeed.
+func (s *MemoryStore) ensureColumnDefinition(table, column, definition string) error {
+	var columnType, isNullable string
+	var defaultValue sql.NullString
+	err := s.db.QueryRow(
+		`SELECT column_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+		table, column,
+	).Scan(&columnType, &isNullable, &defaultValue)
+	if err != nil {
+		return err
+	}
+	if !columnDefinitionNeedsMigration(columnType, isNullable, defaultValue) {
+		return nil
+	}
+	_, err = s.db.Exec("ALTER TABLE " + table + " MODIFY COLUMN " + column + " " + definition)
+	return err
+}
+
+func columnDefinitionNeedsMigration(columnType, isNullable string, defaultValue sql.NullString) bool {
+	return !strings.EqualFold(columnType, "varchar(191)") ||
+		!strings.EqualFold(isNullable, "NO") ||
+		!defaultValue.Valid ||
+		defaultValue.String != ""
 }
 
 func (s *MemoryStore) needsDatabaseBootstrap() (bool, error) {

@@ -473,7 +473,11 @@ func (s *MemoryStore) loadNoticesFromDB() error {
 		out = append(out, item)
 	}
 	s.notices = out
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	s.restorePendingNoticeDeliveries()
+	return nil
 }
 
 func (s *MemoryStore) loadLogsFromDB() error {

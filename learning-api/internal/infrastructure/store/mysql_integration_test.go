@@ -1,11 +1,41 @@
 package store
 
 import (
+	"database/sql"
 	"os"
 	"testing"
 
 	"starline/learning-api/internal/domain/learning"
 )
+
+func TestMySQLNoticeExternalIDSchema(t *testing.T) {
+	dsn := os.Getenv("STARLINE_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("STARLINE_TEST_MYSQL_DSN is not configured")
+	}
+	store := NewMemoryStoreWithOptions(Options{SkipBaseData: true})
+	if err := store.ConnectDatabase(dsn); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.db.Close()
+
+	var columnType, isNullable string
+	var defaultValue sql.NullString
+	if err := store.db.QueryRow(`SELECT column_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'notices' AND column_name = 'external_id'`).Scan(&columnType, &isNullable, &defaultValue); err != nil {
+		t.Fatalf("read notices.external_id definition: %v", err)
+	}
+	if columnDefinitionNeedsMigration(columnType, isNullable, defaultValue) {
+		t.Fatalf("notices.external_id was not migrated: type=%q nullable=%q default=%#v", columnType, isNullable, defaultValue)
+	}
+
+	var indexColumns int
+	if err := store.db.QueryRow(`SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'notices' AND index_name = 'uk_notice_external_id' AND non_unique = 0`).Scan(&indexColumns); err != nil {
+		t.Fatalf("read notices external-ID index: %v", err)
+	}
+	if indexColumns != 1 {
+		t.Fatalf("uk_notice_external_id column count = %d, want 1", indexColumns)
+	}
+}
 
 func TestMySQLMutationSurvivesStoreRestart(t *testing.T) {
 	dsn := os.Getenv("STARLINE_TEST_MYSQL_DSN")

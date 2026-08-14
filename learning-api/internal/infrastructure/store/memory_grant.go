@@ -13,42 +13,56 @@ func (s *MemoryStore) grantPreviewUnlocked(studentID, packageID string) (learnin
 		return learning.GrantPreview{}, err
 	}
 	openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
-	alreadyOpened, existingUntil := s.activeGrantState(student.ID, pkg.ID)
+	alreadyOpened, existingStartsAt, existingUntil := s.activeGrantState(student.ID, pkg.ID)
+	defaultStartsAt, defaultEndsAt := defaultGrantPeriod()
 	return learning.GrantPreview{
 		StudentID: student.ID, PackageID: pkg.ID, StudentName: student.Name, PackageName: pkg.Name,
-		AlreadyOpened: alreadyOpened, ExistingUntil: existingUntil,
+		AlreadyOpened: alreadyOpened, ExistingStartsAt: existingStartsAt, ExistingUntil: existingUntil,
 		LearningSpaces: s.learningSpaceNamesForPackage(pkg.ID), ContentTypes: s.contentTypeLabelsForPackage(pkg.ID),
 		OpenCourses: openCourses, OpenMaterials: openMaterials, OpenHomework: openHomework,
-		BlockedContent: s.blockedContentForPackage(pkg), EffectiveDefault: "今天起 365 天",
+		BlockedContent: s.blockedContentForPackage(pkg), EffectiveDefault: defaultStartsAt + " 至 " + defaultEndsAt,
+		StartsAtDefault: defaultStartsAt, EndsAtDefault: defaultEndsAt,
 	}, nil
 }
 
-func (s *MemoryStore) createGrantUnlocked(operator, studentID, packageID string) (learning.GrantPreview, error) {
+func (s *MemoryStore) createGrantUnlocked(operator string, req learning.GrantCreateRequest) (learning.GrantPreview, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.GrantPreview, error) {
-			return work.createGrantUnlocked(operator, studentID, packageID)
+			return work.createGrantUnlocked(operator, req)
 		})
 	}
-	preview, err := s.grantPreviewUnlocked(studentID, packageID)
+	preview, err := s.grantPreviewUnlocked(req.StudentID, req.PackageID)
 	if err != nil {
 		return learning.GrantPreview{}, err
 	}
-	if !s.hasGrant(studentID, packageID) {
-		startsAt := time.Now().Format("2006-01-02")
-		endsAt := time.Now().AddDate(1, 0, 0).Format("2006-01-02")
-		grant := packageGrant{
-			ID:             "grant-" + time.Now().Format("20060102150405"),
-			StudentID:      studentID,
-			PackageID:      packageID,
-			StartsAt:       startsAt,
-			EndsAt:         endsAt,
-			Status:         "active",
-			EffectiveUntil: endsAt,
-		}
+	if preview.AlreadyOpened {
+		s.prependLog(operator, "开通套餐", preview.StudentName+" / "+preview.PackageName)
+		return preview, nil
+	}
+	startsAt, endsAt, err := normalizeGrantPeriod(req.StartsAt, req.EndsAt)
+	if err != nil {
+		return learning.GrantPreview{}, err
+	}
+	grant := packageGrant{
+		ID:             "grant-" + time.Now().Format("20060102150405"),
+		StudentID:      req.StudentID,
+		PackageID:      req.PackageID,
+		StartsAt:       startsAt,
+		EndsAt:         endsAt,
+		Status:         "active",
+		EffectiveUntil: endsAt,
+	}
+	if index, ok := s.findGrantIndex(req.StudentID, req.PackageID); ok {
+		grant.ID = s.grants[index].ID
+		s.grants[index] = grant
+		s.replaceSpaceAccessForGrant(grant)
+	} else {
 		s.grants = append(s.grants, grant)
 		s.syncSpaceAccessForGrant(grant)
-		s.addStudentOpenedPackage(studentID, preview.PackageName)
 	}
+	s.addStudentOpenedPackage(req.StudentID, preview.PackageName)
+	preview.ExistingStartsAt = startsAt
+	preview.ExistingUntil = endsAt
 	s.prependLog(operator, "开通套餐", preview.StudentName+" / "+preview.PackageName)
 	return preview, nil
 }
@@ -100,6 +114,33 @@ func (s *MemoryStore) packagePermissionsUnlocked() []learning.PackagePermissionS
 		})
 	}
 	return out
+}
+
+func defaultGrantPeriod() (string, string) {
+	now := time.Now()
+	return now.Format("2006-01-02"), now.AddDate(1, 0, 0).Format("2006-01-02")
+}
+
+func normalizeGrantPeriod(startsAt, endsAt string) (string, string, error) {
+	defaultStartsAt, defaultEndsAt := defaultGrantPeriod()
+	if startsAt == "" {
+		startsAt = defaultStartsAt
+	}
+	if endsAt == "" {
+		endsAt = defaultEndsAt
+	}
+	start, err := time.Parse("2006-01-02", startsAt)
+	if err != nil {
+		return "", "", errors.New("请选择正确的开通开始日期")
+	}
+	end, err := time.Parse("2006-01-02", endsAt)
+	if err != nil {
+		return "", "", errors.New("请选择正确的开通结束日期")
+	}
+	if end.Before(start) {
+		return "", "", errors.New("开通结束日期不能早于开始日期")
+	}
+	return startsAt, endsAt, nil
 }
 
 func (s *MemoryStore) contentPermissionsUnlocked() []learning.ContentPermissionSummary {

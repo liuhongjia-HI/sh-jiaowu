@@ -24,12 +24,13 @@ import {
 import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getData, postData, postForm, putData } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
 import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
 import type {
   CurrentUser,
+  GrantCreateRequest,
   GrantPreview,
   Student,
   StudentDetail,
@@ -62,6 +63,8 @@ type StudentFilters = {
 
 type GrantFormValues = {
   packageId: string;
+  startsAt?: string;
+  endsAt?: string;
 };
 
 function canWrite(user: CurrentUser) {
@@ -98,6 +101,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
 
   const packageId = Form.useWatch('packageId', grantForm);
+  const grantStartsAt = Form.useWatch('startsAt', grantForm);
   const availableGrantPackages = useMemo(
     () => (packages.data ?? []).filter((item) => item.status === '启用' && item.grade === grantStudent?.grade),
     [packages.data, grantStudent?.grade]
@@ -107,6 +111,11 @@ export default function Students({ user }: { user: CurrentUser }) {
     enabled: Boolean(grantStudent?.id && packageId),
     queryFn: () => getData<GrantPreview>('/grants/preview', { studentId: grantStudent?.id ?? '', packageId })
   });
+  useEffect(() => {
+    if (!grantPreview.data || grantPreview.data.alreadyOpened) return;
+    if (!grantForm.getFieldValue('startsAt')) grantForm.setFieldValue('startsAt', grantPreview.data.startsAtDefault);
+    if (!grantForm.getFieldValue('endsAt')) grantForm.setFieldValue('endsAt', grantPreview.data.endsAtDefault);
+  }, [grantForm, grantPreview.data]);
 
   const saveStudent = useMutation({
     mutationFn: (values: StudentFormValues) => {
@@ -141,12 +150,14 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
 
   const createGrant = useMutation({
-    mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', { studentId: grantStudent?.id, packageId: values.packageId }),
+    mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', grantBody(grantStudent, values)),
     onSuccess: (result) => {
       message.success(result.alreadyOpened ? '该学生已开通过这个套餐，学习权限保持有效。' : '学习套餐已开通');
       setGrantStudent(null);
       grantForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (err: Error) => message.error(err.message || '开通失败，请检查学生和学习套餐。')
   });
@@ -383,8 +394,32 @@ export default function Students({ user }: { user: CurrentUser }) {
               loading={packages.isLoading}
               disabled={!grantStudent}
               notFoundContent={grantStudent ? '该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。' : '请先选择学生，再选择该年级可用套餐。'}
+              onChange={() => grantForm.setFieldsValue({ startsAt: undefined, endsAt: undefined })}
             />
           </Form.Item>
+          <Space size={12} style={{ width: '100%' }} align="start">
+            <Form.Item name="startsAt" label="开始日期" rules={[{ required: true, message: '请选择开始日期' }]} style={{ flex: 1 }}>
+              <InputDate disabled={!packageId || grantPreview.data?.alreadyOpened} />
+            </Form.Item>
+            <Form.Item
+              name="endsAt"
+              label="结束日期"
+              dependencies={['startsAt']}
+              rules={[
+                { required: true, message: '请选择结束日期' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const start = getFieldValue('startsAt');
+                    if (!value || !start || value >= start) return Promise.resolve();
+                    return Promise.reject(new Error('结束日期不能早于开始日期'));
+                  }
+                })
+              ]}
+              style={{ flex: 1 }}
+            >
+              <InputDate disabled={!packageId || grantPreview.data?.alreadyOpened} min={grantStartsAt} />
+            </Form.Item>
+          </Space>
         </Form>
         {grantStudent && availableGrantPackages.length === 0 && (
           <Alert type="warning" showIcon message="该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。" />
@@ -396,7 +431,7 @@ export default function Students({ user }: { user: CurrentUser }) {
             type={grantPreview.data.alreadyOpened ? 'info' : 'success'}
             showIcon
             message={grantPreview.data.alreadyOpened ? `${grantPreview.data.studentName} 已开通：${grantPreview.data.packageName}` : `${grantPreview.data.studentName} 将开通：${grantPreview.data.packageName}`}
-            description={grantPreview.data.alreadyOpened ? `当前有效期至：${grantPreview.data.existingUntil || '暂无'}` : `适用课程范围：${grantPreview.data.learningSpaces.join('、') || '暂无'}；包含学习内容：${grantPreview.data.contentTypes.join('、') || '暂无'}；有效期：${grantPreview.data.effectiveDefault}`}
+            description={grantPreview.data.alreadyOpened ? `当前有效期：${grantPreview.data.existingStartsAt || '-'} 至 ${grantPreview.data.existingUntil || '-'}` : `适用课程范围：${grantPreview.data.learningSpaces.join('、') || '暂无'}；包含学习内容：${grantPreview.data.contentTypes.join('、') || '暂无'}；默认有效期：${grantPreview.data.effectiveDefault}`}
           />
         )}
       </Modal>
@@ -650,8 +685,8 @@ function StudentProfile({ detail }: { detail: StudentDetail }) {
         renderCard={(record) => (
           <InfoCard
             title={record.packageName}
-            subtitle={`有效期至 ${record.effectiveUntil}`}
-            status={<Tag color={record.permissionState === '生效中' ? 'green' : 'default'}>{record.permissionState}</Tag>}
+            subtitle={`${record.startsAt || '-'} 至 ${record.effectiveUntil || '-'}`}
+            status={tagStatus(record.permissionState)}
           />
         )}
       />
@@ -782,6 +817,19 @@ function packageOptionLabel(item: StudyPackage) {
   return [item.name, item.subject, item.semester, item.packageType].filter(Boolean).join(' · ');
 }
 
+function grantBody(student: Student | null, values: GrantFormValues): GrantCreateRequest {
+  return {
+    studentId: student?.id,
+    packageId: values.packageId,
+    startsAt: values.startsAt,
+    endsAt: values.endsAt
+  };
+}
+
+function InputDate(props: { disabled?: boolean; min?: string; value?: string; onChange?: (event: any) => void }) {
+  return <input className="ant-input" type="date" disabled={props.disabled} min={props.min} value={props.value || ''} onChange={props.onChange} />;
+}
+
 function tagList(values: string[], color: string, emptyText: string) {
   if (!values || values.length === 0) return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
   return (
@@ -789,6 +837,11 @@ function tagList(values: string[], color: string, emptyText: string) {
       {values.map((value) => <Tag key={value} color={color}>{value}</Tag>)}
     </Space>
   );
+}
+
+function tagStatus(value: string) {
+  const color = value === '生效中' ? 'green' : value === '未开始' ? 'orange' : 'default';
+  return <Tag color={color}>{value}</Tag>;
 }
 
 function submissionStatusColor(status?: string) {

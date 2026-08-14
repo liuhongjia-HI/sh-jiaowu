@@ -3,6 +3,7 @@ package store
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"starline/learning-api/internal/domain/learning"
 )
@@ -48,7 +49,7 @@ func TestCreatePackageSupportsGrantPreview(t *testing.T) {
 			store.students[index].LearningStatus = "待开通"
 		}
 	}
-	if _, err := store.CreateGrant("运营教务", "stu-001", pkg.ID); err != nil {
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: "stu-001", PackageID: pkg.ID}); err != nil {
 		t.Fatalf("expected grant creation to succeed: %v", err)
 	}
 	student, ok := store.findRawStudent("stu-001")
@@ -113,7 +114,7 @@ func TestUpdatePackageRefreshesExistingGrantAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected package creation to succeed: %v", err)
 	}
-	if _, err := store.CreateGrant("运营教务", "stu-001", pkg.ID); err != nil {
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: "stu-001", PackageID: pkg.ID}); err != nil {
 		t.Fatalf("expected grant creation to succeed: %v", err)
 	}
 
@@ -188,6 +189,50 @@ func TestGrantPreviewMarksExistingActiveGrant(t *testing.T) {
 	}
 }
 
+func TestFutureGrantDoesNotOpenStudentContentBeforeStart(t *testing.T) {
+	store := NewMemoryStore()
+	startsAt := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	endsAt := time.Now().AddDate(0, 1, 1).Format("2006-01-02")
+	packageID := packageID(4, "地理", 0, "full")
+
+	preview, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{
+		StudentID: "stu-001",
+		PackageID: packageID,
+		StartsAt:  startsAt,
+		EndsAt:    endsAt,
+	})
+	if err != nil {
+		t.Fatalf("expected future grant to be created: %v", err)
+	}
+	if preview.ExistingStartsAt != startsAt || preview.ExistingUntil != endsAt {
+		t.Fatalf("expected preview to expose selected grant period, got %#v", preview)
+	}
+
+	for _, course := range store.coursesForStudent("stu-001") {
+		if course.Subject == "地理" {
+			t.Fatalf("future grant should not expose geography course before start: %#v", course)
+		}
+	}
+	permission := store.permissionForStudent(learning.Student{ID: "stu-001", Name: "小明", Grade: "五年级", AccountStatus: "正常"})
+	if permission.PermissionState != "生效中" {
+		t.Fatalf("existing active grant should keep overall state active, got %#v", permission)
+	}
+
+	student, ok := store.findStudent("stu-001")
+	if !ok {
+		t.Fatal("expected demo student")
+	}
+	store.grants = []packageGrant{{
+		ID: "future-only", StudentID: student.ID, PackageID: packageID, StartsAt: startsAt, EndsAt: endsAt, Status: "active",
+	}}
+	store.spaceAccess = nil
+	store.syncSpaceAccessForGrant(store.grants[0])
+	permission = store.permissionForStudent(student)
+	if permission.PermissionState != "未开始" || len(permission.OpenCourses) != 0 {
+		t.Fatalf("future-only grant should be visible as not started without open content, got %#v", permission)
+	}
+}
+
 func TestGrantPreviewRejectsPackageOutsideStudentGrade(t *testing.T) {
 	store := NewMemoryStore()
 
@@ -210,7 +255,7 @@ func TestGrantPreviewRejectsPackageOutsideStudentGrade(t *testing.T) {
 	if _, err := store.GrantPreview("stu-001", pkg.ID); err == nil || !strings.Contains(err.Error(), "不能给五年级学生开通") {
 		t.Fatalf("expected grade mismatch preview error, got %v", err)
 	}
-	if _, err := store.CreateGrant("运营教务", "stu-001", pkg.ID); err == nil || !strings.Contains(err.Error(), "不能给五年级学生开通") {
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: "stu-001", PackageID: pkg.ID}); err == nil || !strings.Contains(err.Error(), "不能给五年级学生开通") {
 		t.Fatalf("expected grade mismatch grant error, got %v", err)
 	}
 }
@@ -237,7 +282,7 @@ func TestGrantPreviewRejectsDisabledPackage(t *testing.T) {
 	if _, err := store.GrantPreview("stu-001", pkg.ID); err == nil || !strings.Contains(err.Error(), "套餐当前未启用") {
 		t.Fatalf("expected disabled package preview error, got %v", err)
 	}
-	if _, err := store.CreateGrant("运营教务", "stu-001", pkg.ID); err == nil || !strings.Contains(err.Error(), "套餐当前未启用") {
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: "stu-001", PackageID: pkg.ID}); err == nil || !strings.Contains(err.Error(), "套餐当前未启用") {
 		t.Fatalf("expected disabled package grant error, got %v", err)
 	}
 }
