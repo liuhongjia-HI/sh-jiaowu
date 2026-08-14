@@ -69,7 +69,43 @@ function uploadFileTitle(file: UploadFile) {
   return String(file.name || '文件');
 }
 
-import { RichTextInput, courseSelectOptions, optionFromValues, questionAnswerOptions, questionOption, questionsForCourse, settingLabel, statusTag, uniqueValues } from './resource-shared';
+import { RichTextInput, courseSelectOptions, optionFromValues, questionAnswerOptions, questionTitle, questionTypeLabel, questionsForCourse, settingLabel, statusTag, uniqueValues } from './resource-shared';
+
+function QuestionCheckboxGroup({
+  value = [],
+  onChange,
+  selectedCourse,
+  questions
+}: {
+  value?: string[];
+  onChange?: (values: string[]) => void;
+  selectedCourse?: Course;
+  questions: QuestionBankItem[];
+}) {
+  if (!selectedCourse) {
+    return <Typography.Text type="secondary">请先选择课程范围</Typography.Text>;
+  }
+  if (questions.length === 0) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配课程范围的启用题目，请先到题库出题。" />;
+  }
+  return (
+    <Checkbox.Group value={value} onChange={(checkedValues) => onChange?.(checkedValues.map(String))} style={{ width: '100%' }}>
+      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        {questions.map((question) => (
+          <Checkbox key={question.id} value={question.id}>
+            <Space direction="vertical" size={0}>
+              <Typography.Text>{questionTitle(question)}</Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {question.grade} · {semesterLabel(question.semester)} · {question.subject} · {questionTypeLabel(question.type)} · {question.score} 分
+              </Typography.Text>
+            </Space>
+          </Checkbox>
+        ))}
+      </Space>
+    </Checkbox.Group>
+  );
+}
+
 export function HomeworkSubmissionDialog({
   homework,
   summary,
@@ -925,19 +961,7 @@ export function UploadDialog({
               <Input placeholder="例如：2026-10-30" />
             </Form.Item>
             <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
-              <Select
-                mode="multiple"
-                showSearch
-                optionFilterProp="searchLabel"
-                placeholder={selectedCourse ? '从可用题库中选择题目' : '请先选择课程范围'}
-                disabled={!selectedCourse}
-                options={availableQuestions.map(questionOption)}
-                onChange={(values) => {
-                  form.setFieldValue('questionIds', values);
-                  form.validateFields(['questionIds']).catch(() => undefined);
-                }}
-                notFoundContent={selectedCourse ? '没有匹配课程范围的启用题目，请先到题库出题。' : '请先选择课程范围'}
-              />
+              <QuestionCheckboxGroup selectedCourse={selectedCourse} questions={availableQuestions} />
             </Form.Item>
             {selectedCourse && availableQuestions.length === 0 && (
               <Alert type="warning" showIcon message="当前课程暂无可用题目，请先到题库新增同年级、同学期、同学科的启用题目。" />
@@ -1033,19 +1057,7 @@ export function ContentEditDialog({
               <Input placeholder="例如：2026-10-30" />
             </Form.Item>
             <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
-              <Select
-                mode="multiple"
-                showSearch
-                optionFilterProp="searchLabel"
-                placeholder={selectedCourse ? '从可用题库中选择题目' : '请先选择课程范围'}
-                disabled={!selectedCourse}
-                options={availableQuestions.map(questionOption)}
-                onChange={(values) => {
-                  form.setFieldValue('questionIds', values);
-                  form.validateFields(['questionIds']).catch(() => undefined);
-                }}
-                notFoundContent={selectedCourse ? '没有匹配课程范围的启用题目，请先到题库出题。' : '请先选择课程范围'}
-              />
+              <QuestionCheckboxGroup selectedCourse={selectedCourse} questions={availableQuestions} />
             </Form.Item>
             {selectedCourse && availableQuestions.length === 0 && (
               <Alert type="warning" showIcon message="当前课程暂无可用题目，请先到题库新增同年级、同学期、同学科的启用题目。" />
