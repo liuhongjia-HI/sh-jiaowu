@@ -13,7 +13,7 @@ func (s *MemoryStore) grantPreviewUnlocked(studentID, packageID string) (learnin
 		return learning.GrantPreview{}, err
 	}
 	openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
-	alreadyOpened, existingStartsAt, existingUntil := s.activeGrantState(student.ID, pkg.ID)
+	alreadyOpened, existingStartsAt, existingUntil := s.grantState(student.ID, pkg.ID)
 	defaultStartsAt, defaultEndsAt := defaultGrantPeriod()
 	return learning.GrantPreview{
 		StudentID: student.ID, PackageID: pkg.ID, StudentName: student.Name, PackageName: pkg.Name,
@@ -34,10 +34,6 @@ func (s *MemoryStore) createGrantUnlocked(operator string, req learning.GrantCre
 	preview, err := s.grantPreviewUnlocked(req.StudentID, req.PackageID)
 	if err != nil {
 		return learning.GrantPreview{}, err
-	}
-	if preview.AlreadyOpened {
-		s.prependLog(operator, "开通套餐", preview.StudentName+" / "+preview.PackageName)
-		return preview, nil
 	}
 	startsAt, endsAt, err := normalizeGrantPeriod(req.StartsAt, req.EndsAt)
 	if err != nil {
@@ -63,7 +59,12 @@ func (s *MemoryStore) createGrantUnlocked(operator string, req learning.GrantCre
 	s.addStudentOpenedPackage(req.StudentID, preview.PackageName)
 	preview.ExistingStartsAt = startsAt
 	preview.ExistingUntil = endsAt
-	s.prependLog(operator, "开通套餐", preview.StudentName+" / "+preview.PackageName)
+	if preview.AlreadyOpened {
+		s.prependLog(operator, "调整套餐有效期", preview.StudentName+" / "+preview.PackageName)
+	} else {
+		s.prependLog(operator, "开通套餐", preview.StudentName+" / "+preview.PackageName)
+	}
+	preview.AlreadyOpened = true
 	return preview, nil
 }
 

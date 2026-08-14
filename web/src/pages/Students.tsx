@@ -112,9 +112,9 @@ export default function Students({ user }: { user: CurrentUser }) {
     queryFn: () => getData<GrantPreview>('/grants/preview', { studentId: grantStudent?.id ?? '', packageId })
   });
   useEffect(() => {
-    if (!grantPreview.data || grantPreview.data.alreadyOpened) return;
-    if (!grantForm.getFieldValue('startsAt')) grantForm.setFieldValue('startsAt', grantPreview.data.startsAtDefault);
-    if (!grantForm.getFieldValue('endsAt')) grantForm.setFieldValue('endsAt', grantPreview.data.endsAtDefault);
+    if (!grantPreview.data) return;
+    if (!grantForm.getFieldValue('startsAt')) grantForm.setFieldValue('startsAt', grantPreview.data.existingStartsAt || grantPreview.data.startsAtDefault);
+    if (!grantForm.getFieldValue('endsAt')) grantForm.setFieldValue('endsAt', grantPreview.data.existingUntil || grantPreview.data.endsAtDefault);
   }, [grantForm, grantPreview.data]);
 
   const saveStudent = useMutation({
@@ -152,7 +152,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   const createGrant = useMutation({
     mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', grantBody(grantStudent, values)),
     onSuccess: (result) => {
-      message.success(result.alreadyOpened ? '该学生已开通过这个套餐，学习权限保持有效。' : '学习套餐已开通');
+      message.success(result.alreadyOpened ? '套餐有效期已更新，学习权限已同步。' : '学习套餐已开通');
       setGrantStudent(null);
       grantForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -381,7 +381,7 @@ export default function Students({ user }: { user: CurrentUser }) {
         }}
         onOk={() => grantForm.submit()}
         confirmLoading={createGrant.isPending}
-        okButtonProps={{ disabled: Boolean(grantPreview.data?.alreadyOpened) || !packageId }}
+        okButtonProps={{ disabled: !packageId }}
         destroyOnHidden
       >
         <Form form={grantForm} layout="vertical" onFinish={(values) => createGrant.mutate(values)}>
@@ -399,7 +399,7 @@ export default function Students({ user }: { user: CurrentUser }) {
           </Form.Item>
           <Space size={12} style={{ width: '100%' }} align="start">
             <Form.Item name="startsAt" label="开始日期" rules={[{ required: true, message: '请选择开始日期' }]} style={{ flex: 1 }}>
-              <InputDate disabled={!packageId || grantPreview.data?.alreadyOpened} />
+              <InputDate disabled={!packageId} />
             </Form.Item>
             <Form.Item
               name="endsAt"
@@ -417,7 +417,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               ]}
               style={{ flex: 1 }}
             >
-              <InputDate disabled={!packageId || grantPreview.data?.alreadyOpened} min={grantStartsAt} />
+              <InputDate disabled={!packageId} min={grantStartsAt} />
             </Form.Item>
           </Space>
         </Form>

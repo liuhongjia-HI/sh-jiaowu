@@ -233,6 +233,52 @@ func TestFutureGrantDoesNotOpenStudentContentBeforeStart(t *testing.T) {
 	}
 }
 
+func TestCreateGrantUpdatesExistingGrantPeriod(t *testing.T) {
+	store := NewMemoryStore()
+	packageID := packageID(4, "地理", 0, "full")
+	initialStart := time.Now().Format("2006-01-02")
+	initialEnd := time.Now().AddDate(0, 1, 0).Format("2006-01-02")
+	updatedStart := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
+	updatedEnd := time.Now().AddDate(0, 2, 0).Format("2006-01-02")
+
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{
+		StudentID: "stu-001",
+		PackageID: packageID,
+		StartsAt:  initialStart,
+		EndsAt:    initialEnd,
+	}); err != nil {
+		t.Fatalf("expected initial grant to be created: %v", err)
+	}
+	preview, err := store.GrantPreview("stu-001", packageID)
+	if err != nil {
+		t.Fatalf("expected preview for existing grant: %v", err)
+	}
+	if !preview.AlreadyOpened || preview.ExistingStartsAt != initialStart || preview.ExistingUntil != initialEnd {
+		t.Fatalf("expected preview to show existing grant period, got %#v", preview)
+	}
+
+	updated, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{
+		StudentID: "stu-001",
+		PackageID: packageID,
+		StartsAt:  updatedStart,
+		EndsAt:    updatedEnd,
+	})
+	if err != nil {
+		t.Fatalf("expected existing grant period to update: %v", err)
+	}
+	if !updated.AlreadyOpened || updated.ExistingStartsAt != updatedStart || updated.ExistingUntil != updatedEnd {
+		t.Fatalf("expected updated grant period in response, got %#v", updated)
+	}
+	if _, startsAt, endsAt := store.grantState("stu-001", packageID); startsAt != updatedStart || endsAt != updatedEnd {
+		t.Fatalf("expected stored grant period to update, got %s - %s", startsAt, endsAt)
+	}
+	for _, access := range store.spaceAccess {
+		if access.StudentID == "stu-001" && access.StartsAt == initialStart && access.EndsAt == initialEnd {
+			t.Fatalf("expected old learning space access period to be replaced, got %#v", access)
+		}
+	}
+}
+
 func TestGrantPreviewRejectsPackageOutsideStudentGrade(t *testing.T) {
 	store := NewMemoryStore()
 

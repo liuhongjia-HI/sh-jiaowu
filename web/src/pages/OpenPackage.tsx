@@ -30,14 +30,14 @@ export default function OpenPackage() {
     queryFn: () => getData<GrantPreview>('/grants/preview', { studentId, packageId })
   });
   useEffect(() => {
-    if (!preview.data || preview.data.alreadyOpened) return;
-    if (!form.getFieldValue('startsAt')) form.setFieldValue('startsAt', preview.data.startsAtDefault);
-    if (!form.getFieldValue('endsAt')) form.setFieldValue('endsAt', preview.data.endsAtDefault);
+    if (!preview.data) return;
+    if (!form.getFieldValue('startsAt')) form.setFieldValue('startsAt', preview.data.existingStartsAt || preview.data.startsAtDefault);
+    if (!form.getFieldValue('endsAt')) form.setFieldValue('endsAt', preview.data.existingUntil || preview.data.endsAtDefault);
   }, [form, preview.data]);
   const createGrant = useMutation({
     mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', grantBody(values)),
     onSuccess: (result) => {
-      message.success(result.alreadyOpened ? '该学生已开通过这个套餐，学习权限保持有效。' : '学习套餐已开通，学习权限已同步。');
+      message.success(result.alreadyOpened ? '套餐有效期已更新，学习权限已同步。' : '学习套餐已开通，学习权限已同步。');
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
@@ -82,7 +82,7 @@ export default function OpenPackage() {
               <Row gutter={12}>
                 <Col span={12}>
                   <Form.Item name="startsAt" label="开始日期" rules={[{ required: true, message: '请选择开始日期' }]}>
-                    <InputDate disabled={!packageId || preview.data?.alreadyOpened} />
+                    <InputDate disabled={!packageId} />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
@@ -101,15 +101,15 @@ export default function OpenPackage() {
                       })
                     ]}
                   >
-                    <InputDate disabled={!packageId || preview.data?.alreadyOpened} min={startsAt} />
+                    <InputDate disabled={!packageId} min={startsAt} />
                   </Form.Item>
                 </Col>
               </Row>
               {selectedStudent && availablePackages.length === 0 && (
                 <Alert type="warning" showIcon message="该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。" style={{ marginBottom: 16 }} />
               )}
-              <Button type="primary" block loading={createGrant.isPending} disabled={!preview.data || preview.data.alreadyOpened || !packageId} onClick={() => form.submit()}>
-                {preview.data?.alreadyOpened ? '已开通' : '确认开通'}
+              <Button type="primary" block loading={createGrant.isPending} disabled={!preview.data || !packageId} onClick={() => form.submit()}>
+                {preview.data?.alreadyOpened ? '更新有效期' : '确认开通'}
               </Button>
             </Form>
           </Card>

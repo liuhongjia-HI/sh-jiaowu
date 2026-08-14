@@ -887,6 +887,15 @@ func (s *MemoryStore) activeGrantState(studentID, packageID string) (bool, strin
 	return false, "", ""
 }
 
+func (s *MemoryStore) grantState(studentID, packageID string) (bool, string, string) {
+	for _, grant := range s.grants {
+		if grant.StudentID == studentID && grant.PackageID == packageID && grant.Status != "revoked" {
+			return true, grant.StartsAt, grantEndsAt(grant)
+		}
+	}
+	return false, "", ""
+}
+
 func (s *MemoryStore) addStudentOpenedPackage(studentID, packageName string) {
 	for i := range s.students {
 		if s.students[i].ID == studentID {
