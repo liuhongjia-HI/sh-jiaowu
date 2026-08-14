@@ -932,6 +932,10 @@ export function UploadDialog({
                 placeholder={selectedCourse ? '从可用题库中选择题目' : '请先选择课程范围'}
                 disabled={!selectedCourse}
                 options={availableQuestions.map(questionOption)}
+                onChange={(values) => {
+                  form.setFieldValue('questionIds', values);
+                  form.validateFields(['questionIds']).catch(() => undefined);
+                }}
                 notFoundContent={selectedCourse ? '没有匹配课程范围的启用题目，请先到题库出题。' : '请先选择课程范围'}
               />
             </Form.Item>
@@ -1036,6 +1040,10 @@ export function ContentEditDialog({
                 placeholder={selectedCourse ? '从可用题库中选择题目' : '请先选择课程范围'}
                 disabled={!selectedCourse}
                 options={availableQuestions.map(questionOption)}
+                onChange={(values) => {
+                  form.setFieldValue('questionIds', values);
+                  form.validateFields(['questionIds']).catch(() => undefined);
+                }}
                 notFoundContent={selectedCourse ? '没有匹配课程范围的启用题目，请先到题库出题。' : '请先选择课程范围'}
               />
             </Form.Item>
