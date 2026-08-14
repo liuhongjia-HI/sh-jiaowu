@@ -32,6 +32,13 @@ Page({
   onLoad() {
     this.loadHome();
   },
+  onShareAppMessage() {
+    const courseName = this.data.continueCourse && this.data.continueCourse.name;
+    return {
+      title: courseName ? `我正在 Starline 学习《${courseName}》` : "Starline 学习｜课后练习和学习反馈都在这里",
+      path: "/pages/home/index"
+    };
+  },
   onShow() {
     if (!this.data.loading && !this.data.home) {
       this.loadHome();

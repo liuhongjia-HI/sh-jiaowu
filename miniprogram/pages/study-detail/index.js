@@ -19,6 +19,12 @@ Page({
     }
     this.loadDetail();
   },
+  onShareAppMessage() {
+    return {
+      title: this.data.course.name || "Starline 课程详情",
+      path: this.courseId ? `/pages/study-detail/index?id=${encodeURIComponent(this.courseId)}` : "/pages/study/index"
+    };
+  },
   onShow() {
     // 从答题页提交返回时刷新站点状态
     if (this.courseId && this.loaded) {

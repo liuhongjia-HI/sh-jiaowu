@@ -9,6 +9,12 @@ Page({
   onLoad() {
     this.loadGrowth();
   },
+  onShareAppMessage() {
+    return {
+      title: "我的 Starline 成长足迹",
+      path: "/pages/growth/index"
+    };
+  },
   onShow() {
     if (!this.data.loading && this.data.records.length === 0) {
       this.loadGrowth();

@@ -2,7 +2,7 @@
   <view class="detail-topbar">
     <view class="detail-back" bindtap="goBack">‹</view>
     <view class="detail-topbar-title">{{course.name || "课程详情"}}</view>
-    <view class="detail-share">↗</view>
+    <button class="detail-share" open-type="share" plain="true">↗</button>
   </view>
 
   <view class="detail-summary">

@@ -31,6 +31,12 @@ Page({
       })
       .catch(() => {});
   },
+  onShareAppMessage() {
+    return {
+      title: this.data.taskTitle ? `我完成了 Starline 小挑战：${this.data.taskTitle}` : "我完成了 Starline 小挑战",
+      path: "/pages/home/index"
+    };
+  },
   goBack() {
     wx.navigateBack({
       delta: 1,

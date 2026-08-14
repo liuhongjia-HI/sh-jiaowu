@@ -1,0 +1,54 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const test = require("node:test");
+
+function loadStudyDetailPage(requestImpl, wxMock = {}) {
+  const pages = [];
+  const requestPath = require.resolve("../utils/request");
+  const pagePath = require.resolve("../pages/study-detail/index.js");
+  delete require.cache[requestPath];
+  delete require.cache[pagePath];
+  require.cache[requestPath] = {
+    id: requestPath,
+    filename: requestPath,
+    loaded: true,
+    exports: { request: requestImpl }
+  };
+  global.wx = wxMock;
+  global.Page = (definition) => pages.push(definition);
+  require(pagePath);
+  const definition = pages[0];
+  const page = {
+    data: JSON.parse(JSON.stringify(definition.data)),
+    setData(patch, callback) {
+      Object.assign(this.data, patch);
+      callback && callback();
+    }
+  };
+  Object.keys(definition).forEach((key) => {
+    if (key !== "data") {
+      page[key] = typeof definition[key] === "function" ? definition[key].bind(page) : definition[key];
+    }
+  });
+  return page;
+}
+
+test("study detail shares the current course id and title", () => {
+  const page = loadStudyDetailPage(() => Promise.resolve({}), {
+    showToast() {}
+  });
+  page.courseId = "course-g05-english-s1-q1";
+  page.setData({ course: { name: "五年级英语S1Q1课程" } });
+
+  assert.deepEqual(page.onShareAppMessage(), {
+    title: "五年级英语S1Q1课程",
+    path: "/pages/study-detail/index?id=course-g05-english-s1-q1"
+  });
+});
+
+test("study detail top-right affordance is a native share button", () => {
+  const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
+
+  assert.match(wxml, /<button class="detail-share" open-type="share"/);
+});

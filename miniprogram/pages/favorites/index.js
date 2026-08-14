@@ -9,6 +9,12 @@ Page({
   onLoad() {
     this.loadFavorites();
   },
+  onShareAppMessage() {
+    return {
+      title: "我的 Starline 学习收藏",
+      path: "/pages/favorites/index"
+    };
+  },
   onShow() {
     if (!this.data.loading) {
       this.loadFavorites();

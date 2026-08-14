@@ -58,6 +58,12 @@ Page({
     });
     this.refreshFavorite(id);
   },
+  onShareAppMessage() {
+    return {
+      title: this.data.taskTitle ? `Starline 小挑战：${this.data.taskTitle}` : "Starline 课后小挑战",
+      path: this.data.homeworkId ? `/pages/answer/index?id=${encodeURIComponent(this.data.homeworkId)}` : "/pages/tasks/index"
+    };
+  },
   onUnload() {
     if (this.stopContentSecurity) {
       this.stopContentSecurity();

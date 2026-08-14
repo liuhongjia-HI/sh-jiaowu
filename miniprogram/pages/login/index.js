@@ -18,6 +18,12 @@ Page({
   onLoad() {
     this.silentLogin();
   },
+  onShareAppMessage() {
+    return {
+      title: "加入 Starline 学习",
+      path: "/pages/home/index"
+    };
+  },
   onInput(event) {
     const field = event.currentTarget.dataset.field;
     this.setData({ [`form.${field}`]: event.detail.value });

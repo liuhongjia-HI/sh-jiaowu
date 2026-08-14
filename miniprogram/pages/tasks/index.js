@@ -18,6 +18,12 @@ Page({
   onLoad() {
     this.loadTasks();
   },
+  onShareAppMessage() {
+    return {
+      title: "Starline 课后小挑战",
+      path: "/pages/tasks/index"
+    };
+  },
   onShow() {
     if (!this.data.loading) {
       this.loadTasks();

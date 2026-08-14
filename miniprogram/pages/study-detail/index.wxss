@@ -27,6 +27,14 @@
 
 .detail-share {
   font-size: 31rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.detail-share::after {
+  border: 0;
 }
 
 .detail-topbar-title {

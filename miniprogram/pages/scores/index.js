@@ -11,6 +11,12 @@ Page({
   onLoad() {
     this.loadScores();
   },
+  onShareAppMessage() {
+    return {
+      title: "Starline 学习效果",
+      path: "/pages/scores/index"
+    };
+  },
   onShow() {
     if (!this.data.loading && this.data.examScores.length === 0 && this.data.practiceRecords.length === 0) {
       this.loadScores();

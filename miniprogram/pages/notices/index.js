@@ -17,6 +17,12 @@ Page({
         loading: false
       }));
   },
+  onShareAppMessage() {
+    return {
+      title: "Starline 学习消息提醒",
+      path: "/pages/notices/index"
+    };
+  },
   goStudy() {
     wx.switchTab({ url: "/pages/study/index" });
   }

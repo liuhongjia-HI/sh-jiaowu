@@ -34,6 +34,13 @@ Page({
     this.syncStatusBarHeight();
     this.loadMe();
   },
+  onShareAppMessage() {
+    const studentName = this.data.studentProfile && this.data.studentProfile.name;
+    return {
+      title: studentName ? `${studentName} 的 Starline 学习主页` : "Starline 学习主页",
+      path: "/pages/home/index"
+    };
+  },
   syncStatusBarHeight() {
     try {
       const systemInfo = wx.getWindowInfo ? wx.getWindowInfo() : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : null);

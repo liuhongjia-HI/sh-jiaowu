@@ -21,6 +21,12 @@ Page({
   onLoad() {
     this.loadStudy();
   },
+  onShareAppMessage() {
+    return {
+      title: "我的 Starline 学习课程",
+      path: "/pages/study/index"
+    };
+  },
   onShow() {
     if (!this.data.loading) {
       this.loadStudy();

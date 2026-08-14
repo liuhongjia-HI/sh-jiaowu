@@ -10,6 +10,12 @@ Page({
   onLoad() {
     this.loadBadges();
   },
+  onShareAppMessage() {
+    return {
+      title: "我在 Starline 点亮了成长徽章",
+      path: "/pages/badges/index"
+    };
+  },
   onShow() {
     if (!this.data.loading && this.data.badges.length === 0) {
       this.loadBadges();

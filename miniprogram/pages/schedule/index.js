@@ -23,6 +23,12 @@ Page({
   onLoad() {
     this.loadData();
   },
+  onShareAppMessage() {
+    return {
+      title: "Starline 学习课表",
+      path: "/pages/schedule/index"
+    };
+  },
   loadData() {
     Promise.all([
       request("/student/availability"),
