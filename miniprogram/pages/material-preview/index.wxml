@@ -37,7 +37,7 @@
       <view wx:if="{{pagesLoading}}" class="page-loading">正在加载第 {{loadedPageCount}}/{{pageCount}} 页…</view>
     </view>
 
-    <view wx:elif="{{previewMode !== 'image'}}" class="paper">
+    <view wx:elif="{{previewMode === 'pdf'}}" class="paper">
       <view class="watermark-layer">
         <view wx:for="{{watermarkTexts}}" wx:key="index" class="watermark">{{item}}</view>
       </view>
@@ -49,6 +49,13 @@
       <view class="paper-line tiny"></view>
     </view>
 
+    <view wx:elif="{{previewMode === 'unavailable'}}" class="preview-unavailable">
+      <view class="preview-unavailable-icon">📄</view>
+      <view class="preview-unavailable-title">课件暂时无法打开</view>
+      <view class="preview-unavailable-message">{{previewMessage}}</view>
+      <button class="button light preview-retry" bindtap="retryPreview">重新检查</button>
+    </view>
+
     <view class="badges">
       <view class="badge">{{readText}}</view>
       <view class="badge">距离小徽章还差一步</view>
@@ -56,7 +63,7 @@
     <view class="button-row">
       <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
       <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
-      <button wx:if="{{previewMode !== 'image'}}" class="button light" bindtap="openSecurePreview">安全预览</button>
+      <button wx:if="{{previewMode === 'pdf'}}" class="button light" bindtap="openSecurePreview">安全预览</button>
       <button class="button" bindtap="goAnswer">去做小挑战</button>
     </view>
   </view>

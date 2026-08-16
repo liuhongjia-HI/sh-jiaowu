@@ -176,6 +176,10 @@ func (h *LearningHandler) StudentMaterialPreviewPages(c *gin.Context) {
 		OK(c, gin.H{"imageMode": false, "pageCount": 0})
 		return
 	}
+	if _, err := os.Stat(filepath.Join(asset.PreviewPageDir, "page-0001.jpg")); err != nil {
+		BadRequest(c, "历史课件分页文件不可用，请联系老师重新上传")
+		return
+	}
 	OK(c, gin.H{"imageMode": true, "pageCount": asset.PreviewPageCount})
 }
 

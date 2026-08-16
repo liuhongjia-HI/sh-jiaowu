@@ -135,6 +135,20 @@
   background: #fffaf6;
 }
 
+.preview-unavailable {
+  margin-top: 24rpx;
+  padding: 46rpx 30rpx;
+  border-radius: 24rpx;
+  background: #fff8f3;
+  border: 1rpx solid #f1d8ca;
+  text-align: center;
+}
+
+.preview-unavailable-icon { font-size: 58rpx; }
+.preview-unavailable-title { margin-top: 18rpx; font-size: 30rpx; font-weight: 800; color: #46352d; }
+.preview-unavailable-message { margin-top: 12rpx; color: #8a6554; font-size: 24rpx; line-height: 1.6; }
+.preview-retry { margin-top: 24rpx; }
+
 .page-image {
   width: 100%;
   display: block;

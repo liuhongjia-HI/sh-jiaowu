@@ -18,6 +18,7 @@ Page({
     pageImages: [],
     loadedPageCount: 0,
     pagesLoading: false,
+    previewMessage: "",
     recordingWarning: false
   },
   onLoad(options) {
@@ -28,6 +29,7 @@ Page({
     }
     this.materialId = id;
     this.pageLoadToken = 0;
+    this.previewRetryCount = 0;
     this.stopContentSecurity = activateContentSecurity({
       targetType: "material",
       targetId: id,
@@ -62,6 +64,10 @@ Page({
   },
   onUnload() {
     this.pageLoadToken += 1;
+    if (this.previewRetryTimer) {
+      clearTimeout(this.previewRetryTimer);
+      this.previewRetryTimer = null;
+    }
     if (this.stopContentSecurity) {
       this.stopContentSecurity();
       this.stopContentSecurity = null;
@@ -78,8 +84,8 @@ Page({
       wx.saveFile({ tempFilePath, success: resolve, fail: reject });
     })).then(() => {
       wx.showToast({ title: "已保存课件", icon: "success" });
-    }).catch(() => {
-      wx.showToast({ title: "下载失败，请稍后重试", icon: "none" });
+    }).catch((error) => {
+      showFileError("课件下载失败", error);
     }).finally(() => wx.hideLoading());
   },
   // 分页图片在上传后由服务端预生成，学生专属水印由当前页面覆盖显示。
@@ -99,15 +105,27 @@ Page({
       }));
       this.setData({
         previewMode: "image",
+        previewMessage: "",
         pageCount: info.pageCount,
         pageImages,
         loadedPageCount: 0,
         pagesLoading: true
       });
       this.loadNextPage(id, token, 1, info.pageCount);
-    }).catch(() => {
-      this.setData({ previewMode: "pdf" });
+    }).catch((error) => {
+      const message = error.message || "课件暂时无法打开";
+      this.setData({ previewMode: "unavailable", previewMessage: message, pagesLoading: false });
+      if (message.includes("正在生成") && this.previewRetryCount < 3) {
+        this.previewRetryCount += 1;
+        this.previewRetryTimer = setTimeout(() => this.loadPagedPreview(id), 3000);
+      }
     });
+  },
+  retryPreview() {
+    if (!this.materialId) return;
+    this.previewRetryCount = 0;
+    this.setData({ previewMode: "unknown", previewMessage: "" });
+    this.loadPagedPreview(this.materialId);
   },
   loadNextPage(id, token, page, total) {
     if (token !== this.pageLoadToken) {
@@ -208,8 +226,8 @@ Page({
           }
         });
       })
-      .catch(() => {
-        wx.showToast({ title: "资料打开失败，请稍后再试", icon: "none" });
+      .catch((error) => {
+        showFileError("课件无法打开", error);
       })
       .then(() => wx.hideLoading());
   }
@@ -232,7 +250,7 @@ function downloadWithAuth(path) {
       },
       success(res) {
         if (res.statusCode !== 200) {
-          reject(new Error(`课件下载失败（${res.statusCode}）`));
+          readDownloadErrorMessage(res).then((message) => reject(new Error(message || `课件请求失败（${res.statusCode}）`)));
           return;
         }
         resolve(res.tempFilePath);
@@ -242,6 +260,39 @@ function downloadWithAuth(path) {
       }
     });
   });
+}
+
+function readDownloadErrorMessage(response) {
+  if (response && response.data && typeof response.data === "object") {
+    return Promise.resolve(response.data.message || "");
+  }
+  if (!response || !response.tempFilePath || !wx.getFileSystemManager) {
+    return Promise.resolve("");
+  }
+  return new Promise((resolve) => {
+    wx.getFileSystemManager().readFile({
+      filePath: response.tempFilePath,
+      encoding: "utf8",
+      success(result) {
+        try {
+          const body = JSON.parse(result.data || "{}");
+          resolve(body.message || "");
+        } catch (_) {
+          resolve("");
+        }
+      },
+      fail() { resolve(""); }
+    });
+  });
+}
+
+function showFileError(title, error) {
+  const content = (error && error.message) || "请稍后重试";
+  if (wx.showModal) {
+    wx.showModal({ title, content, showCancel: false, confirmText: "知道了" });
+    return;
+  }
+  wx.showToast({ title: content, icon: "none" });
 }
 
 // stripApiPrefix 去掉后端接口返回字段里多余的 "/api" 前缀。

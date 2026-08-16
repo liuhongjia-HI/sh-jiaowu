@@ -191,6 +191,61 @@ test("openSecurePreview strips the redundant /api prefix from previewUrl before 
   assert.equal(openedPath, "secure-preview.pdf#local");
 });
 
+test("openSecurePreview shows the backend reason when a historical preview file is missing", async () => {
+  let modal = null;
+  const wxMock = baseWxMock({
+    downloadFile(opts) {
+      opts.success({ statusCode: 400, tempFilePath: "error-response.json" });
+    },
+    getFileSystemManager() {
+      return {
+        readFile(opts) {
+          opts.success({ data: JSON.stringify({ code: 400, message: "历史课件文件不可用，请联系老师重新上传" }) });
+        }
+      };
+    },
+    showModal(opts) { modal = opts; }
+  });
+  const requestImpl = (path) => {
+    if (path === "/student/materials/mat-1") {
+      return Promise.resolve({ id: "mat-1", title: "历史课件", previewUrl: "/api/student/materials/mat-1/preview" });
+    }
+    if (path === "/student/materials/mat-1/preview/pages") {
+      return Promise.resolve({ imageMode: false, pageCount: 0 });
+    }
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.reject(new Error("unexpected path " + path));
+  };
+  const page = loadMaterialPreviewPage(requestImpl, wxMock);
+
+  page.onLoad({ id: "mat-1" });
+  await flushPromises();
+  await flushPromises();
+  page.openSecurePreview();
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(modal.title, "课件无法打开");
+  assert.equal(modal.content, "历史课件文件不可用，请联系老师重新上传");
+});
+
+test("material preview displays page metadata errors instead of a fake PDF placeholder", async () => {
+  const requestImpl = (path) => {
+    if (path === "/student/materials/mat-1") return Promise.resolve({ id: "mat-1", title: "历史课件" });
+    if (path === "/student/materials/mat-1/preview/pages") return Promise.reject(new Error("历史课件分页文件不可用，请联系老师重新上传"));
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.reject(new Error("unexpected path " + path));
+  };
+  const page = loadMaterialPreviewPage(requestImpl, baseWxMock());
+
+  page.onLoad({ id: "mat-1" });
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(page.data.previewMode, "unavailable");
+  assert.equal(page.data.previewMessage, "历史课件分页文件不可用，请联系老师重新上传");
+});
+
 test("recording change shows a warning without hiding the page content", async () => {
   let recordingHandler = null;
   const wxMock = baseWxMock({
