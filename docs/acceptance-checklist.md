@@ -91,7 +91,8 @@
 整改建议：
 - 如果开发版仍请求本地地址：检查 `miniprogram/app.js` 的 `resolveApiBaseUrl()`。
 - 如果微信登录返回 `40029 invalid code`：说明接口通了，但 code 非真实或已过期，需要从开发者工具重新触发 `wx.login()`。
-- 如果提示 request 域名不合法：在微信公众平台配置 request 合法域名 `https://gate.starlineeducation.com.cn`。
+- 如果普通接口提示域名不合法：配置 request 合法域名 `https://gate.starlineeducation.com.cn`。
+- 如果课件详情能打开但分页图片/PDF下载失败：配置 downloadFile 合法域名 `https://gate.starlineeducation.com.cn`。
 
 ## 6. 教学业务闭环
 

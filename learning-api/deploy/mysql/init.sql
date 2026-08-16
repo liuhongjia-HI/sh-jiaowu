@@ -235,6 +235,8 @@ CREATE TABLE IF NOT EXISTS schedule_classes (
   end_time CHAR(5) NOT NULL,
   start_date DATE NULL,
   end_date DATE NULL,
+  expected_student_count INT NOT NULL DEFAULT 1,
+  reservation_note VARCHAR(255) NOT NULL DEFAULT '',
   status VARCHAR(32) NOT NULL DEFAULT '已确认',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_schedule_teacher_time (teacher_id, day_of_week, start_time, end_time),
@@ -361,6 +363,33 @@ CREATE TABLE IF NOT EXISTS material_access_logs (
   material_id VARCHAR(64) NOT NULL,
   action VARCHAR(32) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS starline_file_assets (
+  id VARCHAR(64) PRIMARY KEY,
+  file_name VARCHAR(255) NOT NULL DEFAULT '',
+  file_size BIGINT NOT NULL DEFAULT 0,
+  file_type VARCHAR(32) NOT NULL DEFAULT '',
+  content_type VARCHAR(128) NOT NULL DEFAULT '',
+  original_path TEXT NOT NULL,
+  preview_path TEXT NOT NULL,
+  preview_page_dir TEXT NOT NULL,
+  preview_page_count INT NOT NULL DEFAULT 0,
+  preview_status VARCHAR(32) NOT NULL DEFAULT '',
+  preview_error TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS preview_jobs (
+  id VARCHAR(64) PRIMARY KEY,
+  file_id VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT '待处理',
+  attempt_count INT NOT NULL DEFAULT 0,
+  error_message TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  started_at DATETIME NULL,
+  finished_at DATETIME NULL,
+  KEY idx_preview_jobs_status (status, created_at),
+  UNIQUE KEY uk_preview_jobs_file (file_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS operation_logs (

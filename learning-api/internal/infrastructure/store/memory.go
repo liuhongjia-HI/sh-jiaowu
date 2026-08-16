@@ -39,6 +39,7 @@ type MemoryStore struct {
 	materials                       []learning.Material
 	homework                        []learning.Homework
 	fileAssets                      map[string]learning.FileAsset
+	previewJobs                     []learning.PreviewJob
 	reviews                         []learning.Review
 	notices                         []learning.Notice
 	logs                            []learning.OperationLog
@@ -174,12 +175,23 @@ func (s *MemoryStore) seedBaseDictionaries() {
 }
 
 func defaultSettings() map[string]string {
+	now := time.Now()
+	startYear := now.Year()
+	if now.Month() < time.July {
+		startYear--
+	}
+	grantStart := now.Format("2006-01-02")
+	grantEnd := now.AddDate(1, 0, 0).Format("2006-01-02")
+	periods := fmt.Sprintf(`[{"name":"期中","startDate":"%d-11-01","endDate":"%d-11-15"},{"name":"期末","startDate":"%d-01-05","endDate":"%d-01-20"}]`, startYear, startYear, startYear+1, startYear+1)
 	return map[string]string{
 		"academicYear":                 "2025.2026学年",
 		"grades":                       "G1-G9",
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀",
-		"downloadPolicy":               "学生端仅安全预览，不提供下载",
+		"downloadPolicy":               "套餐生效期内可下载，到期自动关闭",
+		"grantDefaultStart":            grantStart,
+		"grantDefaultEnd":              grantEnd,
+		"academicPeriods":              periods,
 		"miniProgramDomainStatus":      "待确认",
 		"officialAccountBindingStatus": "待确认",
 		"templateMessageStatus":        "待确认",

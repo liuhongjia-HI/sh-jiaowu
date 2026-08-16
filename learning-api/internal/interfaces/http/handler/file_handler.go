@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"os"
@@ -147,27 +148,19 @@ func (h *LearningHandler) StudentMaterialPreview(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
-	if _, err := os.Stat(asset.PreviewPath); err != nil {
-		BadRequest(c, "资料正在生成安全预览，请稍后再试")
+	if asset.PreviewStatus != "可预览" || asset.PreviewPath == "" {
+		BadRequest(c, previewUnavailableMessage(asset))
 		return
 	}
-	servePath := asset.PreviewPath
-	// 优先下发烧录了本次访问学生水印的临时文件；Ghostscript 不可用时，
-	// 降级为下发干净的预览副本——依然与原始文件物理隔离，只是没有动态水印。
-	if strings.TrimSpace(asset.WatermarkText) != "" {
-		if stampedPath, err := stampStudentPreviewCopy(c.Request.Context(), asset.PreviewPath, asset.WatermarkText); err == nil {
-			defer os.Remove(stampedPath)
-			servePath = stampedPath
-		} else if err != errGhostscriptUnavailable {
-			h.recordSecurityEvent(c, "水印烧录失败", asset.ID, err.Error())
-		}
+	if _, err := os.Stat(asset.PreviewPath); err != nil {
+		BadRequest(c, "历史课件文件不可用，请联系老师重新上传")
+		return
 	}
 	c.Header("Content-Disposition", "inline; filename=\"secure-preview.pdf\"")
-	c.File(servePath)
+	c.File(asset.PreviewPath)
 }
 
-// StudentMaterialPreviewPages 返回分页预览的元信息。图片模式依赖服务器安装 Ghostscript；
-// 不可用时前端应当回退到 StudentMaterialPreview 的整份 PDF 预览。
+// StudentMaterialPreviewPages 返回上传后预生成的分页图片元信息。
 func (h *LearningHandler) StudentMaterialPreviewPages(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
@@ -175,20 +168,18 @@ func (h *LearningHandler) StudentMaterialPreviewPages(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
-	if _, err := os.Stat(asset.PreviewPath); err != nil {
-		BadRequest(c, "资料正在生成安全预览，请稍后再试")
+	if asset.PreviewStatus != "可预览" {
+		BadRequest(c, previewUnavailableMessage(asset))
 		return
 	}
-	pageCount, err := countPDFPages(c.Request.Context(), asset.PreviewPath)
-	if err != nil {
+	if asset.PreviewPageCount <= 0 || strings.TrimSpace(asset.PreviewPageDir) == "" {
 		OK(c, gin.H{"imageMode": false, "pageCount": 0})
 		return
 	}
-	OK(c, gin.H{"imageMode": true, "pageCount": pageCount})
+	OK(c, gin.H{"imageMode": true, "pageCount": asset.PreviewPageCount})
 }
 
-// StudentMaterialPreviewPage 返回单页栅格化图片，水印已经烧进像素点，
-// 不是覆盖层，无法通过复制文本或去掉某一层的方式剥离。
+// StudentMaterialPreviewPage 返回单页栅格化图片，学生水印由小程序覆盖显示。
 func (h *LearningHandler) StudentMaterialPreviewPage(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	page, err := strconv.Atoi(c.Param("page"))
@@ -201,49 +192,32 @@ func (h *LearningHandler) StudentMaterialPreviewPage(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
-	if _, err := os.Stat(asset.PreviewPath); err != nil {
-		BadRequest(c, "资料正在生成安全预览，请稍后再试")
+	if asset.PreviewStatus != "可预览" {
+		BadRequest(c, previewUnavailableMessage(asset))
 		return
 	}
-	sourcePath := asset.PreviewPath
-	if strings.TrimSpace(asset.WatermarkText) != "" {
-		if stampedPath, stampErr := stampStudentPreviewCopy(c.Request.Context(), asset.PreviewPath, asset.WatermarkText); stampErr == nil {
-			defer os.Remove(stampedPath)
-			sourcePath = stampedPath
-		}
-	}
-	imagePath, err := studentPreviewPageImage(c.Request.Context(), sourcePath, asset.ID, page)
-	if err != nil {
-		BadRequest(c, "该页图片生成失败，请稍后再试")
+	if page > asset.PreviewPageCount || strings.TrimSpace(asset.PreviewPageDir) == "" {
+		BadRequest(c, "页码超出课件范围")
 		return
 	}
-	defer os.Remove(imagePath)
+	imagePath := filepath.Join(asset.PreviewPageDir, fmt.Sprintf("page-%04d.jpg", page))
+	if _, err := os.Stat(imagePath); err != nil {
+		BadRequest(c, "本页课件文件不可用，请联系老师重新生成")
+		return
+	}
 	c.Header("Cache-Control", "no-store")
 	c.File(imagePath)
 }
 
-func stampStudentPreviewCopy(ctx context.Context, previewPath, watermarkText string) (string, error) {
-	stampedDir := filepath.Join(filepath.Dir(filepath.Dir(previewPath)), "preview-stamped")
-	if err := os.MkdirAll(stampedDir, 0755); err != nil {
-		return "", err
+func previewUnavailableMessage(asset learning.FileAsset) string {
+	switch asset.PreviewStatus {
+	case "转换失败":
+		return "课件生成失败，请联系老师处理"
+	case "待转换", "处理中":
+		return "课件正在生成，请稍后再试"
+	default:
+		return "历史课件文件不可用，请联系老师重新上传"
 	}
-	target := filepath.Join(stampedDir, "stamp-"+time.Now().Format("20060102150405.000000000")+".pdf")
-	if err := stampWatermarkPDF(ctx, previewPath, target, watermarkText); err != nil {
-		return "", err
-	}
-	return target, nil
-}
-
-func studentPreviewPageImage(ctx context.Context, sourcePath, assetID string, page int) (string, error) {
-	stampedDir := filepath.Join(filepath.Dir(filepath.Dir(sourcePath)), "preview-stamped")
-	if err := os.MkdirAll(stampedDir, 0755); err != nil {
-		return "", err
-	}
-	target := filepath.Join(stampedDir, "page-"+assetID+"-"+strconv.Itoa(page)+"-"+time.Now().Format("150405.000000000")+".jpg")
-	if err := rasterizePDFPage(ctx, sourcePath, target, page); err != nil {
-		return "", err
-	}
-	return target, nil
 }
 
 func (h *LearningHandler) DownloadFile(c *gin.Context) {
@@ -260,13 +234,38 @@ func (h *LearningHandler) DownloadFile(c *gin.Context) {
 	c.FileAttachment(asset.OriginalPath, asset.FileName)
 }
 
+// StudentMaterialDownload 复用学生资料访问校验；套餐授权到期后下载地址立即失效。
+func (h *LearningHandler) StudentMaterialDownload(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
+	if err != nil {
+		Forbidden(c, err.Error())
+		return
+	}
+	if _, err := os.Stat(asset.OriginalPath); err != nil {
+		BadRequest(c, "历史课件文件缺失，请联系老师重新上传")
+		return
+	}
+	c.FileAttachment(asset.OriginalPath, asset.FileName)
+}
+
+func (h *LearningHandler) RetryFilePreview(c *gin.Context) {
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	principal, _ := middleware.CurrentPrincipal(c)
+	if err := h.service.RetryPreviewJob(operator.(string), principal, c.Param("id")); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"fileId": c.Param("id"), "previewStatus": "待转换"})
+}
+
 func (h *LearningHandler) saveUploadedLearningFile(c *gin.Context) (learning.FileAsset, bool) {
 	file, err := c.FormFile("file")
 	if err != nil {
 		BadRequest(c, "请选择要上传的文件")
 		return learning.FileAsset{}, false
 	}
-	asset, err := saveLearningFile(file)
+	asset, err := saveLearningFileAt(file, h.fileStorageRoot)
 	if err != nil {
 		BadRequest(c, err.Error())
 		return learning.FileAsset{}, false
@@ -275,6 +274,10 @@ func (h *LearningHandler) saveUploadedLearningFile(c *gin.Context) (learning.Fil
 }
 
 func saveLearningFile(file *multipart.FileHeader) (learning.FileAsset, error) {
+	return saveLearningFileAt(file, "uploads")
+}
+
+func saveLearningFileAt(file *multipart.FileHeader, storageRoot string) (learning.FileAsset, error) {
 	if file.Size <= 0 {
 		return learning.FileAsset{}, errors.New("文件内容为空，请重新选择")
 	}
@@ -286,24 +289,22 @@ func saveLearningFile(file *multipart.FileHeader) (learning.FileAsset, error) {
 	if !ok {
 		return learning.FileAsset{}, errors.New("仅支持 PDF、PPT、Word 文件")
 	}
-	uploadRoot, err := filepath.Abs("uploads")
+	if !uploadSignatureMatches(file, ext) {
+		return learning.FileAsset{}, errors.New("文件内容与扩展名不一致，请重新选择正确的课件文件")
+	}
+	uploadRoot, err := filepath.Abs(storageRoot)
 	if err != nil {
 		return learning.FileAsset{}, errors.New("上传目录初始化失败")
 	}
 	originalDir := filepath.Join(uploadRoot, "original")
-	previewDir := filepath.Join(uploadRoot, "preview")
 	if err := os.MkdirAll(originalDir, 0755); err != nil {
 		return learning.FileAsset{}, errors.New("上传目录创建失败")
-	}
-	if err := os.MkdirAll(previewDir, 0755); err != nil {
-		return learning.FileAsset{}, errors.New("预览目录创建失败")
 	}
 	id := "file-" + time.Now().Format("20060102150405.000000000")
 	originalPath := filepath.Join(originalDir, id+ext)
 	if err := copyUpload(file, originalPath); err != nil {
 		return learning.FileAsset{}, errors.New("文件保存失败")
 	}
-	previewPath, previewStatus := buildPreview(originalPath, previewDir, ext)
 	return learning.FileAsset{
 		ID:            id,
 		FileName:      filepath.Base(file.Filename),
@@ -311,9 +312,29 @@ func saveLearningFile(file *multipart.FileHeader) (learning.FileAsset, error) {
 		FileType:      spec.label,
 		ContentType:   spec.contentType,
 		OriginalPath:  originalPath,
-		PreviewPath:   previewPath,
-		PreviewStatus: previewStatus,
+		PreviewStatus: "待转换",
 	}, nil
+}
+
+func uploadSignatureMatches(file *multipart.FileHeader, ext string) bool {
+	source, err := file.Open()
+	if err != nil {
+		return false
+	}
+	defer source.Close()
+	header := make([]byte, 8)
+	count, err := source.Read(header)
+	if err != nil && err != io.EOF {
+		return false
+	}
+	header = header[:count]
+	if ext == ".pdf" {
+		return len(header) >= 5 && string(header[:5]) == "%PDF-"
+	}
+	if ext == ".docx" || ext == ".pptx" {
+		return len(header) >= 4 && header[0] == 'P' && header[1] == 'K' && header[2] == 3 && header[3] == 4
+	}
+	return len(header) >= 8 && header[0] == 0xd0 && header[1] == 0xcf && header[2] == 0x11 && header[3] == 0xe0 && header[4] == 0xa1 && header[5] == 0xb1 && header[6] == 0x1a && header[7] == 0xe1
 }
 
 func copyUpload(file *multipart.FileHeader, target string) error {

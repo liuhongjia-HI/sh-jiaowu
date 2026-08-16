@@ -1,0 +1,13 @@
+<view class="intro-page">
+  <view class="intro-hero">
+    <view class="intro-brand">STARLINE</view>
+    <view class="intro-title">让每一次学习都有方向</view>
+    <view class="intro-summary">以清晰的课程路径、及时的课堂反馈和持续的成长记录，陪伴学生稳步进步。</view>
+  </view>
+  <view class="intro-section">
+    <view class="intro-card"><text class="intro-icon">🧭</text><view><view class="intro-card-title">清晰的学习路径</view><view class="intro-card-text">课程、资料、练习和反馈集中呈现，知道现在学什么、下一步做什么。</view></view></view>
+    <view class="intro-card"><text class="intro-icon">✍️</text><view><view class="intro-card-title">老师全程反馈</view><view class="intro-card-text">课堂表现、作业批改与改进建议及时同步，家长和学生都能看懂。</view></view></view>
+    <view class="intro-card"><text class="intro-icon">🌱</text><view><view class="intro-card-title">持续记录成长</view><view class="intro-card-text">学习进度、成绩与成长徽章长期沉淀，让进步看得见。</view></view></view>
+  </view>
+  <button class="intro-action" bindtap="goStudy">进入学习中心</button>
+</view>

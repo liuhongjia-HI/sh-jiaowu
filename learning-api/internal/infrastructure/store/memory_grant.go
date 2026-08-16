@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"starline/learning-api/internal/domain/learning"
@@ -14,7 +15,7 @@ func (s *MemoryStore) grantPreviewUnlocked(studentID, packageID string) (learnin
 	}
 	openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
 	alreadyOpened, existingStartsAt, existingUntil := s.grantState(student.ID, pkg.ID)
-	defaultStartsAt, defaultEndsAt := defaultGrantPeriod()
+	defaultStartsAt, defaultEndsAt := s.defaultGrantPeriod()
 	return learning.GrantPreview{
 		StudentID: student.ID, PackageID: pkg.ID, StudentName: student.Name, PackageName: pkg.Name,
 		AlreadyOpened: alreadyOpened, ExistingStartsAt: existingStartsAt, ExistingUntil: existingUntil,
@@ -35,7 +36,7 @@ func (s *MemoryStore) createGrantUnlocked(operator string, req learning.GrantCre
 	if err != nil {
 		return learning.GrantPreview{}, err
 	}
-	startsAt, endsAt, err := normalizeGrantPeriod(req.StartsAt, req.EndsAt)
+	startsAt, endsAt, err := s.normalizeGrantPeriod(req.StartsAt, req.EndsAt)
 	if err != nil {
 		return learning.GrantPreview{}, err
 	}
@@ -117,13 +118,21 @@ func (s *MemoryStore) packagePermissionsUnlocked() []learning.PackagePermissionS
 	return out
 }
 
-func defaultGrantPeriod() (string, string) {
+func (s *MemoryStore) defaultGrantPeriod() (string, string) {
 	now := time.Now()
-	return now.Format("2006-01-02"), now.AddDate(1, 0, 0).Format("2006-01-02")
+	startsAt := strings.TrimSpace(s.settings["grantDefaultStart"])
+	endsAt := strings.TrimSpace(s.settings["grantDefaultEnd"])
+	if _, err := time.Parse("2006-01-02", startsAt); err != nil {
+		startsAt = now.Format("2006-01-02")
+	}
+	if end, err := time.Parse("2006-01-02", endsAt); err != nil || endsAt < startsAt || end.Before(now.AddDate(-10, 0, 0)) {
+		endsAt = now.AddDate(1, 0, 0).Format("2006-01-02")
+	}
+	return startsAt, endsAt
 }
 
-func normalizeGrantPeriod(startsAt, endsAt string) (string, string, error) {
-	defaultStartsAt, defaultEndsAt := defaultGrantPeriod()
+func (s *MemoryStore) normalizeGrantPeriod(startsAt, endsAt string) (string, string, error) {
+	defaultStartsAt, defaultEndsAt := s.defaultGrantPeriod()
 	if startsAt == "" {
 		startsAt = defaultStartsAt
 	}

@@ -82,7 +82,8 @@
   margin: 36rpx 0;
 }
 
-.recording-guard {
+.recording-guard,
+.recording-warning {
   margin-top: 24rpx;
   min-height: 400rpx;
   border-radius: 28rpx;
@@ -93,6 +94,16 @@
   align-items: center;
   justify-content: center;
   padding: 40rpx;
+}
+
+.recording-warning {
+  min-height: 0;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 20rpx;
+  background: #fff2ea;
+  color: #8a4b32;
+  padding: 24rpx;
 }
 
 .recording-guard-icon {
@@ -127,6 +138,30 @@
 .page-image {
   width: 100%;
   display: block;
+}
+
+.page-placeholder,
+.page-error {
+  min-height: 360rpx;
+  padding: 40rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #9a5b3d;
+  text-align: center;
+}
+
+.page-error-message {
+  margin-top: 12rpx;
+  color: #8c7b72;
+  font-size: 22rpx;
+  word-break: break-all;
+}
+
+.page-retry {
+  margin-top: 22rpx;
+  min-width: 220rpx;
 }
 
 .page-index {

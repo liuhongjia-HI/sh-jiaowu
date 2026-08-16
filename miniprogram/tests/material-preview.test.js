@@ -117,7 +117,7 @@ test("material preview falls back to pdf mode when the server has no image mode"
   assert.equal(page.data.pageImages.length, 0);
 });
 
-test("material preview falls back to pdf mode when a page download fails midway", async () => {
+test("material preview keeps loaded pages and marks failed pages for retry", async () => {
   let call = 0;
   const wxMock = baseWxMock({
     downloadFile(opts) {
@@ -149,9 +149,10 @@ test("material preview falls back to pdf mode when a page download fails midway"
   await flushPromises();
   await flushPromises();
 
-  assert.equal(page.data.previewMode, "pdf");
+  assert.equal(page.data.previewMode, "image");
   assert.equal(page.data.pagesLoading, false);
-  assert.equal(page.data.pageImages.length, 0);
+  assert.deepEqual(page.data.pageImages.map((item) => item.status), ["ready", "error", "error"]);
+  assert.equal(page.data.pageImages[0].path, "page-1#local");
 });
 
 test("openSecurePreview strips the redundant /api prefix from previewUrl before downloading", async () => {
@@ -190,7 +191,7 @@ test("openSecurePreview strips the redundant /api prefix from previewUrl before 
   assert.equal(openedPath, "secure-preview.pdf#local");
 });
 
-test("recording change from content security hides the page content", async () => {
+test("recording change shows a warning without hiding the page content", async () => {
   let recordingHandler = null;
   const wxMock = baseWxMock({
     onScreenRecordingStateChanged(handler) {
@@ -215,9 +216,10 @@ test("recording change from content security hides the page content", async () =
   page.onLoad({ id: "mat-1" });
   await flushPromises();
 
-  assert.equal(page.data.recordingBlocked, false);
+  assert.equal(page.data.recordingWarning, false);
   recordingHandler({ state: "start" });
-  assert.equal(page.data.recordingBlocked, true);
+  assert.equal(page.data.recordingWarning, true);
+  assert.notEqual(page.data.previewMode, "unknown");
   recordingHandler({ state: "end" });
-  assert.equal(page.data.recordingBlocked, false);
+  assert.equal(page.data.recordingWarning, false);
 });

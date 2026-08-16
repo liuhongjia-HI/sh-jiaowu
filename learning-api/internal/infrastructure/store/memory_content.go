@@ -97,6 +97,9 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	}
 	asset := req.File
 	s.fileAssets[asset.ID] = asset
+	if asset.ID != "" {
+		s.enqueuePreviewJobUnlocked(asset.ID)
+	}
 	item := learning.Material{
 		ID:               "material-" + time.Now().Format("20060102150405.000000000"),
 		Title:            req.Title,
@@ -271,12 +274,23 @@ func (s *MemoryStore) expectedStudentsForHomework(homework learning.Homework) []
 	return students
 }
 
-func (s *MemoryStore) questionsUnlocked(principal learning.Principal) []learning.QuestionBankItem {
+func (s *MemoryStore) questionsUnlocked(principal learning.Principal, query learning.QuestionBankQuery) []learning.QuestionBankItem {
+	query.Grade = strings.TrimSpace(query.Grade)
+	query.Semester = strings.TrimSpace(query.Semester)
+	query.Subject = strings.TrimSpace(query.Subject)
+	keyword := strings.ToLower(strings.TrimSpace(query.Keyword))
 	out := make([]learning.QuestionBankItem, 0, len(s.questionBank))
 	for _, item := range s.questionBank {
-		if canSeeQuestionScope(principal, item.Grade, item.Semester, item.Subject, s.learningSpaces) {
-			out = append(out, cloneQuestionBankItem(item))
+		if !canSeeQuestionScope(principal, item.Grade, item.Semester, item.Subject, s.learningSpaces) ||
+			(query.Grade != "" && item.Grade != query.Grade) ||
+			(query.Semester != "" && item.Semester != query.Semester) ||
+			(query.Subject != "" && item.Subject != query.Subject) {
+			continue
 		}
+		if keyword != "" && !strings.Contains(strings.ToLower(strings.Join([]string{item.Title, item.Stem, item.Grade, item.Semester, item.Subject, item.Type}, " ")), keyword) {
+			continue
+		}
+		out = append(out, cloneQuestionBankItem(item))
 	}
 	return out
 }
@@ -437,6 +451,7 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	asset := req.File
 	if asset.ID != "" {
 		s.fileAssets[asset.ID] = asset
+		s.enqueuePreviewJobUnlocked(asset.ID)
 	}
 	status := learning.Status(strings.TrimSpace(req.Status))
 	if status == "" {

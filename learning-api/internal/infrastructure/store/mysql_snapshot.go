@@ -38,6 +38,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM student_submission_results",
 		"DELETE FROM pending_reviews",
 		"DELETE FROM question_bank_items",
+		"DELETE FROM preview_jobs",
 		"DELETE FROM starline_file_assets",
 		"DELETE FROM schedule_class_students",
 		"DELETE FROM schedule_classes",
@@ -200,9 +201,17 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, asset := range s.fileAssets {
 		if _, err := tx.Exec(
-			`INSERT INTO starline_file_assets (id, file_name, file_size, file_type, content_type, original_path, preview_path, preview_status)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			asset.ID, asset.FileName, asset.FileSize, asset.FileType, asset.ContentType, asset.OriginalPath, asset.PreviewPath, asset.PreviewStatus,
+			`INSERT INTO starline_file_assets (id, file_name, file_size, file_type, content_type, original_path, preview_path, preview_page_dir, preview_page_count, preview_status, preview_error)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			asset.ID, asset.FileName, asset.FileSize, asset.FileType, asset.ContentType, asset.OriginalPath, asset.PreviewPath, asset.PreviewPageDir, asset.PreviewPageCount, asset.PreviewStatus, asset.PreviewError,
+		); err != nil {
+			return err
+		}
+	}
+	for _, job := range s.previewJobs {
+		if _, err := tx.Exec(
+			`INSERT INTO preview_jobs (id, file_id, status, attempt_count, error_message, created_at, started_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			job.ID, job.FileID, job.Status, job.AttemptCount, job.ErrorMessage, nullableDateTime(job.CreatedAt), nullableDateTime(job.StartedAt), nullableDateTime(job.FinishedAt),
 		); err != nil {
 			return err
 		}
@@ -218,10 +227,10 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, item := range s.scheduleClasses {
 		if _, err := tx.Exec(
-			`INSERT INTO schedule_classes (id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO schedule_classes (id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, expected_student_count, reservation_note, status, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			item.ID, item.Name, item.CourseID, item.CourseName, item.TeacherID, item.TeacherName, item.CampusID, item.RoomName, item.ClassType, item.Capacity, item.DurationMinutes,
-			item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Status, nullableDateTime(item.CreatedAt),
+			item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.ExpectedStudentCount, item.ReservationNote, item.Status, nullableDateTime(item.CreatedAt),
 		); err != nil {
 			return err
 		}

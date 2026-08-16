@@ -11,6 +11,8 @@ type AuthRepository interface {
 	ResetPassword(operator string, principal learning.Principal, userID string) (learning.PasswordResetResult, error)
 	RecordSecurityEvent(operator, action, target, detail string) error
 	PrincipalByUserID(userID string) (learning.Principal, error)
+	StudentAccounts(learning.Principal) ([]learning.StudentAccount, error)
+	SwitchStudentAccount(learning.Principal, string) (learning.Principal, error)
 }
 
 // StaffRepository keeps personnel administration independent from content and scheduling.
@@ -43,6 +45,12 @@ func (s *Service) RecordSecurityEvent(operator, action, target, detail string) e
 }
 func (s *Service) PrincipalByUserID(userID string) (learning.Principal, error) {
 	return s.auth.PrincipalByUserID(userID)
+}
+func (s *Service) StudentAccounts(principal learning.Principal) ([]learning.StudentAccount, error) {
+	return s.auth.StudentAccounts(principal)
+}
+func (s *Service) SwitchStudentAccount(principal learning.Principal, studentID string) (learning.Principal, error) {
+	return s.auth.SwitchStudentAccount(principal, studentID)
 }
 func (s *Service) AdminStaff() []learning.AdminStaff { return s.staff.AdminStaff() }
 func (s *Service) CreateAdminStaff(operator string, req learning.AdminStaffUpsertRequest) (learning.AdminStaff, error) {

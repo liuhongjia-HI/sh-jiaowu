@@ -5,6 +5,8 @@ Page({
   data: {
     statusBarHeight: 0,
     loading: true,
+    studentAccounts: [],
+    switchingStudentId: "",
     savingProfile: false,
     savingBasicProfile: false,
     profileEditing: false,
@@ -65,6 +67,7 @@ Page({
       .then((home) => {
         const state = buildPageState(home);
         this.setData({ ...state, loading: false });
+        this.loadStudentAccounts();
       })
       .catch((error) => {
         const message = error.message || "登录后可以同步学习记录、小挑战结果和老师反馈。";
@@ -78,6 +81,22 @@ Page({
           loading: false
         });
       });
+  },
+  loadStudentAccounts() {
+    request("/student/accounts", { silent: true }).then((accounts) => {
+      this.setData({ studentAccounts: Array.isArray(accounts) ? accounts : [] });
+    }).catch(() => this.setData({ studentAccounts: [] }));
+  },
+  switchStudent(event) {
+    const studentId = event.currentTarget.dataset.studentId;
+    if (!studentId || studentId === (this.data.me && this.data.me.id) || this.data.switchingStudentId) return;
+    this.setData({ switchingStudentId: studentId });
+    request(`/student/accounts/${studentId}/switch`, { method: "POST", data: {} }).then((result) => {
+      wx.setStorageSync("starline_token", result.token);
+      wx.showToast({ title: `已切换到${result.user.name}`, icon: "success" });
+      this.setData({ switchingStudentId: "" });
+      this.loadMe();
+    }).catch(() => this.setData({ switchingStudentId: "" }));
   },
   goLogin() {
     wx.navigateTo({ url: "/pages/login/index" });

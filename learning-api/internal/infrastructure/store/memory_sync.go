@@ -172,10 +172,10 @@ func (s *MemoryStore) HomeworkSubmissions(principal learning.Principal, homework
 	return result1, err
 }
 
-func (s *MemoryStore) Questions(principal learning.Principal) []learning.QuestionBankItem {
+func (s *MemoryStore) Questions(principal learning.Principal, query learning.QuestionBankQuery) []learning.QuestionBankItem {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result := s.questionsUnlocked(principal)
+	result := s.questionsUnlocked(principal, query)
 	return result
 }
 
@@ -315,6 +315,18 @@ func (s *MemoryStore) PrincipalByUserID(userID string) (learning.Principal, erro
 	defer s.mu.Unlock()
 	result1, err := s.principalByUserIDUnlocked(userID)
 	return result1, err
+}
+
+func (s *MemoryStore) StudentAccounts(principal learning.Principal) ([]learning.StudentAccount, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.studentAccountsUnlocked(principal)
+}
+
+func (s *MemoryStore) SwitchStudentAccount(principal learning.Principal, studentID string) (learning.Principal, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.switchStudentAccountUnlocked(principal, studentID)
 }
 
 func (s *MemoryStore) Notices(principal learning.Principal) []learning.Notice {

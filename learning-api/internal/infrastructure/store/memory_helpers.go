@@ -760,6 +760,12 @@ func settingLabel(key string) string {
 		return "水印规则"
 	case "downloadPolicy":
 		return "下载规则"
+	case "grantDefaultStart":
+		return "套餐默认开始日期"
+	case "grantDefaultEnd":
+		return "套餐默认结束日期"
+	case "academicPeriods":
+		return "期中/期末时间段"
 	case "miniProgramDomainStatus":
 		return "小程序域名备案"
 	case "officialAccountBindingStatus":

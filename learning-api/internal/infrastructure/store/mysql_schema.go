@@ -29,7 +29,22 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			content_type VARCHAR(128) NOT NULL DEFAULT '',
 			original_path TEXT NOT NULL,
 			preview_path TEXT NOT NULL,
-			preview_status VARCHAR(32) NOT NULL DEFAULT ''
+			preview_page_dir TEXT NOT NULL,
+			preview_page_count INT NOT NULL DEFAULT 0,
+			preview_status VARCHAR(32) NOT NULL DEFAULT '',
+			preview_error TEXT NOT NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS preview_jobs (
+			id VARCHAR(64) PRIMARY KEY,
+			file_id VARCHAR(64) NOT NULL,
+			status VARCHAR(32) NOT NULL DEFAULT '待处理',
+			attempt_count INT NOT NULL DEFAULT 0,
+			error_message TEXT NOT NULL,
+			created_at DATETIME NOT NULL,
+			started_at DATETIME NULL,
+			finished_at DATETIME NULL,
+			KEY idx_preview_jobs_status (status, created_at),
+			UNIQUE KEY uk_preview_jobs_file (file_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS pending_reviews (
 			id VARCHAR(64) PRIMARY KEY,
@@ -243,6 +258,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"homework_tasks", "preview_status", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "preview_url", "TEXT NOT NULL"},
 		{"homework_tasks", "download_url", "TEXT NOT NULL"},
+		{"starline_file_assets", "preview_page_dir", "TEXT NOT NULL"},
+		{"starline_file_assets", "preview_page_count", "INT NOT NULL DEFAULT 0"},
+		{"starline_file_assets", "preview_error", "TEXT NOT NULL"},
 		{"schedule_classes", "campus_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "room_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},

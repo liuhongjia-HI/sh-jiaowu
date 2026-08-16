@@ -885,8 +885,8 @@ func TestStudentMaterialDetailIncludesSecurityWatermark(t *testing.T) {
 	if material.SecurityNotice == "" {
 		t.Fatalf("expected security notice, got %#v", material)
 	}
-	if material.DownloadURL != "" {
-		t.Fatalf("student material should not expose download url, got %#v", material.DownloadURL)
+	if material.FileID == "" && material.DownloadURL != "" {
+		t.Fatalf("material without a file should not expose download url, got %#v", material.DownloadURL)
 	}
 }
 

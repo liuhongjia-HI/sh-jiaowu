@@ -1,11 +1,9 @@
 import {
   BookOutlined,
-  CheckCircleOutlined,
   DashboardOutlined,
   DownOutlined,
   DollarOutlined,
   LogoutOutlined,
-  FileTextOutlined,
   FormOutlined,
   HistoryOutlined,
   KeyOutlined,
@@ -35,9 +33,6 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const PackagesPage = lazy(() => import('./pages/resources/PackagesPage'));
 const ContentPage = lazy(() => import('./pages/resources/ContentPage'));
 const QuestionsPage = lazy(() => import('./pages/resources/QuestionsPage'));
-const MaterialsPage = lazy(() => import('./pages/resources/MaterialsPage'));
-const HomeworkPage = lazy(() => import('./pages/resources/HomeworkPage'));
-const ReviewsPage = lazy(() => import('./pages/resources/ReviewsPage'));
 const NoticesPage = lazy(() => import('./pages/resources/NoticesPage'));
 const LogsPage = lazy(() => import('./pages/resources/LogsPage'));
 const SettingsPage = lazy(() => import('./pages/resources/SettingsPage'));
@@ -92,10 +87,7 @@ const navItems: NavNode[] = [
     children: [
       { key: '/content', icon: <ReadOutlined />, label: '课程内容', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/scheduling', icon: <ScheduleOutlined />, label: '排课管理', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
-      { key: '/questions', icon: <FormOutlined />, label: '题库', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
-      { key: '/materials', icon: <FileTextOutlined />, label: '学习资料', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
-      { key: '/homework', icon: <FormOutlined />, label: '课后练习', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
-      { key: '/review', icon: <CheckCircleOutlined />, label: '批改反馈', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] }
+      { key: '/questions', icon: <FormOutlined />, label: '题库', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] }
     ]
   },
   {
@@ -429,9 +421,9 @@ function Shell({ user }: { user: CurrentUser }) {
               <Route path="/scheduling" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Scheduling user={user} /></GuardedRoute>} />
               <Route path="/questions" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><QuestionsPage user={user} /></GuardedRoute>} />
               <Route path="/commercial" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><Commercial /></GuardedRoute>} />
-              <Route path="/materials" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><MaterialsPage user={user} /></GuardedRoute>} />
-              <Route path="/homework" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><HomeworkPage user={user} /></GuardedRoute>} />
-              <Route path="/review" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><ReviewsPage /></GuardedRoute>} />
+              <Route path="/materials" element={<Navigate to="/content?tab=materials" replace />} />
+              <Route path="/homework" element={<Navigate to="/content?tab=homework" replace />} />
+              <Route path="/review" element={<Navigate to="/content?tab=review" replace />} />
               <Route path="/notices" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><NoticesPage /></GuardedRoute>} />
               <Route path="/logs" element={<GuardedRoute user={user} roles={['campus_admin', 'super_admin']}><LogsPage /></GuardedRoute>} />
               <Route path="/settings" element={<GuardedRoute user={user} roles={['campus_admin', 'super_admin']}><SettingsPage /></GuardedRoute>} />

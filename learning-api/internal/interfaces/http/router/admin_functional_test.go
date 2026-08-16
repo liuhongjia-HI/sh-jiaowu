@@ -111,7 +111,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		"learningSpaceId": "space-g05-english-s1-q1",
 		"chapter":         "第一章",
 	}, "file", "material.pdf", []byte("%PDF-1.4 test material"), http.StatusOK, &material)
-	if material.ID == "" || material.FileID == "" || material.PreviewStatus != "可预览" {
+	if material.ID == "" || material.FileID == "" || material.PreviewStatus != "待转换" {
 		t.Fatalf("unexpected material: %#v", material)
 	}
 
@@ -125,7 +125,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		t.Fatalf("preview request: %v", err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("preview status = %d", resp.StatusCode)
 	}
 

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -46,6 +47,9 @@ type Config struct {
 	MySQL struct {
 		DSN string
 	}
+	FileStorage struct {
+		Root string
+	}
 	Redis struct {
 		Addr string
 	}
@@ -79,6 +83,11 @@ func MustLoad() *Config {
 	cfg.OfficialAccount.TemplateID = getString("WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID", "")
 	cfg.MiniProgramSubscribe.TemplateIDs = getCSV("WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS", nil)
 	cfg.MySQL.DSN = getString("MYSQL_DSN", "app:app123@tcp(127.0.0.1:3317)/starline?charset=utf8mb4&parseTime=True&loc=Local")
+	defaultStorageRoot := "uploads"
+	if cfg.App.Env == "production" {
+		defaultStorageRoot = "/opt/starline/data/uploads"
+	}
+	cfg.FileStorage.Root = getString("FILE_STORAGE_ROOT", defaultStorageRoot)
 	cfg.Redis.Addr = getString("REDIS_ADDR", "127.0.0.1:6380")
 	cfg.RabbitMQ.URL = getString("RABBITMQ_URL", "amqp://app:app123@127.0.0.1:5674/starline")
 	cfg.Nacos.Enabled = getBool("NACOS_ENABLED", false)
@@ -112,6 +121,10 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.MySQL.DSN) == "" || strings.Contains(c.MySQL.DSN, "127.0.0.1:3317") || strings.Contains(c.MySQL.DSN, "app:app123") {
 		missing = append(missing, "MYSQL_DSN")
+	}
+	storageRoot := strings.TrimSpace(c.FileStorage.Root)
+	if storageRoot == "" || !filepath.IsAbs(storageRoot) || strings.Contains(filepath.Clean(storageRoot), "/opt/starline/current") || strings.Contains(filepath.Clean(storageRoot), "/opt/starline/releases") {
+		missing = append(missing, "FILE_STORAGE_ROOT must be an absolute persistent path outside current/releases")
 	}
 	if strings.TrimSpace(c.Wechat.AppID) == "" {
 		missing = append(missing, "WECHAT_APPID")

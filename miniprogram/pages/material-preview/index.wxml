@@ -1,7 +1,7 @@
 <view class="hero">
   <view class="eyebrow">资料预览</view>
   <view class="hero-title">{{pageTitle}}</view>
-  <view class="badge">资料仅在线查看</view>
+  <view class="badge">{{material.downloadUrl ? '开放期内可下载' : '资料仅在线查看'}}</view>
 </view>
 <view class="section">
   <view class="card">
@@ -12,24 +12,32 @@
     </view>
     <view class="security-notice">{{securityNotice}}</view>
 
-    <view wx:if="{{recordingBlocked}}" class="recording-guard">
-      <view class="recording-guard-icon">🚫</view>
-      <view class="recording-guard-text">检测到系统录屏，内容已暂时隐藏</view>
-      <view class="recording-guard-sub">停止录屏后会自动恢复</view>
+    <view wx:if="{{recordingWarning}}" class="recording-warning">
+      <view class="recording-guard-icon">⚠️</view>
+      <view>
+        <view class="recording-guard-text">检测到系统录屏</view>
+        <view class="recording-guard-sub">课件已带专属水印，请勿录制或外传。</view>
+      </view>
     </view>
 
-    <view wx:elif="{{previewMode === 'image'}}" class="paged-preview">
+    <view wx:if="{{previewMode === 'image'}}" class="paged-preview">
       <view wx:for="{{pageImages}}" wx:key="index" class="page-wrap">
-        <image class="page-image" src="{{item.path}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
-        <view class="watermark-layer">
+        <image wx:if="{{item.status === 'ready'}}" class="page-image" src="{{item.path}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
+        <view wx:if="{{item.status === 'ready'}}" class="watermark-layer">
           <view wx:for="{{watermarkTexts}}" wx:for-item="mark" wx:key="mark" class="watermark">{{mark}}</view>
         </view>
+        <view wx:elif="{{item.status === 'error'}}" class="page-error">
+          <view>第 {{item.index}} 页加载失败</view>
+          <view class="page-error-message">{{item.error}}</view>
+          <button class="button light page-retry" data-page="{{item.index}}" bindtap="retryPage">重新加载</button>
+        </view>
+        <view wx:else class="page-placeholder">正在加载第 {{item.index}} 页…</view>
         <view class="page-index">第 {{item.index}}/{{pageCount}} 页</view>
       </view>
       <view wx:if="{{pagesLoading}}" class="page-loading">正在加载第 {{loadedPageCount}}/{{pageCount}} 页…</view>
     </view>
 
-    <view wx:else class="paper">
+    <view wx:elif="{{previewMode !== 'image'}}" class="paper">
       <view class="watermark-layer">
         <view wx:for="{{watermarkTexts}}" wx:key="index" class="watermark">{{item}}</view>
       </view>
@@ -47,6 +55,7 @@
     </view>
     <view class="button-row">
       <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
+      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
       <button wx:if="{{previewMode !== 'image'}}" class="button light" bindtap="openSecurePreview">安全预览</button>
       <button class="button" bindtap="goAnswer">去做小挑战</button>
     </view>

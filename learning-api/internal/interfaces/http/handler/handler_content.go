@@ -43,7 +43,12 @@ func (h *LearningHandler) UpdateCourse(c *gin.Context) {
 }
 func (h *LearningHandler) Questions(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
-	OK(c, h.service.Questions(principal))
+	var query learning.QuestionBankQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		BadRequest(c, "筛选条件格式不正确")
+		return
+	}
+	OK(c, h.service.Questions(principal, query))
 }
 func (h *LearningHandler) CreateQuestion(c *gin.Context) {
 	var req learning.QuestionBankUpsertRequest

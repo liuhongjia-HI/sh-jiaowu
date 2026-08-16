@@ -40,6 +40,7 @@ type Material struct {
 	FileSize         int64  `json:"fileSize,omitempty"`
 	FileType         string `json:"fileType,omitempty"`
 	PreviewStatus    string `json:"previewStatus,omitempty"`
+	PreviewError     string `json:"previewError,omitempty"`
 	PreviewURL       string `json:"previewUrl,omitempty"`
 	DownloadURL      string `json:"downloadUrl,omitempty"`
 	WatermarkText    string `json:"watermarkText,omitempty"`
@@ -79,6 +80,7 @@ type Homework struct {
 	FileSize         int64      `json:"fileSize,omitempty"`
 	FileType         string     `json:"fileType,omitempty"`
 	PreviewStatus    string     `json:"previewStatus,omitempty"`
+	PreviewError     string     `json:"previewError,omitempty"`
 	PreviewURL       string     `json:"previewUrl,omitempty"`
 	DownloadURL      string     `json:"downloadUrl,omitempty"`
 	WatermarkText    string     `json:"watermarkText,omitempty"`
@@ -133,6 +135,13 @@ type QuestionBankItem struct {
 	OwnerTeacherName string   `json:"ownerTeacherName,omitempty"`
 	CreatedAt        string   `json:"createdAt,omitempty"`
 	UpdatedAt        string   `json:"updatedAt,omitempty"`
+}
+
+type QuestionBankQuery struct {
+	Grade    string `form:"grade"`
+	Semester string `form:"semester"`
+	Subject  string `form:"subject"`
+	Keyword  string `form:"keyword"`
 }
 
 type QuestionBankUpsertRequest struct {
@@ -214,16 +223,36 @@ type SubmissionRequest struct {
 }
 
 type FileAsset struct {
-	ID            string
-	FileName      string
-	FileSize      int64
-	FileType      string
-	ContentType   string
-	OriginalPath  string
-	PreviewPath   string
-	PreviewStatus string
-	// WatermarkText 仅在学生端预览场景下填充，用于在下发前把水印烧录进 PDF 内容本身。
+	ID               string
+	FileName         string
+	FileSize         int64
+	FileType         string
+	ContentType      string
+	OriginalPath     string
+	PreviewPath      string
+	PreviewPageDir   string
+	PreviewPageCount int
+	PreviewStatus    string
+	PreviewError     string
+	// WatermarkText 仅在学生端返回，用于小程序在分页图片上叠加专属水印。
 	WatermarkText string
+}
+
+type PreviewJob struct {
+	ID           string
+	FileID       string
+	Status       string
+	AttemptCount int
+	ErrorMessage string
+	CreatedAt    string
+	StartedAt    string
+	FinishedAt   string
+}
+
+type PreviewResult struct {
+	PreviewPath      string
+	PreviewPageDir   string
+	PreviewPageCount int
 }
 
 type MaterialUploadRequest struct {

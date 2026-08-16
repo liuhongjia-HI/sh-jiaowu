@@ -21,6 +21,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadHomeworkFromDB,
 		s.loadGrantsFromDB,
 		s.loadFileAssetsFromDB,
+		s.loadPreviewJobsFromDB,
 		s.loadReviewsFromDB,
 		s.loadNoticesFromDB,
 		s.loadLogsFromDB,
@@ -419,7 +420,7 @@ func (s *MemoryStore) loadGrantsFromDB() error {
 }
 
 func (s *MemoryStore) loadFileAssetsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, file_name, file_size, file_type, content_type, original_path, preview_path, preview_status FROM starline_file_assets ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, file_name, file_size, file_type, content_type, original_path, preview_path, preview_page_dir, preview_page_count, preview_status, preview_error FROM starline_file_assets ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -427,12 +428,35 @@ func (s *MemoryStore) loadFileAssetsFromDB() error {
 	out := map[string]learning.FileAsset{}
 	for rows.Next() {
 		var item learning.FileAsset
-		if err := rows.Scan(&item.ID, &item.FileName, &item.FileSize, &item.FileType, &item.ContentType, &item.OriginalPath, &item.PreviewPath, &item.PreviewStatus); err != nil {
+		if err := rows.Scan(&item.ID, &item.FileName, &item.FileSize, &item.FileType, &item.ContentType, &item.OriginalPath, &item.PreviewPath, &item.PreviewPageDir, &item.PreviewPageCount, &item.PreviewStatus, &item.PreviewError); err != nil {
 			return err
 		}
 		out[item.ID] = item
 	}
 	s.fileAssets = out
+	return rows.Err()
+}
+
+func (s *MemoryStore) loadPreviewJobsFromDB() error {
+	rows, err := s.db.Query(`SELECT id, file_id, status, attempt_count, error_message, created_at, started_at, finished_at FROM preview_jobs ORDER BY created_at, id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.PreviewJob{}
+	for rows.Next() {
+		var item learning.PreviewJob
+		var createdAt time.Time
+		var startedAt, finishedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.FileID, &item.Status, &item.AttemptCount, &item.ErrorMessage, &createdAt, &startedAt, &finishedAt); err != nil {
+			return err
+		}
+		item.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		item.StartedAt = dateTimeString(startedAt)
+		item.FinishedAt = dateTimeString(finishedAt)
+		out = append(out, item)
+	}
+	s.previewJobs = out
 	return rows.Err()
 }
 

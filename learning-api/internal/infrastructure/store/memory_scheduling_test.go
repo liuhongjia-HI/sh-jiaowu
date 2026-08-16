@@ -7,6 +7,41 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func TestScheduleClassCanReserveTimeWithoutRegisteredStudents(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	req := learning.ScheduleClassCreateRequest{
+		CourseID:             "course-g05-english-s1-q1",
+		TeacherID:            "user-teacher",
+		CampusID:             "campus-main",
+		ClassType:            "1V2",
+		DurationMinutes:      90,
+		DayOfWeek:            3,
+		StartTime:            "19:00",
+		EndTime:              "20:30",
+		StartDate:            "2026-06-01",
+		EndDate:              "2026-08-31",
+		ExpectedStudentCount: 2,
+		ReservationNote:      "待家长确认学生名单",
+	}
+	created, err := store.CreateScheduleClass("运营教务", ops, req)
+	if err != nil {
+		t.Fatalf("expected pending reservation to succeed: %v", err)
+	}
+	if created.Status != "待确认" || len(created.Students) != 0 {
+		t.Fatalf("expected pending class without students, got %#v", created)
+	}
+	if created.ExpectedStudentCount != 2 || created.ReservationNote != req.ReservationNote {
+		t.Fatalf("expected reservation metadata to be kept, got %#v", created)
+	}
+	if _, err := store.CreateScheduleClass("运营教务", ops, req); err == nil || !strings.Contains(err.Error(), "老师该时间已有课程") {
+		t.Fatalf("expected pending reservation to lock teacher time, got %v", err)
+	}
+}
+
 func TestScheduleClassKeepsRoomMetadataWithoutBlocking(t *testing.T) {
 	store := NewMemoryStore()
 	store.users = append(store.users, learning.User{

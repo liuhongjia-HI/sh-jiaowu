@@ -41,7 +41,7 @@ type ContentRepository interface {
 	Courses(learning.Principal) []learning.Course
 	CreateCourse(string, learning.Principal, learning.CourseUpsertRequest) (learning.Course, error)
 	UpdateCourse(string, learning.Principal, string, learning.CourseUpsertRequest) (learning.Course, error)
-	Questions(learning.Principal) []learning.QuestionBankItem
+	Questions(learning.Principal, learning.QuestionBankQuery) []learning.QuestionBankItem
 	Materials(learning.Principal) []learning.Material
 	Homework(learning.Principal) []learning.Homework
 	Reviews(learning.Principal) []learning.Review
@@ -53,6 +53,12 @@ type ContentRepository interface {
 	CreateHomework(string, learning.Principal, learning.HomeworkUploadRequest) (learning.Homework, error)
 	UpdateHomework(string, learning.Principal, string, learning.HomeworkUpdateRequest) (learning.Homework, error)
 	ContentFile(learning.Principal, string) (learning.FileAsset, error)
+	RecoverPreviewJobs() error
+	ClaimPreviewJob() (learning.PreviewJob, bool, error)
+	PreviewJobFile(string) (learning.FileAsset, error)
+	CompletePreviewJob(string, learning.PreviewResult) error
+	FailPreviewJob(string, string) error
+	RetryPreviewJob(string, learning.Principal, string) error
 	CompleteReview(string, learning.Principal, string, learning.ReviewCompleteRequest) (learning.Submission, error)
 }
 

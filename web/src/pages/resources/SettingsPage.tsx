@@ -6,7 +6,7 @@ import { getData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import type { SettingUpdateRequest } from '../../types/starline';
 
-const labels: Record<string, string> = { academicYear: '当前学年', grades: '适用年级', semesters: '学期设置', watermarkRule: '水印规则', downloadPolicy: '下载策略', miniProgramDomainStatus: '小程序域名状态', productionApiDomain: '生产接口域名', officialAccountBindingStatus: '公众号绑定状态', templateMessageStatus: '模板消息状态' };
+const labels: Record<string, string> = { academicYear: '当前学年', grades: '适用年级', semesters: '学期设置', grantDefaultStart: '套餐默认开始日期', grantDefaultEnd: '套餐默认结束日期', academicPeriods: '期中/期末时间段', watermarkRule: '水印规则', downloadPolicy: '下载策略', miniProgramDomainStatus: '小程序域名状态', productionApiDomain: '生产接口域名', officialAccountBindingStatus: '公众号绑定状态', templateMessageStatus: '模板消息状态' };
 const order = Object.keys(labels);
 
 export default function SettingsPage() {

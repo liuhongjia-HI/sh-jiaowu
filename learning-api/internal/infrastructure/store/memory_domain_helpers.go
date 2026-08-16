@@ -340,6 +340,15 @@ func (s *MemoryStore) phoneExists(currentStudentID, phone string) bool {
 	return false
 }
 
+func (s *MemoryStore) studentAdminPhoneConflicts(phone string) bool {
+	for _, user := range s.users {
+		if user.StudentID == "" && phoneSame(user.Phone, phone) {
+			return true
+		}
+	}
+	return false
+}
+
 func phoneSame(left, right string) bool {
 	left = strings.TrimSpace(left)
 	right = strings.TrimSpace(right)
@@ -1083,6 +1092,10 @@ func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Mate
 		material.Semester = space.Semester
 		material.Subject = space.Subject
 	}
+	if asset, ok := s.fileAssets[material.FileID]; ok {
+		material.PreviewStatus = asset.PreviewStatus
+		material.PreviewError = asset.PreviewError
+	}
 	return material
 }
 
@@ -1092,12 +1105,16 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
+		material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 	}
-	material.DownloadURL = ""
 	return material
 }
 
 func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, homework learning.Homework) learning.Homework {
+	if asset, ok := s.fileAssets[homework.FileID]; ok {
+		homework.PreviewStatus = asset.PreviewStatus
+		homework.PreviewError = asset.PreviewError
+	}
 	homework.WatermarkText = s.studentWatermarkText(principal)
 	homework.SecurityNotice = studentSecurityNotice()
 	homework.DownloadURL = ""

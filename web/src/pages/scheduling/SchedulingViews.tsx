@@ -52,6 +52,8 @@ type ScheduleClassFormValues = {
   startDate: string;
   endDate: string;
   studentIds: string[];
+  expectedStudentCount: number;
+  reservationNote?: string;
 };
 
 type ScheduleFilters = {
@@ -108,7 +110,7 @@ type WeekDay = {
 
 const timelineSlotMinutes = 30;
 const timelineSlotHeight = 44;
-const defaultTimelineStart = 14 * 60;
+const defaultTimelineStart = 8 * 60;
 const defaultTimelineEnd = 22 * 60;
 
 export function ScheduleWeekTimeline({
@@ -349,7 +351,7 @@ export function TimelineBlock({
       <div className="schedule-timeline-tags">
         {item.classType && <Tag>{item.classType}</Tag>}
         {item.countText && <Tag>{item.countText}</Tag>}
-        {item.status && <Tag color={item.status === '已取消' ? 'default' : 'green'}>{item.status}</Tag>}
+        {item.status && <Tag color={item.status === '已取消' ? 'default' : item.status === '待确认' ? 'gold' : 'green'}>{item.status}</Tag>}
       </div>
     </>
   );
@@ -478,7 +480,7 @@ export function classColumns(courseById: CourseLookup, teacherById: Record<strin
     { title: '时间', width: 160, render: (_, record) => `${weekLabel(record.dayOfWeek)} ${record.startTime}-${record.endTime}` },
     { title: '班型', dataIndex: 'classType', width: 90 },
     { title: '学生', render: (_, record) => tagList(record.students.map(studentDisplayName), 'blue') },
-    { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '已取消' ? 'default' : 'green'}>{value}</Tag> }
+    { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '已取消' ? 'default' : value === '待确认' ? 'gold' : 'green'}>{value}</Tag> }
   ];
   if (canManage) {
     columns.push({
@@ -699,14 +701,8 @@ export function layoutOverlappingGroup(items: TimelineItem[]) {
 }
 
 export function buildTimelineRange(items: TimelineItem[]) {
-  const minutes = items.flatMap((item) => [timeToMinutes(item.startTime), timeToMinutes(item.endTime)]).filter((value) => Number.isFinite(value));
-  if (minutes.length === 0) return { start: defaultTimelineStart, end: defaultTimelineEnd };
-  const min = Math.min(defaultTimelineStart, ...minutes);
-  const max = Math.max(defaultTimelineEnd, ...minutes);
-  return {
-    start: Math.max(0, Math.floor(min / 60) * 60),
-    end: Math.min(24 * 60, Math.ceil(max / 60) * 60)
-  };
+  void items;
+  return { start: defaultTimelineStart, end: defaultTimelineEnd };
 }
 
 export function buildTimelineRows(start: number, end: number) {
@@ -770,14 +766,12 @@ export function shortList(values: string[], limit = 2) {
 export function scheduleResultNote(items: ScheduleClass[], totalConfirmedCount: number, hasFilters: boolean, grade?: string) {
   const gradeText = grade ? `${grade}课程` : '课程';
   if (items.length === 0) {
-    return hasFilters ? `没有符合筛选条件的${gradeText}，可清空筛选查看全部已确认课程。` : '还没有已确认课程，确认候选时间后会显示在这里。';
+    return hasFilters ? `没有符合筛选条件的${gradeText}，可清空筛选查看全部课程。` : '还没有课程，可先创建待确认课程锁定时间段。';
   }
   const confirmedCount = items.filter((item) => item.status === '已确认').length;
+  const pendingCount = items.filter((item) => item.status === '待确认').length;
   const canceledCount = items.filter((item) => item.status === '已取消').length;
-  if (canceledCount > 0) {
-    return `当前显示 ${items.length} 节${gradeText}，其中已确认 ${confirmedCount} 节、已取消 ${canceledCount} 节。全部已确认课程 ${totalConfirmedCount} 节。`;
-  }
-  return `当前显示 ${confirmedCount} 节已确认${gradeText}，全部已确认课程 ${totalConfirmedCount} 节。`;
+  return `当前显示 ${items.length} 节${gradeText}：待确认 ${pendingCount} 节、已确认 ${confirmedCount} 节、已取消 ${canceledCount} 节。全部已确认课程 ${totalConfirmedCount} 节。`;
 }
 
 export function availabilityStats(items: AvailabilitySlot[]) {
@@ -844,7 +838,7 @@ export function scheduleClassPayload(record: ScheduleClass, target: ScheduleMove
     courseId: record.courseId,
     teacherId: record.teacherId,
     campusId: record.campusId || 'campus-main',
-    roomName: '',
+    roomName: record.roomName,
     classType: record.classType,
     durationMinutes: record.durationMinutes,
     dayOfWeek: target.dayOfWeek,
@@ -852,7 +846,9 @@ export function scheduleClassPayload(record: ScheduleClass, target: ScheduleMove
     endTime: target.endTime ?? record.endTime,
     startDate: target.startDate ?? record.startDate,
     endDate: target.endDate ?? record.endDate,
-    studentIds: record.students.map((student) => student.id)
+    studentIds: record.students.map((student) => student.id),
+    expectedStudentCount: record.expectedStudentCount,
+    reservationNote: record.reservationNote
   };
 }
 

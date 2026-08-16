@@ -245,6 +245,8 @@ func (s *MemoryStore) ensureSchedulingTables() error {
 			end_time CHAR(5) NOT NULL,
 			start_date DATE NULL,
 			end_date DATE NULL,
+			expected_student_count INT NOT NULL DEFAULT 1,
+			reservation_note VARCHAR(255) NOT NULL DEFAULT '',
 			status VARCHAR(32) NOT NULL DEFAULT '已确认',
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			KEY idx_schedule_teacher_time (teacher_id, day_of_week, start_time, end_time),
@@ -264,6 +266,12 @@ func (s *MemoryStore) ensureSchedulingTables() error {
 		if _, err := s.db.Exec(statement); err != nil {
 			return err
 		}
+	}
+	if err := s.ensureColumn("schedule_classes", "expected_student_count", "INT NOT NULL DEFAULT 1"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("schedule_classes", "reservation_note", "VARCHAR(255) NOT NULL DEFAULT ''"); err != nil {
+		return err
 	}
 	return nil
 }
@@ -330,7 +338,7 @@ func (s *MemoryStore) loadAvailabilitySlots() ([]learning.AvailabilitySlot, erro
 }
 
 func (s *MemoryStore) loadScheduleClasses() ([]learning.ScheduleClass, error) {
-	rows, err := s.db.Query(`SELECT id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, status, created_at FROM schedule_classes ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, expected_student_count, reservation_note, status, created_at FROM schedule_classes ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +347,7 @@ func (s *MemoryStore) loadScheduleClasses() ([]learning.ScheduleClass, error) {
 	for rows.Next() {
 		var item learning.ScheduleClass
 		var startDate, endDate, createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.Name, &item.CourseID, &item.CourseName, &item.TeacherID, &item.TeacherName, &item.CampusID, &item.RoomName, &item.ClassType, &item.Capacity, &item.DurationMinutes, &item.DayOfWeek, &item.StartTime, &item.EndTime, &startDate, &endDate, &item.Status, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.CourseID, &item.CourseName, &item.TeacherID, &item.TeacherName, &item.CampusID, &item.RoomName, &item.ClassType, &item.Capacity, &item.DurationMinutes, &item.DayOfWeek, &item.StartTime, &item.EndTime, &startDate, &endDate, &item.ExpectedStudentCount, &item.ReservationNote, &item.Status, &createdAt); err != nil {
 			return nil, err
 		}
 		item.StartDate = dateString(startDate)

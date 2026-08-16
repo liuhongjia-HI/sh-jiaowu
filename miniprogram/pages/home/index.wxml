@@ -24,6 +24,16 @@
   </view>
   <view wx:else>
     <view class="section">
+      <view class="starline-intro-banner" bindtap="goStarlineIntro">
+        <view>
+          <view class="starline-intro-tag">STARLINE</view>
+          <view class="starline-intro-title">了解 Starline</view>
+          <view class="starline-intro-sub">课程体系、学习服务与成长陪伴</view>
+        </view>
+        <view class="starline-intro-arrow">›</view>
+      </view>
+    </view>
+    <view class="section">
       <view class="home-banner" bindtap="goStudyDetail">
         <view class="banner-copy">
           <view class="banner-year">{{bannerTag}}</view>

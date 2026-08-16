@@ -184,6 +184,31 @@ func (h *LearningHandler) Me(c *gin.Context) {
 	OK(c, principal)
 }
 
+func (h *LearningHandler) StudentAccounts(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	accounts, err := h.service.StudentAccounts(principal)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, accounts)
+}
+
+func (h *LearningHandler) SwitchStudentAccount(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	next, err := h.service.SwitchStudentAccount(principal, c.Param("id"))
+	if err != nil {
+		Forbidden(c, err.Error())
+		return
+	}
+	token, err := h.tokens.Issue(next)
+	if err != nil {
+		BadRequest(c, "切换账号失败")
+		return
+	}
+	OK(c, learning.AuthResult{Token: token, User: next, AuthMethod: next.AuthMethod})
+}
+
 func (h *LearningHandler) ChangePassword(c *gin.Context) {
 	var req learning.PasswordChangeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

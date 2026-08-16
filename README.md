@@ -55,6 +55,7 @@ npm run dev
 APP_ENV=production
 AUTH_TOKEN_SECRET=<高强度随机密钥>
 MYSQL_DSN=<生产 MySQL DSN>
+FILE_STORAGE_ROOT=/opt/starline/data/uploads
 WECHAT_APPID=<微信小程序 AppID>
 WECHAT_SECRET=<微信小程序 Secret>
 WECHAT_OFFICIAL_ACCOUNT_APPID=<微信公众号 AppID>

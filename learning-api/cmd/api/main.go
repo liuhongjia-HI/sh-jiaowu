@@ -12,6 +12,7 @@ import (
 	"starline/learning-api/internal/infrastructure/config"
 	"starline/learning-api/internal/infrastructure/logger"
 	"starline/learning-api/internal/infrastructure/store"
+	"starline/learning-api/internal/interfaces/http/handler"
 	"starline/learning-api/internal/interfaces/http/router"
 )
 
@@ -64,6 +65,12 @@ func main() {
 	}
 	log.Infof("mysql persistence enabled")
 	service := learningapp.NewService(repo)
+	previewWorker := handler.NewPreviewWorker(service, cfg.FileStorage.Root)
+	if err := previewWorker.Recover(); err != nil {
+		log.Errorf("preview jobs recovery failed: %v", err)
+		return
+	}
+	go previewWorker.Run(ctx)
 
 	r := router.New(router.Dependencies{
 		Config:  cfg,

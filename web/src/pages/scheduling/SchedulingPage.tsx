@@ -76,6 +76,8 @@ type ScheduleClassFormValues = {
   startDate: string;
   endDate: string;
   studentIds: string[];
+  expectedStudentCount: number;
+  reservationNote?: string;
 };
 
 type ScheduleFilters = {
@@ -131,11 +133,6 @@ type WeekDay = {
 };
 
 const classTypeOptions = ['1V1', '1V2', '1V3', '1V4'].map((value) => ({ label: value, value }));
-const timelineSlotMinutes = 30;
-const timelineSlotHeight = 44;
-const defaultTimelineStart = 14 * 60;
-const defaultTimelineEnd = 22 * 60;
-
 export default function Scheduling({ user }: { user: CurrentUser }) {
   const [availabilityForm] = Form.useForm<AvailabilityFormValues>();
   const [candidateForm] = Form.useForm<CandidateFormValues>();
@@ -156,7 +153,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [classCampusFilter, setClassCampusFilter] = useState<string>();
   const [classCourseFilter, setClassCourseFilter] = useState<string>();
   const [classTypeFilter, setClassTypeFilter] = useState<string>();
-  const [statusFilter, setStatusFilter] = useState<string>('已确认');
+  const [statusFilter, setStatusFilter] = useState<string>('全部');
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [hiddenSubjects, setHiddenSubjects] = useState<string[]>([]);
@@ -220,11 +217,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         endTime: selectedCandidate.endTime,
         startDate: candidateRequest.startDate,
         endDate: candidateRequest.endDate,
-        studentIds: selectedStudentIds
+        studentIds: selectedStudentIds,
+        expectedStudentCount: selectedCandidate.capacity,
+        reservationNote: ''
       });
     },
-    onSuccess: () => {
-      message.success('已确认成班，课表已生成');
+    onSuccess: (record) => {
+      message.success(record.status === '待确认' ? '已锁定时间段，课程待确认' : '已确认成班，课表已生成');
       setSelectedCandidate(null);
       setSelectedStudentIds([]);
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
@@ -246,8 +245,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
   const createManualClass = useMutation({
     mutationFn: (values: ScheduleClassFormValues) => postData<ScheduleClass>('/schedule-classes', values),
-    onSuccess: () => {
-      message.success('课程已创建，课表已更新');
+    onSuccess: (record) => {
+      message.success(record.status === '待确认' ? '时间段已锁定，后续可补充学生' : '课程已创建，课表已更新');
       setCreatingClass(false);
       editForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
@@ -261,8 +260,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       if (!editingClass) throw new Error('请选择要调整的课程');
       return putData<ScheduleClass>(`/schedule-classes/${editingClass.id}`, values);
     },
-    onSuccess: () => {
-      message.success('调课已保存');
+    onSuccess: (record) => {
+      message.success(record.status === '待确认' ? '调课已保存，当前课程待确认' : '调课已保存');
       setEditingClass(null);
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
@@ -297,9 +296,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const teacherById = useMemo(() => Object.fromEntries((teachers.data ?? []).map((item) => [item.id, item])), [teachers.data]);
   const studentById = useMemo(() => Object.fromEntries((students.data ?? []).map((item) => [item.id, item])), [students.data]);
   const statusOptions = [
+    { label: '全部状态', value: '全部' },
+    { label: '待确认', value: '待确认' },
     { label: '已确认', value: '已确认' },
-    { label: '已取消', value: '已取消' },
-    { label: '全部', value: '全部' }
+    { label: '已取消', value: '已取消' }
   ];
   const classFilters = useMemo<ScheduleFilters>(() => ({
     grade: classGradeFilter,
@@ -329,9 +329,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const candidatesByDay = useMemo(() => groupScheduleItems(readyCandidates), [readyCandidates]);
   const availabilityByDay = useMemo(() => groupScheduleItems(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const availabilitySummary = useMemo(() => availabilityStats(availabilityOverview.data ?? []), [availabilityOverview.data]);
-  const activeClassCount = subjectVisibleClasses.filter((item) => item.status !== '已取消').length;
+  const activeClassCount = subjectVisibleClasses.filter((item) => item.status === '已确认').length;
   const totalConfirmedClassCount = (classes.data ?? []).filter((item) => item.status === '已确认').length;
-  const hasClassFilters = Boolean(classGradeFilter || classSubjectFilter || classTeacherFilter || classStudentFilter || classCampusFilter || classCourseFilter || classTypeFilter || hiddenSubjects.length > 0 || statusFilter !== '已确认');
+  const hasClassFilters = Boolean(classGradeFilter || classSubjectFilter || classTeacherFilter || classStudentFilter || classCampusFilter || classCourseFilter || classTypeFilter || hiddenSubjects.length > 0 || statusFilter !== '全部');
   const classResultNote = scheduleResultNote(subjectVisibleClasses, totalConfirmedClassCount, hasClassFilters, classGradeFilter);
   const recommendedCount = readyCandidates.length;
   const emptyTips = candidateEmptyTips(candidateRequest, allCandidates);
@@ -374,7 +374,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       courseId: record.courseId,
       teacherId: record.teacherId,
       campusId: record.campusId || user.campusId || 'campus-main',
-      roomName: '',
+      roomName: record.roomName,
       classType: record.classType,
       durationMinutes: record.durationMinutes,
       dayOfWeek: record.dayOfWeek,
@@ -382,7 +382,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       endTime: record.endTime,
       startDate: record.startDate,
       endDate: record.endDate,
-      studentIds: record.students.map((student) => student.id)
+      studentIds: record.students.map((student) => student.id),
+      expectedStudentCount: record.expectedStudentCount,
+      reservationNote: record.reservationNote
     });
   }
 
@@ -402,7 +404,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       endTime: '20:30',
       startDate: new Date().toISOString().slice(0, 10),
       endDate: '',
-      studentIds: []
+      studentIds: [],
+      expectedStudentCount: 1,
+      reservationNote: ''
     });
   }
 
@@ -615,7 +619,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                         setClassCourseFilter(undefined);
                         setClassTypeFilter(undefined);
                         setHiddenSubjects([]);
-                        setStatusFilter('已确认');
+                        setStatusFilter('全部');
                       }}
                     >
                       清空
@@ -649,6 +653,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                 <span><i className="legend-dot legend-available-teacher" />老师可授课</span>
                 <span><i className="legend-dot legend-available-student" />学生可上课</span>
                 <span><i className="legend-dot legend-candidate" />可排方案</span>
+                <span><i className="legend-dot legend-candidate" />待确认</span>
                 <span><i className="legend-dot legend-confirmed" />已确认</span>
                 <span><i className="legend-dot legend-canceled" />已取消</span>
               </div>
@@ -696,7 +701,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               ) : (
                 subjectVisibleClasses.length === 0 ? (
                   <Empty
-                    description={hasClassFilters ? '没有符合筛选条件的课程。' : '还没有已确认课程。'}
+                    description={hasClassFilters ? '没有符合筛选条件的课程。' : '还没有课程。'}
                   >
                     {hasClassFilters && (
                       <Button onClick={() => {
@@ -706,7 +711,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                         setClassSubjectFilter(undefined);
                         setClassTypeFilter(undefined);
                         setHiddenSubjects([]);
-                        setStatusFilter('已确认');
+                        setStatusFilter('全部');
                       }}
                       >
                         清空筛选
@@ -863,7 +868,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           <Form.Item
             name="studentIds"
             label={`学生（已选 ${editingStudentIDs.length}/${classCapacity(editingClassType)}）`}
-            rules={[{ required: true, message: '请选择学生' }]}
           >
             <Select
               mode="multiple"
@@ -873,7 +877,15 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               options={studentOptions}
             />
           </Form.Item>
-          <Typography.Text type="secondary">可直接搜索并增减学生；保存时会校验同年级、开通学科、可上课时间和冲突。</Typography.Text>
+          <Space.Compact block>
+            <Form.Item name="expectedStudentCount" label="预计人数" rules={[{ required: true, message: '请输入预计人数' }]} style={{ width: '35%' }}>
+              <InputNumber min={1} max={classCapacity(editingClassType)} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="reservationNote" label="预留说明" style={{ width: '65%' }}>
+              <Input maxLength={255} placeholder="例如：待家长确认学生名单" />
+            </Form.Item>
+          </Space.Compact>
+          <Typography.Text type="secondary">可先不绑定学生来锁定时间段，课程将标记为“待确认”；补足最低人数后自动转为“已确认”。</Typography.Text>
         </Form>
       </Drawer>
     </div>

@@ -5,11 +5,20 @@ APP_ROOT="${1:-/opt/starline}"
 RELEASE_ID="${2:-}"
 API_PORT="${STARLINE_API_PORT:-8892}"
 SERVICE_NAME="${STARLINE_SERVICE_NAME:-starline-api}"
+SERVICE_USER="${STARLINE_SERVICE_USER:-starline}"
+DATA_ROOT="${STARLINE_DATA_ROOT:-$APP_ROOT/data}"
 
 if [ -z "$RELEASE_ID" ]; then
   echo "Usage: activate-release.sh <app-root> <release-id>" >&2
   exit 1
 fi
+
+if ! id "$SERVICE_USER" >/dev/null 2>&1; then
+  useradd --system --home-dir "$DATA_ROOT" --shell /usr/sbin/nologin "$SERVICE_USER"
+fi
+mkdir -p "$DATA_ROOT/uploads/original" "$DATA_ROOT/uploads/preview" "$DATA_ROOT/uploads/pages" "$DATA_ROOT/uploads/temp"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_ROOT"
+chmod 0750 "$DATA_ROOT" "$DATA_ROOT/uploads" "$DATA_ROOT/uploads/original" "$DATA_ROOT/uploads/preview" "$DATA_ROOT/uploads/pages" "$DATA_ROOT/uploads/temp"
 
 RELEASE_DIR="$APP_ROOT/releases/$RELEASE_ID"
 CURRENT_LINK="$APP_ROOT/current"

@@ -9,8 +9,10 @@ EnvironmentFile=/etc/starline/learning-api.env
 ExecStart=/opt/starline/current/learning-api/learning-api
 Restart=always
 RestartSec=5
-User=root
-Group=root
+User=starline
+Group=starline
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

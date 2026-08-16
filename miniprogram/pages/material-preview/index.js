@@ -12,13 +12,13 @@ Page({
     securityNotice: "学习内容仅限本人查看，请勿外传。",
     favorited: false,
     favoriteId: "",
-    // previewMode: unknown 加载中 / image 分页图片模式(服务端已烧录逐页水印) / pdf 退回整份安全预览
+    // previewMode: unknown 加载中 / image 上传后预生成分页图片 / pdf 整份安全预览
     previewMode: "unknown",
     pageCount: 0,
     pageImages: [],
     loadedPageCount: 0,
     pagesLoading: false,
-    recordingBlocked: false
+    recordingWarning: false
   },
   onLoad(options) {
     const id = options.id || "";
@@ -32,7 +32,7 @@ Page({
       targetType: "material",
       targetId: id,
       pagePath: "pages/material-preview/index",
-      onRecordingChange: (isRecording) => this.setData({ recordingBlocked: isRecording })
+      onRecordingChange: (isRecording) => this.setData({ recordingWarning: isRecording })
     });
     request(`/student/materials/${id}`).then((material) => {
       const watermarkText = material.watermarkText || "专属水印加载中";
@@ -67,10 +67,23 @@ Page({
       this.stopContentSecurity = null;
     }
   },
-  // loadPagedPreview 尝试用分页图片模式加载资料：每一页是服务端把当前学生水印烧录
-  // 进像素后栅格化出来的 JPEG，水印无法通过复制文本或去掉图层剥离。
-  // 服务器没装 Ghostscript（本地开发环境常见）时接口会返回 imageMode=false，
-  // 这时保留原来的“安全预览”整份 PDF 按钮作为兜底，不影响正常使用。
+  downloadMaterial() {
+    const downloadUrl = this.data.material && this.data.material.downloadUrl;
+    if (!downloadUrl) {
+      wx.showToast({ title: "当前不在课件开放期", icon: "none" });
+      return;
+    }
+    wx.showLoading({ title: "正在下载" });
+    downloadWithAuth(stripApiPrefix(downloadUrl)).then((tempFilePath) => new Promise((resolve, reject) => {
+      wx.saveFile({ tempFilePath, success: resolve, fail: reject });
+    })).then(() => {
+      wx.showToast({ title: "已保存课件", icon: "success" });
+    }).catch(() => {
+      wx.showToast({ title: "下载失败，请稍后重试", icon: "none" });
+    }).finally(() => wx.hideLoading());
+  },
+  // 分页图片在上传后由服务端预生成，学生专属水印由当前页面覆盖显示。
+  // 图片模式不可用时保留整份 PDF 按钮，单页失败则留在原位重试，不清空已加载页面。
   loadPagedPreview(id) {
     request(`/student/materials/${id}/preview/pages`).then((info) => {
       if (!info || !info.imageMode || !info.pageCount) {
@@ -78,10 +91,16 @@ Page({
         return;
       }
       const token = ++this.pageLoadToken;
+      const pageImages = Array.from({ length: info.pageCount }).map((_, index) => ({
+        index: index + 1,
+        path: "",
+        status: "pending",
+        error: ""
+      }));
       this.setData({
         previewMode: "image",
         pageCount: info.pageCount,
-        pageImages: [],
+        pageImages,
         loadedPageCount: 0,
         pagesLoading: true
       });
@@ -98,23 +117,40 @@ Page({
       this.setData({ pagesLoading: false });
       return;
     }
+    this.updatePage(page, { status: "loading", error: "" });
     downloadWithAuth(`/student/materials/${id}/preview/pages/${page}`)
       .then((tempFilePath) => {
         if (token !== this.pageLoadToken) {
           return;
         }
-        const pageImages = this.data.pageImages.concat([{ index: page, path: tempFilePath }]);
-        this.setData({ pageImages, loadedPageCount: page });
+        this.updatePage(page, { path: tempFilePath, status: "ready", error: "" });
+        this.setData({ loadedPageCount: this.data.loadedPageCount + 1 });
         this.loadNextPage(id, token, page + 1, total);
       })
-      .catch(() => {
+      .catch((error) => {
         if (token !== this.pageLoadToken) {
           return;
         }
-        // 某一页加载失败就整体退回整份 PDF 安全预览，保证学生始终能看到内容，
-        // 不会卡在“加载中”。
-        this.setData({ previewMode: "pdf", pagesLoading: false, pageImages: [] });
+        this.updatePage(page, { status: "error", error: error.message || "本页加载失败" });
+        this.loadNextPage(id, token, page + 1, total);
       });
+  },
+  updatePage(page, patch) {
+    const pageImages = this.data.pageImages.map((item) => item.index === page ? { ...item, ...patch } : item);
+    this.setData({ pageImages });
+  },
+  retryPage(event) {
+    const page = Number(event.currentTarget.dataset.page);
+    if (!page || !this.materialId) {
+      return;
+    }
+    this.updatePage(page, { status: "loading", error: "" });
+    downloadWithAuth(`/student/materials/${this.materialId}/preview/pages/${page}`)
+      .then((tempFilePath) => {
+        this.updatePage(page, { path: tempFilePath, status: "ready", error: "" });
+        this.setData({ loadedPageCount: this.data.loadedPageCount + 1 });
+      })
+      .catch((error) => this.updatePage(page, { status: "error", error: error.message || "本页加载失败" }));
   },
   refreshFavorite(materialId) {
     request("/student/favorites").then((favorites) => {
@@ -196,13 +232,13 @@ function downloadWithAuth(path) {
       },
       success(res) {
         if (res.statusCode !== 200) {
-          reject(new Error("下载失败"));
+          reject(new Error(`课件下载失败（${res.statusCode}）`));
           return;
         }
         resolve(res.tempFilePath);
       },
       fail(err) {
-        reject(err);
+        reject(new Error((err && err.errMsg) || "网络下载失败"));
       }
     });
   });

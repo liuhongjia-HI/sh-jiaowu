@@ -2,6 +2,8 @@
 
 `master` 分支推送后，GitHub Actions 会构建后端二进制和管理后台静态文件，并上传到服务器 `/opt/starline/releases/<commit>`，再切换 `/opt/starline/current` 并重启 `starline-api`。
 
+课件文件不再写入 release 目录。生产环境使用独立持久化目录 `/opt/starline/data/uploads`，服务账号为 `starline`；发布脚本会创建目录和账号，但不会迁移旧 release 中的历史课件。历史文件缺失时需由老师重新上传。
+
 ## GitHub Secrets
 
 仓库 `Settings -> Secrets and variables -> Actions` 需要配置：
@@ -32,7 +34,7 @@ nginx -t && systemctl reload nginx
   ```bash
   apt-get install -y libreoffice
   ```
-- `gs`（Ghostscript）：学生端资料预览的防盗版能力全靠它——把当前学生的姓名/手机尾号/时间水印烧录进 PDF 内容本身（而不是前端盖一层可以被跳过的图层），并把烧录后的 PDF 逐页栅格化成图片下发，避免学生端拿到可复制、可转发的完整 PDF 文件。没装 `gs` 时会退回到“物理隔离但没有动态水印”的干净 PDF 预览，仍然比改动前安全，但达不到设计的防盗版效果。
+- `gs`（Ghostscript）：上传后把预览 PDF 逐页转换为图片。学生专属水印由小程序覆盖显示；平台防截屏能力不可用时不阻止打开，只保留水印与安全提示。
   ```bash
   apt-get install -y ghostscript
   ```
@@ -41,6 +43,7 @@ nginx -t && systemctl reload nginx
 
 ```bash
 APP_ENV=production
+FILE_STORAGE_ROOT=/opt/starline/data/uploads
 HTTP_PORT=8892
 AUTH_TOKEN_SECRET=<高强度随机密钥>
 MYSQL_DSN=<生产 MySQL DSN>

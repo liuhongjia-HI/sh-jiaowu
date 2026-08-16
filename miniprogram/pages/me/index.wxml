@@ -32,6 +32,13 @@
       <view class="profile-arrow" bindtap="toggleProfileEdit">›</view>
     </view>
 
+    <view wx:if="{{studentAccounts.length > 1}}" class="student-switcher">
+      <view class="student-switcher-label">当前查看：{{studentProfile.name}}</view>
+      <view class="student-switcher-list">
+        <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{item.active || switchingStudentId}}">{{item.name}} · {{item.grade}}</button>
+      </view>
+    </view>
+
     <view class="me-section recent-section">
       <view class="me-section-head">
         <view class="me-section-title">最近学习</view>

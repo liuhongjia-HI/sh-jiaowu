@@ -67,6 +67,7 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 		work.homework[index] = cloneHomework(item)
 	}
 	work.fileAssets = cloneMap(s.fileAssets)
+	work.previewJobs = append([]learning.PreviewJob(nil), s.previewJobs...)
 	work.reviews = append([]learning.Review(nil), s.reviews...)
 	work.notices = append([]learning.Notice(nil), s.notices...)
 	work.logs = append([]learning.OperationLog(nil), s.logs...)
@@ -154,6 +155,7 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.materials = work.materials
 	s.homework = work.homework
 	s.fileAssets = work.fileAssets
+	s.previewJobs = work.previewJobs
 	s.reviews = work.reviews
 	s.notices = work.notices
 	s.logs = work.logs

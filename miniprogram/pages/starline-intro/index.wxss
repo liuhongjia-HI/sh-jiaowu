@@ -1,0 +1,11 @@
+.intro-page { min-height: 100vh; padding: 32rpx; box-sizing: border-box; background: #f5f8fa; color: #20313b; }
+.intro-hero { padding: 54rpx 40rpx; border-radius: 28rpx; color: #fff; background: linear-gradient(145deg, #17354a, #2f7a8f 68%, #ef9a70); }
+.intro-brand { font-size: 22rpx; font-weight: 900; letter-spacing: 7rpx; opacity: .78; }
+.intro-title { margin-top: 26rpx; font-size: 48rpx; line-height: 1.2; font-weight: 900; }
+.intro-summary { margin-top: 22rpx; font-size: 27rpx; line-height: 1.75; opacity: .86; }
+.intro-section { margin-top: 28rpx; }
+.intro-card { display: flex; gap: 22rpx; margin-bottom: 20rpx; padding: 30rpx; border-radius: 24rpx; background: #fff; box-shadow: 0 12rpx 30rpx rgba(40, 65, 78, .06); }
+.intro-icon { font-size: 42rpx; }
+.intro-card-title { font-size: 30rpx; font-weight: 850; }
+.intro-card-text { margin-top: 10rpx; color: #687982; font-size: 25rpx; line-height: 1.65; }
+.intro-action { margin-top: 34rpx; border-radius: 999rpx; color: #fff; background: #ef7f50; font-size: 29rpx; font-weight: 800; }

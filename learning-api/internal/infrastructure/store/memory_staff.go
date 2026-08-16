@@ -124,11 +124,15 @@ func (s *MemoryStore) createTeacherUnlocked(operator string, principal learning.
 			return learning.Teacher{}, errors.New("手机号已存在")
 		}
 	}
+	temporaryPassword, err := generateTemporaryPassword()
+	if err != nil {
+		return learning.Teacher{}, errors.New("临时密码生成失败")
+	}
 	user := learning.User{
 		ID:                 "user-teacher-" + time.Now().Format("20060102150405"),
 		Name:               req.Name,
 		Phone:              req.Phone,
-		PasswordHash:       mustPasswordHash(demoLoginPassword),
+		PasswordHash:       mustPasswordHash(temporaryPassword),
 		MustChangePassword: true,
 		AccountStatus:      "正常",
 		Roles:              []learning.Role{learning.RoleTeacher},
@@ -141,7 +145,9 @@ func (s *MemoryStore) createTeacherUnlocked(operator string, principal learning.
 	}
 	s.users = append(s.users, user)
 	s.prependLog(operator, "新增教师", user.Name)
-	return s.teacherFromUser(user), nil
+	created := s.teacherFromUser(user)
+	created.TemporaryPassword = temporaryPassword
+	return created, nil
 }
 
 func (s *MemoryStore) updateTeacherUnlocked(operator string, principal learning.Principal, id string, req learning.TeacherUpsertRequest) (learning.Teacher, error) {

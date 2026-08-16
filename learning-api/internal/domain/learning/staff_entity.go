@@ -15,6 +15,7 @@ type Teacher struct {
 	AccountStatus     string   `json:"accountStatus"`
 	BindStatus        string   `json:"bindStatus"`
 	Remark            string   `json:"remark"`
+	TemporaryPassword string   `json:"temporaryPassword,omitempty"`
 }
 
 type TeacherUpsertRequest struct {

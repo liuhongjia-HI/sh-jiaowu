@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Form, Input, Pagination, Skeleton, Space, Table, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Pagination, Select, Skeleton, Space, Table, Typography, message } from 'antd';
 import { EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,9 +14,11 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
   const [editing, setEditing] = useState<QuestionBankItem | null>(null);
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
+  const [gradeFilter, setGradeFilter] = useState<string>();
+  const [subjectFilter, setSubjectFilter] = useState<string>();
   const [page, setPage] = useState(1);
   const client = useQueryClient();
-  const questions = useQuery({ queryKey: ['questions'], queryFn: () => getData<QuestionBankItem[]>('/questions') });
+  const questions = useQuery({ queryKey: ['questions', gradeFilter, subjectFilter, keyword], queryFn: () => getData<QuestionBankItem[]>('/questions', { grade: gradeFilter || '', subject: subjectFilter || '', keyword }) });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces-for-questions'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const settings = useQuery({ queryKey: ['settings-for-questions'], queryFn: () => getData<Record<string, string>>('/settings') });
   const currentSemesterOptions = semesterOptions(settings.data?.semesters);
@@ -53,7 +55,7 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
     },
     onError: (error: Error) => message.error(error.message || '保存题目失败，请检查题干、选项和答案。')
   });
-  const rows = useMemo(() => (questions.data ?? []).filter((item) => Object.values(item).join(' ').toLowerCase().includes(keyword.toLowerCase())), [questions.data, keyword]);
+  const rows = questions.data ?? [];
   const paged = rows.slice((page - 1) * 10, page * 10);
 
   const start = (item?: QuestionBankItem) => {
@@ -73,7 +75,7 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
 
   return <div className="page-stack">
     <div className="page-heading"><div><Typography.Title level={3}>题库</Typography.Title><Typography.Text type="secondary">按年级、学期和学科维护可复用题目。</Typography.Text></div>{canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => start()}>新增题目</Button>}</div>
-    {questions.isLoading ? <Skeleton active /> : questions.error ? <Alert type="error" message="题库加载失败，请稍后重试。" /> : <Card><Space style={{ marginBottom: 16 }}><Input.Search allowClear placeholder="搜索题目" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} /><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => questions.refetch()} /></Space><Table rowKey="id" dataSource={paged} pagination={false} columns={[{ title: '题目', dataIndex: 'title', render: (title, row) => title || row.stem }, { title: '年级', dataIndex: 'grade' }, { title: '学期', dataIndex: 'semester' }, { title: '学科', dataIndex: 'subject' }, { title: '题型', dataIndex: 'type' }, { title: '操作', render: (_: unknown, row: QuestionBankItem) => <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => start(row)} /> }]} />{rows.length > 10 && <Pagination current={page} pageSize={10} total={rows.length} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />}</Card>}
+    {questions.isLoading ? <Skeleton active /> : questions.error ? <Alert type="error" message="题库加载失败，请稍后重试。" /> : <Card><Space wrap style={{ marginBottom: 16 }}><Select allowClear placeholder="全部年级" options={gradeOptions()} value={gradeFilter} onChange={(value) => { setGradeFilter(value); setSubjectFilter(undefined); setPage(1); }} style={{ width: 140 }} /><Select allowClear placeholder="全部学科" options={subjectOptions(gradeFilter)} value={subjectFilter} onChange={(value) => { setSubjectFilter(value); setPage(1); }} style={{ width: 140 }} /><Input.Search allowClear placeholder="搜索题目" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} /><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => questions.refetch()} /></Space><Table rowKey="id" dataSource={paged} pagination={false} columns={[{ title: '题目', dataIndex: 'title', render: (title, row) => title || row.stem }, { title: '年级', dataIndex: 'grade' }, { title: '学期', dataIndex: 'semester' }, { title: '学科', dataIndex: 'subject' }, { title: '题型', dataIndex: 'type' }, { title: '操作', render: (_: unknown, row: QuestionBankItem) => <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => start(row)} /> }]} />{rows.length > 10 && <Pagination current={page} pageSize={10} total={rows.length} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />}</Card>}
     <QuestionDialog form={form} open={open} editing={Boolean(editing)} loading={save.isPending} scopeLoading={!questionScope.unrestricted && learningSpaces.isLoading} scopeError={Boolean(!questionScope.unrestricted && learningSpaces.error)} gradeOptions={questionScope.gradeOptions} semesterOptions={questionScope.semesterOptions} allowedSpaces={questionScope.spaces} unrestricted={questionScope.unrestricted} hasScope={questionScope.hasScope} onCancel={() => setOpen(false)} onSubmit={(values) => save.mutate(values)} />
   </div>;
 }

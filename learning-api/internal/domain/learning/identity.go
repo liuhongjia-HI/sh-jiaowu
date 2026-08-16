@@ -51,6 +51,13 @@ type AuthResult struct {
 	User       Principal `json:"user"`
 	AuthMethod string    `json:"authMethod"`
 }
+
+type StudentAccount struct {
+	StudentID string `json:"studentId"`
+	Name      string `json:"name"`
+	Grade     string `json:"grade"`
+	Active    bool   `json:"active"`
+}
 type WechatLoginRequest struct {
 	Code        string `json:"code"`
 	Phone       string `json:"phone"`

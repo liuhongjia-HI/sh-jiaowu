@@ -27,7 +27,7 @@ func New(dep Dependencies) *gin.Engine {
 	r.Use(middleware.OperatorContext())
 
 	tokens := auth.NewTokenManager(dep.Config.Auth.TokenSecret, 24*time.Hour)
-	h := handler.NewLearningHandler(dep.Service, tokens, auth.NewLoginProtector(), dep.Config.Demo.AdminPasswordLogin, dep.Config.Demo.StudentPasswordLogin)
+	h := handler.NewLearningHandler(dep.Service, tokens, auth.NewLoginProtector(), dep.Config.Demo.AdminPasswordLogin, dep.Config.Demo.StudentPasswordLogin, dep.Config.FileStorage.Root)
 	registerRoutes(r.Group("/api"), dep.Service, tokens, h)
 	return r
 }

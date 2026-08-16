@@ -51,7 +51,7 @@ func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.
 	if err != nil {
 		return learning.Student{}, err
 	}
-	if s.phoneExists("", req.Phone) {
+	if s.studentAdminPhoneConflicts(req.Phone) {
 		return learning.Student{}, errors.New("手机号已存在")
 	}
 	id := "stu-" + time.Now().Format("20060102150405.000000000")
@@ -72,6 +72,7 @@ func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.
 		AccountStatus:          "正常",
 		Remark:                 req.Remark,
 		BindStatus:             "待绑定",
+		EffectiveUntil:         s.defaultStudentDeadline(),
 	}
 	s.students = append([]learning.Student{student}, s.students...)
 	s.users = append(s.users, learning.User{
@@ -104,7 +105,7 @@ func (s *MemoryStore) updateStudentUnlocked(operator string, principal learning.
 		if _, err := s.visibleStudent(principal, id); err != nil {
 			return learning.Student{}, err
 		}
-		if s.phoneExists(id, req.Phone) {
+		if s.studentAdminPhoneConflicts(req.Phone) {
 			return learning.Student{}, errors.New("手机号已存在")
 		}
 		before := s.decorateStudent(s.students[i])

@@ -53,6 +53,7 @@ export type Teacher = {
   accountStatus: string;
   bindStatus: string;
   remark: string;
+  temporaryPassword?: string;
 };
 
 export type TeacherUpsertRequest = {
@@ -312,6 +313,7 @@ export type Material = {
   fileSize?: number;
   fileType?: string;
   previewStatus?: string;
+  previewError?: string;
   previewUrl?: string;
   downloadUrl?: string;
   watermarkText?: string;
@@ -351,6 +353,7 @@ export type Homework = {
   fileSize?: number;
   fileType?: string;
   previewStatus?: string;
+  previewError?: string;
   previewUrl?: string;
   downloadUrl?: string;
   watermarkText?: string;
@@ -679,6 +682,8 @@ export type ScheduleClass = {
   startDate: string;
   endDate: string;
   students: CandidateStudent[];
+  expectedStudentCount: number;
+  reservationNote?: string;
   status: string;
   createdAt: string;
 };

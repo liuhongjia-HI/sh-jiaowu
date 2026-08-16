@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -240,9 +241,67 @@ func (s *MemoryStore) updateSettingUnlocked(operator string, req learning.Settin
 	if _, ok := s.settings[req.Key]; !ok {
 		return nil, errors.New("设置项不存在")
 	}
+	if err := s.validateSettingValue(req.Key, req.Value); err != nil {
+		return nil, err
+	}
 	before := map[string]string{req.Key: s.settings[req.Key]}
 	s.settings[req.Key] = req.Value
 	after := map[string]string{req.Key: s.settings[req.Key]}
 	s.prependLogDetail(operator, "修改系统设置", settingLabel(req.Key), auditChangeDetail(before, after))
 	return s.settingsUnlocked(), nil
+}
+
+type academicPeriodSetting struct {
+	Name      string `json:"name"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+}
+
+func (s *MemoryStore) validateSettingValue(key, value string) error {
+	if key == "grantDefaultStart" || key == "grantDefaultEnd" {
+		if _, err := time.Parse("2006-01-02", value); err != nil {
+			return errors.New("默认时间格式应为 YYYY-MM-DD")
+		}
+		start, end := s.settings["grantDefaultStart"], s.settings["grantDefaultEnd"]
+		if key == "grantDefaultStart" {
+			start = value
+		} else {
+			end = value
+		}
+		if start != "" && end != "" && end < start {
+			return errors.New("默认结束日期不能早于开始日期")
+		}
+	}
+	if key == "academicPeriods" {
+		var periods []academicPeriodSetting
+		if err := json.Unmarshal([]byte(value), &periods); err != nil || len(periods) == 0 {
+			return errors.New("考试时间段需填写有效的 JSON 数组")
+		}
+		for _, period := range periods {
+			if strings.TrimSpace(period.Name) == "" {
+				return errors.New("考试时间段名称不能为空")
+			}
+			start, startErr := time.Parse("2006-01-02", period.StartDate)
+			end, endErr := time.Parse("2006-01-02", period.EndDate)
+			if startErr != nil || endErr != nil || end.Before(start) {
+				return errors.New("考试时间段日期无效")
+			}
+		}
+	}
+	return nil
+}
+
+func (s *MemoryStore) defaultStudentDeadline() string {
+	var periods []academicPeriodSetting
+	if json.Unmarshal([]byte(s.settings["academicPeriods"]), &periods) != nil {
+		return ""
+	}
+	today := time.Now().Format("2006-01-02")
+	deadline := ""
+	for _, period := range periods {
+		if period.EndDate >= today && (deadline == "" || period.EndDate < deadline) {
+			deadline = period.EndDate
+		}
+	}
+	return deadline
 }

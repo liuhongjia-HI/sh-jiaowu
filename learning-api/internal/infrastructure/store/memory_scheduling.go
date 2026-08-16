@@ -279,8 +279,12 @@ func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal lea
 	item.ID = "schedule-" + time.Now().Format("20060102150405.000000000")
 	item.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
 	s.scheduleClasses = append([]learning.ScheduleClass{cloneScheduleClass(item)}, s.scheduleClasses...)
-	s.notifyScheduleClass(item, "课程已安排", "已安排")
-	s.prependLog(operator, "确认排课", item.Name+" / "+item.TeacherName)
+	if item.Status == "已确认" {
+		s.notifyScheduleClass(item, "课程已安排", "已安排")
+		s.prependLog(operator, "确认排课", item.Name+" / "+item.TeacherName)
+	} else {
+		s.prependLog(operator, "创建待确认排课", item.Name+" / "+item.TeacherName)
+	}
 	return cloneScheduleClass(item), nil
 }
 
@@ -294,6 +298,7 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	req.EndTime = strings.TrimSpace(req.EndTime)
 	req.StartDate = strings.TrimSpace(req.StartDate)
 	req.EndDate = strings.TrimSpace(req.EndDate)
+	req.ReservationNote = strings.TrimSpace(req.ReservationNote)
 	if req.DurationMinutes <= 0 {
 		req.DurationMinutes = 90
 	}
@@ -318,9 +323,6 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	if capacity <= 0 {
 		return learning.ScheduleClass{}, errors.New("请选择正确班型")
 	}
-	if len(req.StudentIDs) < minClassStudents(capacity) {
-		return learning.ScheduleClass{}, errors.New("学生人数不足，暂不能成班")
-	}
 	if len(req.StudentIDs) > capacity {
 		return learning.ScheduleClass{}, errors.New("学生人数超过班型容量")
 	}
@@ -344,8 +346,17 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 		}
 		students = append(students, learning.CandidateStudent{ID: student.ID, Name: student.Name, Grade: student.Grade, OpenedPackages: student.OpenedPackages})
 	}
-	if len(students) < minClassStudents(capacity) {
-		return learning.ScheduleClass{}, errors.New("学生人数不足，暂不能成班")
+	if len([]rune(req.ReservationNote)) > 255 {
+		return learning.ScheduleClass{}, errors.New("预约备注最多255个字")
+	}
+	if req.ExpectedStudentCount <= 0 {
+		req.ExpectedStudentCount = minClassStudents(capacity)
+	}
+	if req.ExpectedStudentCount < len(students) {
+		req.ExpectedStudentCount = len(students)
+	}
+	if req.ExpectedStudentCount > capacity {
+		return learning.ScheduleClass{}, errors.New("预计人数不能超过班型容量")
 	}
 	startMin, ok := parseClock(req.StartTime)
 	if !ok {
@@ -377,24 +388,30 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 			return learning.ScheduleClass{}, errors.New(student.Name + " 该时间不可上课")
 		}
 	}
+	status := "待确认"
+	if len(students) >= minClassStudents(capacity) {
+		status = "已确认"
+	}
 	return learning.ScheduleClass{
-		Name:            course.Subject + " " + req.ClassType + " 小班",
-		CourseID:        course.ID,
-		CourseName:      course.Name,
-		TeacherID:       teacher.ID,
-		TeacherName:     teacher.Name,
-		CampusID:        req.CampusID,
-		RoomName:        req.RoomName,
-		ClassType:       req.ClassType,
-		Capacity:        capacity,
-		DurationMinutes: req.DurationMinutes,
-		DayOfWeek:       req.DayOfWeek,
-		StartTime:       req.StartTime,
-		EndTime:         req.EndTime,
-		StartDate:       req.StartDate,
-		EndDate:         req.EndDate,
-		Students:        students,
-		Status:          "已确认",
+		Name:                 course.Subject + " " + req.ClassType + " 小班",
+		CourseID:             course.ID,
+		CourseName:           course.Name,
+		TeacherID:            teacher.ID,
+		TeacherName:          teacher.Name,
+		CampusID:             req.CampusID,
+		RoomName:             req.RoomName,
+		ClassType:            req.ClassType,
+		Capacity:             capacity,
+		DurationMinutes:      req.DurationMinutes,
+		DayOfWeek:            req.DayOfWeek,
+		StartTime:            req.StartTime,
+		EndTime:              req.EndTime,
+		StartDate:            req.StartDate,
+		EndDate:              req.EndDate,
+		Students:             students,
+		ExpectedStudentCount: req.ExpectedStudentCount,
+		ReservationNote:      req.ReservationNote,
+		Status:               status,
 	}, nil
 }
 
@@ -428,7 +445,9 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 		item.ID = existing.ID
 		item.CreatedAt = existing.CreatedAt
 		s.scheduleClasses[index] = cloneScheduleClass(item)
-		s.notifyScheduleClass(item, "课程调整提醒", "已调整")
+		if item.Status == "已确认" {
+			s.notifyScheduleClass(item, "课程调整提醒", "已调整")
+		}
 		s.prependLogDetail(operator, "调整排课", item.Name+" / "+item.TeacherName, auditChangeDetail(scheduleClassAuditSnapshot(existing), scheduleClassAuditSnapshot(item)))
 		return cloneScheduleClass(item), nil
 	}
@@ -461,7 +480,9 @@ func (s *MemoryStore) cancelScheduleClassUnlocked(operator string, principal lea
 		before := item
 		item.Status = "已取消"
 		s.scheduleClasses[index] = cloneScheduleClass(item)
-		s.notifyScheduleClass(item, "课程取消提醒", "已取消")
+		if before.Status == "已确认" {
+			s.notifyScheduleClass(item, "课程取消提醒", "已取消")
+		}
 		s.prependLogDetail(operator, "取消排课", item.Name+" / "+item.TeacherName, auditChangeDetail(scheduleClassAuditSnapshot(before), scheduleClassAuditSnapshot(item)))
 		return cloneScheduleClass(item), nil
 	}

@@ -52,6 +52,41 @@
   box-shadow: 0 18rpx 42rpx rgba(51, 129, 196, .18);
 }
 
+.starline-intro-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 30rpx;
+  border-radius: 20rpx;
+  color: #fff;
+  background: linear-gradient(120deg, #17354a 0%, #2b6b83 65%, #ef8f62 100%);
+  box-shadow: 0 16rpx 36rpx rgba(30, 73, 94, .18);
+}
+
+.starline-intro-tag {
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 5rpx;
+  opacity: .78;
+}
+
+.starline-intro-title {
+  margin-top: 8rpx;
+  font-size: 34rpx;
+  font-weight: 900;
+}
+
+.starline-intro-sub {
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  opacity: .8;
+}
+
+.starline-intro-arrow {
+  font-size: 64rpx;
+  font-weight: 300;
+}
+
 .banner-copy {
   position: relative;
   z-index: 2;

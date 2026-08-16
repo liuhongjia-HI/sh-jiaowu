@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Form, Input, Pagination, Skeleton, Space, Table, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Pagination, Skeleton, Space, Table, Tabs, Typography, message } from 'antd';
 import { EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,8 +6,19 @@ import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import { CourseDialog, type CourseFormValues } from './ResourceDialogs';
 import type { Course, CourseUpsertRequest, CurrentUser, LearningSpace } from '../../types/starline';
+import { useSearchParams } from 'react-router-dom';
+import MaterialsPage from './MaterialsPage';
+import HomeworkPage from './HomeworkPage';
+import ReviewsPage from './ReviewsPage';
 
 export default function ContentPage({ user }: { user?: CurrentUser }) {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') || 'courses';
+  const content = tab === 'materials' ? <MaterialsPage user={user} /> : tab === 'homework' ? <HomeworkPage user={user} /> : tab === 'review' ? <ReviewsPage /> : <CourseCatalog user={user} />;
+  return <div className="page-stack"><Card><Tabs activeKey={tab} onChange={(value) => setParams(value === 'courses' ? {} : { tab: value })} items={[{ key: 'courses', label: '课程' }, { key: 'materials', label: '学习资料' }, { key: 'homework', label: '课后练习' }, { key: 'review', label: '批改反馈' }]} /></Card>{content}</div>;
+}
+
+function CourseCatalog({ user }: { user?: CurrentUser }) {
   const [form] = Form.useForm<CourseFormValues>(); const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Course | null>(null); const [keyword, setKeyword] = useState(''); const [page, setPage] = useState(1); const client = useQueryClient();
   const courses = useQuery({ queryKey: ['content'], queryFn: () => getData<Course[]>('/courses') }); const spaces = useQuery({ queryKey: ['learning-spaces-for-content'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') }); const canManage = Boolean(user?.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role)));
   const save = useMutation({ mutationFn: (values: CourseFormValues) => { const { grade: _grade, subject: _subject, ...courseValues } = values; const body: CourseUpsertRequest = { ...courseValues, chapterCount: Number(values.chapterCount || 0), status: values.status || '启用' }; return editing ? putData<Course>(`/courses/${editing.id}`, body) : postData<Course>('/courses', body); }, onSuccess: () => { message.success(editing ? '课程已保存。' : '课程已创建，可继续上传学习资料和题目。'); setEditing(null); setOpen(false); form.resetFields(); client.invalidateQueries({ queryKey: ['content'] }); client.invalidateQueries({ queryKey: ['courses'] }); }, onError: (error: Error) => message.error(error.message || '保存课程失败，请检查课程范围。') });

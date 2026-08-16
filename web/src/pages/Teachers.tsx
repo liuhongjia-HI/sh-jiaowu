@@ -43,8 +43,11 @@ export default function Teachers() {
       if (editing) return putData<Teacher>(`/teachers/${editing.id}`, body);
       return postData<Teacher>('/teachers', body);
     },
-    onSuccess: () => {
-      message.success(editing ? '教师信息已保存' : '教师已新增，等待首次登录确认身份');
+    onSuccess: (result) => {
+      message.success(editing ? '教师信息已保存' : '教师账号已创建');
+      if (!editing && result.temporaryPassword) {
+        setResetResult({ userId: result.id, temporaryPassword: result.temporaryPassword, mustChangePassword: true });
+      }
       setOpen(false);
       setEditing(null);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
