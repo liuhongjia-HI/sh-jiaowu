@@ -1,8 +1,8 @@
 import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Popover, Segmented, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
@@ -77,7 +77,7 @@ type ScheduleMoveTarget = {
 };
 
 type CourseLookup = Record<string, Course>;
-type TimelineKind = 'class' | 'candidate' | 'availability';
+type TimelineKind = 'class' | 'candidate' | 'availability' | 'overflow';
 type TimelineItem = {
   id: string;
   kind: TimelineKind;
@@ -98,7 +98,19 @@ type TimelineLayoutItem = TimelineItem & {
   columns: number;
   leftPct?: number;
   widthPct?: number;
+  // 同一时段并排数量超过可读上限时，末列折叠成一个 "+N"，hiddenItems 是被折叠的课程。
+  hiddenItems?: TimelineItem[];
 };
+
+// 单个课程块低于这个宽度就只剩一两个字，并排再多也读不出是什么课，
+// 超出的部分折叠成 "+N"。数值来自实测：约 64px 时课程名可显示 3 个汉字。
+const minReadableBlockWidth = 64;
+const maxTimelineColumns = 4;
+
+export function maxColumnsForWidth(columnWidth: number) {
+  if (!columnWidth || columnWidth <= 0) return 2;
+  return Math.min(maxTimelineColumns, Math.max(1, Math.floor(columnWidth / minReadableBlockWidth)));
+}
 type WeekDay = {
   key: string;
   date: Date;
@@ -161,12 +173,29 @@ export function ScheduleWeekTimeline({
   const timelineRange = useMemo(() => buildTimelineRange(timelineItems), [timelineItems]);
   const rows = useMemo(() => buildTimelineRows(timelineRange.start, timelineRange.end), [timelineRange]);
   const boardHeight = ((timelineRange.end - timelineRange.start) / timelineSlotMinutes) * timelineSlotHeight;
+  // 按日列的真实渲染宽度决定能并排几节课：窗口越窄能读的列数越少，
+  // 超出的折叠成 "+N"，而不是把每块压到只剩一两个字。
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [dayColumnWidth, setDayColumnWidth] = useState(0);
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const column = grid.querySelector('.schedule-day-column');
+      if (column) setDayColumnWidth(column.getBoundingClientRect().width);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [loading, weekDays.length]);
+
   const itemsByDay = useMemo(() => {
     return weekDays.reduce<Record<number, TimelineLayoutItem[]>>((result, day) => {
-      result[day.dayOfWeek] = layoutOverlappingItems(timelineItems.filter((item) => item.dayOfWeek === day.dayOfWeek));
+      result[day.dayOfWeek] = layoutOverlappingItems(timelineItems.filter((item) => item.dayOfWeek === day.dayOfWeek), dayColumnWidth);
       return result;
     }, {});
-  }, [weekDays, timelineItems]);
+  }, [weekDays, timelineItems, dayColumnWidth]);
 
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />;
 
@@ -195,7 +224,7 @@ export function ScheduleWeekTimeline({
       </div>
 
       <div className="schedule-timeline-scroll">
-        <div className="schedule-timeline-grid" style={{ '--timeline-height': `${boardHeight}px` } as CSSProperties}>
+        <div ref={gridRef} className="schedule-timeline-grid" style={{ '--timeline-height': `${boardHeight}px` } as CSSProperties}>
           <div className="schedule-time-gutter schedule-day-head-spacer" />
           {weekDays.map((day) => (
             <div className="schedule-day-head" key={day.key}>
@@ -358,6 +387,43 @@ export function TimelineBlock({
       {extra}
     </span>
   );
+
+  // 被折叠的课程不会丢失：点开可以看到完整列表，并直接进入任意一节课。
+  if (item.kind === 'overflow') {
+    const hidden = item.hiddenItems ?? [];
+    return (
+      <Popover
+        trigger="click"
+        placement="right"
+        title={`${item.startTime}-${item.endTime} 还有 ${hidden.length} 节课`}
+        content={(
+          <div className="schedule-overflow-list">
+            {hidden.map((hiddenItem) => (
+              <button
+                type="button"
+                key={hiddenItem.id}
+                className="schedule-overflow-entry"
+                onClick={() => {
+                  if (hiddenItem.kind === 'class') onEditClass(hiddenItem.record as ScheduleClass);
+                  if (hiddenItem.kind === 'candidate') onPickCandidate(hiddenItem.record as ScheduleCandidate);
+                }}
+              >
+                <strong>{hiddenItem.title}</strong>
+                <span>{hiddenItem.startTime}-{hiddenItem.endTime} · {hiddenItem.subtitle}</span>
+                {hiddenItem.meta && <small>{hiddenItem.meta}</small>}
+              </button>
+            ))}
+          </div>
+        )}
+      >
+        <button type="button" className={className} style={style} title={`还有 ${hidden.length} 节课，点击查看`}>
+          <span className="schedule-timeline-body">
+            <strong>{item.title}</strong>
+          </span>
+        </button>
+      </Popover>
+    );
+  }
 
   if (item.kind === 'class') {
     const record = item.record as ScheduleClass;
@@ -650,19 +716,23 @@ export function aggregateAvailabilitySlots(slots: AvailabilitySlot[], teacherByI
 const availabilityLaneWidth = 20;
 const laneGap = 2;
 
-export function layoutOverlappingItems(items: TimelineItem[]) {
+export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
   const primary = items.filter((item) => item.kind !== 'availability');
   const availability = items.filter((item) => item.kind === 'availability');
-  if (primary.length === 0) return layoutOverlappingGroup(availability);
-  if (availability.length === 0) return layoutOverlappingGroup(primary);
+  const maxColumns = maxColumnsForWidth(columnWidth);
+  if (primary.length === 0) return layoutOverlappingGroup(availability, maxColumns);
+  if (availability.length === 0) return layoutOverlappingGroup(primary, maxColumns);
 
+  // 两条车道时课程实际可用宽度只有整列的 78%，可读列数要按这个宽度算，
+  // 否则会按整列宽度高估能并排的数量。
   const primaryLaneWidth = 100 - availabilityLaneWidth - laneGap;
-  const primaryItems = layoutOverlappingGroup(primary).map((item) => ({
+  const primaryMaxColumns = maxColumnsForWidth(columnWidth * (primaryLaneWidth / 100));
+  const primaryItems = layoutOverlappingGroup(primary, primaryMaxColumns).map((item) => ({
     ...item,
     leftPct: (primaryLaneWidth / item.columns) * item.column,
     widthPct: primaryLaneWidth / item.columns
   }));
-  const availabilityItems = layoutOverlappingGroup(availability).map((item) => ({
+  const availabilityItems = layoutOverlappingGroup(availability, 1).map((item) => ({
     ...item,
     leftPct: primaryLaneWidth + laneGap + (availabilityLaneWidth / item.columns) * item.column,
     widthPct: availabilityLaneWidth / item.columns
@@ -670,7 +740,7 @@ export function layoutOverlappingItems(items: TimelineItem[]) {
   return [...availabilityItems, ...primaryItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
 }
 
-export function layoutOverlappingGroup(items: TimelineItem[]) {
+export function layoutOverlappingGroup(items: TimelineItem[], maxColumns = maxTimelineColumns) {
   const sorted = [...items].sort((left, right) => {
     const diff = timeToMinutes(left.startTime) - timeToMinutes(right.startTime);
     return diff || timeToMinutes(left.endTime) - timeToMinutes(right.endTime);
@@ -694,8 +764,49 @@ export function layoutOverlappingGroup(items: TimelineItem[]) {
       }
       return { ...item, column, columns: 1 };
     });
-    const columns = Math.max(1, columnEnds.length);
-    laidOut.forEach((item) => result.push({ ...item, columns }));
+    const rawColumns = Math.max(1, columnEnds.length);
+
+    if (rawColumns <= maxColumns) {
+      laidOut.forEach((item) => result.push({ ...item, columns: rawColumns }));
+      group = [];
+      groupEnd = -1;
+      return;
+    }
+
+    // 超出可读上限：保留前几列正常显示，其余全部折叠进最后一列的 "+N"。
+    // 被折叠的课程不会丢失，点击 "+N" 可以看到完整列表。
+    // visibleColumns 至少为 1，否则 maxColumns 落到 1 时会把整组课程全部折叠、
+    // 一节都不显示，比压窄更糟。
+    const visibleColumns = Math.max(1, maxColumns - 1);
+    const renderedColumns = visibleColumns + 1;
+    const visible = laidOut.filter((item) => item.column < visibleColumns);
+    const hidden = laidOut.filter((item) => item.column >= visibleColumns);
+    visible.forEach((item) => result.push({ ...item, columns: renderedColumns }));
+
+    const hiddenStart = Math.min(...hidden.map((item) => timeToMinutes(item.startTime)));
+    const hiddenEnd = Math.max(...hidden.map((item) => timeToMinutes(item.endTime)));
+    const first = hidden[0];
+    result.push({
+      ...first,
+      id: `overflow-${first.id}`,
+      kind: 'overflow',
+      startTime: formatMinute(hiddenStart),
+      endTime: formatMinute(hiddenEnd),
+      title: `+${hidden.length}`,
+      subtitle: '',
+      meta: '',
+      status: undefined,
+      classType: undefined,
+      countText: undefined,
+      column: visibleColumns,
+      columns: renderedColumns,
+      hiddenItems: hidden.map(({ column, columns, ...rest }) => {
+        void column;
+        void columns;
+        return rest;
+      })
+    });
+
     group = [];
     groupEnd = -1;
   }
