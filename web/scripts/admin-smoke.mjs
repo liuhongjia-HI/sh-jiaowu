@@ -19,7 +19,7 @@ const pages = [
   ['/commercial', '商业运营'],
   ['/notices', '通知提醒'],
   ['/admin-staff', '管理人员'],
-  ['/teachers', '教师管理'],
+  ['/teachers', '老师管理'],
   ['/logs', '操作记录'],
   ['/settings', '系统设置']
 ];

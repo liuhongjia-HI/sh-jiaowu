@@ -175,19 +175,30 @@ export function ScheduleWeekTimeline({
   const boardHeight = ((timelineRange.end - timelineRange.start) / timelineSlotMinutes) * timelineSlotHeight;
   // 按日列的真实渲染宽度决定能并排几节课：窗口越窄能读的列数越少，
   // 超出的折叠成 "+N"，而不是把每块压到只剩一两个字。
-  const gridRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [dayColumnWidth, setDayColumnWidth] = useState(0);
   useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid || typeof ResizeObserver === 'undefined') return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    // 同步测量：effect 与 resize 回调触发时布局已经结算完毕。
+    // 不要包在 requestAnimationFrame 里——后台标签页或无头环境下 rAF 可能一直不触发，
+    // 会让宽度永远停在初始值，静默退化成固定列数。
     const measure = () => {
-      const column = grid.querySelector('.schedule-day-column');
+      const column = scroller.querySelector('.schedule-day-column');
       if (column) setDayColumnWidth(column.getBoundingClientRect().width);
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(grid);
-    return () => observer.disconnect();
+    // 观察滚动容器而不是内部表格：表格有 min-width，窗口收窄到阈值以下时
+    // 它的宽度会被钉住不再变化，观察它就收不到后续的尺寸变化。
+    // 同时监听 window resize：ResizeObserver 覆盖侧边栏折叠这类窗口尺寸不变的布局变化，
+    // window resize 覆盖普通的缩放窗口，两者都留着以免任一环境下失效。
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(scroller);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
   }, [loading, weekDays.length]);
 
   const itemsByDay = useMemo(() => {
@@ -223,8 +234,8 @@ export function ScheduleWeekTimeline({
         </div>
       </div>
 
-      <div className="schedule-timeline-scroll">
-        <div ref={gridRef} className="schedule-timeline-grid" style={{ '--timeline-height': `${boardHeight}px` } as CSSProperties}>
+      <div ref={scrollRef} className="schedule-timeline-scroll">
+        <div className="schedule-timeline-grid" style={{ '--timeline-height': `${boardHeight}px` } as CSSProperties}>
           <div className="schedule-time-gutter schedule-day-head-spacer" />
           {weekDays.map((day) => (
             <div className="schedule-day-head" key={day.key}>
@@ -720,7 +731,9 @@ export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
   const primary = items.filter((item) => item.kind !== 'availability');
   const availability = items.filter((item) => item.kind === 'availability');
   const maxColumns = maxColumnsForWidth(columnWidth);
-  if (primary.length === 0) return layoutOverlappingGroup(availability, maxColumns);
+  // 可上课/可授课时段是背景参考信息，不参与 "+N" 折叠：把它折叠成 10px 的
+  // 色块加一个 "+1" 既读不出内容，也没有点开的价值。
+  if (primary.length === 0) return layoutOverlappingGroup(availability, Number.POSITIVE_INFINITY);
   if (availability.length === 0) return layoutOverlappingGroup(primary, maxColumns);
 
   // 两条车道时课程实际可用宽度只有整列的 78%，可读列数要按这个宽度算，
@@ -732,7 +745,7 @@ export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
     leftPct: (primaryLaneWidth / item.columns) * item.column,
     widthPct: primaryLaneWidth / item.columns
   }));
-  const availabilityItems = layoutOverlappingGroup(availability, 1).map((item) => ({
+  const availabilityItems = layoutOverlappingGroup(availability, Number.POSITIVE_INFINITY).map((item) => ({
     ...item,
     leftPct: primaryLaneWidth + laneGap + (availabilityLaneWidth / item.columns) * item.column,
     widthPct: availabilityLaneWidth / item.columns
