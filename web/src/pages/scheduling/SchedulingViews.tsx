@@ -721,36 +721,80 @@ export function aggregateAvailabilitySlots(slots: AvailabilitySlot[], teacherByI
   });
 }
 
-// 课程与“可上课/可授课”时段分左右两条车道，避免背景色块盖住课程。
-// 车道宽度按当天实际内容分配：只有一侧有内容时，这一侧独占整列宽度，
-// 不为空车道预留空间——否则密集时段的课程会被凭空压缩掉四分之一的可用宽度。
-const availabilityLaneWidth = 20;
-const laneGap = 2;
-
+// 可上课/可授课时段是背景参考信息（没有任何点击行为），不该和课程抢横向空间。
+// 它铺满整列垫在课程下层，重叠的合并成一条：原来它和课程分左右车道，
+// 一列 139px 时自己只剩 10px 宽，只画得出虚线边框、一个字也放不下，
+// 同时还白白占掉课程五分之一的宽度。
 export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
   const primary = items.filter((item) => item.kind !== 'availability');
   const availability = items.filter((item) => item.kind === 'availability');
-  const maxColumns = maxColumnsForWidth(columnWidth);
-  // 可上课/可授课时段是背景参考信息，不参与 "+N" 折叠：把它折叠成 10px 的
-  // 色块加一个 "+1" 既读不出内容，也没有点开的价值。
-  if (primary.length === 0) return layoutOverlappingGroup(availability, Number.POSITIVE_INFINITY);
-  if (availability.length === 0) return layoutOverlappingGroup(primary, maxColumns);
 
-  // 两条车道时课程实际可用宽度只有整列的 78%，可读列数要按这个宽度算，
-  // 否则会按整列宽度高估能并排的数量。
-  const primaryLaneWidth = 100 - availabilityLaneWidth - laneGap;
-  const primaryMaxColumns = maxColumnsForWidth(columnWidth * (primaryLaneWidth / 100));
-  const primaryItems = layoutOverlappingGroup(primary, primaryMaxColumns).map((item) => ({
+  const availabilityBands: TimelineLayoutItem[] = mergeAvailabilityBands(availability).map((item) => ({
     ...item,
-    leftPct: (primaryLaneWidth / item.columns) * item.column,
-    widthPct: primaryLaneWidth / item.columns
+    column: 0,
+    columns: 1,
+    leftPct: 0,
+    widthPct: 100
   }));
-  const availabilityItems = layoutOverlappingGroup(availability, Number.POSITIVE_INFINITY).map((item) => ({
+  if (primary.length === 0) return availabilityBands;
+
+  // 课程独占整列宽度，可读列数直接按整列算。
+  const primaryItems = layoutOverlappingGroup(primary, maxColumnsForWidth(columnWidth)).map((item) => ({
     ...item,
-    leftPct: primaryLaneWidth + laneGap + (availabilityLaneWidth / item.columns) * item.column,
-    widthPct: availabilityLaneWidth / item.columns
+    leftPct: (100 / item.columns) * item.column,
+    widthPct: 100 / item.columns
   }));
-  return [...availabilityItems, ...primaryItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
+  return [...availabilityBands, ...primaryItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
+}
+
+// mergeAvailabilityBands 把时间上重叠的可排时段合并成一条背景带。
+// 合并后标题显示条数，具体是谁放进副标题和 title 悬浮提示，信息不丢。
+export function mergeAvailabilityBands(items: TimelineItem[]) {
+  if (items.length === 0) return [];
+  const sorted = [...items].sort((left, right) => {
+    const diff = timeToMinutes(left.startTime) - timeToMinutes(right.startTime);
+    return diff || timeToMinutes(left.endTime) - timeToMinutes(right.endTime);
+  });
+  const bands: TimelineItem[] = [];
+  let group: TimelineItem[] = [];
+  let groupEnd = -1;
+
+  const flush = () => {
+    if (group.length === 0) return;
+    if (group.length === 1) {
+      bands.push(group[0]);
+    } else {
+      const start = Math.min(...group.map((item) => timeToMinutes(item.startTime)));
+      const end = Math.max(...group.map((item) => timeToMinutes(item.endTime)));
+      const first = group[0];
+      const detail = group
+        .map((item) => [item.title, item.subtitle].filter(Boolean).join(' '))
+        .filter(Boolean);
+      bands.push({
+        ...first,
+        id: `availability-band-${first.id}`,
+        startTime: formatMinute(start),
+        endTime: formatMinute(end),
+        title: `${group.length} 个可排时段`,
+        subtitle: detail.join('、'),
+        meta: '',
+        countText: undefined,
+        status: undefined
+      });
+    }
+    group = [];
+    groupEnd = -1;
+  };
+
+  sorted.forEach((item) => {
+    const start = timeToMinutes(item.startTime);
+    const end = Math.max(timeToMinutes(item.endTime), start + timelineSlotMinutes);
+    if (group.length > 0 && start >= groupEnd) flush();
+    group.push(item);
+    groupEnd = Math.max(groupEnd, end);
+  });
+  flush();
+  return bands;
 }
 
 export function layoutOverlappingGroup(items: TimelineItem[], maxColumns = maxTimelineColumns) {

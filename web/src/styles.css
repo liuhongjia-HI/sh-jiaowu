@@ -1181,9 +1181,17 @@ button.schedule-timeline-block:hover {
   line-height: 16px;
 }
 
+/* 可排时段是背景层：铺满整列、垫在课程下面，课程块永远压在它上面。 */
 .schedule-timeline-block.is-availability {
-  opacity: .72;
+  z-index: 1;
+  opacity: .62;
   border-style: dashed;
+  pointer-events: none;
+}
+
+/* 背景带里只保留时间和一行说明，避免长名单把整条撑得很密。 */
+.schedule-timeline-block.is-availability .schedule-timeline-body {
+  align-content: start;
 }
 
 /* "+N" 折叠块：中性配色，不抢真实课程的视觉权重，但要一眼看出可点。 */
