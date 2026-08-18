@@ -1064,19 +1064,64 @@ body {
 .schedule-timeline-block {
   position: absolute;
   z-index: 2;
-  display: grid;
-  align-content: start;
-  gap: 2px;
   overflow: hidden;
   border: 1px solid var(--subject-border);
   border-left: 5px solid var(--subject-accent);
   border-radius: 6px;
   background: var(--subject-bg);
   color: var(--subject-text);
-  padding: 7px 8px;
+  padding: 0;
   text-align: left;
   font: inherit;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  /* 让块内内容能按自己被压缩后的真实宽度逐档降级，而不是按屏幕断点。 */
+  container-type: inline-size;
+}
+
+/* 内边距挂在 body 上而不是块本身：容器查询只能作用于容器的后代，
+   写在 .schedule-timeline-block 上的规则会被静默忽略。 */
+.schedule-timeline-body {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  height: 100%;
+  padding: 7px 8px;
+}
+
+/* 同一时段并排的课程越多，每块越窄。按实际宽度从次要到主要依次隐藏，
+   保证任何宽度下课程名都完整可读；被隐藏的信息仍在 title 悬浮提示里，
+   点击块本身也能打开完整详情。 */
+@container (max-width: 150px) {
+  .schedule-timeline-block small {
+    display: none;
+  }
+}
+
+@container (max-width: 118px) {
+  .schedule-timeline-block .schedule-timeline-tags {
+    display: none;
+  }
+}
+
+@container (max-width: 92px) {
+  .schedule-timeline-block .schedule-timeline-subtitle {
+    display: none;
+  }
+
+  /* 窄块里 8px 内边距会吃掉近一半可用宽度，一并收窄。 */
+  .schedule-timeline-body {
+    padding: 5px 4px;
+  }
+}
+
+@container (max-width: 64px) {
+  .schedule-timeline-block .schedule-timeline-time {
+    display: none;
+  }
+
+  .schedule-timeline-block strong {
+    font-size: 12px;
+  }
 }
 
 button.schedule-timeline-block {
@@ -1089,8 +1134,10 @@ button.schedule-timeline-block:hover {
   box-shadow: 0 8px 18px rgba(15, 23, 42, .12);
 }
 
+/* 只作用于单行文本元素：body 和 tags 现在也是 span，不能用裸 span 选择器，
+   否则它们会被 nowrap/ellipsis 影响到布局。 */
 .schedule-timeline-block strong,
-.schedule-timeline-block span,
+.schedule-timeline-block .schedule-timeline-subtitle,
 .schedule-timeline-block small,
 .schedule-timeline-time {
   min-width: 0;
@@ -1109,7 +1156,7 @@ button.schedule-timeline-block:hover {
   line-height: 1.25;
 }
 
-.schedule-timeline-block span {
+.schedule-timeline-block .schedule-timeline-subtitle {
   font-size: 12px;
   line-height: 1.25;
 }
@@ -1157,8 +1204,18 @@ button.schedule-timeline-block:hover {
 
 .schedule-timeline-action {
   margin-top: 2px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #1d4ed8;
   font-weight: 700;
+}
+
+@container (max-width: 118px) {
+  .schedule-timeline-action {
+    display: none;
+  }
 }
 
 .week-board {

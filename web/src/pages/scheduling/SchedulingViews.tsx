@@ -3,7 +3,7 @@ import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Po
 import type { TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import { gradeOptions, subjectOptions } from '../../utils/curriculum';
@@ -342,18 +342,21 @@ export function TimelineBlock({
     item.status === '已取消' ? 'is-canceled' : '',
     item.kind === 'candidate' && item.id === selectedCandidateId ? 'is-selected' : ''
   ].filter(Boolean).join(' ');
-  const content = (
-    <>
-      <div className="schedule-timeline-time">{item.startTime}-{item.endTime}</div>
+  // 内容包一层 body：容器查询只能作用于容器的后代，不能作用于容器自身，
+  // 所以内边距必须挂在这一层才能随块宽收窄（挂在外层块上会被静默忽略）。
+  const renderBody = (extra?: ReactNode) => (
+    <span className="schedule-timeline-body">
+      <span className="schedule-timeline-time">{item.startTime}-{item.endTime}</span>
       <strong>{item.title}</strong>
-      <span>{item.subtitle}</span>
+      <span className="schedule-timeline-subtitle">{item.subtitle}</span>
       <small>{item.meta}</small>
-      <div className="schedule-timeline-tags">
+      <span className="schedule-timeline-tags">
         {item.classType && <Tag>{item.classType}</Tag>}
         {item.countText && <Tag>{item.countText}</Tag>}
         {item.status && <Tag color={item.status === '已取消' ? 'default' : item.status === '待确认' ? 'gold' : 'green'}>{item.status}</Tag>}
-      </div>
-    </>
+      </span>
+      {extra}
+    </span>
   );
 
   if (item.kind === 'class') {
@@ -368,7 +371,7 @@ export function TimelineBlock({
         onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', record.id)}
         onClick={() => canManage && record.status !== '已取消' ? onEditClass(record) : undefined}
       >
-        {content}
+        {renderBody()}
       </button>
     );
   }
@@ -382,15 +385,14 @@ export function TimelineBlock({
         title={title}
         onClick={() => onPickCandidate(item.record as ScheduleCandidate)}
       >
-        {content}
-        <span className="schedule-timeline-action">确认这个时间</span>
+        {renderBody(<span className="schedule-timeline-action">确认这个时间</span>)}
       </button>
     );
   }
 
   return (
     <div className={className} style={style} title={title}>
-      {content}
+      {renderBody()}
     </div>
   );
 }
@@ -642,19 +644,28 @@ export function aggregateAvailabilitySlots(slots: AvailabilitySlot[], teacherByI
   });
 }
 
+// 课程与“可上课/可授课”时段分左右两条车道，避免背景色块盖住课程。
+// 车道宽度按当天实际内容分配：只有一侧有内容时，这一侧独占整列宽度，
+// 不为空车道预留空间——否则密集时段的课程会被凭空压缩掉四分之一的可用宽度。
+const availabilityLaneWidth = 20;
+const laneGap = 2;
+
 export function layoutOverlappingItems(items: TimelineItem[]) {
   const primary = items.filter((item) => item.kind !== 'availability');
   const availability = items.filter((item) => item.kind === 'availability');
   if (primary.length === 0) return layoutOverlappingGroup(availability);
+  if (availability.length === 0) return layoutOverlappingGroup(primary);
+
+  const primaryLaneWidth = 100 - availabilityLaneWidth - laneGap;
   const primaryItems = layoutOverlappingGroup(primary).map((item) => ({
     ...item,
-    leftPct: (76 / item.columns) * item.column,
-    widthPct: 76 / item.columns
+    leftPct: (primaryLaneWidth / item.columns) * item.column,
+    widthPct: primaryLaneWidth / item.columns
   }));
   const availabilityItems = layoutOverlappingGroup(availability).map((item) => ({
     ...item,
-    leftPct: 78 + (20 / item.columns) * item.column,
-    widthPct: 20 / item.columns
+    leftPct: primaryLaneWidth + laneGap + (availabilityLaneWidth / item.columns) * item.column,
+    widthPct: availabilityLaneWidth / item.columns
   }));
   return [...availabilityItems, ...primaryItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
 }
