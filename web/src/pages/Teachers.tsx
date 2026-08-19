@@ -27,6 +27,7 @@ export default function Teachers() {
 
   const teachers = useQuery({ queryKey: ['teachers'], queryFn: () => getData<Teacher[]>('/teachers') });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
+  const enabledWatch = Form.useWatch('enabled', form);
 
   const saveTeacher = useMutation({
     mutationFn: (values: TeacherFormValues) => {
@@ -92,6 +93,25 @@ export default function Teachers() {
       enabled: teacher.accountStatus === '正常'
     });
     setOpen(true);
+  }
+
+  // 停用一个名下还带着课的老师，教务照着课表联系人时对方已经登不进去了——
+  // 这个提醒必须在提交前拦一次，而不是等出了事故才发现。
+  // 只在“正常→停用”这个方向拦：新建、启用、改别的字段都不用问。
+  function submitTeacher(values: TeacherFormValues) {
+    const willDisable = Boolean(editing) && editing!.accountStatus === '正常' && !values.enabled;
+    if (willDisable && editing!.activeClassCount > 0) {
+      Modal.confirm({
+        title: '这个老师名下还有排课',
+        content: `「${editing!.name}」名下还有 ${editing!.activeClassCount} 节未结束的课程。停用账号后老师将无法登录，请先在排课管理里把这些课转给其他老师，或确认可以直接停用。`,
+        okText: '仍然停用',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => saveTeacher.mutate(values)
+      });
+      return;
+    }
+    saveTeacher.mutate(values);
   }
 
   if (teachers.isLoading || learningSpaces.isLoading) return <Skeleton active />;
@@ -184,7 +204,7 @@ export default function Teachers() {
         confirmLoading={saveTeacher.isPending}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" onFinish={(values) => saveTeacher.mutate(values)}>
+        <Form form={form} layout="vertical" onFinish={submitTeacher}>
           {!editing && (
             <Alert
               type="info"
@@ -223,9 +243,20 @@ export default function Teachers() {
             <Input.TextArea rows={3} placeholder="可填写岗位、排班或交接说明" />
           </Form.Item>
           {editing && (
-            <Form.Item name="enabled" label="启用账号" valuePropName="checked">
-              <Switch />
-            </Form.Item>
+            <>
+              <Form.Item name="enabled" label="启用账号" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+              {!enabledWatch && editing.accountStatus === '正常' && editing.activeClassCount > 0 && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message={`名下还有 ${editing.activeClassCount} 节未结束的课程`}
+                  description="停用后老师无法登录，学生和教务照着课表联系可能会联系不上。建议先在排课管理里把课转给其他老师。"
+                />
+              )}
+            </>
           )}
         </Form>
       </Modal>

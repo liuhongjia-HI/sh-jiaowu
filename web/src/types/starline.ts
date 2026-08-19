@@ -54,6 +54,9 @@ export type Teacher = {
   bindStatus: string;
   remark: string;
   temporaryPassword?: string;
+  // 名下还没结束、也没取消的排课数量。停用账号前用这个数字提醒教务，
+  // 不用等老师登不进去了才发现课还没交接。
+  activeClassCount: number;
 };
 
 export type TeacherUpsertRequest = {

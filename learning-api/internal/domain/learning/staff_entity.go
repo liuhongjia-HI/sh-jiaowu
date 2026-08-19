@@ -16,6 +16,10 @@ type Teacher struct {
 	BindStatus        string   `json:"bindStatus"`
 	Remark            string   `json:"remark"`
 	TemporaryPassword string   `json:"temporaryPassword,omitempty"`
+	// ActiveClassCount 是这个老师名下还没结束、也没取消的排课数量。
+	// 停用一个还带着课的老师会让教务照着课表联系一个登不进去的人，
+	// 前端在停用前用这个数字弹确认，而不是等出了事故才发现。
+	ActiveClassCount int `json:"activeClassCount"`
 }
 
 type TeacherUpsertRequest struct {
