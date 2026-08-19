@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -174,21 +175,43 @@ func (s *MemoryStore) seedBaseDictionaries() {
 	s.seedBaseLearningSpaces()
 }
 
+// retiredSettingKeys 是废弃的设置项。ensureDefaultSettings 只会补齐
+// defaultSettings 里缺的键，从不删除多余的键，所以旧版本写过的值会一直留在
+// 数据库里、留在系统设置列表里，即使代码早就不读它们了。这里显式清掉，
+// 每加一个新的“取代关系”就在这补一条。
+var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd"}
+
+// academicCalendarTerm 是校历上的一个学期条目：某学年某学期的起止日期。
+// 真实的教育局校历是按学年、按学期公布的，不是一个学年只有一对笼统的起止日期——
+// 所以校历存成列表，每学年每学期一条，而不是拍扁成两个日期字段。
+type academicCalendarTerm struct {
+	AcademicYear string `json:"academicYear"`
+	Semester     string `json:"semester"`
+	StartDate    string `json:"startDate"`
+	EndDate      string `json:"endDate"`
+}
+
 func defaultSettings() map[string]string {
 	now := time.Now()
 	startYear := now.Year()
 	if now.Month() < time.July {
 		startYear--
 	}
+	academicYear := currentAcademicYear()
 	periods := fmt.Sprintf(`[{"name":"期中","startDate":"%d-11-01","endDate":"%d-11-15"},{"name":"期末","startDate":"%d-01-05","endDate":"%d-01-20"}]`, startYear, startYear, startYear+1, startYear+1)
+	calendar, _ := json.Marshal([]academicCalendarTerm{
+		{AcademicYear: academicYear, Semester: "S1 第一学期", StartDate: fmt.Sprintf("%d-09-01", startYear), EndDate: fmt.Sprintf("%d-01-15", startYear+1)},
+		{AcademicYear: academicYear, Semester: "S2 第二学期", StartDate: fmt.Sprintf("%d-02-01", startYear+1), EndDate: fmt.Sprintf("%d-07-15", startYear+1)},
+	})
 	return map[string]string{
 		// 按日期滚动推导，不写死具体学年：写死会导致跨年后系统一直显示过期学年，
 		// 新建套餐也被打上过期标签。学习空间不参与学年匹配（见
 		// learningSpaceMatches），套餐可以自由归属任意学年，不受此影响。
-		"academicYear": currentAcademicYear(),
-		// 校历学年起止：套餐默认有效期对齐到这里，由管理端在系统设置里维护。
-		"academicYearStart":            fmt.Sprintf("%d-09-01", startYear),
-		"academicYearEnd":              fmt.Sprintf("%d-07-15", startYear+1),
+		"academicYear": academicYear,
+		// 校历：每学年每学期一条起止日期，管理端在系统设置里按列表维护，
+		// 可以提前把下一学年的校历也配好。套餐默认有效期跟着当前学年对应的
+		// 学期起止走，见 defaultGrantPeriod。
+		"academicCalendar":             string(calendar),
 		"grades":                       "G1-G9",
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀",
@@ -232,6 +255,9 @@ func (s *MemoryStore) ensureDefaultSettings() {
 		if strings.TrimSpace(s.settings[key]) == "" {
 			s.settings[key] = value
 		}
+	}
+	for _, key := range retiredSettingKeys {
+		delete(s.settings, key)
 	}
 }
 

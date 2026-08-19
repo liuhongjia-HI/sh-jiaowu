@@ -272,18 +272,23 @@ func (s *MemoryStore) validateSettingValue(key, value string) error {
 			return errors.New("默认结束日期不能早于开始日期")
 		}
 	}
-	if key == "academicYearStart" || key == "academicYearEnd" {
-		if _, err := time.Parse("2006-01-02", value); err != nil {
-			return errors.New("校历日期格式应为 YYYY-MM-DD")
+	if key == "academicCalendar" {
+		var terms []academicCalendarTerm
+		if err := json.Unmarshal([]byte(value), &terms); err != nil || len(terms) == 0 {
+			return errors.New("校历需填写有效的学期列表")
 		}
-		start, end := s.settings["academicYearStart"], s.settings["academicYearEnd"]
-		if key == "academicYearStart" {
-			start = value
-		} else {
-			end = value
-		}
-		if start != "" && end != "" && end < start {
-			return errors.New("学年结束日期不能早于开始日期")
+		for _, term := range terms {
+			if strings.TrimSpace(term.AcademicYear) == "" {
+				return errors.New("校历每一条都要填学年")
+			}
+			if strings.TrimSpace(term.Semester) == "" {
+				return errors.New("校历每一条都要填学期")
+			}
+			start, startErr := time.Parse("2006-01-02", term.StartDate)
+			end, endErr := time.Parse("2006-01-02", term.EndDate)
+			if startErr != nil || endErr != nil || end.Before(start) {
+				return errors.New("校历日期无效或结束日期早于开始日期")
+			}
 		}
 	}
 	if key == "academicPeriods" {

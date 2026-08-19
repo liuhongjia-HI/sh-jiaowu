@@ -764,10 +764,8 @@ func settingLabel(key string) string {
 		return "水印规则"
 	case "downloadPolicy":
 		return "下载规则"
-	case "academicYearStart":
-		return "校历学年开始日期"
-	case "academicYearEnd":
-		return "校历学年结束日期"
+	case "academicCalendar":
+		return "校历（按学年学期）"
 	case "academicPeriods":
 		return "期中/期末时间段"
 	case "miniProgramDomainStatus":

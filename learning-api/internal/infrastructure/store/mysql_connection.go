@@ -86,6 +86,13 @@ func (s *MemoryStore) reconcileDefaultSettings() error {
 			return err
 		}
 	}
+	// 清掉被取代的旧设置项，否则它们会一直躺在数据库里、一直出现在系统设置列表里，
+	// 即使代码早就不读它们了（例如“套餐默认开始/结束日期”被“校历”取代之后）。
+	for _, key := range retiredSettingKeys {
+		if _, err := s.db.Exec(`DELETE FROM system_settings WHERE setting_key = ?`, key); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

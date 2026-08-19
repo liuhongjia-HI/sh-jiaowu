@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -139,23 +140,52 @@ func (s *MemoryStore) defaultGrantPeriod() (string, string) {
 	return today, now.AddDate(1, 0, 0).Format("2006-01-02")
 }
 
-// academicCalendarRange 读取系统设置里的校历学年起止，两个值都合法才生效。
+// academicCalendarRange 汇总当前学年在校历里配置的全部学期，
+// 返回覆盖这些学期的起止范围（最早的开学日 到 最晚的学期结束日）。
+// 校历按学年、按学期存（见 academicCalendarTerm），不是一个学年只有一对笼统日期，
+// 这里只是把“当前学年”对应的若干条学期记录合并成一个区间给开通逻辑用。
 func (s *MemoryStore) academicCalendarRange() (string, string, bool) {
-	start := strings.TrimSpace(s.settings["academicYearStart"])
-	end := strings.TrimSpace(s.settings["academicYearEnd"])
-	if start == "" || end == "" {
+	terms := s.academicCalendarTerms()
+	if len(terms) == 0 {
 		return "", "", false
 	}
-	if _, err := time.Parse("2006-01-02", start); err != nil {
-		return "", "", false
+	currentYear := s.configuredAcademicYear()
+	start, end := "", ""
+	for _, term := range terms {
+		if term.AcademicYear != currentYear {
+			continue
+		}
+		if _, err := time.Parse("2006-01-02", term.StartDate); err != nil {
+			continue
+		}
+		if _, err := time.Parse("2006-01-02", term.EndDate); err != nil {
+			continue
+		}
+		if start == "" || term.StartDate < start {
+			start = term.StartDate
+		}
+		if end == "" || term.EndDate > end {
+			end = term.EndDate
+		}
 	}
-	if _, err := time.Parse("2006-01-02", end); err != nil {
-		return "", "", false
-	}
-	if end < start {
+	if start == "" || end == "" || end < start {
 		return "", "", false
 	}
 	return start, end, true
+}
+
+// academicCalendarTerms 解析系统设置里的校历列表，解析失败时返回空列表
+// （调用方会按“校历未配置”处理，退回兜底逻辑，不会因为一条脏数据阻塞开通）。
+func (s *MemoryStore) academicCalendarTerms() []academicCalendarTerm {
+	raw := strings.TrimSpace(s.settings["academicCalendar"])
+	if raw == "" {
+		return nil
+	}
+	var terms []academicCalendarTerm
+	if err := json.Unmarshal([]byte(raw), &terms); err != nil {
+		return nil
+	}
+	return terms
 }
 
 func (s *MemoryStore) normalizeGrantPeriod(startsAt, endsAt string) (string, string, error) {
