@@ -67,10 +67,13 @@ func TestCreatePackageSupportsGrantPreview(t *testing.T) {
 	}
 }
 
-func TestCreatePackageRejectsCrossAcademicYearSpace(t *testing.T) {
+// 学习空间是跨学年复用的课程目录，不参与学年匹配：套餐的学年可以和它绑定的
+// 学习空间上标注的学年不一致，这是有意为之，不是缺陷。学年只属于套餐本身
+// （见 memory.go 里 packageFromRequest 和 learningSpaceMatches 的注释）。
+func TestCreatePackageAcademicYearIsIndependentFromLearningSpaceYear(t *testing.T) {
 	store := NewMemoryStore()
 	store.learningSpaces = append(store.learningSpaces, learningSpace{
-		ID:           "space-g05-english-s1-next-year",
+		ID:           "space-g05-english-s1-other-year-label",
 		AcademicYear: "2026.2027学年",
 		Grade:        "五年级",
 		Semester:     "S1",
@@ -80,19 +83,42 @@ func TestCreatePackageRejectsCrossAcademicYearSpace(t *testing.T) {
 		Status:       learning.StatusEnabled,
 	})
 
-	if _, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
-		Name:             "五年级英语跨学年套餐",
+	pkg, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
+		Name:             "五年级英语套餐",
 		AcademicYear:     "2025.2026学年",
 		Grade:            "五年级",
 		Semester:         "S1",
 		Subject:          "英语",
 		PhaseScope:       "Q1",
 		PackageType:      "题",
-		LearningSpaceIDs: []string{"space-g05-english-s1-next-year"},
+		LearningSpaceIDs: []string{"space-g05-english-s1-other-year-label"},
 		ContentTypeCodes: []string{"question"},
 		Status:           learning.StatusEnabled,
-	}); err == nil || !strings.Contains(err.Error(), "学年") {
-		t.Fatalf("expected cross academic year package space to be rejected, got %v", err)
+	})
+	if err != nil {
+		t.Fatalf("expected package creation to succeed regardless of the space's year label: %v", err)
+	}
+	if pkg.AcademicYear != "2025.2026学年" {
+		t.Fatalf("package academic year should stay as requested, got %q", pkg.AcademicYear)
+	}
+}
+
+// 学习空间匹配仍然要求年级/学科/学期一致——只是不再比较学年。
+func TestCreatePackageStillRejectsMismatchedGradeSpace(t *testing.T) {
+	store := NewMemoryStore()
+	if _, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
+		Name:             "年级不匹配套餐",
+		AcademicYear:     "2025.2026学年",
+		Grade:            "六年级",
+		Semester:         "S1",
+		Subject:          "英语",
+		PhaseScope:       "Q1",
+		PackageType:      "题",
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+		ContentTypeCodes: []string{"question"},
+		Status:           learning.StatusEnabled,
+	}); err == nil || !strings.Contains(err.Error(), "一致") {
+		t.Fatalf("expected grade-mismatched package space to be rejected, got %v", err)
 	}
 }
 

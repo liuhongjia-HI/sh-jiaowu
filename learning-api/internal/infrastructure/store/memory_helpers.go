@@ -24,10 +24,14 @@ func (s *MemoryStore) findLearningSpace(id string) (learningSpace, bool) {
 	return learningSpace{}, false
 }
 
-func (s *MemoryStore) learningSpaceMatches(id, academicYear, grade, subject, semester string) bool {
+// learningSpaceMatches 按 年级/学科/学期 匹配学习空间。
+// 不再比较学年：学习空间是跨学年复用的课程目录（同一个五年级英文 S1 阶段，
+// 内容每年可能会更新，但槽位本身不需要每年建一份新的），学年只属于套餐/开通，
+// 由 Package.AcademicYear / GrantResult.AcademicYear 承载。
+func (s *MemoryStore) learningSpaceMatches(id, grade, subject, semester string) bool {
 	for _, space := range s.learningSpaces {
 		if space.ID == id {
-			return space.AcademicYear == academicYear && space.Grade == grade && subjectsMatch(space.Subject, subject) && space.Semester == semester
+			return space.Grade == grade && subjectsMatch(space.Subject, subject) && space.Semester == semester
 		}
 	}
 	return false
@@ -760,10 +764,10 @@ func settingLabel(key string) string {
 		return "水印规则"
 	case "downloadPolicy":
 		return "下载规则"
-	case "grantDefaultStart":
-		return "套餐默认开始日期"
-	case "grantDefaultEnd":
-		return "套餐默认结束日期"
+	case "academicYearStart":
+		return "校历学年开始日期"
+	case "academicYearEnd":
+		return "校历学年结束日期"
 	case "academicPeriods":
 		return "期中/期末时间段"
 	case "miniProgramDomainStatus":

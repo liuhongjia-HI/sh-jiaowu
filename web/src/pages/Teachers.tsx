@@ -185,6 +185,15 @@ export default function Teachers() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" onFinish={(values) => saveTeacher.mutate(values)}>
+          {!editing && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="保存后会自动生成临时密码"
+              description="这里不需要设置密码。保存成功后会弹出临时密码，请复制并通过安全渠道发给老师；对方首次用手机号登录时需要自行修改。密码遗失可在列表里用钥匙图标重置。"
+            />
+          )}
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入教师姓名' }]}>
             <Input placeholder="例如：英语老师" />
           </Form.Item>

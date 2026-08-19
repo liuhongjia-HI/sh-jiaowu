@@ -592,7 +592,10 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		return learning.Package{}, errors.New("请输入学习套餐名称")
 	}
 	if req.AcademicYear == "" {
-		req.AcademicYear = "2025.2026学年"
+		// 跟随系统设置里的当前学年。学习空间不再参与学年匹配（见
+		// learningSpaceMatches），所以套餐可以自由归属任意学年，不会因为
+		// 学年跨年而绑不上学习空间。
+		req.AcademicYear = s.configuredAcademicYear()
 	}
 	if req.Grade == "" || req.Subject == "" || req.Semester == "" {
 		return learning.Package{}, errors.New("请选择年级、学科和学期")
@@ -616,8 +619,8 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		if !s.learningSpaceExists(spaceID) {
 			return learning.Package{}, errors.New("学习空间不存在：" + spaceID)
 		}
-		if !s.learningSpaceMatches(spaceID, req.AcademicYear, req.Grade, req.Subject, req.Semester) {
-			return learning.Package{}, errors.New("学习空间需与套餐学年、年级、学科和学期一致")
+		if !s.learningSpaceMatches(spaceID, req.Grade, req.Subject, req.Semester) {
+			return learning.Package{}, errors.New("学习空间需与套餐年级、学科和学期一致")
 		}
 	}
 	if len(req.ContentTypeCodes) == 0 {

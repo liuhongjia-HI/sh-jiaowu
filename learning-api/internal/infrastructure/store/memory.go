@@ -180,17 +180,19 @@ func defaultSettings() map[string]string {
 	if now.Month() < time.July {
 		startYear--
 	}
-	grantStart := now.Format("2006-01-02")
-	grantEnd := now.AddDate(1, 0, 0).Format("2006-01-02")
 	periods := fmt.Sprintf(`[{"name":"期中","startDate":"%d-11-01","endDate":"%d-11-15"},{"name":"期末","startDate":"%d-01-05","endDate":"%d-01-20"}]`, startYear, startYear, startYear+1, startYear+1)
 	return map[string]string{
-		"academicYear":                 "2025.2026学年",
+		// 按日期滚动推导，不写死具体学年：写死会导致跨年后系统一直显示过期学年，
+		// 新建套餐也被打上过期标签。学习空间不参与学年匹配（见
+		// learningSpaceMatches），套餐可以自由归属任意学年，不受此影响。
+		"academicYear": currentAcademicYear(),
+		// 校历学年起止：套餐默认有效期对齐到这里，由管理端在系统设置里维护。
+		"academicYearStart":            fmt.Sprintf("%d-09-01", startYear),
+		"academicYearEnd":              fmt.Sprintf("%d-07-15", startYear+1),
 		"grades":                       "G1-G9",
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀",
 		"downloadPolicy":               "套餐生效期内可下载，到期自动关闭",
-		"grantDefaultStart":            grantStart,
-		"grantDefaultEnd":              grantEnd,
 		"academicPeriods":              periods,
 		"miniProgramDomainStatus":      "待确认",
 		"officialAccountBindingStatus": "待确认",
@@ -209,6 +211,15 @@ func academicYearForDate(value time.Time) string {
 	return fmt.Sprintf("%d.%d学年", startYear, startYear+1)
 }
 
+// configuredAcademicYear 取管理端在系统设置里维护的当前学年，
+// 没配或被清空时退回按日期推导的学年，保证永远拿得到一个非空且不过期的值。
+func (s *MemoryStore) configuredAcademicYear() string {
+	if value := strings.TrimSpace(s.settings["academicYear"]); value != "" {
+		return value
+	}
+	return currentAcademicYear()
+}
+
 func currentAcademicYear() string {
 	return academicYearForDate(time.Now())
 }
@@ -225,6 +236,9 @@ func (s *MemoryStore) ensureDefaultSettings() {
 }
 
 func (s *MemoryStore) seedBaseLearningSpaces() {
+	// 学习空间是跨学年复用的课程目录（不参与学年匹配，见 learningSpaceMatches），
+	// 这个学年只是空间记录上的展示值/初始标签，随便选一个固定值即可，
+	// 不需要跟系统设置里的当前学年保持一致。
 	const academicYear = "2025.2026学年"
 	exists := map[string]bool{}
 	for _, space := range s.learningSpaces {
@@ -373,7 +387,9 @@ var demoPackageTypes = []packageTypeSpec{
 }
 
 func seedPermissionDemoData(s *MemoryStore) {
-	const academicYear = "2025.2026学年"
+	// 演示套餐跟随当前学年（和真实新建套餐走同一条默认值逻辑），
+	// 不需要和学习空间的学年一致——学习空间不参与学年匹配，见 learningSpaceMatches。
+	academicYear := s.configuredAcademicYear()
 	s.seedBaseLearningSpaces()
 	for gradeIndex, grade := range demoGrades {
 		for _, subject := range demoSubjects {

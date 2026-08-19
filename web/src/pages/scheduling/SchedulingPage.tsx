@@ -24,9 +24,11 @@ import {
   weekOptions
 } from './scheduling-utils';
 import { CandidatePanel, CoordinationPanel } from './CandidatePanel';
+import type { ResourceLaneMode } from './SchedulingViews';
 import {
   MiniMonthCalendar,
   MonthScheduleBoard,
+  ScheduleDayResourceTimeline,
   ScheduleWeekTimeline,
   availabilityStats,
   buildWeekDays,
@@ -145,7 +147,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [creatingClass, setCreatingClass] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'week' | 'month' | 'list'>('week');
+  // 默认停在资源泳道日视图：这是排课场景真正读得清的密度，周视图退居总览。
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month' | 'list'>('day');
+  const [laneMode, setLaneMode] = useState<ResourceLaneMode>('teacher');
   const [classGradeFilter, setClassGradeFilter] = useState<string>();
   const [classSubjectFilter, setClassSubjectFilter] = useState<string>();
   const [classTeacherFilter, setClassTeacherFilter] = useState<string>();
@@ -155,6 +159,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [classTypeFilter, setClassTypeFilter] = useState<string>();
   const [statusFilter, setStatusFilter] = useState<string>('全部');
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  // 日视图选中的那一天。始终保持在 selectedWeekStart 所在周内，
+  // 这样日/周视图共用同一份按 dayOfWeek 分组的数据，切换视图不用重新取数。
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [hiddenSubjects, setHiddenSubjects] = useState<string[]>([]);
   const queryClient = useQueryClient();
@@ -410,6 +417,14 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     });
   }
 
+  // 日视图翻页要顺带把周对齐过去：classesByDay 是按「选中周」筛出来再按 dayOfWeek 分组的，
+  // 只挪 selectedDate 不挪 selectedWeekStart，跨周之后日视图就会读到上一周的数据。
+  function goToDate(date: Date) {
+    setSelectedDate(date);
+    setSelectedWeekStart(startOfWeek(date));
+    setCalendarMonth(startOfMonth(date));
+  }
+
   function confirmMoveClass(record: ScheduleClass, target: ScheduleMoveTarget) {
     const isSameTarget = record.dayOfWeek === target.dayOfWeek &&
       (!target.startTime || (record.startTime === target.startTime && record.endTime === target.endTime)) &&
@@ -529,9 +544,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         extra={(
           <Segmented
             value={viewMode}
-            onChange={(value) => setViewMode(value as 'week' | 'month' | 'list')}
+            onChange={(value) => setViewMode(value as 'day' | 'week' | 'month' | 'list')}
             options={[
-              { label: '课表视图', value: 'week', icon: <CalendarOutlined /> },
+              { label: '日视图', value: 'day', icon: <CalendarOutlined /> },
+              { label: '周视图', value: 'week', icon: <CalendarOutlined /> },
               { label: '月视图', value: 'month', icon: <CalendarOutlined /> },
               { label: '列表视图', value: 'list', icon: <TableOutlined /> }
             ]}
@@ -571,10 +587,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                 <MiniMonthCalendar
                   month={calendarMonth}
                   selectedWeekStart={selectedWeekStart}
-                  onPickDate={(date) => {
-                    setSelectedWeekStart(startOfWeek(date));
-                    setCalendarMonth(startOfMonth(date));
-                  }}
+                  onPickDate={goToDate}
                 />
               </div>
 
@@ -658,7 +671,35 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                 <span><i className="legend-dot legend-canceled" />已取消</span>
               </div>
 
-              {viewMode === 'week' ? (
+              {viewMode === 'day' ? (
+                <ScheduleDayResourceTimeline
+                  loading={classes.isFetching || candidates.isFetching || availabilityOverview.isFetching}
+                  selectedDate={selectedDate}
+                  laneMode={laneMode}
+                  availabilityByDay={availabilityByDay}
+                  candidatesByDay={candidatesByDay}
+                  classesByDay={classesByDay}
+                  courseById={courseById}
+                  teacherById={teacherById}
+                  studentById={studentById}
+                  candidateRequest={candidateRequest}
+                  selectedCandidateId={selectedCandidate?.id}
+                  emptyTips={emptyTips}
+                  canManage={canCreateClass}
+                  onLaneModeChange={setLaneMode}
+                  onPreviousDay={() => goToDate(addDays(selectedDate, -1))}
+                  onNextDay={() => goToDate(addDays(selectedDate, 1))}
+                  onToday={() => goToDate(new Date())}
+                  onPickCandidate={(record) => {
+                    setSelectedCandidate(record);
+                    setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));
+                    setSelectedCampusId(user.campusId || 'campus-main');
+                  }}
+                  onEditClass={openEdit}
+                  onMoveClass={confirmMoveClass}
+                  onCreateClass={openCreateClassForDay}
+                />
+              ) : viewMode === 'week' ? (
                 <ScheduleWeekTimeline
                   loading={classes.isFetching || candidates.isFetching || availabilityOverview.isFetching}
                   weekDays={selectedWeekDays}
@@ -673,13 +714,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   selectedCandidateId={selectedCandidate?.id}
                   emptyTips={emptyTips}
                   canManage={canCreateClass}
-                  onPreviousWeek={() => setSelectedWeekStart(addDays(selectedWeekStart, -7))}
-                  onNextWeek={() => setSelectedWeekStart(addDays(selectedWeekStart, 7))}
-                  onToday={() => {
-                    const today = new Date();
-                    setSelectedWeekStart(startOfWeek(today));
-                    setCalendarMonth(startOfMonth(today));
-                  }}
+                  onPreviousWeek={() => goToDate(addDays(selectedDate, -7))}
+                  onNextWeek={() => goToDate(addDays(selectedDate, 7))}
+                  onToday={() => goToDate(new Date())}
                   onPickCandidate={(record) => {
                     setSelectedCandidate(record);
                     setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));

@@ -166,9 +166,11 @@ func containsRecommendationContent(contentTypes []string) bool {
 	return containsString(contentTypes, "course") || containsString(contentTypes, "handout")
 }
 
+// sameRecommendationTerm 不比较学年，理由同 learningSpaceMatches：
+// 学习空间是跨学年复用的目录，学年只属于套餐。
 func sameRecommendationTerm(pkg learning.Package, spaces []learningSpace) bool {
 	for _, space := range spaces {
-		if space.AcademicYear == pkg.AcademicYear && space.Grade == pkg.Grade && space.Semester == pkg.Semester {
+		if space.Grade == pkg.Grade && space.Semester == pkg.Semester {
 			return true
 		}
 	}

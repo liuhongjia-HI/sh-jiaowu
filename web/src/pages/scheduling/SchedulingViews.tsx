@@ -102,6 +102,19 @@ type TimelineLayoutItem = TimelineItem & {
   hiddenItems?: TimelineItem[];
 };
 
+export type ResourceLaneMode = 'teacher' | 'room';
+export type ResourceLane = {
+  key: string;
+  title: string;
+  subtitle: string;
+  // 学生可上课泳道只是参考信息，没有可拖动的课程，不接受拖放。
+  droppable: boolean;
+  items: TimelineItem[];
+};
+
+const studentAvailabilityLaneKey = '__student-availability__';
+const unassignedLaneKey = '__unassigned__';
+
 // 单个课程块低于这个宽度就只剩一两个字，并排再多也读不出是什么课，
 // 超出的部分折叠成 "+N"。数值来自实测：约 64px 时课程名可显示 3 个汉字。
 const minReadableBlockWidth = 64;
@@ -301,6 +314,216 @@ export function ScheduleWeekTimeline({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+// 资源泳道视图：列＝老师（或教室），只看一天。
+//
+// 周视图用的是通用日历那套「重叠簇内等宽分列」，它的前提是「同一个人的日程本来就不该重叠」，
+// 所以重叠是异常、是少数。教培排课的前提恰好相反：同一时段本来就该有多节课并行
+// （不同老师、不同教室），重叠是业务主干。7 天塞进横向空间后每块只剩几十像素，
+// 课程名必然被截断，再怎么调分列算法也救不回来——横向空间是被「7 天」吃掉的，不是被重叠吃掉的。
+//
+// 把资源提升为列维度后，跨老师的重叠在结构上就消失了。每条泳道内部剩下的重叠才是真冲突
+// （同一个老师同一时段两节课＝排课错误），数量极少，此时复用 layoutOverlappingItems
+// 的等宽分列正好回到了它擅长的场景：不用重写算法，只是换了个正确的容器。
+export function ScheduleDayResourceTimeline({
+  loading,
+  selectedDate,
+  laneMode,
+  availabilityByDay,
+  candidatesByDay,
+  classesByDay,
+  courseById,
+  teacherById,
+  studentById,
+  candidateRequest,
+  selectedCandidateId,
+  emptyTips,
+  canManage,
+  onLaneModeChange,
+  onPreviousDay,
+  onNextDay,
+  onToday,
+  onPickCandidate,
+  onEditClass,
+  onMoveClass,
+  onCreateClass
+}: {
+  loading: boolean;
+  selectedDate: Date;
+  laneMode: ResourceLaneMode;
+  availabilityByDay: Record<number, AvailabilitySlot[]>;
+  candidatesByDay: Record<number, ScheduleCandidate[]>;
+  classesByDay: Record<number, ScheduleClass[]>;
+  courseById: CourseLookup;
+  teacherById: Record<string, Teacher>;
+  studentById: Record<string, Student>;
+  candidateRequest: CandidateFormValues | null;
+  selectedCandidateId?: string;
+  emptyTips: string[];
+  canManage: boolean;
+  onLaneModeChange: (value: ResourceLaneMode) => void;
+  onPreviousDay: () => void;
+  onNextDay: () => void;
+  onToday: () => void;
+  onPickCandidate: (record: ScheduleCandidate) => void;
+  onEditClass: (record: ScheduleClass) => void;
+  onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
+  onCreateClass: (dayOfWeek: number) => void;
+}) {
+  const dayOfWeek = selectedDate.getDay() === 0 ? 7 : selectedDate.getDay();
+  const lanes = useMemo(
+    () => buildResourceLanes(
+      dayOfWeek,
+      laneMode,
+      availabilityByDay[dayOfWeek] ?? [],
+      candidatesByDay[dayOfWeek] ?? [],
+      (classesByDay[dayOfWeek] ?? []).filter((item) => scheduleClassOccursOn(item, selectedDate)),
+      courseById,
+      teacherById,
+      studentById
+    ),
+    [dayOfWeek, laneMode, availabilityByDay, candidatesByDay, classesByDay, selectedDate, courseById, teacherById, studentById]
+  );
+  const allItems = useMemo(() => lanes.flatMap((lane) => lane.items), [lanes]);
+  const hasAnyItem = allItems.length > 0;
+  const timelineRange = useMemo(() => buildTimelineRange(allItems), [allItems]);
+  const rows = useMemo(() => buildTimelineRows(timelineRange.start, timelineRange.end), [timelineRange]);
+  const boardHeight = ((timelineRange.end - timelineRange.start) / timelineSlotMinutes) * timelineSlotHeight;
+
+  // 与周视图同一套测量逻辑：泳道内真出现冲突时，按泳道实际宽度决定并排几块。
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [laneWidth, setLaneWidth] = useState(0);
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const measure = () => {
+      const column = scroller.querySelector('.schedule-day-column');
+      if (column) setLaneWidth(column.getBoundingClientRect().width);
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(scroller);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [loading, lanes.length]);
+
+  const laidOutLanes = useMemo(
+    () => lanes.map((lane) => ({ ...lane, layout: layoutOverlappingItems(lane.items, laneWidth) })),
+    [lanes, laneWidth]
+  );
+
+  if (loading) return <Skeleton active paragraph={{ rows: 6 }} />;
+
+  return (
+    <div className="schedule-timeline-wrap">
+      {!hasAnyItem && (
+        <ScheduleEmptyTips
+          description={candidateRequest ? '这一天暂时没有可展示的排课结果。' : '这一天还没有课程，也没有收集到可排时间。'}
+          tips={emptyTips}
+          compact
+        />
+      )}
+      <div className="schedule-timeline-toolbar">
+        <Space size={8}>
+          <Button icon={<LeftOutlined />} onClick={onPreviousDay} />
+          <Button onClick={onToday}>今天</Button>
+          <Button icon={<RightOutlined />} onClick={onNextDay} />
+          {/* 这一天一节课都没有时泳道整个不渲染，双击空白的入口也就没了，
+              新建必须有一个不依赖泳道的常驻入口。 */}
+          {canManage && <Button icon={<PlusOutlined />} onClick={() => onCreateClass(dayOfWeek)}>新建课程</Button>}
+        </Space>
+        <div>
+          <Typography.Title level={4}>{formatDayTitle(selectedDate)}</Typography.Title>
+          <Typography.Text type="secondary">双击空白处新建课程；拖动课程可在本泳道内改时间，换老师或教室请点击课程编辑。</Typography.Text>
+        </div>
+        <Segmented
+          value={laneMode}
+          onChange={(value) => onLaneModeChange(value as ResourceLaneMode)}
+          options={[
+            { label: '按老师', value: 'teacher' },
+            { label: '按教室', value: 'room' }
+          ]}
+        />
+      </div>
+
+      {hasAnyItem && (
+        <div ref={scrollRef} className="schedule-timeline-scroll">
+          <div
+            className="schedule-timeline-grid is-resource"
+            style={{ '--timeline-height': `${boardHeight}px`, '--lane-count': laidOutLanes.length } as CSSProperties}
+          >
+            <div className="schedule-time-gutter schedule-day-head-spacer" />
+            {laidOutLanes.map((lane) => (
+              <div className="schedule-day-head schedule-lane-head" key={lane.key}>
+                <strong title={lane.title}>{lane.title}</strong>
+                <span title={lane.subtitle}>{lane.subtitle}</span>
+                {/* 学生可上课那条泳道里一节课都没有，写「0 节课」会被读成「今天没课」，
+                    它该报的是覆盖了几个可排时段。 */}
+                <small>
+                  {lane.key === studentAvailabilityLaneKey
+                    ? `${lane.items.length} 个可排时段`
+                    : `${lane.items.filter((item) => item.kind === 'class' && item.status !== '已取消').length} 节课`}
+                </small>
+              </div>
+            ))}
+            <div className="schedule-time-gutter schedule-time-axis" style={{ height: boardHeight }}>
+              {rows.map((row) => (
+                <div className="schedule-time-label" key={row.minute} style={{ top: row.top }}>
+                  {row.label}
+                </div>
+              ))}
+            </div>
+            {laidOutLanes.map((lane) => (
+              <div
+                className="schedule-day-column"
+                key={lane.key}
+                style={{ height: boardHeight }}
+                onDragOver={(event) => canManage && lane.droppable ? event.preventDefault() : undefined}
+                onDrop={(event) => {
+                  const classID = event.dataTransfer.getData('text/schedule-class-id');
+                  // 只接受本泳道内的课程：调课接口不带老师/教室，跨泳道拖动无法真正改归属，
+                  // 放行只会让人以为换了老师其实只改了时间。跨泳道请走编辑弹窗。
+                  const record = lane.items.find((item) => item.kind === 'class' && item.id === classID)?.record as ScheduleClass | undefined;
+                  if (!record) return;
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const offsetMinutes = Math.round((event.clientY - bounds.top) / timelineSlotHeight) * timelineSlotMinutes;
+                  const startMinute = clampTimelineStart(timelineRange.start + offsetMinutes, record.durationMinutes);
+                  const startTime = formatMinute(startMinute);
+                  const endTime = formatMinute(startMinute + record.durationMinutes);
+                  onMoveClass(record, {
+                    dayOfWeek,
+                    startTime,
+                    endTime,
+                    label: `${weekLabel(dayOfWeek)} ${startTime}-${endTime}`
+                  });
+                }}
+                onDoubleClick={(event) => {
+                  if (event.currentTarget === event.target && canManage) onCreateClass(dayOfWeek);
+                }}
+              >
+                {rows.map((row) => <span className="schedule-time-line" key={row.minute} style={{ top: row.top }} />)}
+                {lane.layout.map((item) => (
+                  <TimelineBlock
+                    key={`${item.kind}-${item.id}`}
+                    item={item}
+                    rangeStart={timelineRange.start}
+                    selectedCandidateId={selectedCandidateId}
+                    canManage={canManage}
+                    onPickCandidate={onPickCandidate}
+                    onEditClass={onEditClass}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -594,9 +817,12 @@ export function teacherOptionLabel(teacher: Teacher) {
 }
 
 export function teacherDisplay(teacherName: string, course: Course | undefined, teacher?: Teacher) {
+  // 课程和可排时间里存了一份冗余的老师名，老师改名后不回写，于是同一个人在不同位置显示成两个名字。
+  // 传进来的 teacher 是老师档案，有就以它为准；查不到（老师已删、历史课程还在）才退回冗余名。
+  const name = teacher?.name || teacherName;
   const scope = teacher ? teacherScopeText(teacher) : '';
-  if (scope) return `教师：${teacherName} · ${scope}`;
-  return course?.grade ? `教师：${teacherName} · ${course.grade}` : `教师：${teacherName}`;
+  if (scope) return `教师：${name} · ${scope}`;
+  return course?.grade ? `教师：${name} · ${course.grade}` : `教师：${name}`;
 }
 
 export function teacherScopeText(teacher: Teacher) {
@@ -694,6 +920,136 @@ export function buildTimelineItems(
     });
     return [...availabilityItems, ...candidateItems, ...classItems];
   });
+}
+
+// 课程和可排时间里都存了一份冗余的老师名（teacherName / ownerName），老师改名后不会回写，
+// 于是同一条泳道可能出现两个名字：表头拿冗余名、块内副标题走 teacherById 拿到的是新名。
+// 泳道表头以老师档案为准，冗余名只在档案查不到时兜底（老师被删了但历史课程还在）。
+export function resourceLaneTeacherName(teacherId: string, fallbackName: string, teacher?: Teacher) {
+  if (!teacherId) return '未指定老师';
+  return teacher?.name || fallbackName || '未指定老师';
+}
+
+export function formatDayTitle(date: Date) {
+  return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日 ${weekLabel(date.getDay() === 0 ? 7 : date.getDay())}`;
+}
+
+// buildResourceLanes 把一天的课程/推荐方案/可排时间摊到「老师」或「教室」泳道上。
+// 课程和推荐方案复用 buildTimelineItems 生成，标题、副标题、meta 的拼法与周视图共用一套，
+// 避免两个视图各写一份、以后改文案漏掉一边。
+//
+// 可排时间不能走 buildTimelineItems：它内部的 aggregateAvailabilitySlots 会把
+// 「同一时段的多个老师」合并成一条、只留下第一个人的 record，那样合并后的条目
+// 只会落进第一个老师的泳道，其余老师的空闲就凭空消失了。所以这里按原始 slot 逐条分发，
+// 落到各自泳道后再由 layoutOverlappingItems 合并成该泳道的背景带。
+export function buildResourceLanes(
+  dayOfWeek: number,
+  laneMode: ResourceLaneMode,
+  availabilitySlots: AvailabilitySlot[],
+  candidates: ScheduleCandidate[],
+  classes: ScheduleClass[],
+  courseById: CourseLookup,
+  teacherById: Record<string, Teacher>,
+  studentById: Record<string, Student>
+): ResourceLane[] {
+  const syntheticDay: WeekDay = {
+    key: `resource-${dayOfWeek}`,
+    date: new Date(),
+    day: 0,
+    dayOfWeek,
+    weekLabel: weekLabel(dayOfWeek),
+    label: weekLabel(dayOfWeek)
+  };
+  const primaryItems = buildTimelineItems(
+    [syntheticDay],
+    {},
+    { [dayOfWeek]: candidates },
+    { [dayOfWeek]: classes },
+    courseById,
+    teacherById,
+    studentById
+  );
+
+  const lanes = new Map<string, ResourceLane>();
+  const ensureLane = (key: string, title: string, subtitle: string, droppable = true) => {
+    const existing = lanes.get(key);
+    if (existing) return existing;
+    const lane: ResourceLane = { key, title, subtitle, droppable, items: [] };
+    lanes.set(key, lane);
+    return lane;
+  };
+
+  primaryItems.forEach((item) => {
+    if (laneMode === 'teacher') {
+      const record = item.record as ScheduleClass | ScheduleCandidate;
+      const teacherId = record.teacherId || '';
+      const teacher = teacherById[teacherId];
+      const key = teacherId || unassignedLaneKey;
+      // 泳道表头只放名字，任教范围放副标题。不要用 teacherDisplay：
+      // 它返回的是「教师：张三 · 五年级/英文」，在「这一列就是这个老师」的语境下，
+      // 前缀是废话、后半段和副标题重复，还把名字挤出可视区。
+      ensureLane(key, resourceLaneTeacherName(teacherId, record.teacherName, teacher), teacher ? teacherScopeText(teacher) : '').items.push(item);
+      return;
+    }
+    // 推荐方案还没成班，本来就没有教室，统一归到「未指定教室」而不是凭空造一条泳道。
+    const roomName = item.kind === 'class' ? (item.record as ScheduleClass).roomName?.trim() ?? '' : '';
+    const key = roomName || unassignedLaneKey;
+    ensureLane(key, roomName || '未指定教室', '').items.push(item);
+  });
+
+  const teacherSlots = availabilitySlots.filter((slot) => slot.ownerType === 'teacher');
+  const studentSlots = availabilitySlots.filter((slot) => slot.ownerType === 'student');
+
+  // 教室视图下老师的空闲时间没有对应泳道，放进任何一条都是错的，直接不展示。
+  if (laneMode === 'teacher') {
+    teacherSlots.forEach((slot) => {
+      const teacher = teacherById[slot.ownerId];
+      const lane = ensureLane(slot.ownerId, resourceLaneTeacherName(slot.ownerId, slot.ownerName, teacher), teacher ? teacherScopeText(teacher) : '');
+      lane.items.push({
+        id: slot.id,
+        kind: 'availability',
+        dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        subject: '老师可授课',
+        title: '老师可授课',
+        subtitle: availabilityOwnerDisplayName(slot, teacherById, studentById),
+        meta: '可排课时间',
+        record: slot
+      });
+    });
+  }
+
+  const sorted = Array.from(lanes.values()).sort((left, right) => {
+    // 未指定老师/教室的兜底泳道排在最后，正常资源按名字排。
+    if (left.key === unassignedLaneKey) return 1;
+    if (right.key === unassignedLaneKey) return -1;
+    return left.title.localeCompare(right.title, 'zh');
+  });
+
+  // 学生的可上课时间是跨老师的，挂在任何一条老师泳道上都不对，也不该在每条泳道里重复画一遍。
+  // 单独给一条末尾泳道：排课时先在老师泳道里找空档，再横向对一眼学生这一列能不能接上。
+  if (studentSlots.length > 0) {
+    const studentLane = ensureLane(studentAvailabilityLaneKey, '学生可上课', '跨老师参考', false);
+    aggregateAvailabilitySlots(studentSlots, teacherById, studentById).forEach((group) => {
+      studentLane.items.push({
+        id: group.id,
+        kind: 'availability',
+        dayOfWeek,
+        startTime: group.startTime,
+        endTime: group.endTime,
+        subject: '学生可上课',
+        title: '学生可上课',
+        subtitle: group.subtitle,
+        meta: '可排课时间',
+        countText: group.countText,
+        record: group.record
+      });
+    });
+    sorted.push(studentLane);
+  }
+
+  return sorted;
 }
 
 export function aggregateAvailabilitySlots(slots: AvailabilitySlot[], teacherById: Record<string, Teacher>, studentById: Record<string, Student>) {

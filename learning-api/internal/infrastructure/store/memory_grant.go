@@ -118,17 +118,44 @@ func (s *MemoryStore) packagePermissionsUnlocked() []learning.PackagePermissionS
 	return out
 }
 
+// defaultGrantPeriod 返回新开通套餐的默认有效期。
+// 优先跟随系统设置里的校历学年：开通日若已在学年内就从当天算起，否则从学年开始日算起，
+// 统一到学年结束日到期——这样不管几月开通，同一学年的套餐一起到期，
+// 和升年级、续费节奏对得上，而不是各自“从开通日起一年”。
+// 校历没配或配错时退回原来的“今天 → 今天+1 年”，不阻塞开通。
+// 单个学生的有效期仍可在开通时显式传入覆盖，这里只提供默认值。
 func (s *MemoryStore) defaultGrantPeriod() (string, string) {
 	now := time.Now()
-	startsAt := strings.TrimSpace(s.settings["grantDefaultStart"])
-	endsAt := strings.TrimSpace(s.settings["grantDefaultEnd"])
-	if _, err := time.Parse("2006-01-02", startsAt); err != nil {
-		startsAt = now.Format("2006-01-02")
+	today := now.Format("2006-01-02")
+	if _, end, ok := s.academicCalendarRange(); ok && today <= end {
+		// 开通即生效：起始日始终是当天，不用学年开始日。
+		// 学年还没开学时若从开学日起算，八月付费的学生要等到九月才能看到内容。
+		// 校历约束的是“到期日”——同一学年开通的套餐统一在学年末到期，
+		// 和升年级、续费节奏对齐。
+		return today, end
 	}
-	if end, err := time.Parse("2006-01-02", endsAt); err != nil || endsAt < startsAt || end.Before(now.AddDate(-10, 0, 0)) {
-		endsAt = now.AddDate(1, 0, 0).Format("2006-01-02")
+	// 校历没配、配错，或本学年结束日已经过去（管理端忘了更新校历）时的兜底，
+	// 避免新开通的套餐一上来就是过期的。
+	return today, now.AddDate(1, 0, 0).Format("2006-01-02")
+}
+
+// academicCalendarRange 读取系统设置里的校历学年起止，两个值都合法才生效。
+func (s *MemoryStore) academicCalendarRange() (string, string, bool) {
+	start := strings.TrimSpace(s.settings["academicYearStart"])
+	end := strings.TrimSpace(s.settings["academicYearEnd"])
+	if start == "" || end == "" {
+		return "", "", false
 	}
-	return startsAt, endsAt
+	if _, err := time.Parse("2006-01-02", start); err != nil {
+		return "", "", false
+	}
+	if _, err := time.Parse("2006-01-02", end); err != nil {
+		return "", "", false
+	}
+	if end < start {
+		return "", "", false
+	}
+	return start, end, true
 }
 
 func (s *MemoryStore) normalizeGrantPeriod(startsAt, endsAt string) (string, string, error) {

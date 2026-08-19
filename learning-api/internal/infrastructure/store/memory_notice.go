@@ -258,7 +258,7 @@ type academicPeriodSetting struct {
 }
 
 func (s *MemoryStore) validateSettingValue(key, value string) error {
-	if key == "grantDefaultStart" || key == "grantDefaultEnd" {
+	if key == "grantDefaultStart" || key == "grantDefaultEnd" { // 已由校历取代，保留校验以兼容历史存量值
 		if _, err := time.Parse("2006-01-02", value); err != nil {
 			return errors.New("默认时间格式应为 YYYY-MM-DD")
 		}
@@ -270,6 +270,20 @@ func (s *MemoryStore) validateSettingValue(key, value string) error {
 		}
 		if start != "" && end != "" && end < start {
 			return errors.New("默认结束日期不能早于开始日期")
+		}
+	}
+	if key == "academicYearStart" || key == "academicYearEnd" {
+		if _, err := time.Parse("2006-01-02", value); err != nil {
+			return errors.New("校历日期格式应为 YYYY-MM-DD")
+		}
+		start, end := s.settings["academicYearStart"], s.settings["academicYearEnd"]
+		if key == "academicYearStart" {
+			start = value
+		} else {
+			end = value
+		}
+		if start != "" && end != "" && end < start {
+			return errors.New("学年结束日期不能早于开始日期")
 		}
 	}
 	if key == "academicPeriods" {
