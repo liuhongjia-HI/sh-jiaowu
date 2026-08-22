@@ -25,6 +25,8 @@ const statusColors: Record<string, string> = {
   已停用: 'default'
 };
 
+const MAX_BANNER_IMAGE_SIZE = 5 * 1024 * 1024;
+
 export default function Banners() {
   const [form] = Form.useForm<BannerFormValues>();
   const [editing, setEditing] = useState<Banner | null>(null);
@@ -202,7 +204,13 @@ export default function Banners() {
             extra="建议尺寸 750×350，JPG 或 PNG，5MB 以内。"
           >
             <Upload
-              beforeUpload={() => false}
+              beforeUpload={(file) => {
+                if (file.size > MAX_BANNER_IMAGE_SIZE) {
+                  message.error('轮播图不能超过 5MB，请压缩图片后重试。');
+                  return Upload.LIST_IGNORE;
+                }
+                return false;
+              }}
               maxCount={1}
               accept=".jpg,.jpeg,.png"
               listType="picture-card"
