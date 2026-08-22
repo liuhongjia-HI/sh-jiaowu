@@ -65,6 +65,21 @@ type WechatLoginRequest struct {
 	StudentName string `json:"studentName"`
 	SchoolName  string `json:"schoolName"`
 	Grade       string `json:"grade"`
+	// SelectedStudentID 用于多子女场景的二次提交：手机号命中多个学生档案时，
+	// 后端先返回 StudentSelectionRequiredError 里的候选列表，小程序弹选择框，
+	// 家长选中后带着这个字段重新提交同一个登录请求完成绑定/登录。
+	SelectedStudentID string `json:"selectedStudentId"`
+}
+
+// StudentSelectionRequiredError 表示同一个手机号下匹配到多个学生档案（多子女），
+// 需要家长明确选择要绑定/登录哪一个，而不是像"账号冲突"那样直接拒绝登录。
+// 调用方用 errors.As 识别这个类型来渲染选择界面。
+type StudentSelectionRequiredError struct {
+	Candidates []StudentAccount
+}
+
+func (e *StudentSelectionRequiredError) Error() string {
+	return "手机号匹配到多个学生档案，请选择要绑定的学生"
 }
 
 type Role string

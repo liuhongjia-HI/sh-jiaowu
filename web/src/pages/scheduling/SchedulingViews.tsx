@@ -222,6 +222,21 @@ export function ScheduleWeekTimeline({
     };
   }, [loading, weekDays.length]);
 
+  // 和日视图同一套：时间轴固定 08:00-22:00，课集中在傍晚，打开后先滚到第一节课，
+  // 否则上面永远是几屏空白。两个视图行为保持一致，切换时不会一个自动定位一个不定位。
+  const firstItemMinute = useMemo(() => {
+    const starts = timelineItems
+      .filter((item) => item.kind === 'class' || item.kind === 'candidate')
+      .map((item) => timeToMinutes(item.startTime));
+    return starts.length > 0 ? Math.min(...starts) : null;
+  }, [timelineItems]);
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller || firstItemMinute === null) return;
+    const offset = ((firstItemMinute - timelineRange.start) / timelineSlotMinutes) * timelineSlotHeight;
+    scroller.scrollTop = Math.max(0, offset - timelineSlotHeight);
+  }, [firstItemMinute, timelineRange.start, selectedWeekStart]);
+
   const itemsByDay = useMemo(() => {
     return weekDays.reduce<Record<number, TimelineLayoutItem[]>>((result, day) => {
       result[day.dayOfWeek] = layoutOverlappingItems(timelineItems.filter((item) => item.dayOfWeek === day.dayOfWeek), dayColumnWidth);

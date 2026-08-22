@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"strings"
-	"time"
 
 	"starline/learning-api/internal/domain/learning"
 
@@ -32,7 +31,25 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 			return s.createWechatStudentAccount(openID, req)
 		}
 		if len(matches) > 1 {
-			return learning.Principal{}, errors.New("手机号匹配到多个账号，请联系老师确认后再绑定")
+			// 多子女：手机号命中多个学生账号。家长带着选中的 studentId 重新提交时，
+			// 把匹配范围收窄到那一个；否则把候选列表交给前端弹选择框，而不是直接拒绝登录。
+			if req.SelectedStudentID != "" {
+				narrowed := -1
+				for _, idx := range matches {
+					if s.users[idx].StudentID == req.SelectedStudentID {
+						narrowed = idx
+						break
+					}
+				}
+				if narrowed == -1 {
+					return learning.Principal{}, errors.New("选择的学生账号不存在，请重新选择")
+				}
+				matches = []int{narrowed}
+			} else if candidates, ok := s.studentSelectionCandidates(matches); ok {
+				return learning.Principal{}, &learning.StudentSelectionRequiredError{Candidates: candidates}
+			} else {
+				return learning.Principal{}, errors.New("手机号匹配到多个账号，请联系老师确认后再绑定")
+			}
 		}
 		i := matches[0]
 		user := s.users[i]
@@ -85,7 +102,35 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 		return learning.Principal{}, false, nil
 	}
 	if len(matches) > 1 {
-		return learning.Principal{}, true, errors.New("手机号匹配到多个学生档案，请联系老师确认后再绑定")
+		// 多子女：几个孩子还没有各自的登录账号（user 记录），只有学生档案。
+		// 同样走"选择哪一个"而不是直接拒绝，逻辑和上面 user 匹配的分支对称。
+		if req.SelectedStudentID != "" {
+			narrowed := -1
+			for _, idx := range matches {
+				if s.students[idx].ID == req.SelectedStudentID {
+					narrowed = idx
+					break
+				}
+			}
+			if narrowed == -1 {
+				return learning.Principal{}, true, errors.New("选择的学生账号不存在，请重新选择")
+			}
+			matches = []int{narrowed}
+		} else {
+			candidates := make([]learning.StudentAccount, 0, len(matches))
+			for _, idx := range matches {
+				student := s.students[idx]
+				if student.AccountStatus != "正常" {
+					continue
+				}
+				decorated := s.decorateStudent(student)
+				candidates = append(candidates, learning.StudentAccount{StudentID: student.ID, Name: student.Name, Grade: decorated.Grade})
+			}
+			if len(candidates) < 2 {
+				return learning.Principal{}, true, errors.New("手机号匹配到多个学生档案，请联系老师确认后再绑定")
+			}
+			return learning.Principal{}, true, &learning.StudentSelectionRequiredError{Candidates: candidates}
+		}
 	}
 	student := s.students[matches[0]]
 	userIndex := s.findUserIndexByStudentID(student.ID)
@@ -126,46 +171,36 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 	return principalFromUser(user), true, nil
 }
 
+// createWechatStudentAccount 曾经会在手机号匹配不到任何后台档案时自动建一个学生账号。
+// 这是多子女/多家长脏数据的根源：家长换个手机号授权（比如爸爸换成妈妈的号），
+// 系统会静默地把同一个孩子建出第二份档案、第二套套餐，作业记录也跟着分裂成两边，
+// 且过程中没有任何报错提示。建档现在必须只走后台，微信这边查不到就明确告诉家长
+// 联系老师，而不是替他建一个"待开通"的影子账号。
 func (s *MemoryStore) createWechatStudentAccount(openID string, req learning.WechatLoginRequest) (learning.Principal, error) {
-	if req.StudentName == "" || req.SchoolName == "" || req.Grade == "" {
-		return learning.Principal{}, errors.New("请填写学生姓名、学校和年级后再绑定")
+	return learning.Principal{}, errors.New("未找到学生档案，请联系老师完成学生建档后再授权绑定")
+}
+
+// studentSelectionCandidates 把命中同一手机号的多个 user 记录转成家长可以看懂的
+// "选哪个孩子"候选列表。只在匹配到的账号全部是纯学生角色时才返回候选——如果混进了
+// 老师/管理员账号，说明这是真的手机号冲突而不是多子女，仍然要走原来的拒绝逻辑。
+func (s *MemoryStore) studentSelectionCandidates(matches []int) ([]learning.StudentAccount, bool) {
+	candidates := make([]learning.StudentAccount, 0, len(matches))
+	for _, idx := range matches {
+		user := s.users[idx]
+		if len(user.Roles) != 1 || user.Roles[0] != learning.RoleStudent {
+			return nil, false
+		}
+		student, ok := s.findStudent(user.StudentID)
+		if !ok || student.AccountStatus != "正常" {
+			continue
+		}
+		decorated := s.decorateStudent(student)
+		candidates = append(candidates, learning.StudentAccount{StudentID: student.ID, Name: student.Name, Grade: decorated.Grade})
 	}
-	if req.Phone == "" {
-		return learning.Principal{}, errors.New("请授权手机号后再登录")
+	if len(candidates) < 2 {
+		return nil, false
 	}
-	if s.phoneExists("", req.Phone) {
-		return learning.Principal{}, errors.New("手机号已存在，请联系老师确认学生档案")
-	}
-	nowID := time.Now().Format("20060102150405.000000000")
-	studentID := "stu-wx-" + nowID
-	student := learning.Student{
-		ID:                     studentID,
-		Name:                   req.StudentName,
-		EnrollmentAcademicYear: currentAcademicYear(),
-		EnrollmentGrade:        req.Grade,
-		Phone:                  req.Phone,
-		SchoolName:             req.SchoolName,
-		OpenedPackages:         []string{},
-		LearningStatus:         "待开通",
-		AccountStatus:          "正常",
-		Remark:                 "微信授权自动创建，待后台开通学习权限",
-		BindStatus:             "已绑定",
-	}
-	user := learning.User{
-		ID:            "user-" + studentID,
-		Name:          req.StudentName,
-		Phone:         req.Phone,
-		OpenID:        openID,
-		AccountStatus: "正常",
-		Remark:        student.Remark,
-		Roles:         []learning.Role{learning.RoleStudent},
-		StudentID:     studentID,
-	}
-	s.students = append([]learning.Student{student}, s.students...)
-	s.users = append(s.users, user)
-	s.removeWechatOnlyStudent(openID, studentID)
-	s.prependLogDetail("微信登录", "微信授权创建学生", student.Name, "手机号未匹配后台档案，已创建待开通学生账号")
-	return principalFromUser(user), nil
+	return candidates, true
 }
 
 func (s *MemoryStore) removeWechatOnlyStudent(openID, keepStudentID string) {
