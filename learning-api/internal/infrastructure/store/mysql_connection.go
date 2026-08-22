@@ -118,13 +118,8 @@ func (s *MemoryStore) reconcileBaseLearningSpaces() error {
 			return err
 		}
 	}
-	if _, err := tx.Exec(`UPDATE system_settings SET setting_value = ? WHERE setting_key = 'academicYear' AND setting_value = '2025.2026学年'`, academicYear); err != nil {
-		tx.Rollback()
-		return err
-	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	s.settings["academicYear"] = academicYear
 	return s.loadLearningSpacesFromDB()
 }

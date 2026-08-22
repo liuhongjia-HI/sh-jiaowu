@@ -100,6 +100,10 @@ type TimelineLayoutItem = TimelineItem & {
   widthPct?: number;
   // 同一时段并排数量超过可读上限时，末列折叠成一个 "+N"，hiddenItems 是被折叠的课程。
   hiddenItems?: TimelineItem[];
+  // 末列要给右侧「已取消」幽灵条让出的像素宽度。
+  reserveRightPx?: number;
+  // 已取消课程的幽灵条序号（从右往左第几条）。有值即表示这个块按幽灵条渲染。
+  ghostIndex?: number;
 };
 
 export type ResourceLaneMode = 'teacher' | 'room';
@@ -119,6 +123,10 @@ const unassignedLaneKey = '__unassigned__';
 // 超出的部分折叠成 "+N"。数值来自实测：约 64px 时课程名可显示 3 个汉字。
 const minReadableBlockWidth = 64;
 const maxTimelineColumns = 4;
+// 已取消课程的幽灵条：只画出「这个时段原本有课、现在空出来了」，不需要能读字。
+const canceledGhostWidth = 10;
+const canceledGhostGap = 3;
+const maxCanceledGhosts = 3;
 
 export function maxColumnsForWidth(columnWidth: number) {
   if (!columnWidth || columnWidth <= 0) return 2;
@@ -422,6 +430,24 @@ export function ScheduleDayResourceTimeline({
     [lanes, laneWidth]
   );
 
+  // 时间轴固定 08:00-22:00，但课通常集中在傍晚，打开后上方是大片空白，
+  // 得手动往下翻好几屏才看得到课。日历产品的通行做法是保留完整时间轴（否则拖不到
+  // 范围外的时段），改成打开时自动滚到第一节课——这里滚的是时间轴自己的滚动容器，
+  // 不动整页滚动位置，不会把上面的筛选区顶走。
+  const firstItemMinute = useMemo(() => {
+    const starts = lanes
+      .flatMap((lane) => lane.items)
+      .filter((item) => item.kind === 'class' || item.kind === 'candidate')
+      .map((item) => timeToMinutes(item.startTime));
+    return starts.length > 0 ? Math.min(...starts) : null;
+  }, [lanes]);
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller || firstItemMinute === null) return;
+    const offset = ((firstItemMinute - timelineRange.start) / timelineSlotMinutes) * timelineSlotHeight;
+    scroller.scrollTop = Math.max(0, offset - timelineSlotHeight);
+  }, [firstItemMinute, timelineRange.start, selectedDate, laneMode]);
+
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />;
 
   return (
@@ -479,7 +505,15 @@ export function ScheduleDayResourceTimeline({
         <div ref={scrollRef} className="schedule-timeline-scroll">
           <div
             className="schedule-timeline-grid is-resource"
-            style={{ '--timeline-height': `${boardHeight}px`, '--lane-count': laidOutLanes.length } as CSSProperties}
+            style={{
+              '--timeline-height': `${boardHeight}px`,
+              '--lane-count': laidOutLanes.length,
+              // 「学生可上课」是跨老师的参考信息，不是一条真资源，给它和老师同等宽度
+              // 会把它抬到和老师一样的地位，老师少的时候还会被拉得特别宽。固定窄一档。
+              gridTemplateColumns: `64px ${laidOutLanes
+                .map((lane) => (lane.key === studentAvailabilityLaneKey ? '200px' : 'minmax(190px, 1fr)'))
+                .join(' ')}`
+            } as CSSProperties}
           >
             <div className="schedule-time-gutter schedule-day-head-spacer" />
             {laidOutLanes.map((lane) => (
@@ -641,12 +675,17 @@ export function TimelineBlock({
   const height = Math.max(34, ((end - start) / timelineSlotMinutes) * timelineSlotHeight - 4);
   const widthPct = item.widthPct ?? (100 / item.columns);
   const leftPct = item.leftPct ?? ((100 / item.columns) * item.column);
-  const width = `calc(${widthPct}% - 4px)`;
-  const left = `calc(${leftPct}% + 2px)`;
+  const reserve = item.reserveRightPx ?? 0;
+  // 幽灵条脱离百分比分列，直接从右边缘按序号排开，宽度固定。
+  const isGhost = item.ghostIndex !== undefined;
+  const width = isGhost ? `${canceledGhostWidth}px` : `calc(${widthPct}% - 4px - ${reserve}px)`;
+  const left = isGhost ? 'auto' : `calc(${leftPct}% + 2px)`;
+  const right = isGhost ? `${canceledGhostGap + (item.ghostIndex ?? 0) * (canceledGhostWidth + canceledGhostGap)}px` : undefined;
   const style = {
     top,
     height,
     left,
+    right,
     width,
     '--subject-bg': color.bg,
     '--subject-border': color.border,
@@ -658,6 +697,7 @@ export function TimelineBlock({
     'schedule-timeline-block',
     `is-${item.kind}`,
     item.status === '已取消' ? 'is-canceled' : '',
+    isGhost ? 'is-ghost' : '',
     item.kind === 'candidate' && item.id === selectedCandidateId ? 'is-selected' : ''
   ].filter(Boolean).join(' ');
   // 内容包一层 body：容器查询只能作用于容器的后代，不能作用于容器自身，
@@ -676,6 +716,12 @@ export function TimelineBlock({
       {extra}
     </span>
   );
+
+  // 已取消课程只画一根窄条：说明「这个时段原本有课、现在空出来了」，
+  // 细节走悬浮提示，不占正常课程的可读宽度。
+  if (isGhost) {
+    return <div className={className} style={style} title={`已取消 ${title}`} />;
+  }
 
   // 被折叠的课程不会丢失：点开可以看到完整列表，并直接进入任意一节课。
   if (item.kind === 'overflow') {
@@ -1137,8 +1183,14 @@ export function aggregateAvailabilitySlots(slots: AvailabilitySlot[], teacherByI
 // 一列 139px 时自己只剩 10px 宽，只画得出虚线边框、一个字也放不下，
 // 同时还白白占掉课程五分之一的宽度。
 export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
-  const primary = items.filter((item) => item.kind !== 'availability');
   const availability = items.filter((item) => item.kind === 'availability');
+  const primary = items.filter((item) => item.kind !== 'availability');
+  // 已取消的课不该和在排的课抢横向空间：一节真课旁边挂着两节已取消的，
+  // 三等分之后每块只剩三分之一宽、课程名全被截断，而泳道表头算的又是「1 节课」，
+  // 看到的和数到的对不上。它们退成右侧的窄幽灵条，保留时间位置和可查性，
+  // 但不再参与在排课程的分列。
+  const canceled = primary.filter((item) => item.status === '已取消');
+  const live = primary.filter((item) => item.status !== '已取消');
 
   const availabilityBands: TimelineLayoutItem[] = mergeAvailabilityBands(availability).map((item) => ({
     ...item,
@@ -1147,15 +1199,29 @@ export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
     leftPct: 0,
     widthPct: 100
   }));
-  if (primary.length === 0) return availabilityBands;
 
-  // 课程独占整列宽度，可读列数直接按整列算。
-  const primaryItems = layoutOverlappingGroup(primary, maxColumnsForWidth(columnWidth)).map((item) => ({
+  // 幽灵条之间互相错开，同一时段有几节已取消就并排几条，不会互相盖住。
+  const ghostItems: TimelineLayoutItem[] = layoutOverlappingGroup(canceled, maxCanceledGhosts).map((item) => ({
+    ...item,
+    ghostIndex: item.column
+  }));
+  const reserveRightPx = ghostItems.length > 0
+    ? canceledGhostGap + Math.min(maxCanceledGhosts, Math.max(...ghostItems.map((item) => item.column + 1))) * (canceledGhostWidth + canceledGhostGap)
+    : 0;
+
+  if (live.length === 0) {
+    return [...availabilityBands, ...ghostItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
+  }
+
+  // 可读列数按扣掉幽灵条之后的净宽算，否则末列会被挤到读不出课程名。
+  const liveItems = layoutOverlappingGroup(live, maxColumnsForWidth(Math.max(0, columnWidth - reserveRightPx))).map((item) => ({
     ...item,
     leftPct: (100 / item.columns) * item.column,
-    widthPct: 100 / item.columns
+    widthPct: 100 / item.columns,
+    // 只有末列需要让位；前面几列本来就够不到右边缘。
+    reserveRightPx: item.column === item.columns - 1 ? reserveRightPx : 0
   }));
-  return [...availabilityBands, ...primaryItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
+  return [...availabilityBands, ...ghostItems, ...liveItems].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
 }
 
 // mergeAvailabilityBands 把时间上重叠的可排时段合并成一条背景带。

@@ -255,7 +255,7 @@ func TestAdminSystemManagementThroughAPI(t *testing.T) {
 		Key:   "downloadPolicy",
 		Value: "接口测试允许下载已发布学习资料",
 	}, http.StatusOK, &settings)
-	if settings["downloadPolicy"] != "接口测试允许下载已发布学习资料" || settings["academicYear"] == "" {
+	if settings["downloadPolicy"] != "接口测试允许下载已发布学习资料" || settings["academicCalendar"] == "" {
 		t.Fatalf("unexpected settings: %#v", settings)
 	}
 

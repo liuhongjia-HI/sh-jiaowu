@@ -251,12 +251,6 @@ func (s *MemoryStore) updateSettingUnlocked(operator string, req learning.Settin
 	return s.settingsUnlocked(), nil
 }
 
-type academicPeriodSetting struct {
-	Name      string `json:"name"`
-	StartDate string `json:"startDate"`
-	EndDate   string `json:"endDate"`
-}
-
 func (s *MemoryStore) validateSettingValue(key, value string) error {
 	if key == "grantDefaultStart" || key == "grantDefaultEnd" { // 已由校历取代，保留校验以兼容历史存量值
 		if _, err := time.Parse("2006-01-02", value); err != nil {
@@ -291,36 +285,5 @@ func (s *MemoryStore) validateSettingValue(key, value string) error {
 			}
 		}
 	}
-	if key == "academicPeriods" {
-		var periods []academicPeriodSetting
-		if err := json.Unmarshal([]byte(value), &periods); err != nil || len(periods) == 0 {
-			return errors.New("考试时间段需填写有效的 JSON 数组")
-		}
-		for _, period := range periods {
-			if strings.TrimSpace(period.Name) == "" {
-				return errors.New("考试时间段名称不能为空")
-			}
-			start, startErr := time.Parse("2006-01-02", period.StartDate)
-			end, endErr := time.Parse("2006-01-02", period.EndDate)
-			if startErr != nil || endErr != nil || end.Before(start) {
-				return errors.New("考试时间段日期无效")
-			}
-		}
-	}
 	return nil
-}
-
-func (s *MemoryStore) defaultStudentDeadline() string {
-	var periods []academicPeriodSetting
-	if json.Unmarshal([]byte(s.settings["academicPeriods"]), &periods) != nil {
-		return ""
-	}
-	today := time.Now().Format("2006-01-02")
-	deadline := ""
-	for _, period := range periods {
-		if period.EndDate >= today && (deadline == "" || period.EndDate < deadline) {
-			deadline = period.EndDate
-		}
-	}
-	return deadline
 }

@@ -544,7 +544,6 @@ SET @seed_academic_year = CONCAT(
 );
 
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
-  ('academicYear', @seed_academic_year),
   ('grades', 'G1-G9'),
   ('semesters', 'S1 / S2'),
   ('watermarkRule', '姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀'),
@@ -554,6 +553,7 @@ INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('templateMessageStatus', '待确认'),
   ('productionApiDomain', '待配置');
 UPDATE system_settings SET setting_value = 'G1-G9' WHERE setting_key = 'grades';
+DELETE FROM system_settings WHERE setting_key IN ('academicYear', 'academicPeriods');
 
 DROP PROCEDURE IF EXISTS seed_starline_demo_data;
 DELIMITER //

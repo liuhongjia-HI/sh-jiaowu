@@ -72,7 +72,9 @@ func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.
 		AccountStatus:          "正常",
 		Remark:                 req.Remark,
 		BindStatus:             "待绑定",
-		EffectiveUntil:         s.defaultStudentDeadline(),
+		// 学生建档不等同于开通套餐，不预设期中/期末等时间段的有效期。
+		// 实际权限有效期在开通套餐时按当前学年校历自动计算。
+		EffectiveUntil: "",
 	}
 	s.students = append([]learning.Student{student}, s.students...)
 	s.users = append(s.users, learning.User{

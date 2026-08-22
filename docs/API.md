@@ -252,7 +252,7 @@
 }
 ```
 
-可维护的 `key` 包括：`academicYear`、`grades`、`semesters`、`watermarkRule`、`downloadPolicy`、`miniProgramDomainStatus`、`productionApiDomain`、`officialAccountBindingStatus`、`templateMessageStatus`。成功后返回完整设置对象，并记录操作日志。
+可维护的 `key` 包括：`grades`、`semesters`、`watermarkRule`、`downloadPolicy`、`miniProgramDomainStatus`、`productionApiDomain`、`officialAccountBindingStatus`、`templateMessageStatus`。当前学年由系统按日期自动判断（每年 7 月 1 日切换），无需维护；套餐开通有效期按“学年校历”自动计算。成功后返回完整设置对象，并记录操作日志。
 
 `GET /api/system/readiness` 返回上线配置检查结果：
 

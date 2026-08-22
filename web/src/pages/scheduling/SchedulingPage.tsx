@@ -556,7 +556,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       )}
 
       <Card
-        title="周排班工作台"
+        // 标题跟着视图走：默认已经是日视图，再顶着「周排班」会让人以为切错了。
+        title={viewMode === 'day' ? '排班工作台 · 按老师看一天' : viewMode === 'week' ? '排班工作台 · 周总览' : '排班工作台'}
         extra={(
           <Segmented
             value={viewMode}

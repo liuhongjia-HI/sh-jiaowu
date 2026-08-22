@@ -1006,8 +1006,14 @@ body {
   text-align: right;
 }
 
+/* 必须给滚动容器一个高度上限，它才真的成为滚动容器。
+   没有上限时容器会长到内容高度（14 小时 ≈ 1232px），滚的是整个页面，
+   于是 .schedule-day-head 的 position:sticky 失去可滚动祖先——
+   往下翻到晚上的课时，泳道表头（老师是谁）整个消失，资源视图最关键的信息没了。 */
 .schedule-timeline-scroll {
   overflow: auto;
+  max-height: calc(100vh - 260px);
+  min-height: 420px;
   border: 1px solid #e1e7f0;
   border-radius: 8px;
   background: #fff;
@@ -1024,6 +1030,7 @@ body {
    min-width 用列数算出来，泳道少时靠 1fr 撑满容器，泳道多时横向滚动，
    每条始终不低于 190px——这个宽度才放得下课程名 + 班型 + 人数，
    也是这个视图相对周视图的全部意义所在。 */
+/* grid-template-columns 由组件内联给出（参考泳道要窄一档），这里只留兜底和最小宽度。 */
 .schedule-timeline-grid.is-resource {
   min-width: calc(64px + var(--lane-count) * 190px);
   grid-template-columns: 64px repeat(var(--lane-count), minmax(190px, 1fr));
@@ -1350,6 +1357,25 @@ button.schedule-timeline-block:hover {
   background: #f1f5f9;
   color: #64748b;
   text-decoration: line-through;
+}
+
+/* 已取消课程的幽灵条：靠右侧竖排，只表达「这个时段原本有课、现在空出来了」。
+   斜纹底纹让它一眼就和在排的课区分开，不需要读字，细节走 title 悬浮提示。 */
+.schedule-timeline-block.is-ghost {
+  z-index: 1;
+  padding: 0;
+  border: 1px solid #d3dae4;
+  border-left: 1px solid #d3dae4;
+  border-radius: 3px;
+  box-shadow: none;
+  text-decoration: none;
+  background: repeating-linear-gradient(
+    45deg,
+    #eef2f7,
+    #eef2f7 3px,
+    #dde4ee 3px,
+    #dde4ee 6px
+  );
 }
 
 .schedule-timeline-action {
@@ -2077,6 +2103,15 @@ button.schedule-block:hover {
 
 .ant-table-tbody > tr > td {
   border-bottom-color: #eef2f6;
+}
+
+.student-table .ant-table-cell {
+  overflow-wrap: anywhere;
+}
+
+.student-table .ant-tag {
+  margin-inline-end: 0;
+  white-space: nowrap;
 }
 
 .ant-input,

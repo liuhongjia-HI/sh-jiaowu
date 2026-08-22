@@ -773,8 +773,6 @@ func roleName(role learning.Role) string {
 
 func settingLabel(key string) string {
 	switch key {
-	case "academicYear":
-		return "当前学年"
 	case "grades":
 		return "年级范围"
 	case "semesters":
@@ -785,8 +783,6 @@ func settingLabel(key string) string {
 		return "下载规则"
 	case "academicCalendar":
 		return "校历（按学年学期）"
-	case "academicPeriods":
-		return "期中/期末时间段"
 	case "miniProgramDomainStatus":
 		return "小程序域名备案"
 	case "officialAccountBindingStatus":

@@ -180,7 +180,7 @@ func (s *MemoryStore) seedBaseDictionaries() {
 // defaultSettings 里缺的键，从不删除多余的键，所以旧版本写过的值会一直留在
 // 数据库里、留在系统设置列表里，即使代码早就不读它们了。这里显式清掉，
 // 每加一个新的“取代关系”就在这补一条。
-var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd"}
+var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd", "academicYear", "academicPeriods"}
 
 // academicCalendarTerm 是校历上的一个学期条目：某学年某学期的起止日期。
 // 真实的教育局校历是按学年、按学期公布的，不是一个学年只有一对笼统的起止日期——
@@ -199,16 +199,11 @@ func defaultSettings() map[string]string {
 		startYear--
 	}
 	academicYear := currentAcademicYear()
-	periods := fmt.Sprintf(`[{"name":"期中","startDate":"%d-11-01","endDate":"%d-11-15"},{"name":"期末","startDate":"%d-01-05","endDate":"%d-01-20"}]`, startYear, startYear, startYear+1, startYear+1)
 	calendar, _ := json.Marshal([]academicCalendarTerm{
 		{AcademicYear: academicYear, Semester: "S1 第一学期", StartDate: fmt.Sprintf("%d-09-01", startYear), EndDate: fmt.Sprintf("%d-01-15", startYear+1)},
 		{AcademicYear: academicYear, Semester: "S2 第二学期", StartDate: fmt.Sprintf("%d-02-01", startYear+1), EndDate: fmt.Sprintf("%d-07-15", startYear+1)},
 	})
 	return map[string]string{
-		// 按日期滚动推导，不写死具体学年：写死会导致跨年后系统一直显示过期学年，
-		// 新建套餐也被打上过期标签。学习空间不参与学年匹配（见
-		// learningSpaceMatches），套餐可以自由归属任意学年，不受此影响。
-		"academicYear": academicYear,
 		// 校历：每学年每学期一条起止日期，管理端在系统设置里按列表维护，
 		// 可以提前把下一学年的校历也配好。套餐默认有效期跟着当前学年对应的
 		// 学期起止走，见 defaultGrantPeriod。
@@ -217,7 +212,6 @@ func defaultSettings() map[string]string {
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀",
 		"downloadPolicy":               "套餐生效期内可下载，到期自动关闭",
-		"academicPeriods":              periods,
 		"miniProgramDomainStatus":      "待确认",
 		"officialAccountBindingStatus": "待确认",
 		"templateMessageStatus":        "待确认",
@@ -235,12 +229,9 @@ func academicYearForDate(value time.Time) string {
 	return fmt.Sprintf("%d.%d学年", startYear, startYear+1)
 }
 
-// configuredAcademicYear 取管理端在系统设置里维护的当前学年，
-// 没配或被清空时退回按日期推导的学年，保证永远拿得到一个非空且不过期的值。
+// configuredAcademicYear 按当前日期推导学年。学年不允许人工录入，避免跨年后
+// 忘记切换导致新套餐、开通有效期和学生年级使用过期学年。
 func (s *MemoryStore) configuredAcademicYear() string {
-	if value := strings.TrimSpace(s.settings["academicYear"]); value != "" {
-		return value
-	}
 	return currentAcademicYear()
 }
 

@@ -210,30 +210,35 @@ export default function Students({ user }: { user: CurrentUser }) {
   }
 
   const columns: TableColumnsType<Student> = [
-    { title: '学生', dataIndex: 'name', width: 120, fixed: 'left' },
-    { title: '年级', dataIndex: 'grade', width: 100 },
-    { title: '手机号', dataIndex: 'phone', width: 140 },
-    { title: '学校', dataIndex: 'schoolName', width: 160, render: (value) => value || '-' },
-    { title: '公众号', dataIndex: 'officialAccountOpenId', width: 110, render: (value) => <Tag color={value ? 'green' : 'orange'}>{value ? '已关联' : '未关联'}</Tag> },
-    { title: '微信绑定', dataIndex: 'bindStatus', width: 110, render: (value) => <Tag color={value === '已绑定' ? 'green' : 'orange'}>{value}</Tag> },
-    { title: '已开通套餐', dataIndex: 'openedPackages', render: (values: string[]) => tagList(values, 'blue', '暂未开通') },
-    { title: '学习状态', dataIndex: 'learningStatus', width: 110, render: (value) => <Tag color={String(value).includes('未') ? 'orange' : 'green'}>{value}</Tag> },
-    { title: '账号状态', dataIndex: 'accountStatus', width: 110, render: (value) => <Tag color={value === '正常' ? 'green' : value === '停用' ? 'default' : 'orange'}>{value}</Tag> },
-    { title: '连续学习', dataIndex: 'streakDays', width: 100, render: (value) => `${value} 天` },
-    { title: '平均分', dataIndex: 'averageScore', width: 90 },
-    { title: '徽章', dataIndex: 'badgeCount', width: 80 },
-    { title: '最近学习', dataIndex: 'lastStudyAt', width: 160, render: (value) => value || '-' },
     {
-      title: '最近提交',
-      width: 180,
-      render: (_, record) => record.lastSubmissionStatus
-        ? <Space size={4}><Tag color={submissionStatusColor(record.lastSubmissionStatus)}>{record.lastSubmissionStatus}</Tag><Typography.Text type="secondary">{record.lastSubmittedAt || '-'}</Typography.Text></Space>
-        : '-'
+      title: '学生',
+      dataIndex: 'name',
+      width: 170,
+      render: (value, record) => <Space direction="vertical" size={0}><Typography.Text strong>{value}</Typography.Text><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
+    },
+    { title: '年级', dataIndex: 'grade', width: 88 },
+    { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
+    {
+      title: '关联状态',
+      width: 108,
+      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag></Space>
     },
     {
+      title: '套餐',
+      dataIndex: 'openedPackages',
+      width: 130,
+      render: (values: string[]) => <Tag color={values?.length ? 'blue' : 'default'}>{values?.length ? `已开通 ${values.length} 个` : '暂未开通'}</Tag>
+    },
+    {
+      title: '学习情况',
+      width: 146,
+      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.learningStatus.includes('未') ? 'orange' : 'green'}>{record.learningStatus}</Tag><Typography.Text type="secondary">连续 {record.streakDays} 天 · 均分 {record.averageScore ?? '-'}</Typography.Text></Space>
+    },
+    { title: '账号', dataIndex: 'accountStatus', width: 88, render: (value) => <Tag color={value === '正常' ? 'green' : value === '停用' ? 'default' : 'orange'}>{value}</Tag> },
+    { title: '最近学习', dataIndex: 'lastStudyAt', width: 150, ellipsis: true, render: (value) => value || '-' },
+    {
       title: '操作',
-      width: writable ? 150 : 64,
-      fixed: 'right',
+      width: writable ? 128 : 52,
       render: (_, record) => (
         <Space size={4}>
           <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
@@ -332,7 +337,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <Table rowKey="id" columns={columns} dataSource={rows} scroll={{ x: 1500 }} pagination={{ pageSize: 8 }} />
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <Table className="student-table" rowKey="id" columns={columns} dataSource={rows} tableLayout="fixed" pagination={{ pageSize: 8 }} />
           )}
         </div>
       </Card>
@@ -828,15 +833,6 @@ function grantBody(student: Student | null, values: GrantFormValues): GrantCreat
 
 function InputDate(props: { disabled?: boolean; min?: string; value?: string; onChange?: (event: any) => void }) {
   return <input className="ant-input" type="date" disabled={props.disabled} min={props.min} value={props.value || ''} onChange={props.onChange} />;
-}
-
-function tagList(values: string[], color: string, emptyText: string) {
-  if (!values || values.length === 0) return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
-  return (
-    <Space size={[4, 4]} wrap>
-      {values.map((value) => <Tag key={value} color={color}>{value}</Tag>)}
-    </Space>
-  );
 }
 
 function tagStatus(value: string) {

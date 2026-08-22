@@ -12,14 +12,12 @@ const SPRING_LABEL = 'S2 第二学期';
 
 // 三个 Tab 分组：系统设置项一多，摊平成一张大表格谁都懒得找。分组按“运营会想在什么场景下打开这一项”来划，
 // 不按数据类型分——校历天天要看，接入状态一年调一次，放在一起只会互相淹没。
-const contentKeys = ['academicYear', 'grades', 'semesters', 'academicPeriods', 'watermarkRule', 'downloadPolicy'];
+const contentKeys = ['grades', 'semesters', 'watermarkRule', 'downloadPolicy'];
 const integrationKeys = ['miniProgramDomainStatus', 'officialAccountBindingStatus', 'templateMessageStatus', 'miniProgramSubscribeStatus', 'productionApiDomain'];
 
 const labels: Record<string, string> = {
-  academicYear: '当前学年',
   grades: '适用年级',
   semesters: '学期设置',
-  academicPeriods: '期中/期末时间段',
   watermarkRule: '水印规则',
   downloadPolicy: '下载规则',
   miniProgramDomainStatus: '小程序域名状态',
@@ -280,7 +278,7 @@ export default function SettingsPage() {
     form.setFieldsValue(row);
   }
 
-  const allEntries = Object.entries(settings.data ?? {}).filter(([key]) => key !== CALENDAR_KEY);
+  const allEntries = Object.entries(settings.data ?? {}).filter(([key]) => key !== CALENDAR_KEY && key !== 'academicYear' && key !== 'academicPeriods');
   const toRows = (keys: string[]) => allEntries.filter(([key]) => keys.includes(key)).map(([key, value]) => ({ key, value })).sort((a, b) => keys.indexOf(a.key) - keys.indexOf(b.key));
   const knownKeys = new Set([...contentKeys, ...integrationKeys]);
   const contentRows = toRows(contentKeys);

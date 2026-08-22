@@ -17,7 +17,7 @@ func TestNewMemoryStoreCanStartWithoutDemoData(t *testing.T) {
 	if len(store.packages) != 0 || len(store.courses) != 0 || len(store.materials) != 0 || len(store.homework) != 0 {
 		t.Fatalf("expected no demo learning data, got packages=%d courses=%d materials=%d homework=%d", len(store.packages), len(store.courses), len(store.materials), len(store.homework))
 	}
-	if store.settings["academicYear"] == "" {
+	if store.settings["academicCalendar"] == "" {
 		t.Fatal("expected base settings to remain available")
 	}
 	if len(store.learningSpaces) == 0 {

@@ -177,7 +177,7 @@ test('校区管理员可以从周历入口新建排课', async ({ page }) => {
   await login(page, '13800000002');
 
   await expectPageHeading(page, '/scheduling', '排课管理');
-  await expect(page.getByText('周排班工作台')).toBeVisible();
+  await expect(page.getByText('排班工作台', { exact: false }).first()).toBeVisible();
   // 默认落在资源泳道日视图，这条用例验的是周视图入口，先切过去。
   await page.locator('.ant-segmented-item-label', { hasText: '周视图' }).click();
   await expect(page.locator('.schedule-timeline-grid')).toBeVisible();
