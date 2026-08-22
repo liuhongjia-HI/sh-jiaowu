@@ -31,9 +31,11 @@ import {
   ScheduleDayResourceTimeline,
   ScheduleWeekTimeline,
   availabilityStats,
+  buildMiniMonthDays,
   buildWeekDays,
   candidateEmptyTips,
   classColumns,
+  findNearestClassDate,
   courseSubjectGradeText,
   filterClasses,
   groupScheduleItems,
@@ -333,6 +335,20 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     [subjectVisibleClasses, selectedWeekDays]
   );
   const classesByDay = useMemo(() => groupScheduleItems(selectedWeekClasses), [selectedWeekClasses]);
+  // 迷你日历上标出这个月每天有几节课。数据源用 subjectVisibleClasses（跟着筛选走、不限于当前周），
+  // 这样翻月份时标记也跟着走，日视图才有得可跳。
+  const classCountByDate = useMemo(() => {
+    const result: Record<string, number> = {};
+    buildMiniMonthDays(calendarMonth).forEach((day) => {
+      const count = subjectVisibleClasses.filter((item) => item.status !== '已取消' && scheduleClassOccursOn(item, day.date)).length;
+      if (count > 0) result[day.key] = count;
+    });
+    return result;
+  }, [calendarMonth, subjectVisibleClasses]);
+  const nearestClassDate = useMemo(
+    () => findNearestClassDate(subjectVisibleClasses, selectedDate),
+    [subjectVisibleClasses, selectedDate]
+  );
   const candidatesByDay = useMemo(() => groupScheduleItems(readyCandidates), [readyCandidates]);
   const availabilityByDay = useMemo(() => groupScheduleItems(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const availabilitySummary = useMemo(() => availabilityStats(availabilityOverview.data ?? []), [availabilityOverview.data]);
@@ -587,6 +603,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                 <MiniMonthCalendar
                   month={calendarMonth}
                   selectedWeekStart={selectedWeekStart}
+                  selectedDate={selectedDate}
+                  highlight={viewMode === 'day' ? 'day' : 'week'}
+                  classCountByDate={classCountByDate}
                   onPickDate={goToDate}
                 />
               </div>
@@ -686,10 +705,12 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   selectedCandidateId={selectedCandidate?.id}
                   emptyTips={emptyTips}
                   canManage={canCreateClass}
+                  nearestClassDate={nearestClassDate}
                   onLaneModeChange={setLaneMode}
                   onPreviousDay={() => goToDate(addDays(selectedDate, -1))}
                   onNextDay={() => goToDate(addDays(selectedDate, 1))}
                   onToday={() => goToDate(new Date())}
+                  onJumpToDate={goToDate}
                   onPickCandidate={(record) => {
                     setSelectedCandidate(record);
                     setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));

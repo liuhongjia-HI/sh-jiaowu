@@ -23,6 +23,13 @@
     </view>
   </view>
   <view wx:else>
+    <view class="section" wx:if="{{promoBanners.length > 0}}">
+      <swiper class="promo-banner-swiper" indicator-dots="{{promoBanners.length > 1}}" indicator-color="rgba(255,255,255,.45)" indicator-active-color="#fff" autoplay circular interval="4500">
+        <swiper-item wx:for="{{promoBanners}}" wx:key="id">
+          <image class="promo-banner-image" src="{{item.imageUrl}}" mode="aspectFill" data-id="{{item.id}}" bindtap="handlePromoBannerTap" />
+        </swiper-item>
+      </swiper>
+    </view>
     <view class="section">
       <view class="starline-intro-banner" bindtap="goStarlineIntro">
         <view>

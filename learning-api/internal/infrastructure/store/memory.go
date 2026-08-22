@@ -60,6 +60,7 @@ type MemoryStore struct {
 	favorites                       map[string]learning.Favorite
 	subscriptionPreferences         map[string]learning.StudentSubscriptionPreference
 	scoreRecords                    []learning.StudentScoreRecord
+	banners                         []learning.Banner
 	wechatResolver                  func(code string) (string, error)
 	phoneResolver                   func(phoneCode string) (string, error)
 	officialNoticeSender            func(learning.Notice) error

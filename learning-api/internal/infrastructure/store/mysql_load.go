@@ -31,6 +31,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadFavoritesFromDB,
 		s.loadSubscriptionPreferencesFromDB,
 		s.loadCommercialFromDB,
+		s.loadBannersFromDB,
 	}
 	for _, loader := range loaders {
 		if err := loader(); err != nil {
@@ -502,6 +503,24 @@ func (s *MemoryStore) loadNoticesFromDB() error {
 	}
 	s.restorePendingNoticeDeliveries()
 	return nil
+}
+
+func (s *MemoryStore) loadBannersFromDB() error {
+	rows, err := s.db.Query(`SELECT id, image_url, title, link_type, link_value, sort_order, starts_at, ends_at, enabled, created_at FROM banners ORDER BY sort_order, id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.Banner{}
+	for rows.Next() {
+		var item learning.Banner
+		if err := rows.Scan(&item.ID, &item.ImageURL, &item.Title, &item.LinkType, &item.LinkValue, &item.SortOrder, &item.StartsAt, &item.EndsAt, &item.Enabled, &item.CreatedAt); err != nil {
+			return err
+		}
+		out = append(out, item)
+	}
+	s.banners = out
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadLogsFromDB() error {

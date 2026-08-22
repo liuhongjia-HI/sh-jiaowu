@@ -10,6 +10,7 @@ type Repository interface {
 	CommercialRepository
 	NoticeRepository
 	SystemRepository
+	BannerRepository
 }
 
 type Service struct {
@@ -22,8 +23,9 @@ type Service struct {
 	commercial CommercialRepository
 	notice     NoticeRepository
 	system     SystemRepository
+	banner     BannerRepository
 }
 
 func NewService(repo Repository) *Service {
-	return &Service{auth: repo, staff: repo, student: repo, content: repo, grant: repo, scheduling: repo, commercial: repo, notice: repo, system: repo}
+	return &Service{auth: repo, staff: repo, student: repo, content: repo, grant: repo, scheduling: repo, commercial: repo, notice: repo, system: repo, banner: repo}
 }

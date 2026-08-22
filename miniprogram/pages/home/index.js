@@ -27,10 +27,12 @@ Page({
     recommendations: [],
     visibleRecommendations: [],
     recommendationsLoading: true,
-    recommendationError: ""
+    recommendationError: "",
+    promoBanners: []
   },
   onLoad() {
     this.loadHome();
+    this.loadPromoBanners();
   },
   onShareAppMessage() {
     const courseName = this.data.continueCourse && this.data.continueCourse.name;
@@ -138,6 +140,39 @@ Page({
         recommendationError: error.message || "推荐套餐加载失败，请稍后重试。",
         recommendationsLoading: false
       }));
+  },
+  // 轮播图是纯展示的运营位，加载失败不该挡住首页其余内容，所以用 silent 请求，
+  // 失败就悄悄清空、不弹错误提示，也不影响 loadHome 那条主链路。
+  loadPromoBanners() {
+    request("/student/banners", { silent: true })
+      .then((banners) => {
+        this.setData({
+          promoBanners: (Array.isArray(banners) ? banners : []).map((item) => ({
+            ...item,
+            imageUrl: normalizeBannerImageUrl(item.imageUrl)
+          }))
+        });
+      })
+      .catch(() => this.setData({ promoBanners: [] }));
+  },
+  handlePromoBannerTap(event) {
+    const id = event.currentTarget.dataset.id;
+    const banner = (this.data.promoBanners || []).find((item) => item.id === id);
+    if (!banner || banner.linkType === "none" || !banner.linkValue) {
+      return;
+    }
+    if (banner.linkType === "page") {
+      navigateByPath(banner.linkValue);
+      return;
+    }
+    if (banner.linkType === "url") {
+      // 小程序不能直接跳外部网页：没有配置业务域名和 web-view 页面时，
+      // 复制链接到剪贴板是唯一能让用户实际打开这个地址的办法。
+      wx.setClipboardData({
+        data: banner.linkValue,
+        success: () => wx.showToast({ title: "链接已复制，请在浏览器打开", icon: "none" })
+      });
+    }
   },
   goStudyDetail() {
     if (!this.data.continueCourse || !this.data.continueCourse.id) {
@@ -364,6 +399,26 @@ function todoIcon(type) {
     subscribe: "醒"
   };
   return icons[type] || "待";
+}
+
+// 后端返回的图片地址是相对服务器根路径的绝对路径（如 /api/banners/images/xxx），
+// image 组件必须给完整地址才能加载，同款转换逻辑在 pages/me/index.js 里也有一份
+// （那边转的是头像），两处独立维护是因为这个仓库里资源地址转换一直是各页面自己内联一份，
+// 不是抽公共方法——跟着现有约定走，不引入新的共享模块。
+function normalizeBannerImageUrl(value) {
+  const text = String(value || "").trim();
+  if (!text || /^https?:\/\//i.test(text)) {
+    return text;
+  }
+  if (text.indexOf("/api/") === 0) {
+    const app = typeof getApp === "function" ? getApp() : null;
+    const baseUrl = app && app.globalData ? String(app.globalData.apiBaseUrl || "").replace(/\/$/, "") : "";
+    if (baseUrl.endsWith("/api")) {
+      return `${baseUrl.slice(0, -4)}${text}`;
+    }
+    return baseUrl ? `${baseUrl}${text}` : text;
+  }
+  return text;
 }
 
 function navigateByPath(path) {

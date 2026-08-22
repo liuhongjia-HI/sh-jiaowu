@@ -204,6 +204,20 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			channel VARCHAR(32) NOT NULL DEFAULT '',
 			failure_reason TEXT NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		// banners 是学生端小程序首页的运营轮播图，纯新表，不像其它表那样有历史数据要迁移，
+		// 直接建表即可，不需要额外的 ensureColumnDefinition 补列步骤。
+		`CREATE TABLE IF NOT EXISTS banners (
+			id VARCHAR(64) PRIMARY KEY,
+			image_url TEXT NOT NULL,
+			title VARCHAR(128) NOT NULL DEFAULT '',
+			link_type VARCHAR(16) NOT NULL DEFAULT 'none',
+			link_value VARCHAR(512) NOT NULL DEFAULT '',
+			sort_order INT NOT NULL DEFAULT 0,
+			starts_at VARCHAR(32) NOT NULL DEFAULT '',
+			ends_at VARCHAR(32) NOT NULL DEFAULT '',
+			enabled TINYINT(1) NOT NULL DEFAULT 1,
+			created_at VARCHAR(32) NOT NULL DEFAULT ''
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {

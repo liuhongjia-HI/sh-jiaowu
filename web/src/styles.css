@@ -388,6 +388,21 @@ body {
   grid-column: 1 / -1;
 }
 
+.banner-thumb {
+  width: 120px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e1e7f0;
+  background: #f5f7fb;
+}
+
+.banner-upload-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .info-card-tags {
   min-width: 0;
 }
@@ -867,6 +882,45 @@ body {
 .schedule-mini-day.is-today {
   box-shadow: inset 0 0 0 1px #2563eb;
   font-weight: 700;
+}
+
+/* 日视图选中的是具体一天，用实心底色和整周高亮区分开。
+   写在 is-week-selected / is-today 之后：特异性相同，靠顺序覆盖。 */
+.schedule-mini-day.is-day-selected {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* 「这天有课」的圆点：日视图一次只看一天，没有它就看不出该往哪天翻。
+   用 position 定位而不是插 DOM 节点，避免影响 place-items:center 的数字居中。 */
+.schedule-mini-day.has-classes {
+  position: relative;
+}
+
+.schedule-mini-day.has-classes::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.schedule-mini-day.has-classes.is-day-selected::after {
+  background: #fff;
+}
+
+.schedule-day-empty {
+  display: grid;
+  gap: 12px;
+  padding: 28px 16px;
+  border: 1px solid #e1e7f0;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .schedule-subject-list,

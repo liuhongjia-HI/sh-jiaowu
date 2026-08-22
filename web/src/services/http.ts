@@ -14,6 +14,19 @@ export const http = axios.create({
   timeout: 15000
 });
 
+// 后端返回的图片地址（轮播图、头像）是相对服务器根路径的绝对路径（如 /api/banners/images/xxx），
+// 已经带着 /api 前缀了。本地开发时 baseURL 是同源的 '/api'，走 vite 代理直接能用；
+// 生产环境 baseURL 是跨域的完整网关地址，<img> 标签不会经过 axios 的 baseURL 拼接，
+// 必须自己把网关源拼回去，否则图片会被当成当前后台域名下的路径去请求，404。
+export function resolveAssetUrl(path?: string) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = resolveApiBaseUrl();
+  if (!/^https?:\/\//i.test(base)) return path;
+  const origin = base.replace(/\/api\/?$/, '');
+  return `${origin}${path}`;
+}
+
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) {
@@ -130,5 +143,10 @@ export async function postForm<T>(url: string, body: FormData) {
   const response = await http.post<ApiResponse<T>>(url, body, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
+  return response.data.data;
+}
+
+export async function deleteData<T>(url: string) {
+  const response = await http.delete<ApiResponse<T>>(url);
   return response.data.data;
 }

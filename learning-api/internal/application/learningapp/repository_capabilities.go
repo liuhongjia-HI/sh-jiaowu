@@ -107,6 +107,14 @@ type NoticeRepository interface {
 	ContentPermissions() []learning.ContentPermissionSummary
 }
 
+type BannerRepository interface {
+	Banners() []learning.Banner
+	ActiveStudentBanners() []learning.Banner
+	CreateBanner(string, learning.BannerUpsertRequest) (learning.Banner, error)
+	UpdateBanner(string, string, learning.BannerUpsertRequest) (learning.Banner, error)
+	DeleteBanner(string, string) error
+}
+
 type SystemRepository interface {
 	Dashboard() learning.DashboardOverview
 	SystemReadiness() learning.SystemReadiness

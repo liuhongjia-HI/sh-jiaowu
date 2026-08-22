@@ -259,3 +259,84 @@ test("home page opens notice tab when mini program subscribe templates are not c
   assert.deepEqual(calls.find((item) => item[0] === "showToast"), ["showToast", "提醒服务开通中，可先查看通知消息"]);
   assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/notices/index"]);
 });
+
+test("home page loads promo banners and resolves image urls against the api origin", async () => {
+  const page = loadHomePage((path) => {
+    if (path === "/student/banners") {
+      return Promise.resolve([
+        { id: "banner-1", imageUrl: "/api/banners/images/banner-1.jpg", linkType: "none", linkValue: "" }
+      ]);
+    }
+    return Promise.resolve({});
+  }, {}, { globalData: { apiBaseUrl: "https://gate.starlineeducation.com.cn/api" } });
+
+  page.loadPromoBanners();
+  await flushPromises();
+
+  assert.equal(page.data.promoBanners.length, 1);
+  assert.equal(page.data.promoBanners[0].imageUrl, "https://gate.starlineeducation.com.cn/api/banners/images/banner-1.jpg");
+});
+
+test("home page promo banner tap navigates to an in-app page", async () => {
+  const calls = [];
+  const page = loadHomePage((path) => {
+    if (path === "/student/banners") {
+      return Promise.resolve([{ id: "banner-1", imageUrl: "/img.jpg", linkType: "page", linkValue: "/pages/study/index" }]);
+    }
+    return Promise.resolve({});
+  }, {
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    },
+    navigateTo(args) {
+      calls.push(["navigateTo", args.url]);
+    }
+  });
+
+  page.loadPromoBanners();
+  await flushPromises();
+  page.handlePromoBannerTap({ currentTarget: { dataset: { id: "banner-1" } } });
+
+  assert.deepEqual(calls, [["switchTab", "/pages/study/index"]]);
+});
+
+test("home page promo banner tap copies an external link instead of failing silently", async () => {
+  const calls = [];
+  const page = loadHomePage((path) => {
+    if (path === "/student/banners") {
+      return Promise.resolve([{ id: "banner-1", imageUrl: "/img.jpg", linkType: "url", linkValue: "https://example.com/promo" }]);
+    }
+    return Promise.resolve({});
+  }, {
+    setClipboardData(args) {
+      calls.push(["setClipboardData", args.data]);
+      args.success && args.success();
+    },
+    showToast(args) {
+      calls.push(["showToast", args.title]);
+    }
+  });
+
+  page.loadPromoBanners();
+  await flushPromises();
+  page.handlePromoBannerTap({ currentTarget: { dataset: { id: "banner-1" } } });
+
+  assert.deepEqual(calls, [
+    ["setClipboardData", "https://example.com/promo"],
+    ["showToast", "链接已复制，请在浏览器打开"]
+  ]);
+});
+
+test("home page ignores promo banner requests that fail instead of breaking the page", async () => {
+  const page = loadHomePage((path) => {
+    if (path === "/student/banners") {
+      return Promise.reject(new Error("network error"));
+    }
+    return Promise.resolve({});
+  });
+
+  page.loadPromoBanners();
+  await flushPromises();
+
+  assert.deepEqual(page.data.promoBanners, []);
+});

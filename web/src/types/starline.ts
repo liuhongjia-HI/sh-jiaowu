@@ -472,6 +472,34 @@ export type NoticeCreateRequest = {
   relatedId?: string;
 };
 
+export type BannerLinkType = 'none' | 'page' | 'url';
+
+export type Banner = {
+  id: string;
+  imageUrl: string;
+  title: string;
+  linkType: BannerLinkType;
+  linkValue: string;
+  sortOrder: number;
+  startsAt?: string;
+  endsAt?: string;
+  enabled: boolean;
+  // 后端算好的展示状态：生效中 / 未开始 / 已结束 / 已停用，前端不用自己比日期。
+  status: string;
+  createdAt: string;
+};
+
+export type BannerUpsertRequest = {
+  imageUrl: string;
+  title: string;
+  linkType: BannerLinkType;
+  linkValue: string;
+  sortOrder: number;
+  startsAt?: string;
+  endsAt?: string;
+  enabled: boolean;
+};
+
 export type OperationLog = {
   id: string;
   operator: string;

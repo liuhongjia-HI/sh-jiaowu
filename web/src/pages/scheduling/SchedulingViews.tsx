@@ -342,10 +342,12 @@ export function ScheduleDayResourceTimeline({
   selectedCandidateId,
   emptyTips,
   canManage,
+  nearestClassDate,
   onLaneModeChange,
   onPreviousDay,
   onNextDay,
   onToday,
+  onJumpToDate,
   onPickCandidate,
   onEditClass,
   onMoveClass,
@@ -354,6 +356,7 @@ export function ScheduleDayResourceTimeline({
   loading: boolean;
   selectedDate: Date;
   laneMode: ResourceLaneMode;
+  nearestClassDate: { date: Date; count: number } | null;
   availabilityByDay: Record<number, AvailabilitySlot[]>;
   candidatesByDay: Record<number, ScheduleCandidate[]>;
   classesByDay: Record<number, ScheduleClass[]>;
@@ -368,6 +371,7 @@ export function ScheduleDayResourceTimeline({
   onPreviousDay: () => void;
   onNextDay: () => void;
   onToday: () => void;
+  onJumpToDate: (date: Date) => void;
   onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
@@ -422,13 +426,8 @@ export function ScheduleDayResourceTimeline({
 
   return (
     <div className="schedule-timeline-wrap">
-      {!hasAnyItem && (
-        <ScheduleEmptyTips
-          description={candidateRequest ? '这一天暂时没有可展示的排课结果。' : '这一天还没有课程，也没有收集到可排时间。'}
-          tips={emptyTips}
-          compact
-        />
-      )}
+      {/* 工具栏必须排在空态前面：先让人看清「你在看哪一天」，再说这天没有内容。
+          反过来的话，满屏「还没有课程」而日期在下方，很容易被读成整个功能坏了。 */}
       <div className="schedule-timeline-toolbar">
         <Space size={8}>
           <Button icon={<LeftOutlined />} onClick={onPreviousDay} />
@@ -451,6 +450,30 @@ export function ScheduleDayResourceTimeline({
           ]}
         />
       </div>
+
+      {/* 空态要给出路。「这天没课」本身没有信息量，能用的是「最近的排课在哪天」——
+          否则用户只能盲点上一天/下一天去撞。候选查找的提示（emptyTips）只在真的
+          发起过查找时才展示：没查找时那句「先选择学科和年级」和「这天没课」无关，是误导。 */}
+      {!hasAnyItem && (
+        <div className="schedule-day-empty">
+          <Empty
+            description={candidateRequest
+              ? `${formatDayTitle(selectedDate)} 没有符合条件的排课结果。`
+              : `${formatDayTitle(selectedDate)} 没有课程，也没有收集到可排时间。`}
+          >
+            {nearestClassDate && (
+              <Button type="primary" onClick={() => onJumpToDate(nearestClassDate.date)}>
+                最近的排课在 {formatDayTitle(nearestClassDate.date)}（{nearestClassDate.count} 节），去看看
+              </Button>
+            )}
+          </Empty>
+          {candidateRequest && emptyTips.length > 0 && (
+            <div className="schedule-tip-list">
+              {emptyTips.map((tip) => <div key={tip}>{tip}</div>)}
+            </div>
+          )}
+        </div>
+      )}
 
       {hasAnyItem && (
         <div ref={scrollRef} className="schedule-timeline-scroll">
@@ -541,19 +564,51 @@ export function ScheduleEmptyTips({ description, tips, compact = false }: { desc
   );
 }
 
-export function MiniMonthCalendar({ month, selectedWeekStart, onPickDate }: { month: Date; selectedWeekStart: Date; onPickDate: (date: Date) => void }) {
+// 迷你日历同时承担「跳转」和「这个月哪几天有课」的导航职责。
+// 后者是日视图能用起来的前提：日视图一次只看一天，如果日历上看不出哪天有课，
+// 打开就是空白的那天时，用户没有任何线索知道该往哪翻，只能盲点上一天/下一天。
+//
+// highlight 区分两种视图：周视图选中的是一整周，日视图选中的是具体某一天。
+// 日视图下仍然高亮整周的话，点 19 号和点 21 号看起来完全一样，等于没有反馈。
+export function MiniMonthCalendar({
+  month,
+  selectedWeekStart,
+  selectedDate,
+  highlight = 'week',
+  classCountByDate,
+  onPickDate
+}: {
+  month: Date;
+  selectedWeekStart: Date;
+  selectedDate?: Date;
+  highlight?: 'week' | 'day';
+  classCountByDate?: Record<string, number>;
+  onPickDate: (date: Date) => void;
+}) {
   const days = useMemo(() => buildMiniMonthDays(month), [month]);
-  const selectedKey = localDateText(selectedWeekStart);
+  const selectedWeekKey = localDateText(selectedWeekStart);
+  const selectedDayKey = selectedDate ? localDateText(selectedDate) : '';
   return (
     <div className="schedule-mini-calendar">
       {['一', '二', '三', '四', '五', '六', '日'].map((item) => <span className="schedule-mini-week" key={item}>{item}</span>)}
       {days.map((day) => {
-        const weekSelected = localDateText(startOfWeek(day.date)) === selectedKey;
+        const weekSelected = highlight === 'week' && localDateText(startOfWeek(day.date)) === selectedWeekKey;
+        const daySelected = highlight === 'day' && day.key === selectedDayKey;
+        const count = classCountByDate?.[day.key] ?? 0;
+        const className = [
+          'schedule-mini-day',
+          day.inMonth ? '' : 'is-outside',
+          weekSelected ? 'is-week-selected' : '',
+          daySelected ? 'is-day-selected' : '',
+          day.isToday ? 'is-today' : '',
+          count > 0 ? 'has-classes' : ''
+        ].filter(Boolean).join(' ');
         return (
           <button
             type="button"
-            className={`schedule-mini-day ${day.inMonth ? '' : 'is-outside'} ${weekSelected ? 'is-week-selected' : ''} ${day.isToday ? 'is-today' : ''}`}
+            className={className}
             key={day.key}
+            title={count > 0 ? `${day.key} 有 ${count} 节课` : day.key}
             onClick={() => onPickDate(day.date)}
           >
             {day.date.getDate()}
@@ -1439,6 +1494,24 @@ export function buildMiniMonthDays(base: Date) {
       isToday: key === todayKey
     };
   });
+}
+
+// findNearestClassDate 从 fromDate 向两边找最近一个有课的日期，用于日视图的空态兜底：
+// 「今天没课」本身不是有用的信息，「最近的排课在周三」才是。没有它，用户只能盲点翻页。
+// 课程是按周重复的（dayOfWeek + startDate/endDate 区间），所以只能逐天试 scheduleClassOccursOn，
+// 没法直接从记录里读出日期。窗口取 ±maxDays 天，找不到就返回 null（真的一节课都没有）。
+// 同距离时优先未来：排课是往前看的动作，跳到下周三比跳回上周三更符合预期。
+export function findNearestClassDate(classes: ScheduleClass[], fromDate: Date, maxDays = 60) {
+  const active = classes.filter((item) => item.status !== '已取消');
+  if (active.length === 0) return null;
+  const hits = (date: Date) => active.filter((item) => scheduleClassOccursOn(item, date));
+  for (let offset = 1; offset <= maxDays; offset += 1) {
+    for (const date of [addDays(fromDate, offset), addDays(fromDate, -offset)]) {
+      const found = hits(date);
+      if (found.length > 0) return { date, count: found.length };
+    }
+  }
+  return null;
 }
 
 export function hasGroupedItems<T>(groups: Record<number, T[]>) {

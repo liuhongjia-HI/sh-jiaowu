@@ -17,5 +17,8 @@ func engagementRows(s *MemoryStore) []persistenceRow {
 	for _, item := range s.subscriptionPreferences {
 		rows = append(rows, simpleRow("student_subscriptions", "student_id", item.StudentID, `INSERT INTO student_subscriptions (student_id, enabled, template_ids_json, updated_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE enabled=VALUES(enabled), template_ids_json=VALUES(template_ids_json), updated_at=VALUES(updated_at)`, item.StudentID, item.Enabled, mustJSON(item.TemplateIDs), nullableDateTime(item.UpdatedAt)))
 	}
+	for _, item := range s.banners {
+		rows = append(rows, simpleRow("banners", "id", item.ID, `INSERT INTO banners (id, image_url, title, link_type, link_value, sort_order, starts_at, ends_at, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE image_url=VALUES(image_url), title=VALUES(title), link_type=VALUES(link_type), link_value=VALUES(link_value), sort_order=VALUES(sort_order), starts_at=VALUES(starts_at), ends_at=VALUES(ends_at), enabled=VALUES(enabled), created_at=VALUES(created_at)`, item.ID, item.ImageURL, item.Title, item.LinkType, item.LinkValue, item.SortOrder, item.StartsAt, item.EndsAt, item.Enabled, item.CreatedAt))
+	}
 	return rows
 }

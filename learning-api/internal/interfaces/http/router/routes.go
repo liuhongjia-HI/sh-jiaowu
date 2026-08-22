@@ -29,6 +29,8 @@ func registerPublicRoutes(api *gin.RouterGroup, h *handler.LearningHandler) {
 	api.GET("/health", h.Health)
 	// 学生头像由 image 组件直接读取，不能依赖 Authorization header；文件名使用不可预测随机值。
 	api.GET("/student/avatars/:asset", h.StudentAvatar)
+	// 轮播图和头像一样：小程序首页 image 组件在登录前就要显示，不能挂 Authorization header。
+	api.GET("/banners/images/:asset", h.BannerImage)
 	api.POST("/auth/wechat-login", h.WechatLogin)
 	api.POST("/auth/admin-password-login", h.AdminPasswordLogin)
 	api.POST("/auth/demo-student-login", h.DemoStudentLogin)
@@ -82,6 +84,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/availability", h.Availability)
 	g.PUT("/availability", h.SaveAvailability)
 	g.GET("/schedule-classes", h.ScheduleClasses)
+	g.GET("/banners", h.Banners)
 }
 
 func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
@@ -111,6 +114,10 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.POST("/schedule-classes", h.CreateScheduleClass)
 	g.PUT("/schedule-classes/:id", h.UpdateScheduleClass)
 	g.POST("/schedule-classes/:id/cancel", h.CancelScheduleClass)
+	g.POST("/banners", h.CreateBanner)
+	g.PUT("/banners/:id", h.UpdateBanner)
+	g.DELETE("/banners/:id", h.DeleteBanner)
+	g.POST("/banners/upload", h.UploadBannerImage)
 }
 
 func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
@@ -134,6 +141,7 @@ func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
 	g := api.Group("/student", middleware.AuthRequired(tokens, service, learning.RoleStudent))
 	g.GET("/home", h.StudentHome)
+	g.GET("/banners", h.StudentBanners)
 	g.GET("/recommendations", h.StudentRecommendations)
 	g.POST("/subscription", h.ConfirmStudentSubscription)
 	g.GET("/study", h.StudentStudy)

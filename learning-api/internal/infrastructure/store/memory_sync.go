@@ -355,6 +355,36 @@ func (s *MemoryStore) Logs() []learning.OperationLog {
 	return result
 }
 
+func (s *MemoryStore) Banners() []learning.Banner {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.bannersUnlocked()
+}
+
+func (s *MemoryStore) ActiveStudentBanners() []learning.Banner {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeStudentBannersUnlocked()
+}
+
+func (s *MemoryStore) CreateBanner(operator string, req learning.BannerUpsertRequest) (learning.Banner, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.createBannerUnlocked(operator, req)
+}
+
+func (s *MemoryStore) UpdateBanner(operator string, id string, req learning.BannerUpsertRequest) (learning.Banner, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.updateBannerUnlocked(operator, id, req)
+}
+
+func (s *MemoryStore) DeleteBanner(operator string, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deleteBannerUnlocked(operator, id)
+}
+
 func (s *MemoryStore) Settings() map[string]string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
