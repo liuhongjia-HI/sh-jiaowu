@@ -7,6 +7,30 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+// 复现真实用户看到的 bug：演示密码登录、老师/管理员登录、或者阶段2上线前
+// 签发的旧 token，principal 里都没有 GuardianID（这些路径压根不经过
+// ensureGuardianLink）。这种情况必须安安静静地返回空列表——不能报错，
+// 因为小程序"我的"页每次都会调这个接口去判断要不要显示切换器，报错会
+// 被 wx.showToast 不看 silent 选项直接弹给用户，绝大多数单孩子家庭会
+// 平白多看到一条"当前账号未关联家长身份"的吓人提示（这就是原始 bug）。
+func TestStudentAccountsIsQuietForNonGuardianLogins(t *testing.T) {
+	store := NewMemoryStore()
+	demoPrincipal, err := store.LoginWithDemoStudentPassword("18500009069", "123456")
+	if err != nil {
+		t.Fatalf("demo student login: %v", err)
+	}
+	if demoPrincipal.GuardianID != "" {
+		t.Fatalf("expected demo password login to have no guardian identity, got %#v", demoPrincipal)
+	}
+	accounts, err := store.StudentAccounts(demoPrincipal)
+	if err != nil {
+		t.Fatalf("expected no error for a non-guardian login, got %v", err)
+	}
+	if len(accounts) != 0 {
+		t.Fatalf("expected an empty switcher list, got %#v", accounts)
+	}
+}
+
 // 走真实的登录入口而不是直接摆数据，因为 StudentAccounts/SwitchStudentAccount
 // 现在读的是 guardian_students 关系表，而这张表只在登录成功那一刻由
 // ensureGuardianLink 建立——绕开登录直接调用会让这条测试跟真实用户路径脱节。

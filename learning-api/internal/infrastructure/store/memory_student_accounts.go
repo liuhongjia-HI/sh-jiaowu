@@ -10,9 +10,15 @@ import (
 // studentAccountsUnlocked 列出当前家长能看到的所有孩子，用来渲染"我的"页的
 // 切换器。来源是 guardian_students 关系表，不再靠"同一个手机号"临时撞出来——
 // 关系在登录成功的那一刻就已经建好（见 ensureGuardianLink），这里只是读。
+//
+// 没有 GuardianID（演示密码登录、老师/管理员账号、还没走过微信登录的旧
+// token）不是错误，就是"没有可切换的孩子"——小程序每次进"我的"页都会
+// 调这个接口探测要不要显示切换器，如果这里报错，前端的 wx.showToast 会
+// 不看 silent 选项直接把错误弹给用户，绝大多数单孩子家庭会平白多看到一条
+// 吓人的提示。返回空列表，界面该怎样就怎样：没有切换器可显示而已。
 func (s *MemoryStore) studentAccountsUnlocked(principal learning.Principal) ([]learning.StudentAccount, error) {
 	if principal.GuardianID == "" {
-		return nil, errors.New("当前账号未关联家长身份")
+		return []learning.StudentAccount{}, nil
 	}
 	accounts := make([]learning.StudentAccount, 0)
 	for _, relation := range s.guardianStudents {
