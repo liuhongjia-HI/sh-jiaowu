@@ -109,12 +109,21 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 		if !hasRole(user.Roles, learning.RoleStudent) {
 			return principalFromUser(user), nil
 		}
-		// 静默重新登录（只带 openID，不带手机号）：优先恢复家长上次查看的孩子，
-		// 而不是死认最初完成手机号绑定时用的那个 user 记录——不然家长在"我的"
-		// 页切到老二之后，小程序一重启又跳回老大，跟切换器承诺的行为对不上。
-		principal := principalFromUser(user)
+		// 静默重新登录（只带 openID，不带手机号）也要重新扫一遍这个手机号下
+		// 现在有没有别的孩子——不然家长绑定老大之后，后台才给同一个手机号
+		// 加老二，家长完全没有重新授权手机号的动作可做，永远看不到切换器。
+		// 用已经在档、验证过的手机号懒补，不需要家长重新走一遍手机号授权。
+		if strings.TrimSpace(user.Phone) != "" {
+			if err := s.backfillGuardianLinksForPhone(user.Phone); err != nil {
+				return learning.Principal{}, err
+			}
+		}
+		// 优先恢复家长上次查看的孩子，而不是死认最初完成手机号绑定时用的
+		// 那个 user 记录——不然家长在"我的"页切到老二之后，小程序一重启
+		// 又跳回老大，跟切换器承诺的行为对不上。
 		if idx, ok := s.findGuardianByOpenIDIndex(openID); ok {
 			guardian := s.guardians[idx]
+			principal := principalFromUser(user)
 			principal.GuardianID = guardian.ID
 			if guardian.LastStudentID != "" && guardian.LastStudentID != user.StudentID &&
 				s.guardianStudentActive(guardian.ID, guardian.LastStudentID) {
@@ -124,8 +133,16 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 					return resumed, nil
 				}
 			}
+			return principal, nil
 		}
-		return principal, nil
+		// 这个 openID 从来没有建立过家长身份——阶段2上线之前就绑定过的老账号，
+		// 或者当初这个手机号下还只有一个孩子（backfill 要求至少两个才动手）。
+		if strings.TrimSpace(user.Phone) != "" {
+			principal := principalFromUser(user)
+			principal.GuardianID = s.ensureGuardianLink(user.Phone, openID, user.StudentID)
+			return principal, nil
+		}
+		return principalFromUser(user), nil
 	}
 	return learning.Principal{}, errors.New("微信账号未绑定，请先填写学生信息并授权手机号完成身份绑定")
 }

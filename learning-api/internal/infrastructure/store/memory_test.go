@@ -139,6 +139,65 @@ func TestLoginWithWechatCodeBindsStudentByPhone(t *testing.T) {
 	}
 }
 
+// 复现真实场景：家长先用手机号绑定了老大（这时候这个手机号下还只有一个
+// 孩子，不会触发多子女的关系建立），后台之后又给同一个手机号加了老二，
+// 家长完全没有重新走一遍手机号授权，只是照常打开小程序（静默登录，只带
+// openID）。这种情况下"我的"页的切换器也应该能看到老二，而不是永远卡在
+// "当初绑定时是什么样，现在就还是什么样"。
+func TestSilentReloginPicksUpSiblingAddedAfterOriginalBinding(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("admin principal: %v", err)
+	}
+	if _, err := store.CreateStudent("超级管理员", admin, learning.StudentUpsertRequest{
+		Name: "浪花", Phone: "18518673993", Grade: "五年级", SchoolName: "星河小学", AccountStatus: "正常",
+	}); err != nil {
+		t.Fatalf("create initial student: %v", err)
+	}
+
+	first, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "family-openid", Phone: "18518673993", StudentName: "浪花", SchoolName: "星河小学", Grade: "五年级",
+	})
+	if err != nil {
+		t.Fatalf("expected initial phone binding to succeed: %v", err)
+	}
+	if first.GuardianID == "" {
+		t.Fatalf("expected the original binding to already establish a guardian identity, got %#v", first)
+	}
+	accountsBeforeSibling, err := store.StudentAccounts(first)
+	if err != nil || len(accountsBeforeSibling) != 1 {
+		t.Fatalf("expected exactly the one existing child before any sibling exists, got %#v err=%v", accountsBeforeSibling, err)
+	}
+
+	sibling, err := store.CreateStudent("超级管理员", admin, learning.StudentUpsertRequest{
+		Name: "浪花弟弟", Phone: "18518673993", Grade: "二年级", AccountStatus: "正常",
+	})
+	if err != nil {
+		t.Fatalf("create sibling after original binding: %v", err)
+	}
+
+	// 家长完全没有重新授权手机号，只是照常打开小程序——这是静默登录路径。
+	resumed, err := store.LoginWithWechatCode(learning.WechatLoginRequest{Code: "family-openid"})
+	if err != nil {
+		t.Fatalf("expected silent relogin to succeed: %v", err)
+	}
+	if resumed.GuardianID != first.GuardianID {
+		t.Fatalf("expected silent relogin to keep the same guardian identity, before=%q after=%q", first.GuardianID, resumed.GuardianID)
+	}
+
+	accounts, err := store.StudentAccounts(resumed)
+	if err != nil {
+		t.Fatalf("expected no error listing accounts: %v", err)
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("expected the switcher to now include the newly added sibling, got %#v", accounts)
+	}
+	if !store.GuardianStudentActive(resumed.GuardianID, sibling.ID) {
+		t.Fatal("expected the sibling to be actively linked after the silent relogin backfill")
+	}
+}
+
 func TestWechatStudentBindingValidatesProfile(t *testing.T) {
 	store := NewMemoryStore()
 	for i := range store.students {

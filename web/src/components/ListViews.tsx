@@ -107,11 +107,24 @@ export function InfoCard({ title, subtitle, status, fields = [], tags, actions, 
   );
 }
 
+const TAG_GROUP_VISIBLE_LIMIT = 3;
+
 export function TagGroup({ values, color, emptyText = '无', className }: { values?: string[]; color?: string; emptyText?: string; className?: string }) {
   if (!values || values.length === 0) return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
+  const visible = values.slice(0, TAG_GROUP_VISIBLE_LIMIT);
+  const hidden = values.slice(TAG_GROUP_VISIBLE_LIMIT);
   return (
     <Space className={className} size={[4, 4]} wrap>
-      {values.map((value, index) => <Tag key={`${value}-${index}`} color={color}>{value}</Tag>)}
+      {visible.map((value, index) => (
+        <Tooltip key={`${value}-${index}`} title={value}>
+          <Tag className="tag-ellipsis" color={color}>{value}</Tag>
+        </Tooltip>
+      ))}
+      {hidden.length > 0 && (
+        <Tooltip title={hidden.join('、')}>
+          <Tag className="tag-ellipsis-more">{`+${hidden.length}`}</Tag>
+        </Tooltip>
+      )}
     </Space>
   );
 }
