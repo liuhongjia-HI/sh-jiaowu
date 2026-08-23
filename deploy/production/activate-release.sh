@@ -123,14 +123,14 @@ if command -v nginx >/dev/null 2>&1; then
 	rm -f /etc/nginx/conf.d/starline-upload-limits.conf
 	NGINX_GATEWAY_CONFIG="$(nginx -T 2>&1 | awk '
 		/^# configuration file / { file = $4; sub(/:$/, "", file); next }
-		/server_name[[:space:]]+gate\.starlineeducation\.com\.cn[[:space:];]/ { print file; exit }
+		/server_name.*(^|[[:space:]])gate\.starlineeducation\.com\.cn([[:space:];]|$)/ { print file; exit }
 	')"
 	if [ -z "$NGINX_GATEWAY_CONFIG" ] || [ ! -f "$NGINX_GATEWAY_CONFIG" ]; then
 		echo "Unable to locate the active Nginx gateway server configuration." >&2
 		exit 1
 	fi
 	if ! grep -q 'starline-upload-limit' "$NGINX_GATEWAY_CONFIG"; then
-		sed -i '/server_name gate\.starlineeducation\.com\.cn;/a\    client_max_body_size 50m; # starline-upload-limit' "$NGINX_GATEWAY_CONFIG"
+		sed -i '/server_name.*\(^\|[[:space:]]\)gate\.starlineeducation\.com\.cn\([[:space:];]\|$\)/a\    client_max_body_size 50m; # starline-upload-limit' "$NGINX_GATEWAY_CONFIG"
 	fi
 	nginx -t
 	if command -v systemctl >/dev/null 2>&1; then
