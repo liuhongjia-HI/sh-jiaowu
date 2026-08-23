@@ -52,6 +52,8 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	work.users = cloneUsers(s.users)
 	work.packages = clonePackages(s.packages)
 	work.students = cloneStudents(s.students)
+	work.guardians = append([]learning.Guardian(nil), s.guardians...)
+	work.guardianStudents = append([]learning.GuardianStudent(nil), s.guardianStudents...)
 	work.learningSpaces = append([]learningSpace(nil), s.learningSpaces...)
 	work.packageSpaces = append([]packageSpace(nil), s.packageSpaces...)
 	work.contentTypes = append([]packageContentType(nil), s.contentTypes...)
@@ -147,6 +149,8 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.users = work.users
 	s.packages = work.packages
 	s.students = work.students
+	s.guardians = work.guardians
+	s.guardianStudents = work.guardianStudents
 	s.learningSpaces = work.learningSpaces
 	s.packageSpaces = work.packageSpaces
 	s.contentTypes = work.contentTypes

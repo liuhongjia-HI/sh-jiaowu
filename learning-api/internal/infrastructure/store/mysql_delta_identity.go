@@ -1,7 +1,17 @@
 package store
 
 func identityRows(s *MemoryStore) []persistenceRow {
-	rows := make([]persistenceRow, 0, len(s.students)+len(s.users)*3+len(s.learningSpaces))
+	rows := make([]persistenceRow, 0, len(s.students)+len(s.users)*3+len(s.learningSpaces)+len(s.guardians)+len(s.guardianStudents))
+	for _, guardian := range s.guardians {
+		rows = append(rows, simpleRow("guardians", "id", guardian.ID,
+			`INSERT INTO guardians (id, phone, open_id, union_id, name, nickname, last_student_id, account_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE phone=VALUES(phone), open_id=VALUES(open_id), union_id=VALUES(union_id), name=VALUES(name), nickname=VALUES(nickname), last_student_id=VALUES(last_student_id), account_status=VALUES(account_status)`,
+			guardian.ID, guardian.Phone, guardian.OpenID, guardian.UnionID, guardian.Name, guardian.Nickname, guardian.LastStudentID, guardian.AccountStatus))
+	}
+	for _, relation := range s.guardianStudents {
+		rows = append(rows, relationRow("guardian_students", []string{"guardian_id", "student_id"}, []any{relation.GuardianID, relation.StudentID},
+			`INSERT INTO guardian_students (guardian_id, student_id, relation, is_primary, status) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE relation=VALUES(relation), is_primary=VALUES(is_primary), status=VALUES(status)`,
+			relation.GuardianID, relation.StudentID, relation.Relation, boolInt(relation.IsPrimary), relation.Status))
+	}
 	for _, space := range s.learningSpaces {
 		rows = append(rows, simpleRow("learning_spaces", "id", space.ID,
 			`INSERT INTO learning_spaces (id, academic_year, grade, subject, semester, phase, name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE academic_year=VALUES(academic_year), grade=VALUES(grade), subject=VALUES(subject), semester=VALUES(semester), phase=VALUES(phase), name=VALUES(name), status=VALUES(status)`,

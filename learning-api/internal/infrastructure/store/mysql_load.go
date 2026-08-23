@@ -14,6 +14,8 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadLearningSpacesFromDB,
 		s.loadStudentsFromDB,
 		s.loadUsersFromDB,
+		s.loadGuardiansFromDB,
+		s.loadGuardianStudentsFromDB,
 		s.loadPackagesFromDB,
 		s.loadCoursesFromDB,
 		s.loadQuestionBankFromDB,
@@ -84,6 +86,44 @@ func (s *MemoryStore) loadStudentsFromDB() error {
 		out = append(out, item)
 	}
 	s.students = out
+	return rows.Err()
+}
+
+func (s *MemoryStore) loadGuardiansFromDB() error {
+	rows, err := s.db.Query(`SELECT id, phone, open_id, union_id, name, nickname, last_student_id, account_status FROM guardians ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.Guardian{}
+	for rows.Next() {
+		var item learning.Guardian
+		if err := rows.Scan(&item.ID, &item.Phone, &item.OpenID, &item.UnionID, &item.Name, &item.Nickname, &item.LastStudentID, &item.AccountStatus); err != nil {
+			return err
+		}
+		out = append(out, item)
+	}
+	s.guardians = out
+	return rows.Err()
+}
+
+func (s *MemoryStore) loadGuardianStudentsFromDB() error {
+	rows, err := s.db.Query(`SELECT guardian_id, student_id, relation, is_primary, status FROM guardian_students ORDER BY guardian_id, student_id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.GuardianStudent{}
+	for rows.Next() {
+		var item learning.GuardianStudent
+		var isPrimary int
+		if err := rows.Scan(&item.GuardianID, &item.StudentID, &item.Relation, &isPrimary, &item.Status); err != nil {
+			return err
+		}
+		item.IsPrimary = isPrimary == 1
+		out = append(out, item)
+	}
+	s.guardianStudents = out
 	return rows.Err()
 }
 

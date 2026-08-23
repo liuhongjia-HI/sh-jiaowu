@@ -32,6 +32,34 @@ CREATE TABLE IF NOT EXISTS users (
   KEY idx_users_student_id (student_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- guardians / guardian_students：多子女/多家长的家长-学生关系表。登录主体是
+-- 家长，谁能看哪个孩子由这张关系表决定，不再靠 students.phone 撞出来。
+CREATE TABLE IF NOT EXISTS guardians (
+  id VARCHAR(64) PRIMARY KEY,
+  phone VARCHAR(32) NOT NULL DEFAULT '',
+  open_id VARCHAR(128) NOT NULL DEFAULT '',
+  union_id VARCHAR(128) NOT NULL DEFAULT '',
+  name VARCHAR(64) NOT NULL DEFAULT '',
+  nickname VARCHAR(64) NOT NULL DEFAULT '',
+  last_student_id VARCHAR(64) NOT NULL DEFAULT '',
+  account_status VARCHAR(32) NOT NULL DEFAULT '正常',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_guardian_phone (phone),
+  KEY idx_guardian_open_id (open_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS guardian_students (
+  guardian_id VARCHAR(64) NOT NULL,
+  student_id VARCHAR(64) NOT NULL,
+  relation VARCHAR(16) NOT NULL DEFAULT '家长',
+  is_primary TINYINT(1) NOT NULL DEFAULT 0,
+  status VARCHAR(16) NOT NULL DEFAULT '在读',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (guardian_id, student_id),
+  KEY idx_guardian_students_student (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS student_subscriptions (
   student_id VARCHAR(64) PRIMARY KEY,
   enabled TINYINT(1) NOT NULL DEFAULT 0,

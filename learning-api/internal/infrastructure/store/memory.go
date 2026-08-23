@@ -31,6 +31,8 @@ type MemoryStore struct {
 	users                           []learning.User
 	packages                        []learning.Package
 	students                        []learning.Student
+	guardians                       []learning.Guardian
+	guardianStudents                []learning.GuardianStudent
 	learningSpaces                  []learningSpace
 	packageSpaces                   []packageSpace
 	contentTypes                    []packageContentType

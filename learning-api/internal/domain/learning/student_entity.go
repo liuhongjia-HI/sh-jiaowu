@@ -59,6 +59,51 @@ type StudentQuery struct {
 	PackageState   string
 }
 
+// Guardian 是登录主体：家长用手机号/微信登录，登录之后可能同时看得到多个孩子。
+// 学生档案（Student）本身不再假定"一个手机号 = 一个孩子"，谁能看哪个孩子由
+// GuardianStudent 关系表决定，而不是靠 students.phone 撞出来。
+type Guardian struct {
+	ID       string `json:"id"`
+	Phone    string `json:"phone"`
+	OpenID   string `json:"openId,omitempty"`
+	UnionID  string `json:"unionId,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Nickname string `json:"nickname,omitempty"`
+	// LastStudentID 只是新会话默认展示哪个孩子的提示值，不是权威状态——权威值
+	// 是 token 里的 activeStudentID，每次切换只更新这里，从不用来做权限判断。
+	LastStudentID string `json:"lastStudentId,omitempty"`
+	AccountStatus string `json:"accountStatus"`
+}
+
+// GuardianRelation 描述家长和学生之间是什么关系，决定权限展示和消息落款怎么称呼。
+type GuardianRelation string
+
+const (
+	GuardianRelationSelf   GuardianRelation = "本人"
+	GuardianRelationFather GuardianRelation = "爸爸"
+	GuardianRelationMother GuardianRelation = "妈妈"
+	GuardianRelationOther  GuardianRelation = "其他家长"
+)
+
+// GuardianStudentStatus 决定这个孩子还出不出现在家长的切换器里。结课/退费不能
+// 直接删关系——家长事后还要能查到历史学习记录，只是不再默认展示。
+type GuardianStudentStatus string
+
+const (
+	GuardianStudentActive   GuardianStudentStatus = "在读"
+	GuardianStudentInactive GuardianStudentStatus = "结课"
+)
+
+// GuardianStudent 是家长与学生的多对多关系：一个家长可能关联多个孩子（多子女），
+// 一个孩子也可能关联多个家长（爸爸/妈妈各自的微信）。
+type GuardianStudent struct {
+	GuardianID string                `json:"guardianId"`
+	StudentID  string                `json:"studentId"`
+	Relation   GuardianRelation      `json:"relation"`
+	IsPrimary  bool                  `json:"isPrimary,omitempty"`
+	Status     GuardianStudentStatus `json:"status"`
+}
+
 type StudentLearningRecord struct {
 	ID          string `json:"id"`
 	Type        string `json:"type"`

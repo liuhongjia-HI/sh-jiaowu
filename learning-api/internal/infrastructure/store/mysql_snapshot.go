@@ -58,6 +58,8 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM admin_campus_scopes",
 		"DELETE FROM user_roles",
 		"DELETE FROM users",
+		"DELETE FROM guardian_students",
+		"DELETE FROM guardians",
 		"DELETE FROM students",
 		"DELETE FROM learning_spaces",
 	}
@@ -68,6 +70,22 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	if err := s.persistStaticRowsTx(tx); err != nil {
 		return err
+	}
+	for _, guardian := range s.guardians {
+		if _, err := tx.Exec(
+			`INSERT INTO guardians (id, phone, open_id, union_id, name, nickname, last_student_id, account_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			guardian.ID, guardian.Phone, guardian.OpenID, guardian.UnionID, guardian.Name, guardian.Nickname, guardian.LastStudentID, guardian.AccountStatus,
+		); err != nil {
+			return err
+		}
+	}
+	for _, relation := range s.guardianStudents {
+		if _, err := tx.Exec(
+			`INSERT INTO guardian_students (guardian_id, student_id, relation, is_primary, status) VALUES (?, ?, ?, ?, ?)`,
+			relation.GuardianID, relation.StudentID, relation.Relation, boolInt(relation.IsPrimary), relation.Status,
+		); err != nil {
+			return err
+		}
 	}
 	for _, space := range s.learningSpaces {
 		if _, err := tx.Exec(
