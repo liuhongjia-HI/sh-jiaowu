@@ -414,7 +414,7 @@ export function NoticeDialog({
               { label: '通知', value: '通知' },
               { label: '练习提醒', value: '练' },
               { label: '批改反馈', value: '评' },
-              { label: '套餐到期', value: '权' },
+              { label: '课程到期', value: '权' },
               { label: '资料更新', value: '资' }
             ]}
           />
@@ -508,7 +508,7 @@ export function PackageDialog({
 
   return (
     <Modal
-      title={editing ? '编辑学习套餐' : '新增学习套餐'}
+      title={editing ? '编辑课程方案' : '新增课程方案'}
       open={open}
       okText="保存"
       cancelText="取消"
@@ -526,7 +526,7 @@ export function PackageDialog({
       width={720}
     >
         <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
-        <Form.Item name="name" label="套餐名称" rules={[{ required: true, message: '请输入套餐名称' }]}>
+        <Form.Item name="name" label="方案名称" rules={[{ required: true, message: '请输入方案名称' }]}>
           <Input
             placeholder="下面选完后自动生成，也可以手动修改"
             onChange={(event) => {
@@ -586,7 +586,7 @@ export function PackageDialog({
           <Form.Item name="phaseScope" label="适用阶段">
             <Input style={{ width: 180 }} placeholder="全学期" />
           </Form.Item>
-          <Form.Item name="packageType" label="套餐类型">
+          <Form.Item name="packageType" label="方案类型">
             <Input style={{ width: 180 }} placeholder="不填则按开放内容自动生成" />
           </Form.Item>
           <Form.Item name="status" label="状态">
@@ -601,7 +601,7 @@ export function PackageDialog({
           </Form.Item>
         </Space>
         <Form.Item name="summary" label="说明">
-          <Input.TextArea rows={3} placeholder="说明这个套餐适合什么学生、包含哪些学习内容。" />
+          <Input.TextArea rows={3} placeholder="说明这个方案适合什么学生、包含哪些课程内容。" />
         </Form.Item>
       </Form>
     </Modal>

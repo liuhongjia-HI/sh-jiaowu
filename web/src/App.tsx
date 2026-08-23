@@ -14,7 +14,6 @@ import {
   SafetyCertificateOutlined,
   SettingOutlined,
   TeamOutlined,
-  UnlockOutlined,
   UsergroupAddOutlined,
   UserOutlined,
   UserSwitchOutlined
@@ -37,8 +36,6 @@ const QuestionsPage = lazy(() => import('./pages/resources/QuestionsPage'));
 const NoticesPage = lazy(() => import('./pages/resources/NoticesPage'));
 const LogsPage = lazy(() => import('./pages/resources/LogsPage'));
 const SettingsPage = lazy(() => import('./pages/resources/SettingsPage'));
-const OpenPackage = lazy(() => import('./pages/OpenPackage'));
-const Permissions = lazy(() => import('./pages/Permissions'));
 const AdminStaff = lazy(() => import('./pages/AdminStaff'));
 const Teachers = lazy(() => import('./pages/Teachers'));
 const Students = lazy(() => import('./pages/Students'));
@@ -73,13 +70,11 @@ const navItems: NavNode[] = [
   {
     key: 'student-access',
     icon: <SafetyCertificateOutlined />,
-    label: '学生与开通',
+    label: '学生与老师',
     children: [
       { key: '/students', icon: <TeamOutlined />, label: '学生管理', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/teachers', icon: <UserSwitchOutlined />, label: '老师管理', roles: ['campus_admin', 'super_admin'] },
-      { key: '/packages', icon: <BookOutlined />, label: '学习套餐', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
-      { key: '/open', icon: <UnlockOutlined />, label: '开通套餐', roles: ['ops_staff', 'campus_admin', 'super_admin'] },
-      { key: '/permissions', icon: <SafetyCertificateOutlined />, label: '学习权限', roles: ['ops_staff', 'campus_admin', 'super_admin'] }
+      { key: '/packages', icon: <BookOutlined />, label: '课程方案', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] }
     ]
   },
   {
@@ -415,8 +410,8 @@ function Shell({ user }: { user: CurrentUser }) {
             <Routes>
               <Route path="/dashboard" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Dashboard /></GuardedRoute>} />
               <Route path="/packages" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><PackagesPage user={user} /></GuardedRoute>} />
-              <Route path="/open" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><OpenPackage /></GuardedRoute>} />
-              <Route path="/permissions" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><Permissions /></GuardedRoute>} />
+              <Route path="/open" element={<Navigate to="/students" replace />} />
+              <Route path="/permissions" element={<Navigate to="/students" replace />} />
               <Route path="/admin-staff" element={<GuardedRoute user={user} roles={['super_admin']}><AdminStaff /></GuardedRoute>} />
               <Route path="/teachers" element={<GuardedRoute user={user} roles={['campus_admin', 'super_admin']}><Teachers /></GuardedRoute>} />
               <Route path="/students" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Students user={user} /></GuardedRoute>} />

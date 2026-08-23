@@ -24,7 +24,7 @@ import {
 import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getData, postData, postForm, putData } from '../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
 import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
@@ -63,8 +63,6 @@ type StudentFilters = {
 
 type GrantFormValues = {
   packageId: string;
-  startsAt?: string;
-  endsAt?: string;
 };
 
 function canWrite(user: CurrentUser) {
@@ -101,21 +99,10 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
 
   const packageId = Form.useWatch('packageId', grantForm);
-  const grantStartsAt = Form.useWatch('startsAt', grantForm);
   const availableGrantPackages = useMemo(
     () => (packages.data ?? []).filter((item) => item.status === '启用' && item.grade === grantStudent?.grade),
     [packages.data, grantStudent?.grade]
   );
-  const grantPreview = useQuery({
-    queryKey: ['student-grant-preview', grantStudent?.id, packageId],
-    enabled: Boolean(grantStudent?.id && packageId),
-    queryFn: () => getData<GrantPreview>('/grants/preview', { studentId: grantStudent?.id ?? '', packageId })
-  });
-  useEffect(() => {
-    if (!grantPreview.data) return;
-    if (!grantForm.getFieldValue('startsAt')) grantForm.setFieldValue('startsAt', grantPreview.data.existingStartsAt || grantPreview.data.startsAtDefault);
-    if (!grantForm.getFieldValue('endsAt')) grantForm.setFieldValue('endsAt', grantPreview.data.existingUntil || grantPreview.data.endsAtDefault);
-  }, [grantForm, grantPreview.data]);
 
   const saveStudent = useMutation({
     mutationFn: (values: StudentFormValues) => {
@@ -162,14 +149,14 @@ export default function Students({ user }: { user: CurrentUser }) {
   const createGrant = useMutation({
     mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', grantBody(grantStudent, values)),
     onSuccess: (result) => {
-      message.success(result.alreadyOpened ? '套餐有效期已更新，学习权限已同步。' : '学习套餐已开通');
+      message.success(`${result.packageName} 已开通，课程权限已同步。`);
       setGrantStudent(null);
       grantForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err: Error) => message.error(err.message || '开通失败，请检查学生和学习套餐。')
+    onError: (err: Error) => message.error(err.message || '开通失败，请检查学生和课程方案。')
   });
 
   const importStudents = useMutation({
@@ -234,7 +221,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag></Space>
     },
     {
-      title: '套餐',
+      title: '课程',
       dataIndex: 'openedPackages',
       width: 130,
       render: (values: string[]) => <Tag color={values?.length ? 'blue' : 'default'}>{values?.length ? `已开通 ${values.length} 个` : '暂未开通'}</Tag>
@@ -252,7 +239,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       render: (_, record) => (
         <Space size={4}>
           <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
-          {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
+          {writable && record.accountStatus !== '停用' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
           {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
           {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
         </Space>
@@ -273,7 +260,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>学生管理</Typography.Title>
-          <Typography.Text type="secondary">查看账号、套餐、进度和跟进状态。</Typography.Text>
+          <Typography.Text type="secondary">查看学生状态，并直接开通家长购买的课程。</Typography.Text>
         </div>
         {writable && (
           <Space>
@@ -285,7 +272,7 @@ export default function Students({ user }: { user: CurrentUser }) {
 
       <div className="student-stat-grid">
         <Card><Statistic title="学生总数" value={stats.total} /></Card>
-        <Card><Statistic title="已开通套餐" value={stats.opened} /></Card>
+        <Card><Statistic title="已开通课程" value={stats.opened} /></Card>
         <Card><Statistic title="待跟进" value={stats.waiting} /></Card>
         <Card><Statistic title="已停用" value={stats.disabled} /></Card>
       </div>
@@ -334,11 +321,11 @@ export default function Students({ user }: { user: CurrentUser }) {
                         : '-'
                     }
                   ]}
-                  tags={<TagGroup values={record.openedPackages} color="blue" emptyText="暂未开通学习套餐" />}
+                  tags={<TagGroup values={record.openedPackages} color="blue" emptyText="暂未开通课程" />}
                   actions={(
                     <>
                       <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
-                      {writable && <ActionButton tooltip="开通" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
+                      {writable && record.accountStatus !== '停用' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
                       {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
                       {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
                     </>
@@ -388,7 +375,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       </Modal>
 
       <Modal
-        title={grantStudent ? `给 ${grantStudent.name} 开通套餐` : '开通套餐'}
+        title={grantStudent ? `给 ${grantStudent.name} 开通课程` : '开通课程'}
         open={Boolean(grantStudent)}
         onCancel={() => {
           setGrantStudent(null);
@@ -396,58 +383,29 @@ export default function Students({ user }: { user: CurrentUser }) {
         }}
         onOk={() => grantForm.submit()}
         confirmLoading={createGrant.isPending}
-        okButtonProps={{ disabled: !packageId }}
+        okText="开通课程"
+        cancelText="取消"
+        okButtonProps={{ disabled: !packageId || createGrant.isPending }}
         destroyOnHidden
       >
+        <Typography.Paragraph type="secondary">
+          选择家长购买的课程方案，系统将立即开放方案内的课程、资料和练习，有效期按当前校历自动计算。
+        </Typography.Paragraph>
         <Form form={grantForm} layout="vertical" onFinish={(values) => createGrant.mutate(values)}>
-          <Form.Item name="packageId" label="学习套餐" rules={[{ required: true, message: '请选择套餐' }]}>
+          <Form.Item name="packageId" label="课程方案" rules={[{ required: true, message: '请选择课程方案' }]}>
             <Select
               showSearch
               optionFilterProp="label"
-              placeholder={grantStudent ? '选择学习套餐' : '请先选择学生'}
+              placeholder={grantStudent ? '选择家长购买的课程方案' : '请先选择学生'}
               options={availableGrantPackages.map((item) => ({ label: packageOptionLabel(item), value: item.id }))}
               loading={packages.isLoading}
               disabled={!grantStudent}
-              notFoundContent={grantStudent ? '该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。' : '请先选择学生，再选择该年级可用套餐。'}
-              onChange={() => grantForm.setFieldsValue({ startsAt: undefined, endsAt: undefined })}
+              notFoundContent={grantStudent ? '该学生所在年级还没有可用课程方案，请先到课程方案中创建或启用。' : '请先选择学生。'}
             />
           </Form.Item>
-          <Space size={12} style={{ width: '100%' }} align="start">
-            <Form.Item name="startsAt" label="开始日期" rules={[{ required: true, message: '请选择开始日期' }]} style={{ flex: 1 }}>
-              <InputDate disabled={!packageId} />
-            </Form.Item>
-            <Form.Item
-              name="endsAt"
-              label="结束日期"
-              dependencies={['startsAt']}
-              rules={[
-                { required: true, message: '请选择结束日期' },
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    const start = getFieldValue('startsAt');
-                    if (!value || !start || value >= start) return Promise.resolve();
-                    return Promise.reject(new Error('结束日期不能早于开始日期'));
-                  }
-                })
-              ]}
-              style={{ flex: 1 }}
-            >
-              <InputDate disabled={!packageId} min={grantStartsAt} />
-            </Form.Item>
-          </Space>
         </Form>
         {grantStudent && availableGrantPackages.length === 0 && (
-          <Alert type="warning" showIcon message="该学生所在年级暂无启用套餐，请先到学习套餐中创建或启用对应年级套餐。" />
-        )}
-        {!packageId && availableGrantPackages.length > 0 && <Alert type="info" message="请选择学习套餐后查看学生可学习的内容。" />}
-        {grantPreview.isLoading && <Skeleton active />}
-        {grantPreview.data && (
-          <Alert
-            type={grantPreview.data.alreadyOpened ? 'info' : 'success'}
-            showIcon
-            message={grantPreview.data.alreadyOpened ? `${grantPreview.data.studentName} 已开通：${grantPreview.data.packageName}` : `${grantPreview.data.studentName} 将开通：${grantPreview.data.packageName}`}
-            description={grantPreview.data.alreadyOpened ? `当前有效期：${grantPreview.data.existingStartsAt || '-'} 至 ${grantPreview.data.existingUntil || '-'}` : `适用课程范围：${grantPreview.data.learningSpaces.join('、') || '暂无'}；包含学习内容：${grantPreview.data.contentTypes.join('、') || '暂无'}；默认有效期：${grantPreview.data.effectiveDefault}`}
-          />
+          <Alert type="warning" showIcon message="该学生所在年级还没有可用课程方案，请先到课程方案中创建或启用。" />
         )}
       </Modal>
 
@@ -745,7 +703,7 @@ function StudentProfile({
       <CardList
         rows={detail.grants}
         rowKey={(record) => record.packageId}
-        emptyText="暂未开通学习套餐"
+        emptyText="暂未开通课程"
         renderCard={(record) => (
           <InfoCard
             title={record.packageName}
@@ -884,14 +842,8 @@ function packageOptionLabel(item: StudyPackage) {
 function grantBody(student: Student | null, values: GrantFormValues): GrantCreateRequest {
   return {
     studentId: student?.id,
-    packageId: values.packageId,
-    startsAt: values.startsAt,
-    endsAt: values.endsAt
+    packageId: values.packageId
   };
-}
-
-function InputDate(props: { disabled?: boolean; min?: string; value?: string; onChange?: (event: any) => void }) {
-  return <input className="ant-input" type="date" disabled={props.disabled} min={props.min} value={props.value || ''} onChange={props.onChange} />;
 }
 
 function tagStatus(value: string) {

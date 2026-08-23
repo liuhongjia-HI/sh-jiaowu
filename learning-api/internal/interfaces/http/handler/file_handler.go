@@ -371,29 +371,38 @@ func copyFile(sourcePath, targetPath string) error {
 	return err
 }
 
-func buildPreview(originalPath, previewDir, ext string) (string, string) {
+func buildPreview(ctx context.Context, originalPath, previewDir, ext string) (string, error) {
 	if ext == ".pdf" {
 		// 预览文件必须与原始文件在磁盘上物理分离：即使内容一开始相同，
 		// 学生端也永远只可能拿到 preview/ 目录下的文件路径，任何代码路径的
 		// 疏漏都不会意外把 original/ 目录下的原文件暴露出去。
 		previewPath := filepath.Join(previewDir, filepath.Base(originalPath))
 		if err := copyFile(originalPath, previewPath); err != nil {
-			return "", "预览生成失败"
+			return "", fmt.Errorf("复制 PDF 预览文件失败: %w", err)
 		}
-		return previewPath, "可预览"
+		return previewPath, nil
 	}
 	if _, err := exec.LookPath("soffice"); err != nil {
-		return "", "预览生成失败"
+		return "", errors.New("服务器未安装 LibreOffice，无法转换 Word/PPT")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	profileDir, err := os.MkdirTemp("", "starline-soffice-")
+	if err != nil {
+		return "", fmt.Errorf("创建 LibreOffice 临时目录失败: %w", err)
+	}
+	defer os.RemoveAll(profileDir)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "soffice", "--headless", "--convert-to", "pdf", "--outdir", previewDir, originalPath)
-	if err := cmd.Run(); err != nil {
-		return "", "预览生成失败"
+	profileURI := "file://" + filepath.ToSlash(profileDir)
+	cmd := exec.CommandContext(ctx, "soffice", "-env:UserInstallation="+profileURI, "--headless", "--convert-to", "pdf", "--outdir", previewDir, originalPath)
+	if _, err := cmd.CombinedOutput(); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", errors.New("LibreOffice 转换超时，请检查文件大小或内容")
+		}
+		return "", errors.New("LibreOffice 转换失败，请检查 Word/PPT 是否损坏或已加密")
 	}
 	previewPath := filepath.Join(previewDir, strings.TrimSuffix(filepath.Base(originalPath), filepath.Ext(originalPath))+".pdf")
 	if _, err := os.Stat(previewPath); err != nil {
-		return "", "预览生成失败"
+		return "", errors.New("LibreOffice 未生成 PDF，请检查 Word/PPT 是否损坏或已加密")
 	}
-	return previewPath, "可预览"
+	return previewPath, nil
 }

@@ -359,6 +359,19 @@ func TestGrantPreviewRejectsDisabledPackage(t *testing.T) {
 	}
 }
 
+func TestCreateGrantRejectsDisabledStudent(t *testing.T) {
+	store := NewMemoryStore()
+	store.students[0].AccountStatus = "停用"
+	packageID := packageID(4, "英文", 0, "full")
+
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{
+		StudentID: "stu-001",
+		PackageID: packageID,
+	}); err == nil || !strings.Contains(err.Error(), "学生账号已停用") {
+		t.Fatalf("expected disabled student to be rejected, got %v", err)
+	}
+}
+
 func TestCreateCourseRespectsTeacherScope(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")

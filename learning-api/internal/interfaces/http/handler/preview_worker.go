@@ -86,13 +86,22 @@ func (w *PreviewWorker) generate(ctx context.Context, asset learning.FileAsset) 
 	if err := os.MkdirAll(pageDir, 0750); err != nil {
 		return learning.PreviewResult{}, fmt.Errorf("创建分页目录失败: %w", err)
 	}
-	previewPath, status := buildPreview(asset.OriginalPath, previewDir, filepath.Ext(asset.OriginalPath))
-	if status != "可预览" || previewPath == "" {
-		return learning.PreviewResult{}, errors.New("预览PDF生成失败，请检查文件格式和转换服务")
+	previewPath, err := buildPreview(ctx, asset.OriginalPath, previewDir, filepath.Ext(asset.OriginalPath))
+	if err != nil {
+		return learning.PreviewResult{}, err
 	}
 	pageCount, err := countPDFPages(ctx, previewPath)
 	if err != nil {
-		return learning.PreviewResult{}, fmt.Errorf("课件页数识别失败: %w", err)
+		if errors.Is(err, errGhostscriptUnavailable) {
+			return learning.PreviewResult{
+				PreviewPath:    previewPath,
+				PreviewWarning: "服务器未安装 Ghostscript，PDF 可以预览，但暂不生成分页图片",
+			}, nil
+		}
+		return learning.PreviewResult{
+			PreviewPath:    previewPath,
+			PreviewWarning: "PDF 可以预览，但分页图片生成失败：" + err.Error(),
+		}, nil
 	}
 	if pageCount > maxPreviewPages {
 		return learning.PreviewResult{}, fmt.Errorf("课件共%d页，超过%d页上限", pageCount, maxPreviewPages)
@@ -100,7 +109,10 @@ func (w *PreviewWorker) generate(ctx context.Context, asset learning.FileAsset) 
 	for page := 1; page <= pageCount; page++ {
 		target := filepath.Join(pageDir, fmt.Sprintf("page-%04d.jpg", page))
 		if err := rasterizePDFPage(ctx, previewPath, target, page); err != nil {
-			return learning.PreviewResult{}, fmt.Errorf("第%d页生成失败: %w", page, err)
+			return learning.PreviewResult{
+				PreviewPath:    previewPath,
+				PreviewWarning: fmt.Sprintf("PDF 可以预览，但第%d页图片生成失败：%v", page, err),
+			}, nil
 		}
 	}
 	return learning.PreviewResult{PreviewPath: previewPath, PreviewPageDir: pageDir, PreviewPageCount: pageCount}, nil

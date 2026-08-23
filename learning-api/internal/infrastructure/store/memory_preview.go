@@ -85,7 +85,7 @@ func (s *MemoryStore) CompletePreviewJob(jobID string, result learning.PreviewRe
 		asset.PreviewPageDir = result.PreviewPageDir
 		asset.PreviewPageCount = result.PreviewPageCount
 		asset.PreviewStatus = "可预览"
-		asset.PreviewError = ""
+		asset.PreviewError = strings.TrimSpace(result.PreviewWarning)
 		work.fileAssets[asset.ID] = *asset
 		work.syncContentPreviewStatus(asset.ID, "可预览")
 		job.Status = "已完成"

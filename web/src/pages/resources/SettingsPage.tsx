@@ -159,7 +159,7 @@ function AcademicCalendarCard({
   return (
     <Card title="学年校历" extra={<Button type="primary" size="small" icon={<PlusOutlined />} onClick={openAdd}>新增学年</Button>}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        每学年一行，填秋季、春季学期的起止日期即可，可以提前配好下一学年。新开通的学习套餐默认在当前学年最后一天到期，开通当天即生效；已开通的记录不受影响，单个学生的有效期仍可在开通时单独调整。
+        每学年一行，填秋季、春季学期的起止日期即可，可以提前配好下一学年。教务开通课程时当天自动生效，并在当前学年最后一天到期；已开通记录不受影响。
       </Typography.Paragraph>
       {rows.length === 0 ? (
         <Empty description="还没有配置校历，点击右上角新增学年。" />

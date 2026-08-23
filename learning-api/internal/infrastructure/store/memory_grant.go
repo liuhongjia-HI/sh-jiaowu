@@ -82,6 +82,9 @@ func (s *MemoryStore) validateGrantTarget(studentID, packageID string) (learning
 	if pkg.Status != learning.StatusEnabled {
 		return learning.Student{}, learning.Package{}, errors.New("该套餐当前未启用，不能开通")
 	}
+	if strings.TrimSpace(student.AccountStatus) == "停用" {
+		return learning.Student{}, learning.Package{}, errors.New("该学生账号已停用，请先恢复账号")
+	}
 	if student.Grade != pkg.Grade {
 		return learning.Student{}, learning.Package{}, errors.New("该套餐适用于" + pkg.Grade + "，不能给" + student.Grade + "学生开通")
 	}

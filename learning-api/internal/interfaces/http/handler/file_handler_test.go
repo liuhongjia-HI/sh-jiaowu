@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,10 +23,10 @@ func TestBuildPreviewNeverReusesOriginalPathForPDF(t *testing.T) {
 		t.Fatalf("write original: %v", err)
 	}
 
-	previewPath, status := buildPreview(originalPath, previewDir, ".pdf")
+	previewPath, err := buildPreview(context.Background(), originalPath, previewDir, ".pdf")
 
-	if status != "可预览" {
-		t.Fatalf("status = %q, want 可预览", status)
+	if err != nil {
+		t.Fatalf("build preview: %v", err)
 	}
 	if previewPath == originalPath {
 		t.Fatalf("previewPath must never equal originalPath, got the same path %q", previewPath)
@@ -51,6 +52,14 @@ func TestBuildPreviewNeverReusesOriginalPathForPDF(t *testing.T) {
 	}
 	if string(stillOriginalCopy) != string(want) {
 		t.Fatalf("preview copy changed after mutating original, physical separation is broken")
+	}
+}
+
+func TestBuildPreviewExplainsMissingLibreOffice(t *testing.T) {
+	withEmptyPath(t)
+	_, err := buildPreview(context.Background(), "/tmp/lesson.docx", t.TempDir(), ".docx")
+	if err == nil || err.Error() != "服务器未安装 LibreOffice，无法转换 Word/PPT" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

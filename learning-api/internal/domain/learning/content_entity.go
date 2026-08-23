@@ -252,6 +252,7 @@ type PreviewResult struct {
 	PreviewPath      string
 	PreviewPageDir   string
 	PreviewPageCount int
+	PreviewWarning   string
 }
 
 type MaterialUploadRequest struct {

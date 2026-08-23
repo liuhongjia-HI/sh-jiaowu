@@ -8,9 +8,7 @@ const dryRun = process.env.ADMIN_SMOKE_DRY_RUN === '1';
 const pages = [
   ['/dashboard', '今日待办'],
   ['/students', '学生管理'],
-  ['/packages', '学习套餐'],
-  ['/open', '开通套餐'],
-  ['/permissions', '学习权限'],
+  ['/packages', '课程方案'],
   ['/content', '课程内容'],
   ['/scheduling', '排课管理'],
   ['/materials', '学习资料'],
@@ -43,7 +41,7 @@ async function login(page, phone, password = '123456') {
 async function run() {
   if (dryRun) {
     assert(typeof chromium.launch === 'function', 'playwright chromium launcher is unavailable');
-    assert(pages.length >= 16, 'admin page coverage is incomplete');
+    assert(pages.length >= 14, 'admin page coverage is incomplete');
     console.log('admin smoke dry run ok');
     return;
   }
@@ -96,7 +94,7 @@ async function run() {
     await waitForText(page, '当前账号不能访问这个功能');
   });
 
-  await step('校区管理员可以打开学生开通和权限核查入口', async () => {
+  await step('校区管理员可以在学生管理直接开通课程', async () => {
     await context.clearCookies();
     await page.goto(`${baseURL}/login`, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => localStorage.clear());
@@ -105,13 +103,14 @@ async function run() {
     await waitForText(page, '学生管理');
     await page.getByRole('button', { name: '新增学生' }).waitFor({ state: 'visible', timeout: 10_000 });
     await page.getByRole('button', { name: '批量导入' }).waitFor({ state: 'visible', timeout: 10_000 });
+    await page.getByRole('button', { name: '开通课程' }).first().click();
+    await waitForText(page, '选择家长购买的课程方案');
     await page.goto(`${baseURL}/open`, { waitUntil: 'domcontentloaded' });
-    await waitForText(page, '选择学生和套餐');
-    await waitForText(page, '本次学习权限预览');
+    await waitForText(page, '学生管理');
+    assert(page.url().includes('/students'), `expected legacy open URL to redirect, got ${page.url()}`);
     await page.goto(`${baseURL}/permissions`, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('tab', { name: '按学生查看' }).waitFor({ state: 'visible', timeout: 10_000 });
-    await page.getByRole('tab', { name: '按套餐查看' }).waitFor({ state: 'visible', timeout: 10_000 });
-    await page.getByRole('tab', { name: '按内容查看' }).waitFor({ state: 'visible', timeout: 10_000 });
+    await waitForText(page, '学生管理');
+    assert(page.url().includes('/students'), `expected legacy permissions URL to redirect, got ${page.url()}`);
   });
 
   await step('退出登录会清理后台访问态', async () => {

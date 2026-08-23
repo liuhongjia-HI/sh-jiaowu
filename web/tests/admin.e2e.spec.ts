@@ -70,9 +70,7 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
   const pages: Array<[string, string]> = [
     ['/dashboard', '今日待办'],
     ['/students', '学生管理'],
-    ['/packages', '学习套餐'],
-    ['/open', '开通套餐'],
-    ['/permissions', '学习权限'],
+    ['/packages', '课程方案'],
     ['/content', '课程内容'],
     ['/scheduling', '排课管理'],
     ['/materials', '学习资料'],
@@ -91,12 +89,12 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
   }
 });
 
-test('新增学习套餐默认带出当前学年', async ({ page }) => {
+test('新增课程方案默认带出当前学年', async ({ page }) => {
   await login(page, '13800000001');
-  await expectPageHeading(page, '/packages', '学习套餐');
+  await expectPageHeading(page, '/packages', '课程方案');
 
-  await page.getByRole('button', { name: '新增套餐' }).click();
-  const dialog = page.getByRole('dialog', { name: '新增学习套餐' });
+  await page.getByRole('button', { name: '新增方案' }).click();
+  const dialog = page.getByRole('dialog', { name: '新增课程方案' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
@@ -115,21 +113,24 @@ test('教师账号不能进入运营和系统高权限功能', async ({ page }) 
   await expect(page.getByText('当前账号不能访问这个功能')).toBeVisible();
 });
 
-test('校区管理员可以打开学生开通和权限核查入口', async ({ page }) => {
+test('校区管理员可以在学生管理直接开通课程', async ({ page }) => {
   await login(page, '13800000002');
 
   await expectPageHeading(page, '/students', '学生管理');
   await expect(page.getByRole('button', { name: '新增学生' })).toBeVisible();
   await expect(page.getByRole('button', { name: '批量导入' })).toBeVisible();
+  await page.getByRole('button', { name: '开通课程' }).first().click();
+  const dialog = page.getByRole('dialog', { name: /开通课程/ });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('课程方案')).toBeVisible();
+  await expect(dialog.getByLabel('开始日期')).toHaveCount(0);
+  await expect(dialog.getByLabel('结束日期')).toHaveCount(0);
 
-  await expectPageHeading(page, '/open', '开通套餐');
-  await expect(page.getByText('选择学生和套餐')).toBeVisible();
-  await expect(page.getByText('本次学习权限预览')).toBeVisible();
-
-  await expectPageHeading(page, '/permissions', '学习权限');
-  await expect(page.getByRole('tab', { name: '按学生查看' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: '按套餐查看' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: '按内容查看' })).toBeVisible();
+  await page.goto('/open');
+  await expect(page).toHaveURL(/\/students$/);
+  await expect(page.getByRole('heading', { name: '学生管理' })).toBeVisible();
+  await page.goto('/permissions');
+  await expect(page).toHaveURL(/\/students$/);
 });
 
 test('教师可以进入题库并打开手动组卷入口', async ({ page }) => {

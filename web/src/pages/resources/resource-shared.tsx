@@ -27,7 +27,7 @@ type ContentFormValues = {
 type QuestionFormValues = QuestionBankUpsertRequest;
 
 export const config: Record<Kind, { title: string; desc: string; path: string }> = {
-  packages: { title: '学习套餐', desc: '维护年级、学科和开放内容。', path: '/packages' },
+  packages: { title: '课程方案', desc: '维护年级、学科和自动开放内容。', path: '/packages' },
   content: { title: '课程内容', desc: '维护课程、章节和课节安排。', path: '/courses' },
   questions: { title: '题库', desc: '按年级、学期和学科维护可复用题目。', path: '/questions' },
   materials: { title: '学习资料', desc: '维护学习资料、图片和课件。', path: '/materials' },
@@ -39,10 +39,10 @@ export const config: Record<Kind, { title: string; desc: string; path: string }>
 };
 
 export const emptyTextByKind: Record<Kind, string> = {
-  packages: '还没有学习套餐，先创建套餐后再给学生开通。',
+  packages: '还没有课程方案，先配置课程包含的资料和练习。',
   content: '还没有课程内容，先维护课程和章节。',
   questions: '还没有题库题目，先按年级、学期和学科新增题目。',
-  materials: '还没有学习资料，上传资料后学生开通套餐即可查看。',
+  materials: '还没有学习资料，上传后会随课程方案自动开放。',
   homework: '还没有课后练习，先从题库选题组卷。',
   review: '暂时没有待批改练习。',
   notices: '还没有通知提醒。',
@@ -220,8 +220,8 @@ export function labelOf(key: string) {
     status: '状态',
     accountStatus: '账号状态',
     phone: '手机号',
-    openedPackages: '已开通套餐',
-    packageName: '学习套餐',
+    openedPackages: '已开通课程',
+    packageName: '课程方案',
     course: '课程',
     ownerTeacherName: '负责老师',
     publishStatus: '发布状态',

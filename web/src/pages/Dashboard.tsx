@@ -58,8 +58,8 @@ export default function Dashboard() {
               <Button type="primary" icon={<TeamOutlined />} />
             </Link>
           </Tooltip>
-          <Tooltip title="套餐">
-            <Link to="/packages" aria-label="套餐">
+          <Tooltip title="课程方案">
+            <Link to="/packages" aria-label="课程方案">
               <Button icon={<BookOutlined />} />
             </Link>
           </Tooltip>
@@ -75,7 +75,7 @@ export default function Dashboard() {
         </Col>
         <Col xs={24} md={6}>
           <Card className="metric-card metric-blue">
-            <Statistic title="套餐" value={data.packageCount} prefix={<BookOutlined />} />
+            <Statistic title="课程方案" value={data.packageCount} prefix={<BookOutlined />} />
             <span>可开通</span>
           </Card>
         </Col>
@@ -108,7 +108,7 @@ export default function Dashboard() {
               <Link className="todo-item warning" to="/students">
                 <span className="todo-icon"><WarningOutlined /></span>
                 <div>
-                  <strong>{data.expiringStudents} 名学生套餐即将到期</strong>
+                  <strong>{data.expiringStudents} 名学生课程即将到期</strong>
                   <span>提前提醒续费。</span>
                 </div>
                 <ArrowRightOutlined />
@@ -134,8 +134,8 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="process-list">
-              <div><ClockCircleOutlined /> 创建或编辑学习套餐</div>
-              <div><TeamOutlined /> 给学生开通并确认有效期</div>
+              <div><ClockCircleOutlined /> 创建或编辑课程方案</div>
+              <div><TeamOutlined /> 给学生直接开通课程</div>
               <div><FileTextOutlined /> 发布资料和练习到学生端</div>
             </div>
           </Card>

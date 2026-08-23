@@ -206,7 +206,7 @@ export default function Commercial() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>商业运营</Typography.Title>
-          <Typography.Text type="secondary">记录线下订单、收款、课消和续费跟进；学习权限请到开通套餐中处理。</Typography.Text>
+          <Typography.Text type="secondary">记录线下订单、收款、课消和续费跟进；家长购买课程后，在学生管理中直接开通。</Typography.Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建订单</Button>
       </div>

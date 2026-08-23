@@ -28,9 +28,17 @@ nginx -t && systemctl reload nginx
 
 ### 文件处理依赖的外部命令行工具
 
-后端不依赖这些工具就能启动，但缺少时对应功能会安静降级（接口返回“预览生成失败”或分页图片模式不可用），不会报 500。生产环境建议装齐：
+生产环境必须安装 LibreOffice 和 Ghostscript。发布激活前会执行 `check-preview-runtime.sh`，依赖缺失时停止切换版本，避免出现“上传成功但无法预览”。首次部署或旧服务器补齐依赖时执行：
 
-- `soffice`（LibreOffice headless）：把学生上传的 PPT/Word 转成 PDF 预览。
+```bash
+sudo /opt/starline/current/deploy/production/provision-preview-runtime.sh
+```
+
+如果新版本因依赖预检而尚未激活，请把 `current` 替换为本次上传的 `releases/<commit>` 目录，安装完成后重新执行激活脚本。
+
+该脚本同时安装常用中文字体 `fonts-noto-cjk`，降低 Word/PPT 转 PDF 后的字体替换和版式偏移。
+
+- `soffice`（LibreOffice headless）：把老师上传的 PPT/Word 转成 PDF 预览。
   ```bash
   apt-get install -y libreoffice
   ```

@@ -19,13 +19,16 @@ func TestPreviewJobLifecycleUpdatesFileAndMaterial(t *testing.T) {
 	if job.Status != "处理中" || job.AttemptCount != 1 {
 		t.Fatalf("claimed job = %#v", job)
 	}
-	result := learning.PreviewResult{PreviewPath: "/data/preview/file-preview.pdf", PreviewPageDir: "/data/pages/file-preview", PreviewPageCount: 4}
+	result := learning.PreviewResult{PreviewPath: "/data/preview/file-preview.pdf", PreviewPageDir: "/data/pages/file-preview", PreviewPageCount: 4, PreviewWarning: "分页图片暂不可用"}
 	if err := store.CompletePreviewJob(job.ID, result); err != nil {
 		t.Fatalf("complete preview job: %v", err)
 	}
 	asset := store.fileAssets["file-preview"]
 	if asset.PreviewStatus != "可预览" || asset.PreviewPageCount != 4 || asset.PreviewPageDir != result.PreviewPageDir {
 		t.Fatalf("completed asset = %#v", asset)
+	}
+	if asset.PreviewError != result.PreviewWarning {
+		t.Fatalf("preview warning = %q", asset.PreviewError)
 	}
 	if got := store.materials[len(store.materials)-1].PreviewStatus; got != "可预览" {
 		t.Fatalf("material preview status = %q", got)

@@ -129,6 +129,24 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		t.Fatalf("preview status = %d", resp.StatusCode)
 	}
 
+	downloadReq, err := http.NewRequest(http.MethodGet, app.server.URL+material.DownloadURL, nil)
+	if err != nil {
+		t.Fatalf("new download request: %v", err)
+	}
+	downloadReq.Header.Set("Authorization", "Bearer "+token)
+	downloadResp, err := http.DefaultClient.Do(downloadReq)
+	if err != nil {
+		t.Fatalf("download request: %v", err)
+	}
+	downloadBody, err := io.ReadAll(downloadResp.Body)
+	downloadResp.Body.Close()
+	if err != nil {
+		t.Fatalf("read download response: %v", err)
+	}
+	if downloadResp.StatusCode != http.StatusOK || !bytes.Equal(downloadBody, []byte("%PDF-1.4 test material")) {
+		t.Fatalf("download status=%d body=%q", downloadResp.StatusCode, string(downloadBody))
+	}
+
 	var updatedMaterial learning.Material
 	app.doJSON(t, http.MethodPut, "/api/materials/"+material.ID, token, learning.MaterialUpdateRequest{
 		Title:           "接口测试学习资料-草稿",
