@@ -1424,17 +1424,57 @@ button.schedule-timeline-block:hover {
   line-height: 16px;
 }
 
-/* 可排时段是背景层：铺满整列、垫在课程下面，课程块永远压在它上面。 */
+/* 可排时段是背景层：铺满整列、垫在课程下面，课程块永远压在它上面。
+   淡化走 color-mix 而不是 opacity：opacity 会连里面的标签一起压淡，
+   而标签正是这条带子唯一说明自己是什么的地方，必须保持可读。 */
 .schedule-timeline-block.is-availability {
   z-index: 1;
-  opacity: .62;
   border-style: dashed;
   pointer-events: none;
+  background: color-mix(in srgb, var(--subject-bg) 62%, #fff);
+  border-color: color-mix(in srgb, var(--subject-border) 62%, #fff);
+  border-left-color: color-mix(in srgb, var(--subject-accent) 62%, #fff);
+  color: color-mix(in srgb, var(--subject-text) 82%, #fff);
+  /* 标签要能 sticky 到滚动容器上：overflow:hidden / container-type:size 都会
+     把这个块变成自己的滚动/包含边界，sticky 就只在块内部生效（等于没生效）。 */
+  overflow: visible;
+  container-type: normal;
 }
 
-/* 背景带里只保留时间和一行说明，避免长名单把整条撑得很密。 */
-.schedule-timeline-block.is-availability .schedule-timeline-body {
-  align-content: start;
+/* 贴顶标签：带子的顶部一旦滚出视野，剩下的就是一块没人看得懂的色块。
+   sticky 让说明跟着可视区走；78px = 粘在顶部的日期表头 74px + 4px 呼吸位。 */
+.schedule-availability-label {
+  position: sticky;
+  top: 78px;
+  z-index: 1;
+  display: grid;
+  gap: 1px;
+  width: fit-content;
+  max-width: calc(100% - 8px);
+  margin: 3px 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .86);
+}
+
+.schedule-availability-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.schedule-availability-label strong,
+.schedule-availability-label small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-availability-label small {
+  color: inherit;
+  opacity: .78;
 }
 
 /* "+N" 折叠块：中性配色，不抢真实课程的视觉权重，但要一眼看出可点。 */

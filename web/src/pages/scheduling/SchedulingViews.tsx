@@ -763,6 +763,26 @@ export function TimelineBlock({
     return <div className={className} style={style} title={title} />;
   }
 
+  // 可排时段背景带自带一行贴顶标签，不走课程块那套多行降级。
+  // 带子经常从早上一路铺到中午，而时间轴打开时会自动滚到第一节课，
+  // 于是带子的顶部（唯一写着「这是什么」的那一行）被滚出视野，
+  // 剩下的就是一大块没有任何说明、又因为 pointer-events:none 连悬浮提示都出不来的色块。
+  // 标签用 position:sticky 跟着滚动停在可视区顶部：不管从哪一段看进来，都能读到
+  // 「这段时间谁有空」。
+  if (item.kind === 'availability') {
+    return (
+      <div className={className} style={style} title={title}>
+        <span className="schedule-availability-label">
+          <span className="schedule-availability-headline">
+            <span className="schedule-timeline-time">{item.startTime}-{item.endTime}</span>
+            <strong>{item.title}</strong>
+          </span>
+          {item.subtitle && <small>{item.subtitle}</small>}
+        </span>
+      </div>
+    );
+  }
+
   // 被折叠的课程不会丢失：点开可以看到完整列表，并直接进入任意一节课。
   if (item.kind === 'overflow') {
     const hidden = item.hiddenItems ?? [];
@@ -1305,7 +1325,9 @@ export function mergeAvailabilityBands(items: TimelineItem[]) {
         id: `availability-band-${first.id}`,
         startTime: formatMinute(start),
         endTime: formatMinute(end),
-        title: `${group.length} 个可排时段`,
+        // 「N 个可排时段」和图例里的「可排方案」（推荐课程）只差一个字，容易被读成推荐结果。
+        // 合并带说的是「师生填报的可上课时间」，标题里就把这层意思写全。
+        title: `可上课时间 · ${group.length} 段`,
         subtitle: detail.join('、'),
         meta: '',
         countText: undefined,

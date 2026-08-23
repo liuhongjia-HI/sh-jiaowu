@@ -11,10 +11,12 @@ import type { AvailabilitySlot, Course, CurrentUser, ScheduleCandidate, Schedule
 import {
   addDays,
   addMonths,
+  availabilityCovers,
   candidateLevel,
   candidateLevelMeta,
   classCapacity,
   formatWeekRange,
+  isClockText,
   localDateText,
   minimumStudentCount,
   scheduleClassOccursOn,
@@ -185,6 +187,11 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const gradeWatch = Form.useWatch('grade', candidateForm);
   const editingClassType = Form.useWatch('classType', editForm);
   const editingStudentIDs = Form.useWatch('studentIds', editForm) ?? [];
+  const editingTeacherId = Form.useWatch('teacherId', editForm);
+  const editingDayOfWeek = Form.useWatch('dayOfWeek', editForm);
+  const editingStartTime = Form.useWatch('startTime', editForm);
+  const editingEndTime = Form.useWatch('endTime', editForm);
+  const editingStartDate = Form.useWatch('startDate', editForm);
   const owner = parseOwnerKey(ownerKey);
   const availability = useQuery({
     queryKey: ['availability', owner?.ownerType, owner?.ownerId],
@@ -327,6 +334,28 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     status: statusFilter
   }), [classGradeFilter, classSubjectFilter, classTeacherFilter, classStudentFilter, classCampusFilter, classCourseFilter, classTypeFilter, statusFilter]);
   const filteredClasses = useMemo(() => filterClasses(classes.data ?? [], classFilters, courseById), [classes.data, classFilters, courseById]);
+  // 建课前先按后端同一套规则核对可上课时间：谁没有覆盖该时段的时间，提交必然被拒。
+  // 提前列出来并给出「维护时间」入口，比提交后收到一句报错再回头猜要快得多。
+  const availabilityGaps = useMemo(() => {
+    if (!isClockText(editingStartTime) || !isClockText(editingEndTime) || !editingDayOfWeek) return [];
+    if (editingEndTime <= editingStartTime) return [];
+    const date = (editingStartDate ?? '').trim();
+    const slots = availabilityOverview.data ?? [];
+    const covered = (ownerType: 'teacher' | 'student', ownerId: string) =>
+      slots.some((slot) => slot.ownerType === ownerType && slot.ownerId === ownerId
+        && availabilityCovers(slot, editingDayOfWeek, editingStartTime, editingEndTime, date));
+    const gaps: { ownerType: 'teacher' | 'student'; ownerId: string; name: string }[] = [];
+    if (editingTeacherId && !covered('teacher', editingTeacherId)) {
+      const teacher = teacherById[editingTeacherId];
+      gaps.push({ ownerType: 'teacher', ownerId: editingTeacherId, name: teacher ? teacher.name : '该老师' });
+    }
+    for (const studentId of editingStudentIDs) {
+      if (covered('student', studentId)) continue;
+      const student = studentById[studentId];
+      gaps.push({ ownerType: 'student', ownerId: studentId, name: student ? studentDisplayName(student) : '该学生' });
+    }
+    return gaps;
+  }, [availabilityOverview.data, editingDayOfWeek, editingStartTime, editingEndTime, editingStartDate, editingTeacherId, editingStudentIDs, teacherById, studentById]);
   const allCandidates = candidates.data ?? [];
   const readyCandidates = useMemo(() => allCandidates.filter((item) => candidateLevel(item) !== 'short'), [allCandidates]);
   const shortCandidates = useMemo(() => allCandidates.filter((item) => candidateLevel(item) === 'short'), [allCandidates]);
@@ -911,6 +940,27 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           </Space>
         )}
       >
+        {availabilityGaps.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="该时段没有可上课时间，直接提交会被拒绝"
+            description={(
+              <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                <Typography.Text type="secondary">
+                  下列老师/学生在 {weekLabel(editingDayOfWeek)} {editingStartTime}-{editingEndTime} 没有登记可上课时间，先补一条再建课。
+                </Typography.Text>
+                {availabilityGaps.map((gap) => (
+                  <Space key={`${gap.ownerType}-${gap.ownerId}`} size={8}>
+                    <Typography.Text>{gap.ownerType === 'teacher' ? '老师' : '学生'}：{gap.name}</Typography.Text>
+                    <Button size="small" type="link" onClick={() => openAvailabilityFor(gap.ownerType, gap.ownerId)}>去维护时间</Button>
+                  </Space>
+                ))}
+              </Space>
+            )}
+          />
+        )}
         <Form form={editForm} layout="vertical" onFinish={(values) => {
           // 课外辅导不跨天：这里只让家长/老师选一个上课日期，结束日期在提交时直接等于开始日期，不再单独收集。
           const payload = { ...values, endDate: values.startDate };
