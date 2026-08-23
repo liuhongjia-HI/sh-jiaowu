@@ -360,6 +360,7 @@ func normalizeStudentRequest(req learning.StudentUpsertRequest, allowStatus bool
 	req.Phone = strings.TrimSpace(req.Phone)
 	req.Grade = strings.TrimSpace(req.Grade)
 	req.SchoolName = strings.TrimSpace(req.SchoolName)
+	req.GuardianName = strings.TrimSpace(req.GuardianName)
 	req.OfficialAccountOpenID = strings.TrimSpace(req.OfficialAccountOpenID)
 	req.AccountStatus = strings.TrimSpace(req.AccountStatus)
 	req.Remark = strings.TrimSpace(req.Remark)

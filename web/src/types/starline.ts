@@ -169,6 +169,7 @@ export type Student = {
   guardianName?: string;
   officialAccountOpenId?: string;
   openedPackages: string[];
+  openedPackageRefs: StudentPackageRef[];
   learningStatus: string;
   accountStatus: string;
   streakDays: number;
@@ -176,6 +177,7 @@ export type Student = {
   badgeCount: number;
   remark?: string;
   bindStatus: string;
+  createdAt: string;
   lastStudyAt?: string;
   lastSubmittedAt?: string;
   lastSubmissionStatus?: string;
@@ -184,11 +186,17 @@ export type Student = {
   bindCodeExpiresAt?: string;
 };
 
+export type StudentPackageRef = {
+  packageId: string;
+  packageName: string;
+};
+
 export type StudentUpsertRequest = {
   name: string;
   phone: string;
   grade: string;
   schoolName?: string;
+  guardianName?: string;
   officialAccountOpenId?: string;
   accountStatus?: string;
   remark: string;

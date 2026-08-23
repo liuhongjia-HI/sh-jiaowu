@@ -27,19 +27,19 @@ func TestAdminStudentManagementLifecycleThroughAPI(t *testing.T) {
 		Grade:  "五年级",
 		Remark: "接口测试新增",
 	}, http.StatusOK, &created)
-	if created.ID == "" || created.AccountStatus != "正常" || created.BindStatus != "待绑定" {
+	if created.ID == "" || created.AccountStatus != "正常" || created.BindStatus != "待绑定" || created.CreatedAt == "" {
 		t.Fatalf("unexpected created student: %#v", created)
 	}
 
 	var filtered []learning.Student
 	app.doJSON(t, http.MethodGet, "/api/students?keyword=接口测试学生", token, nil, http.StatusOK, &filtered)
-	if len(filtered) != 1 || filtered[0].ID != created.ID {
+	if len(filtered) != 1 || filtered[0].ID != created.ID || filtered[0].CreatedAt != created.CreatedAt {
 		t.Fatalf("expected keyword search to find created student, got %#v", filtered)
 	}
 
 	var detail learning.StudentDetail
 	app.doJSON(t, http.MethodGet, "/api/students/"+created.ID, token, nil, http.StatusOK, &detail)
-	if detail.Student.ID != created.ID {
+	if detail.Student.ID != created.ID || detail.Student.CreatedAt != created.CreatedAt {
 		t.Fatalf("unexpected student detail: %#v", detail)
 	}
 

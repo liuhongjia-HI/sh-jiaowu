@@ -8,25 +8,27 @@ type Student struct {
 	// Grade 是按入学基准推导出的当前年级，不直接持久化，也不接受前端写入。
 	Grade string `json:"grade"`
 	// EnrollmentAcademicYear 与 EnrollmentGrade 是年级推导的基准，入学后不再变化。
-	EnrollmentAcademicYear string   `json:"enrollmentAcademicYear,omitempty"`
-	EnrollmentGrade        string   `json:"enrollmentGrade,omitempty"`
-	Graduated              bool     `json:"graduated,omitempty"`
-	Phone                  string   `json:"phone"`
-	SchoolName             string   `json:"schoolName,omitempty"`
-	GuardianName           string   `json:"guardianName,omitempty"`
-	OfficialAccountOpenID  string   `json:"officialAccountOpenId,omitempty"`
-	OpenedPackages         []string `json:"openedPackages"`
-	LearningStatus         string   `json:"learningStatus"`
-	AccountStatus          string   `json:"accountStatus"`
-	StreakDays             int      `json:"streakDays"`
-	AverageScore           int      `json:"averageScore"`
-	BadgeCount             int      `json:"badgeCount"`
-	Remark                 string   `json:"remark,omitempty"`
-	BindStatus             string   `json:"bindStatus"`
-	LastStudyAt            string   `json:"lastStudyAt,omitempty"`
-	LastSubmittedAt        string   `json:"lastSubmittedAt,omitempty"`
-	LastSubmissionStatus   string   `json:"lastSubmissionStatus,omitempty"`
-	EffectiveUntil         string   `json:"effectiveUntil,omitempty"`
+	EnrollmentAcademicYear string              `json:"enrollmentAcademicYear,omitempty"`
+	EnrollmentGrade        string              `json:"enrollmentGrade,omitempty"`
+	Graduated              bool                `json:"graduated,omitempty"`
+	Phone                  string              `json:"phone"`
+	SchoolName             string              `json:"schoolName,omitempty"`
+	GuardianName           string              `json:"guardianName,omitempty"`
+	OfficialAccountOpenID  string              `json:"officialAccountOpenId,omitempty"`
+	OpenedPackages         []string            `json:"openedPackages"`
+	OpenedPackageRefs      []StudentPackageRef `json:"openedPackageRefs"`
+	LearningStatus         string              `json:"learningStatus"`
+	AccountStatus          string              `json:"accountStatus"`
+	StreakDays             int                 `json:"streakDays"`
+	AverageScore           int                 `json:"averageScore"`
+	BadgeCount             int                 `json:"badgeCount"`
+	Remark                 string              `json:"remark,omitempty"`
+	BindStatus             string              `json:"bindStatus"`
+	CreatedAt              string              `json:"createdAt"`
+	LastStudyAt            string              `json:"lastStudyAt,omitempty"`
+	LastSubmittedAt        string              `json:"lastSubmittedAt,omitempty"`
+	LastSubmissionStatus   string              `json:"lastSubmissionStatus,omitempty"`
+	EffectiveUntil         string              `json:"effectiveUntil,omitempty"`
 	// BindCode/BindCodeExpiresAt 是"关联第二个家长"用的邀请码：机构后台生成，
 	// 分享给爸爸/妈妈/其他家长后，对方在小程序里输入即可关联到这个学生，
 	// 不需要走"手机号命中已有档案"那条路。到期后需要在后台重新生成。
@@ -34,11 +36,17 @@ type Student struct {
 	BindCodeExpiresAt string `json:"bindCodeExpiresAt,omitempty"`
 }
 
+type StudentPackageRef struct {
+	PackageID   string `json:"packageId"`
+	PackageName string `json:"packageName"`
+}
+
 type StudentUpsertRequest struct {
 	Name                  string `json:"name"`
 	Phone                 string `json:"phone"`
 	Grade                 string `json:"grade"`
 	SchoolName            string `json:"schoolName"`
+	GuardianName          string `json:"guardianName"`
 	OfficialAccountOpenID string `json:"officialAccountOpenId"`
 	AccountStatus         string `json:"accountStatus"`
 	Remark                string `json:"remark"`

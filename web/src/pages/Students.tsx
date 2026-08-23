@@ -25,8 +25,9 @@ import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getData, postData, postForm, putData } from '../services/http';
-import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
+import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
 import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
 import type {
   CurrentUser,
@@ -35,6 +36,7 @@ import type {
   Student,
   StudentDetail,
   StudentImportResult,
+  StudentPackageRef,
   StudentRemindResult,
   StudentScoreRecord,
   StudentScoreSummary,
@@ -48,7 +50,7 @@ type StudentFormValues = {
   phone: string;
   grade: string;
   schoolName: string;
-  officialAccountOpenId: string;
+  guardianName: string;
   remark: string;
   enabled: boolean;
 };
@@ -74,6 +76,7 @@ function canManageScores(user: CurrentUser) {
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<StudentFilters>({});
   const [studentForm] = Form.useForm<StudentFormValues>();
   const [grantForm] = Form.useForm<GrantFormValues>();
@@ -111,7 +114,7 @@ export default function Students({ user }: { user: CurrentUser }) {
         phone: values.phone,
         grade: values.grade,
         schoolName: values.schoolName ?? '',
-        officialAccountOpenId: values.officialAccountOpenId ?? '',
+        guardianName: values.guardianName ?? '',
         remark: values.remark ?? '',
         accountStatus: editing ? (values.enabled ? '正常' : '停用') : undefined
       };
@@ -188,7 +191,7 @@ export default function Students({ user }: { user: CurrentUser }) {
 
   function openCreate() {
     setEditing(null);
-    studentForm.setFieldsValue({ name: '', phone: '', grade: '', schoolName: '', officialAccountOpenId: '', remark: '', enabled: true });
+    studentForm.setFieldsValue({ name: '', phone: '', grade: '', schoolName: '', guardianName: '', remark: '', enabled: true });
     setStudentModalOpen(true);
   }
 
@@ -199,7 +202,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       phone: student.phone,
       grade: student.grade,
       schoolName: student.schoolName ?? '',
-      officialAccountOpenId: student.officialAccountOpenId ?? '',
+      guardianName: student.guardianName ?? '',
       remark: student.remark ?? '',
       enabled: student.accountStatus !== '停用'
     });
@@ -213,6 +216,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       width: 170,
       render: (value, record) => <Space direction="vertical" size={0}><Typography.Text strong>{value}</Typography.Text><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
     },
+    { title: '家长姓名', dataIndex: 'guardianName', width: 110, ellipsis: true, render: (value) => value || '-' },
     { title: '年级', dataIndex: 'grade', width: 88 },
     { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
     {
@@ -222,9 +226,9 @@ export default function Students({ user }: { user: CurrentUser }) {
     },
     {
       title: '课程',
-      dataIndex: 'openedPackages',
-      width: 130,
-      render: (values: string[]) => <Tag color={values?.length ? 'blue' : 'default'}>{values?.length ? `已开通 ${values.length} 个` : '暂未开通'}</Tag>
+      dataIndex: 'openedPackageRefs',
+      width: 220,
+      render: (values: StudentPackageRef[]) => <PackageLinks values={values} onOpen={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)} />
     },
     {
       title: '学习情况',
@@ -232,6 +236,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.learningStatus.includes('未') ? 'orange' : 'green'}>{record.learningStatus}</Tag><Typography.Text type="secondary">连续 {record.streakDays} 天 · 均分 {record.averageScore ?? '-'}</Typography.Text></Space>
     },
     { title: '账号', dataIndex: 'accountStatus', width: 88, render: (value) => <Tag color={value === '正常' ? 'green' : value === '停用' ? 'default' : 'orange'}>{value}</Tag> },
+    { title: '添加时间', dataIndex: 'createdAt', width: 150, ellipsis: true, render: (value) => value || '-' },
     { title: '最近学习', dataIndex: 'lastStudyAt', width: 150, ellipsis: true, render: (value) => value || '-' },
     {
       title: '操作',
@@ -307,12 +312,14 @@ export default function Students({ user }: { user: CurrentUser }) {
                   status={<Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>}
                   fields={[
                     { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
+                    { label: '家长姓名', value: record.guardianName || '-' },
                     { label: '学校', value: record.schoolName || '-' },
                     { label: '公众号', value: <Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '已关联' : '未关联'}</Tag> },
                     { label: '学习状态', value: <Tag color={record.learningStatus.includes('未') ? 'orange' : 'green'}>{record.learningStatus}</Tag> },
                     { label: '连续学习', value: `${record.streakDays} 天` },
                     { label: '平均分', value: record.averageScore ?? '-' },
                     { label: '徽章', value: `${record.badgeCount} 枚` },
+                    { label: '添加时间', value: record.createdAt || '-' },
                     { label: '最近学习', value: record.lastStudyAt || '-' },
                     {
                       label: '最近提交',
@@ -321,7 +328,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                         : '-'
                     }
                   ]}
-                  tags={<TagGroup values={record.openedPackages} color="blue" emptyText="暂未开通课程" />}
+                  tags={<PackageLinks values={record.openedPackageRefs} onOpen={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)} />}
                   actions={(
                     <>
                       <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
@@ -360,8 +367,8 @@ export default function Students({ user }: { user: CurrentUser }) {
           <Form.Item name="schoolName" label="学校" rules={[{ required: true, message: '请输入学校' }]}>
             <Input placeholder="例如：星河小学" />
           </Form.Item>
-          <Form.Item name="officialAccountOpenId" label="公众号 openid">
-            <Input placeholder="关注公众号后的 openid，用于模板消息提醒" />
+          <Form.Item name="guardianName" label="家长姓名">
+            <Input placeholder="例如：王女士" />
           </Form.Item>
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={3} placeholder="可填写家长沟通、分班或交接信息" />
@@ -452,6 +459,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                     writable={writable}
                     generatingBindCode={generateBindCode.isPending}
                     onGenerateBindCode={() => generateBindCode.mutate(detail.data!.student.id)}
+                    onOpenPackage={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)}
                   />
                 )
               },
@@ -646,12 +654,14 @@ function StudentProfile({
   detail,
   writable,
   generatingBindCode,
-  onGenerateBindCode
+  onGenerateBindCode,
+  onOpenPackage
 }: {
   detail: StudentDetail;
   writable: boolean;
   generatingBindCode: boolean;
   onGenerateBindCode: () => void;
+  onOpenPackage: (packageId: string) => void;
 }) {
   const codeExpired = Boolean(detail.student.bindCodeExpiresAt && detail.student.bindCodeExpiresAt < new Date().toISOString().slice(0, 10));
   return (
@@ -661,10 +671,11 @@ function StudentProfile({
         <Descriptions.Item label="年级">{detail.student.grade}</Descriptions.Item>
         <Descriptions.Item label="手机号">{detail.student.phone}</Descriptions.Item>
         <Descriptions.Item label="学校">{detail.student.schoolName || '-'}</Descriptions.Item>
-        <Descriptions.Item label="家长称呼">{detail.student.guardianName || '-'}</Descriptions.Item>
+        <Descriptions.Item label="家长姓名">{detail.student.guardianName || '-'}</Descriptions.Item>
         <Descriptions.Item label="公众号">{detail.student.officialAccountOpenId ? '已关联' : '未关联'}</Descriptions.Item>
         <Descriptions.Item label="微信绑定">{detail.student.bindStatus}</Descriptions.Item>
         <Descriptions.Item label="账号状态">{detail.student.accountStatus}</Descriptions.Item>
+        <Descriptions.Item label="添加时间">{detail.student.createdAt || '-'}</Descriptions.Item>
         <Descriptions.Item label="最近学习">{detail.student.lastStudyAt || '-'}</Descriptions.Item>
         <Descriptions.Item label="最近提交">
           {detail.student.lastSubmissionStatus
@@ -706,7 +717,7 @@ function StudentProfile({
         emptyText="暂未开通课程"
         renderCard={(record) => (
           <InfoCard
-            title={record.packageName}
+            title={<Typography.Link onClick={() => onOpenPackage(record.packageId)}>{record.packageName}</Typography.Link>}
             subtitle={`${record.startsAt || '-'} 至 ${record.effectiveUntil || '-'}`}
             status={tagStatus(record.permissionState)}
           />
@@ -719,6 +730,19 @@ function StudentProfile({
         <Descriptions.Item label="开放资料">{detail.permissions.openMaterials.join('、') || '暂无'}</Descriptions.Item>
         <Descriptions.Item label="开放练习">{detail.permissions.openHomework.join('、') || '暂无'}</Descriptions.Item>
       </Descriptions>
+    </Space>
+  );
+}
+
+function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: (packageId: string) => void }) {
+  if (!values?.length) return <Typography.Text type="secondary">暂未开通课程</Typography.Text>;
+  return (
+    <Space size={[4, 4]} wrap>
+      {values.map((item) => (
+        <Typography.Link key={item.packageId} onClick={() => onOpen(item.packageId)}>
+          <Tag color="blue">{item.packageName}</Tag>
+        </Typography.Link>
+      ))}
     </Space>
   );
 }

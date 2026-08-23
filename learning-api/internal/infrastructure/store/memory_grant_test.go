@@ -65,6 +65,16 @@ func TestCreatePackageSupportsGrantPreview(t *testing.T) {
 	if !ok || student.LearningStatus != "已开通" {
 		t.Fatalf("active grant should correct stale pending status in student view, got %#v", student)
 	}
+	foundPackageRef := false
+	for _, ref := range student.OpenedPackageRefs {
+		if ref.PackageID == pkg.ID && ref.PackageName == pkg.Name {
+			foundPackageRef = true
+			break
+		}
+	}
+	if !foundPackageRef {
+		t.Fatalf("student view should expose a stable package link target, got %#v", student.OpenedPackageRefs)
+	}
 }
 
 // 学习空间是跨学年复用的课程目录，不参与学年匹配：套餐的学年可以和它绑定的

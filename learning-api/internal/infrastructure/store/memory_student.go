@@ -66,6 +66,7 @@ func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.
 		EnrollmentGrade:        req.Grade,
 		Phone:                  req.Phone,
 		SchoolName:             req.SchoolName,
+		GuardianName:           req.GuardianName,
 		OfficialAccountOpenID:  req.OfficialAccountOpenID,
 		OpenedPackages:         []string{},
 		LearningStatus:         "未开始",
@@ -121,7 +122,12 @@ func (s *MemoryStore) updateStudentUnlocked(operator string, principal learning.
 			s.students[i].EnrollmentGrade = req.Grade
 		}
 		s.students[i].SchoolName = req.SchoolName
-		s.students[i].OfficialAccountOpenID = req.OfficialAccountOpenID
+		s.students[i].GuardianName = req.GuardianName
+		// openid 只能靠学生关注公众号后回传获得，管理端编辑表单不再采集这一项，
+		// 空值意味着"这次提交没带这个字段"，不能拿来覆盖已经绑定上的 openid。
+		if req.OfficialAccountOpenID != "" {
+			s.students[i].OfficialAccountOpenID = req.OfficialAccountOpenID
+		}
 		s.students[i].AccountStatus = req.AccountStatus
 		s.students[i].Remark = req.Remark
 		s.syncStudentUser(s.students[i])
