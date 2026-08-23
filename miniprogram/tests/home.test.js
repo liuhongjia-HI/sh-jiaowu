@@ -39,6 +39,19 @@ function flushPromises() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
+test("home page greeting follows the current local hour", () => {
+  const page = loadHomePage(() => Promise.resolve({}));
+
+  page.refreshGreeting(new Date(2026, 7, 23, 8, 52));
+  assert.equal(page.data.greeting, "早上好");
+  page.refreshGreeting(new Date(2026, 7, 23, 12, 0));
+  assert.equal(page.data.greeting, "中午好");
+  page.refreshGreeting(new Date(2026, 7, 23, 15, 0));
+  assert.equal(page.data.greeting, "下午好");
+  page.refreshGreeting(new Date(2026, 7, 23, 20, 0));
+  assert.equal(page.data.greeting, "晚上好");
+});
+
 test("home page renders today todos and classroom feedback from student home", async () => {
   const page = loadHomePage(() => Promise.resolve({
     student: { id: "stu-001", grade: "五年级", openedPackages: ["英语套餐"] },

@@ -5,6 +5,7 @@ Page({
     loading: true,
     error: "",
     emptyMessage: "请先登录绑定，或联系老师开通学习套餐。",
+    greeting: "你好",
     keyword: "",
     home: null,
     hasContent: false,
@@ -31,6 +32,7 @@ Page({
     promoBanners: []
   },
   onLoad() {
+    this.refreshGreeting();
     this.loadHome();
     this.loadPromoBanners();
   },
@@ -42,9 +44,13 @@ Page({
     };
   },
   onShow() {
+    this.refreshGreeting();
     if (!this.data.loading && !this.data.home) {
       this.loadHome();
     }
+  },
+  refreshGreeting(now = new Date()) {
+    this.setData({ greeting: greetingForHour(now.getHours()) });
   },
   loadHome() {
     this.setData({ loading: true, error: "" });
@@ -328,6 +334,13 @@ Page({
     });
   }
 });
+
+function greetingForHour(hour) {
+  if (hour >= 5 && hour < 11) return "早上好";
+  if (hour >= 11 && hour < 13) return "中午好";
+  if (hour >= 13 && hour < 18) return "下午好";
+  return "晚上好";
+}
 
 function decorateTodos(todos) {
   return (todos || []).map((item) => ({
