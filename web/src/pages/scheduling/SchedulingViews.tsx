@@ -418,9 +418,11 @@ export function ScheduleDayResourceTimeline({
   const rows = useMemo(() => buildTimelineRows(timelineRange.start, timelineRange.end), [timelineRange]);
   const boardHeight = ((timelineRange.end - timelineRange.start) / timelineSlotMinutes) * timelineSlotHeight;
 
-  // 空白日的成因分三种，给的出路完全不同：周末通常本来就不排课，不该催人去排；
-  // 一条可上课时间都没收到时，卡点在收集环节，催建课没用；收到了但没落在这一天，
-  // 才是「换一天看」或「手动补一节」。顶部统计条其实已经知道是哪一种，只是没喂给空态。
+  // 空白日的成因分两种，给的出路完全不同：一条可上课时间都没收到时，卡点在收集环节，
+  // 催建课没用；收到了但没落在这一天，才是「换一天看」或「手动补一节」。
+  // 顶部统计条其实已经知道是哪一种，只是没喂给空态。
+  // 注意：这里不能按周末/工作日分叉。校外教培周六日恰恰是排课高峰，
+  // 把周末的空白解释成「周末一般不排课」是把最该补课的一天说成正常。
   const totalAvailabilityCount = useMemo(
     () => Object.values(availabilityByDay).reduce((sum, slots) => sum + slots.length, 0),
     [availabilityByDay]
@@ -428,10 +430,9 @@ export function ScheduleDayResourceTimeline({
   const emptyReason = useMemo(() => {
     const dayText = formatDayTitle(selectedDate);
     if (candidateRequest) return `${dayText} 没有符合条件的排课结果。`;
-    if (dayOfWeek >= 6) return `${dayText} 没有安排，周末一般不排课。`;
     if (totalAvailabilityCount === 0) return `${dayText} 没有课程——目前还没有收到任何老师或学生填报的可上课时间，先把时间收上来才能匹配出可排方案。`;
     return `${dayText} 没有课程：已收到的 ${totalAvailabilityCount} 个可上课时段都不在这一天。`;
-  }, [candidateRequest, dayOfWeek, selectedDate, totalAvailabilityCount]);
+  }, [candidateRequest, selectedDate, totalAvailabilityCount]);
 
   // 与周视图同一套测量逻辑：泳道内真出现冲突时，按泳道实际宽度决定并排几块。
   const scrollRef = useRef<HTMLDivElement | null>(null);
