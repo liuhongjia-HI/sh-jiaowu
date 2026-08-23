@@ -91,6 +91,10 @@ type ScheduleClass struct {
 	EndTime              string             `json:"endTime"`
 	StartDate            string             `json:"startDate"`
 	EndDate              string             `json:"endDate"`
+	// AcademicYear 与 Semester 在建班时按开课日期落校历判定一次后固定下来，
+	// 不随日后校历调整或学年切换而改变，避免历史排课的学年归属跟着漂移。
+	AcademicYear         string             `json:"academicYear,omitempty"`
+	Semester             string             `json:"semester,omitempty"`
 	Students             []CandidateStudent `json:"students"`
 	ExpectedStudentCount int                `json:"expectedStudentCount"`
 	ReservationNote      string             `json:"reservationNote,omitempty"`

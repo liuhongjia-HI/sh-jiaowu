@@ -288,6 +288,8 @@ func scheduleClassAuditSnapshot(item learning.ScheduleClass) map[string]any {
 		"endTime":         item.EndTime,
 		"startDate":       item.StartDate,
 		"endDate":         item.EndDate,
+		"academicYear":    item.AcademicYear,
+		"semester":        item.Semester,
 		"studentIds":      studentIDs,
 		"status":          item.Status,
 	}
@@ -688,7 +690,7 @@ func (s *MemoryStore) validateStudentWechatBinding(user learning.User, openID st
 	if student.EnrollmentGrade != "" && student.EnrollmentGrade != "待完善" {
 		// 对比的是按学年滚动推导出来的当前年级，不是入学时的年级快照——
 		// 学生登录时在选择器里填的是“我现在是几年级”，不是“我入学时是几年级”。
-		currentGrade, _ := resolveGrade(student.EnrollmentAcademicYear, student.EnrollmentGrade, currentAcademicYear())
+		currentGrade, _ := resolveGrade(student.EnrollmentAcademicYear, student.EnrollmentGrade, s.configuredAcademicYear())
 		if currentGrade != req.Grade {
 			return errors.New("年级与后台档案不一致，请联系老师确认")
 		}
@@ -716,7 +718,7 @@ func (s *MemoryStore) applyStudentBindingProfile(studentID string, req learning.
 			// 只在管理端从未录过入学年级时才由学生首次绑定时确立基准；
 			// 已有基准的档案不接受绑定流程覆盖，校验逻辑早前已经比对过一致性。
 			s.students[i].EnrollmentGrade = req.Grade
-			s.students[i].EnrollmentAcademicYear = currentAcademicYear()
+			s.students[i].EnrollmentAcademicYear = s.configuredAcademicYear()
 		}
 		if req.SchoolName != "" {
 			s.students[i].SchoolName = req.SchoolName

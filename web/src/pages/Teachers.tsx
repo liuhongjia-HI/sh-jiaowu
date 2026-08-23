@@ -53,7 +53,7 @@ export default function Teachers() {
       setEditing(null);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
     },
-    onError: () => message.error('保存失败，请检查姓名、手机号和负责课程范围。')
+    onError: () => message.error('保存失败，请检查姓名、手机号和负责学习空间。')
   });
 
   const resetPassword = useMutation({
@@ -141,7 +141,7 @@ export default function Teachers() {
           <CardList
             rows={rows}
             rowKey={(record) => record.id}
-            emptyText="还没有教师，先新增教师并设置负责课程范围。"
+            emptyText="还没有教师，先新增教师并设置负责学习空间。"
             renderCard={(record) => (
               <InfoCard
                 title={record.name}
@@ -154,7 +154,7 @@ export default function Teachers() {
                   { label: '可批改', value: <Tag color={record.canReview ? 'green' : 'default'}>{record.canReview ? '是' : '否'}</Tag> },
                   { label: '备注', value: record.remark || '-' }
                 ]}
-                tags={<TagGroup values={record.learningSpaces} color="blue" emptyText="未分配负责课程范围" />}
+                tags={<TagGroup values={record.learningSpaces} color="blue" emptyText="未分配负责学习空间" />}
                 actions={(
                   <>
                     <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
@@ -165,7 +165,7 @@ export default function Teachers() {
             )}
           />
         ) : rows.length === 0 ? (
-          <Empty description="还没有教师，先新增教师并设置负责课程范围。" />
+          <Empty description="还没有教师，先新增教师并设置负责学习空间。" />
         ) : (
           <Table
             rowKey="id"
@@ -177,7 +177,7 @@ export default function Teachers() {
               { title: '微信绑定', dataIndex: 'bindStatus', width: 110, render: (value: string) => <Tag color={value === '已绑定' ? 'green' : 'orange'}>{value}</Tag> },
               { title: '登录方式', dataIndex: 'bindStatus', width: 130, render: passwordFallbackTag },
               { title: '账号状态', dataIndex: 'accountStatus', width: 110, render: (value: string) => <Tag color={value === '正常' ? 'green' : 'default'}>{value}</Tag> },
-              { title: '负责课程范围', dataIndex: 'learningSpaces', render: (values: string[]) => scopeTags(values, 'blue', '未分配') },
+              { title: '负责学习空间', dataIndex: 'learningSpaces', render: (values: string[]) => scopeTags(values, 'blue', '未分配') },
               { title: '可上传内容', width: 180, render: (_, record) => uploadTags(record) },
               { title: '可批改', dataIndex: 'canReview', width: 100, render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag> },
               { title: '备注', dataIndex: 'remark', ellipsis: true },
@@ -220,7 +220,7 @@ export default function Teachers() {
           <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}>
             <Input placeholder="用于首次登录和身份确认" />
           </Form.Item>
-          <Form.Item name="learningSpaceIds" label="负责课程范围" rules={[{ required: true, message: '请选择负责课程范围' }]}>
+          <Form.Item name="learningSpaceIds" label="负责学习空间" rules={[{ required: true, message: '请选择负责学习空间' }]}>
             <Select
               mode="multiple"
               allowClear

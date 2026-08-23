@@ -91,7 +91,10 @@ type packageGrant struct {
 }
 
 type learningSpace struct {
-	ID           string
+	ID string
+	// AcademicYear 只是数据库那一列的镜像，纯展示、不参与匹配，见
+	// learning.LearningSpace.AcademicYear 上的说明；别在业务逻辑或前端
+	// 学年下拉里读它。
 	AcademicYear string
 	Grade        string
 	Subject      string
@@ -231,9 +234,17 @@ func academicYearForDate(value time.Time) string {
 	return fmt.Sprintf("%d.%d学年", startYear, startYear+1)
 }
 
-// configuredAcademicYear 按当前日期推导学年。学年不允许人工录入，避免跨年后
-// 忘记切换导致新套餐、开通有效期和学生年级使用过期学年。
+// configuredAcademicYear 是全系统「现在是哪个学年」的唯一权威口径：优先查
+// 系统设置里的校历——今天落在哪个学期区间里就是哪个学年；校历没配、配错，
+// 或者今天没落在任何已配置的学期里时，才退回 7 月 1 日规则兜底，不阻塞开通、
+// 建档等操作。和 resolveScheduleTerm（排课学年判定）共用同一份校历匹配逻辑
+// 见 findCalendarTermForDate，只是这里判定的是“今天”而不是某次排课的开课日。
+// 学年不允许人工录入，避免跨年后忘记切换导致新套餐、开通有效期和学生年级
+// 使用过期学年。
 func (s *MemoryStore) configuredAcademicYear() string {
+	if term, ok := s.findCalendarTermForDate(time.Now().Format("2006-01-02")); ok {
+		return term.AcademicYear
+	}
 	return currentAcademicYear()
 }
 

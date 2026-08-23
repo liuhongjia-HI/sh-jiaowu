@@ -52,7 +52,7 @@ func materialVisible(items []learning.Material, id string) bool {
 func materialHasLearningDimensions(items []learning.Material, id string) bool {
 	for _, item := range items {
 		if item.ID == id {
-			return item.AcademicYear != "" && item.Grade != "" && item.Semester != "" && item.Subject != ""
+			return item.Grade != "" && item.Semester != "" && item.Subject != ""
 		}
 	}
 	return false

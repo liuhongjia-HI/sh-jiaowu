@@ -35,7 +35,7 @@ func (s *MemoryStore) visibleStudent(principal learning.Principal, id string) (l
 }
 
 func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student {
-	applyDerivedGrade(&student, currentAcademicYear())
+	applyDerivedGrade(&student, s.configuredAcademicYear())
 	student.AverageScore = s.studentAverageScore(student.ID)
 	if user, ok := s.findUserByStudentID(student.ID); ok && strings.TrimSpace(user.OpenID) != "" {
 		student.BindStatus = "已绑定"
@@ -1090,7 +1090,6 @@ func (s *MemoryStore) learningSpaceName(id string) string {
 
 func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Material {
 	if space, ok := s.findLearningSpace(material.LearningSpaceID); ok {
-		material.AcademicYear = space.AcademicYear
 		material.Grade = space.Grade
 		material.Semester = space.Semester
 		material.Subject = space.Subject

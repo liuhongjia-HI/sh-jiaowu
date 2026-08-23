@@ -392,6 +392,13 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	if len(students) >= minClassStudents(capacity) {
 		status = "已确认"
 	}
+	// 学年、学期按开课日期落校历判定一次，写入排课记录后不再变化，
+	// 见 resolveScheduleTerm；fallbackSemester 兜底取自课程所属学习空间。
+	fallbackSemester := ""
+	if space, ok := s.findLearningSpace(course.LearningSpaceID); ok {
+		fallbackSemester = space.Semester
+	}
+	academicYear, semester := s.resolveScheduleTerm(req.StartDate, fallbackSemester)
 	return learning.ScheduleClass{
 		Name:                 course.Subject + " " + req.ClassType + " 小班",
 		CourseID:             course.ID,
@@ -408,6 +415,8 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 		EndTime:              req.EndTime,
 		StartDate:            req.StartDate,
 		EndDate:              req.EndDate,
+		AcademicYear:         academicYear,
+		Semester:             semester,
 		Students:             students,
 		ExpectedStudentCount: req.ExpectedStudentCount,
 		ReservationNote:      req.ReservationNote,
@@ -444,6 +453,13 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 		}
 		item.ID = existing.ID
 		item.CreatedAt = existing.CreatedAt
+		// 开课日期和课程都没变时，学年/学期沿用原判定，不因为校历后来被
+		// 改过、或者只是调了教室/人数这类无关字段而跟着漂移；
+		// 真正改了开课日期或课程才重新按 resolveScheduleTerm 落一次。
+		if existing.StartDate == item.StartDate && existing.CourseID == item.CourseID {
+			item.AcademicYear = existing.AcademicYear
+			item.Semester = existing.Semester
+		}
 		s.scheduleClasses[index] = cloneScheduleClass(item)
 		if item.Status == "已确认" {
 			s.notifyScheduleClass(item, "课程调整提醒", "已调整")

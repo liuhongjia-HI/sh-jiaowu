@@ -46,6 +46,43 @@ func TestConfiguredAcademicYearAlwaysFollowsDate(t *testing.T) {
 	}
 }
 
+// TestConfiguredAcademicYearPrefersCalendarOverDateRule 校历是学年判定的唯一权威口径：
+// 今天落在校历配置的哪个学期区间里，就是哪个学年——即便这和「7 月 1 日切学年」的
+// 兜底规则算出来的结果不一样。这个口径要和 resolveScheduleTerm（排课学年判定）
+// 保持一致，否则同一天，排课和学生年级/套餐默认学年会各自算出不同的学年。
+func TestConfiguredAcademicYearPrefersCalendarOverDateRule(t *testing.T) {
+	store := NewMemoryStore()
+	today := time.Now().Format("2006-01-02")
+	naiveYear := currentAcademicYear()
+	overrideYear := naiveYear + "-校历订正"
+	calendar, err := json.Marshal([]academicCalendarTerm{
+		{AcademicYear: overrideYear, Semester: "S1 第一学期", StartDate: today, EndDate: today},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode calendar terms: %v", err)
+	}
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(calendar)}); err != nil {
+		t.Fatalf("expected calendar update: %v", err)
+	}
+	if got := store.configuredAcademicYear(); got != overrideYear {
+		t.Fatalf("expected calendar-covered date to override the 7/1 fallback, got %q want %q", got, overrideYear)
+	}
+
+	// 校历里没有覆盖今天时，退回 7 月 1 日规则，不阻塞任何业务操作。
+	emptyCalendar, err := json.Marshal([]academicCalendarTerm{
+		{AcademicYear: overrideYear, Semester: "S1 第一学期", StartDate: "2000-01-01", EndDate: "2000-01-02"},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode calendar terms: %v", err)
+	}
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(emptyCalendar)}); err != nil {
+		t.Fatalf("expected calendar update: %v", err)
+	}
+	if got := store.configuredAcademicYear(); got != naiveYear {
+		t.Fatalf("expected fallback to 7/1 rule when calendar does not cover today, got %q want %q", got, naiveYear)
+	}
+}
+
 func TestNewStudentDoesNotReceiveExamPeriodDeadline(t *testing.T) {
 	store := NewMemoryStore()
 	admin, _ := store.PrincipalByUserID("user-super")

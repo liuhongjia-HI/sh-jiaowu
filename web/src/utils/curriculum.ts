@@ -91,3 +91,23 @@ export function semesterOptions(settingValue?: string) {
 export function formatLearningSpace(space: { grade: string; subject: string; semester: string; phase: string; name?: string }) {
   return `${space.grade} · ${space.subject} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)}`;
 }
+
+// 校历（系统设置 academicCalendar）里的一条学期记录，是学年下拉的唯一权威来源——
+// 不要再从学习空间或套餐历史数据里凑学年选项，那些字段要么是纯展示、要么只反映
+// “曾经建过的套餐”，都不等于“学校实际配置的学年”。
+type AcademicCalendarTerm = { academicYear: string; semester?: string; startDate?: string; endDate?: string };
+
+// 把系统设置里 academicCalendar 的原始 JSON 解析成学年下拉选项：去重、按年份倒序，
+// 解析失败或未配置时返回空数组而不是抛错，调用方自行拼默认学年兜底。
+export function academicYearsFromCalendar(raw?: string): string[] {
+  if (!raw) return [];
+  let terms: AcademicCalendarTerm[];
+  try {
+    const parsed = JSON.parse(raw);
+    terms = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+  const years = Array.from(new Set(terms.map((term) => term.academicYear).filter(Boolean)));
+  return years.sort((a, b) => b.localeCompare(a));
+}

@@ -91,6 +91,9 @@ type TimelineItem = {
   status?: string;
   classType?: string;
   countText?: string;
+  // 只画底色不画字：背景带的文字在顶部，常被压在上面的课程块裁掉半行，
+  // 留下一截读不通的残字。详情仍在悬浮提示里。
+  quiet?: boolean;
   record: ScheduleClass | ScheduleCandidate | AvailabilitySlot;
 };
 type TimelineLayoutItem = TimelineItem & {
@@ -707,7 +710,15 @@ export function TimelineBlock({
     '--subject-accent': color.accent,
     '--subject-text': color.text
   } as CSSProperties;
-  const title = `${item.startTime}-${item.endTime} ${item.title} ${item.subtitle}`;
+  // 块矮的时候会按高度逐档隐藏副标题/学生/标签，悬浮提示必须带上全部内容，
+  // 否则被降级掉的信息就真的看不到了（点击块打开详情是另一条路径）。
+  const title = [
+    `${item.startTime}-${item.endTime}`,
+    item.title,
+    item.subtitle,
+    item.meta,
+    [item.classType, item.countText, item.status].filter(Boolean).join(' · ')
+  ].filter(Boolean).join('\n');
   const className = [
     'schedule-timeline-block',
     `is-${item.kind}`,
@@ -735,7 +746,12 @@ export function TimelineBlock({
   // 已取消课程只画一根窄条：说明「这个时段原本有课、现在空出来了」，
   // 细节走悬浮提示，不占正常课程的可读宽度。
   if (isGhost) {
-    return <div className={className} style={style} title={`已取消 ${title}`} />;
+    return <div className={className} style={style} title={`已取消\n${title}`} />;
+  }
+
+  // 静音的背景带：只画底色，文字全部留给悬浮提示。
+  if (item.quiet) {
+    return <div className={className} style={style} title={title} />;
   }
 
   // 被折叠的课程不会丢失：点开可以看到完整列表，并直接进入任意一节课。
@@ -1058,6 +1074,24 @@ export function formatDayTitle(date: Date) {
 // 「同一时段的多个老师」合并成一条、只留下第一个人的 record，那样合并后的条目
 // 只会落进第一个老师的泳道，其余老师的空闲就凭空消失了。所以这里按原始 slot 逐条分发，
 // 落到各自泳道后再由 layoutOverlappingItems 合并成该泳道的背景带。
+// 按老师分泳道时，块里那句「教师：张三 · 五年级/英文 · 学生：…」有一半是废话——
+// 这一列的表头写的就是张三。而它恰恰是块里最长的一行，把真正要看的学生挤到看不见。
+// 只保留学生。按教室分泳道时老师不冗余，那边不走这个函数。
+function resourceLaneMeta(item: TimelineItem) {
+  if (item.kind === 'class') {
+    return studentSummaryText((item.record as ScheduleClass).students);
+  }
+  if (item.kind === 'candidate') {
+    return studentSummaryText((item.record as ScheduleCandidate).availableStudents);
+  }
+  return item.meta;
+}
+
+function studentSummaryText(students: { name: string; grade?: string }[]) {
+  if (!students || students.length === 0) return '暂无学生';
+  return studentDisplayNames(students);
+}
+
 export function buildResourceLanes(
   dayOfWeek: number,
   laneMode: ResourceLaneMode,
@@ -1104,7 +1138,8 @@ export function buildResourceLanes(
       // 泳道表头只放名字，任教范围放副标题。不要用 teacherDisplay：
       // 它返回的是「教师：张三 · 五年级/英文」，在「这一列就是这个老师」的语境下，
       // 前缀是废话、后半段和副标题重复，还把名字挤出可视区。
-      ensureLane(key, resourceLaneTeacherName(teacherId, record.teacherName, teacher), teacher ? teacherScopeText(teacher) : '').items.push(item);
+      ensureLane(key, resourceLaneTeacherName(teacherId, record.teacherName, teacher), teacher ? teacherScopeText(teacher) : '')
+        .items.push({ ...item, meta: resourceLaneMeta(item) });
       return;
     }
     // 推荐方案还没成班，本来就没有教室，统一归到「未指定教室」而不是凭空造一条泳道。
@@ -1129,8 +1164,13 @@ export function buildResourceLanes(
         endTime: slot.endTime,
         subject: '老师可授课',
         title: '老师可授课',
-        subtitle: availabilityOwnerDisplayName(slot, teacherById, studentById),
-        meta: '可排课时间',
+        // 这条带子垫在课程下层，课程之间的缝隙里会透出它的文字，而在老师泳道里
+        // 「是哪位老师」表头已经写了、「可排课时间」是废话，全是冗余。
+        // 直接静音成一片底色（图例已经说明绿色＝老师可授课），跟 Google Calendar
+        // 的工作时间底色一个处理；具体时段仍可悬浮查看。
+        subtitle: '',
+        meta: '',
+        quiet: true,
         record: slot
       });
     });

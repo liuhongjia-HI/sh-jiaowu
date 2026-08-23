@@ -188,6 +188,51 @@ func (s *MemoryStore) academicCalendarTerms() []academicCalendarTerm {
 	return terms
 }
 
+// findCalendarTermForDate 在系统设置的校历里找覆盖给定日期的学期条目，找不到
+// 时返回 false。resolveScheduleTerm（排课学年判定）和 configuredAcademicYear
+// （系统当前学年）共用这一份匹配逻辑，确保“现在是哪个学年”和“某天属于哪个
+// 学年”是同一套口径，不会出现两套并行的判定规则。
+func (s *MemoryStore) findCalendarTermForDate(date string) (academicCalendarTerm, bool) {
+	target := strings.TrimSpace(date)
+	if _, err := time.Parse("2006-01-02", target); err != nil {
+		return academicCalendarTerm{}, false
+	}
+	for _, term := range s.academicCalendarTerms() {
+		if _, err := time.Parse("2006-01-02", term.StartDate); err != nil {
+			continue
+		}
+		if _, err := time.Parse("2006-01-02", term.EndDate); err != nil {
+			continue
+		}
+		if term.StartDate <= target && target <= term.EndDate {
+			return term, true
+		}
+	}
+	return academicCalendarTerm{}, false
+}
+
+// resolveScheduleTerm 按开课日期落校历，判定这个班归属哪个学年、哪个学期。
+// 只在建班那一刻判定一次，判定结果随排课记录固定下来——校历日后调整、
+// 学年切换，都不会改变已排课程的学年归属（否则历史排课的统计会跟着漂移）。
+// fallbackSemester 通常来自课程所属学习空间的学期（S1/S2），在开课日落不进
+// 任何校历学期时兜底使用，例如尚未配置该学年校历，或者是校历没有覆盖的假期班。
+func (s *MemoryStore) resolveScheduleTerm(startDate, fallbackSemester string) (academicYear, semester string) {
+	if term, ok := s.findCalendarTermForDate(startDate); ok {
+		return term.AcademicYear, term.Semester
+	}
+	start, err := time.Parse("2006-01-02", strings.TrimSpace(startDate))
+	if err != nil {
+		// 没有可用的开课日期（理论上建班已校验过），退回当前时间点判定，
+		// 保证这个函数总有确定的返回值。
+		return currentAcademicYear(), fallbackSemester
+	}
+	// 校历没覆盖到（未配置该学年校历，或是假期班）：学期退回课程自带的 S1/S2
+	// 标签，学年按开课日本身的 7 月 1 日规则推算——而不是按“现在”推算，避免
+	// 补排过去或未来日期的课时学年算错。不阻塞建班，但调用方应当把这种情况
+	// 回显给教务，提示去补校历。
+	return academicYearForDate(start), fallbackSemester
+}
+
 func (s *MemoryStore) normalizeGrantPeriod(startsAt, endsAt string) (string, string, error) {
 	defaultStartsAt, defaultEndsAt := s.defaultGrantPeriod()
 	if startsAt == "" {

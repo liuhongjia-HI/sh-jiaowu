@@ -62,7 +62,7 @@ func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.
 		AvatarURL: "",
 		// 年级不直接存 req.Grade：只记录入学基准，当前年级由 decorateStudent
 		// 按学年滚动推导，7 月 1 日自动升一级。
-		EnrollmentAcademicYear: currentAcademicYear(),
+		EnrollmentAcademicYear: s.configuredAcademicYear(),
 		EnrollmentGrade:        req.Grade,
 		Phone:                  req.Phone,
 		SchoolName:             req.SchoolName,
@@ -116,7 +116,7 @@ func (s *MemoryStore) updateStudentUnlocked(operator string, principal learning.
 		if req.Grade != before.Grade {
 			// 管理端改年级是一次人工订正：以“现在”为新的入学基准重新起算，
 			// 之后的学年滚动从这个订正点继续走，而不是覆盖一个孤立的静态值。
-			s.students[i].EnrollmentAcademicYear = currentAcademicYear()
+			s.students[i].EnrollmentAcademicYear = s.configuredAcademicYear()
 			s.students[i].EnrollmentGrade = req.Grade
 		}
 		s.students[i].SchoolName = req.SchoolName

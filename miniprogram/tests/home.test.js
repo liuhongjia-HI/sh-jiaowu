@@ -52,6 +52,32 @@ test("home page greeting follows the current local hour", () => {
   assert.equal(page.data.greeting, "晚上好");
 });
 
+test("home page greeting uses the student's nickname, name, then a friendly fallback", async () => {
+  const students = [
+    { nickname: "小星", name: "王同学" },
+    { nickname: "微信用户", name: "李同学" },
+    {}
+  ];
+  let index = 0;
+  const page = loadHomePage((path) => Promise.resolve(path === "/student/home" ? { student: students[index++] || {} } : []), {
+    getStorageSync() {
+      return "";
+    }
+  });
+
+  page.loadHome();
+  await flushPromises();
+  assert.equal(page.data.greetingName, "小星");
+
+  page.loadHome();
+  await flushPromises();
+  assert.equal(page.data.greetingName, "李同学");
+
+  page.loadHome();
+  await flushPromises();
+  assert.equal(page.data.greetingName, "同学");
+});
+
 test("home page renders today todos and classroom feedback from student home", async () => {
   const page = loadHomePage(() => Promise.resolve({
     student: { id: "stu-001", grade: "五年级", openedPackages: ["英语套餐"] },

@@ -1164,8 +1164,10 @@ body {
   text-align: left;
   font: inherit;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
-  /* 让块内内容能按自己被压缩后的真实宽度逐档降级，而不是按屏幕断点。 */
-  container-type: inline-size;
+  /* size 而不是 inline-size：块的高度由课程时长决定（30 分钟只有 40px），
+     只按宽度降级的话，短课和长课塞进去的行数一样多，短块里的字会挤成一团。
+     块的宽高都由内联样式写死，两个方向都做尺寸containment 是安全的。 */
+  container-type: size;
 }
 
 /* 内边距挂在 body 上而不是块本身：容器查询只能作用于容器的后代，
@@ -1207,6 +1209,46 @@ body {
 @container (max-width: 64px) {
   .schedule-timeline-block .schedule-timeline-time {
     display: none;
+  }
+
+  .schedule-timeline-block strong {
+    font-size: 12px;
+  }
+}
+
+/* 按块高度逐档降级。块高 = 课程时长：30 分钟只有 40px，1 小时 84px。
+   原来不管多高都渲染 5 行（时间/标题/学科年级/学生/标签），1 小时的块里
+   5 行叠在 84px 内，字挤成一团——这正是「日视图还是挤」的来源。
+   通行做法（Google Calendar、Outlook、Teamup）是一小时的块只显示标题和时间，
+   其余走点击详情。这里按 1V1 教培实际要扫的信息排优先级：
+   标题 > 时间 > 学生（跟谁上）> 标签 > 学科年级。
+   标签排在学生后面是因为班型（1V1）已经写在标题里了，人数和状态可以 hover 看。 */
+@container (max-height: 116px) {
+  /* 学科年级和泳道副标题重复，最先让位。 */
+  .schedule-timeline-block .schedule-timeline-subtitle {
+    display: none;
+  }
+}
+
+@container (max-height: 92px) {
+  .schedule-timeline-block .schedule-timeline-tags {
+    display: none;
+  }
+}
+
+@container (max-height: 62px) {
+  .schedule-timeline-block small {
+    display: none;
+  }
+}
+
+@container (max-height: 42px) {
+  .schedule-timeline-block .schedule-timeline-time {
+    display: none;
+  }
+
+  .schedule-timeline-body {
+    padding: 3px 8px;
   }
 
   .schedule-timeline-block strong {

@@ -73,6 +73,7 @@ export type TeacherUpsertRequest = {
 
 export type LearningSpace = {
   id: string;
+  /** 数据库历史遗留列，纯展示、不参与匹配，别用它拼学年下拉——校历（settings.academicCalendar）才是学年的权威来源，见 academicYearsFromCalendar。 */
   academicYear: string;
   grade: string;
   subject: string;
@@ -303,7 +304,6 @@ export type Material = {
   courseId?: string;
   course: string;
   learningSpaceId?: string;
-  academicYear?: string;
   grade?: string;
   semester?: string;
   subject?: string;
@@ -714,6 +714,9 @@ export type ScheduleClass = {
   endTime: string;
   startDate: string;
   endDate: string;
+  /** 建班时按开课日期落校历判定一次，此后固定不变，不随校历调整或学年切换漂移。 */
+  academicYear?: string;
+  semester?: string;
   students: CandidateStudent[];
   expectedStudentCount: number;
   reservationNote?: string;

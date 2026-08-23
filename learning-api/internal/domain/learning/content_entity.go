@@ -25,7 +25,6 @@ type Material struct {
 	CourseID         string `json:"courseId,omitempty"`
 	Course           string `json:"course"`
 	LearningSpaceID  string `json:"learningSpaceId,omitempty"`
-	AcademicYear     string `json:"academicYear,omitempty"`
 	Grade            string `json:"grade,omitempty"`
 	Semester         string `json:"semester,omitempty"`
 	Subject          string `json:"subject,omitempty"`

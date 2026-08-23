@@ -6,6 +6,7 @@ Page({
     error: "",
     emptyMessage: "请先登录绑定，或联系老师开通学习套餐。",
     greeting: "你好",
+    greetingName: "同学",
     keyword: "",
     home: null,
     hasContent: false,
@@ -76,6 +77,7 @@ Page({
         const progressPercent = Number(home.continueProgress) || 0;
         this.setData({
           home,
+          greetingName: preferredGreetingName(student),
           hasContent,
           hasOpenedPackage,
           emptyMessage: homeEmptyMessage(hasOpenedPackage),
@@ -340,6 +342,12 @@ function greetingForHour(hour) {
   if (hour >= 11 && hour < 13) return "中午好";
   if (hour >= 13 && hour < 18) return "下午好";
   return "晚上好";
+}
+
+function preferredGreetingName(student) {
+  const nickname = String(student.nickname || "").trim();
+  if (nickname && nickname !== "微信用户") return nickname;
+  return String(student.name || "").trim() || "同学";
 }
 
 function decorateTodos(todos) {

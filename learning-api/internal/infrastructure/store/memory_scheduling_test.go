@@ -94,6 +94,68 @@ func TestScheduleClassKeepsRoomMetadataWithoutBlocking(t *testing.T) {
 	}
 }
 
+func TestScheduleClassResolvesTermFromAcademicCalendar(t *testing.T) {
+	store := NewMemoryStore()
+	// 用一份确定的校历覆盖种子数据，避免用例结果随运行日期漂移。
+	// 种子数据里 user-teacher 的可授课时段固定在 2026-06-01 至 2026-08-31，
+	// 所以校历也配成覆盖这个窗口，避免用例卡在“老师该时间不可授课”上。
+	store.settings["academicCalendar"] = `[
+		{"academicYear":"2025.2026学年","semester":"S2 第二学期","startDate":"2026-02-01","endDate":"2026-07-15"},
+		{"academicYear":"2025.2026学年","semester":"暑期学期","startDate":"2026-07-16","endDate":"2026-08-31"}
+	]`
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	req := learning.ScheduleClassCreateRequest{
+		CourseID:        "course-g05-english-s1-q1",
+		TeacherID:       "user-teacher",
+		CampusID:        "campus-main",
+		ClassType:       "1V1",
+		DurationMinutes: 90,
+		DayOfWeek:       3,
+		StartTime:       "19:00",
+		EndTime:         "20:30",
+		StartDate:       "2026-06-10",
+		EndDate:         "2026-07-10",
+	}
+	created, err := store.CreateScheduleClass("运营教务", ops, req)
+	if err != nil {
+		t.Fatalf("expected schedule to succeed: %v", err)
+	}
+	if created.AcademicYear != "2025.2026学年" || created.Semester != "S2 第二学期" {
+		t.Fatalf("expected term resolved from calendar, got %#v", created)
+	}
+
+	// 建班后再调整校历，历史排课的学年归属不应该跟着漂移——只有真的改了
+	// 开课日期或课程才重新判定，见 updateScheduleClassUnlocked。
+	store.settings["academicCalendar"] = `[
+		{"academicYear":"2026.2027学年","semester":"S2 第二学期","startDate":"2026-02-01","endDate":"2026-07-15"}
+	]`
+	req.RoomName = "A102"
+	updated, err := store.UpdateScheduleClass("运营教务", ops, created.ID, req)
+	if err != nil {
+		t.Fatalf("expected update to succeed: %v", err)
+	}
+	if updated.AcademicYear != "2025.2026学年" || updated.Semester != "S2 第二学期" {
+		t.Fatalf("expected term to stay fixed across unrelated edits, got %#v", updated)
+	}
+
+	// 开课日期落不进任何校历学期（例如假期班）时，退回课程所属学习空间的
+	// 学期标签 + 开课日期本身的 7 月 1 日规则，而不是阻塞建班。
+	req2 := req
+	req2.RoomName = ""
+	req2.StartDate = "2026-07-20"
+	req2.EndDate = "2026-08-20"
+	holiday, err := store.CreateScheduleClass("运营教务", ops, req2)
+	if err != nil {
+		t.Fatalf("expected holiday schedule to succeed: %v", err)
+	}
+	if holiday.AcademicYear != "2026.2027学年" || holiday.Semester != "S1" {
+		t.Fatalf("expected fallback term derived from course space + start date, got %#v", holiday)
+	}
+}
+
 func TestScheduleClassRejectsStudentConflict(t *testing.T) {
 	store := NewMemoryStore()
 	store.users = append(store.users,
@@ -329,7 +391,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected material creation to succeed: %v", err)
 	}
-	if created.AcademicYear == "" || created.Grade != "五年级" || created.Semester != "S1" || created.Subject != "英文" {
+	if created.Grade != "五年级" || created.Semester != "S1" || created.Subject != "英文" {
 		t.Fatalf("expected created material to include learning dimensions, got %#v", created)
 	}
 	if created.Type != "学习资料" {

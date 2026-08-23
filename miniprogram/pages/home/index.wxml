@@ -2,7 +2,7 @@
   <view class="home-top">
     <view class="home-greeting-row">
       <view>
-        <view class="home-greeting">{{greeting}}，学员 <text class="home-greeting-wave">👋</text></view>
+        <view class="home-greeting">{{greeting}}，{{greetingName}} <text class="home-greeting-wave">👋</text></view>
         <view class="home-greeting-sub">坚持学习，遇见更好的自己</view>
       </view>
       <view class="home-search-mark">⌕</view>
