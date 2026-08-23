@@ -99,3 +99,85 @@ func TestLegacyTokenWithoutGuardianIDStillSeesSiblings(t *testing.T) {
 		t.Fatalf("expected both siblings for a legacy session, got %#v", accounts)
 	}
 }
+
+// 最坏的存量情况：token 里没有 GuardianID，库里也一条关系行都没有（多子女
+// 功能上线之前就绑好的家长，之后从没重新登录过）。切换器必须仍然能显示，
+// 并且点下去真的切得过去——只显示不能用比不显示更糟。
+func TestLegacySessionWithNoRelationRowsCanStillListAndSwitch(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	store.students = append(store.students,
+		learning.Student{
+			ID: "stu-a", Name: "老大", EnrollmentAcademicYear: currentAcademicYear(),
+			EnrollmentGrade: "五年级", Phone: "185****3993", AccountStatus: "正常",
+		},
+		learning.Student{
+			ID: "stu-b", Name: "老二", EnrollmentAcademicYear: currentAcademicYear(),
+			EnrollmentGrade: "二年级", Phone: "18518673993", AccountStatus: "正常",
+		},
+	)
+	store.users = append(store.users,
+		learning.User{
+			ID: "user-stu-a", Name: "老大", Phone: "185****3993", AccountStatus: "正常",
+			Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-a",
+		},
+		learning.User{
+			ID: "user-stu-b", Name: "老二", Phone: "18518673993", AccountStatus: "正常",
+			Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-b",
+		},
+	)
+	if len(store.guardianStudents) != 0 {
+		t.Fatal("fixture must start with no guardian relations at all")
+	}
+
+	principal, err := store.PrincipalByUserID("user-stu-a")
+	if err != nil {
+		t.Fatalf("rebuild principal: %v", err)
+	}
+	if principal.GuardianID != "" {
+		t.Fatalf("fixture should have no guardian to derive, got %q", principal.GuardianID)
+	}
+
+	accounts, err := store.StudentAccounts(principal)
+	if err != nil {
+		t.Fatalf("account list: %v", err)
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("expected the phone fallback to surface both siblings, got %#v", accounts)
+	}
+
+	switched, err := store.SwitchStudentAccount(principal, "stu-b")
+	if err != nil {
+		t.Fatalf("expected the displayed switcher entry to actually work: %v", err)
+	}
+	if switched.StudentID != "stu-b" || switched.GuardianID == "" {
+		t.Fatalf("expected switch to stu-b with a repaired guardian identity, got %#v", switched)
+	}
+	// 兜底只需要发生一次：切换之后关系应该已经补进库，回到正常路径。
+	if !store.GuardianStudentActive(switched.GuardianID, "stu-b") {
+		t.Fatal("expected the switch to persist a real guardian relation")
+	}
+}
+
+// 安全边界：兜底用的是"同一个家长手机号"，不能因此换到别人家的孩子。
+func TestPhoneFallbackDoesNotAllowSwitchingToAnotherFamily(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	store.students = append(store.students,
+		learning.Student{ID: "stu-mine", Name: "我家孩子", EnrollmentAcademicYear: currentAcademicYear(),
+			EnrollmentGrade: "五年级", Phone: "18500000001", AccountStatus: "正常"},
+		learning.Student{ID: "stu-other", Name: "别人家孩子", EnrollmentAcademicYear: currentAcademicYear(),
+			EnrollmentGrade: "五年级", Phone: "18900009999", AccountStatus: "正常"},
+	)
+	store.users = append(store.users,
+		learning.User{ID: "user-stu-mine", Name: "我家孩子", Phone: "18500000001", AccountStatus: "正常",
+			Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-mine"},
+		learning.User{ID: "user-stu-other", Name: "别人家孩子", Phone: "18900009999", AccountStatus: "正常",
+			Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-other"},
+	)
+	principal, err := store.PrincipalByUserID("user-stu-mine")
+	if err != nil {
+		t.Fatalf("rebuild principal: %v", err)
+	}
+	if _, err := store.SwitchStudentAccount(principal, "stu-other"); err == nil {
+		t.Fatal("expected switching to a different family to be refused")
+	}
+}

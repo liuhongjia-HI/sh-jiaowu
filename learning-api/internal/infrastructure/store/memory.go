@@ -316,9 +316,9 @@ func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {
 		{ID: "user-student-003", Name: "小航", Phone: "13700003303", OpenID: "", AccountStatus: "正常", Roles: []learning.Role{learning.RoleStudent}, StudentID: "stu-003", CampusID: "campus-main"},
 	}
 	s.students = []learning.Student{
-		{ID: "stu-001", Name: "小明", EnrollmentAcademicYear: currentAcademicYear(), EnrollmentGrade: "五年级", Phone: "185****9069", LearningStatus: "连续7天", AccountStatus: "正常", StreakDays: 7, BadgeCount: 5, BindStatus: "待绑定", LastStudyAt: "2026-05-22 18:20:00", EffectiveUntil: "2027-05-22"},
-		{ID: "stu-002", Name: "Lucy", EnrollmentAcademicYear: currentAcademicYear(), EnrollmentGrade: "五年级", Phone: "136****2201", LearningStatus: "今日未学", AccountStatus: "待提醒", StreakDays: 3, BadgeCount: 3, BindStatus: "待绑定", LastStudyAt: "2026-05-21 19:10:00", EffectiveUntil: "2027-05-22"},
-		{ID: "stu-003", Name: "小航", EnrollmentAcademicYear: currentAcademicYear(), EnrollmentGrade: "五年级", Phone: "137****3303", LearningStatus: "刚开通", AccountStatus: "正常", StreakDays: 1, BadgeCount: 1, BindStatus: "待绑定", LastStudyAt: "2026-05-22 20:00:00", EffectiveUntil: "2027-05-22"},
+		{ID: "stu-001", Name: "小明", EnrollmentAcademicYear: currentAcademicYear(), EnrollmentGrade: "五年级", Phone: "185****9069", LearningStatus: "连续7天", AccountStatus: "正常", StreakDays: 7, BadgeCount: 5, BindStatus: "待绑定", CreatedAt: "2026-05-18 09:20:00", LastStudyAt: "2026-05-22 18:20:00", EffectiveUntil: "2027-05-22"},
+		{ID: "stu-002", Name: "Lucy", EnrollmentAcademicYear: currentAcademicYear(), EnrollmentGrade: "五年级", Phone: "136****2201", LearningStatus: "今日未学", AccountStatus: "待提醒", StreakDays: 3, BadgeCount: 3, BindStatus: "待绑定", CreatedAt: "2026-05-19 10:15:00", LastStudyAt: "2026-05-21 19:10:00", EffectiveUntil: "2027-05-22"},
+		{ID: "stu-003", Name: "小航", EnrollmentAcademicYear: currentAcademicYear(), EnrollmentGrade: "五年级", Phone: "137****3303", LearningStatus: "刚开通", AccountStatus: "正常", StreakDays: 1, BadgeCount: 1, BindStatus: "待绑定", CreatedAt: "2026-05-20 14:30:00", LastStudyAt: "2026-05-22 20:00:00", EffectiveUntil: "2027-05-22"},
 	}
 	s.reviews = []learning.Review{
 		{ID: "rev-001", StudentID: "stu-001", HomeworkID: "hw-g05-english-s1-q1", StudentName: "小明", PackageName: "英语班", Homework: "阅读挑战", SystemScore: 86, TeacherComment: "阅读理解整体不错，注意把答案依据写完整。", Reward: "阅读小星星", Status: "待批改"},

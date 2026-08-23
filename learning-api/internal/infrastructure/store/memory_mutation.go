@@ -140,6 +140,7 @@ func cloneStudents(values []learning.Student) []learning.Student {
 	out := make([]learning.Student, len(values))
 	for index, value := range values {
 		value.OpenedPackages = cloneStrings(value.OpenedPackages)
+		value.OpenedPackageRefs = append([]learning.StudentPackageRef(nil), value.OpenedPackageRefs...)
 		out[index] = value
 	}
 	return out

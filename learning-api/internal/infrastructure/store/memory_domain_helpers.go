@@ -44,6 +44,7 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	}
 	effectiveUntil := ""
 	packages := make([]string, 0)
+	packageRefs := make([]learning.StudentPackageRef, 0)
 	hasActiveGrant := false
 	for _, grant := range s.grants {
 		if grant.StudentID != student.ID {
@@ -57,12 +58,14 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 		}
 		if pkg, ok := s.findPackage(grant.PackageID); ok {
 			packages = appendUnique(packages, pkg.Name)
+			packageRefs = append(packageRefs, learning.StudentPackageRef{PackageID: pkg.ID, PackageName: pkg.Name})
 		}
 	}
 	if effectiveUntil != "" {
 		student.EffectiveUntil = effectiveUntil
 	}
 	student.OpenedPackages = packages
+	student.OpenedPackageRefs = packageRefs
 	if hasActiveGrant && student.LearningStatus == "待开通" {
 		student.LearningStatus = "已开通"
 	}
