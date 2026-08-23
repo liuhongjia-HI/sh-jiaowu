@@ -11,6 +11,14 @@ import (
 )
 
 func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRequest, openID string, realWechatLogin bool) (learning.Principal, error) {
+	// 多子女的候选选择分支下面会直接 return 一个 error（StudentSelectionRequiredError），
+	// 而 persistentMutation 一看到非 nil error 就整个丢弃这次调用里的所有写入——
+	// 所以"把手机号命中的几个学生都关联到同一个家长"必须在那之前，作为一次独立
+	// 的、总是成功的写入先落库，不能等到家长选完、真正登录成功的那一刻才做，
+	// 否则切换器要等每个孩子都各自完整登录一遍才会认全。
+	if err := s.backfillGuardianLinksForPhone(req.Phone); err != nil {
+		return learning.Principal{}, err
+	}
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.Principal, error) {
 			return work.loginWithWechatResolvedUnlocked(req, openID, realWechatLogin)

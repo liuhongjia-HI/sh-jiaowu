@@ -1018,3 +1018,68 @@ func submissionSummaryContains(summary learning.HomeworkSubmissionSummary, stude
 	}
 	return false
 }
+
+// 多子女的完整闭环，走真实 HTTP：手机号命中两个学生 -> 需要选择 -> 选中一个
+// 登录 -> 切换器列出两个孩子 -> 切到另一个 -> 新 token 在受保护接口上确实读到
+// 了另一个孩子的数据。中间件把 GuardianID 从 token 里正确地拉出来这件事，只有
+// 真的过一遍 HTTP + gin 路由 + AuthRequired 才能验证到；store 层的单测测的是
+// 逻辑本身，测不到这几层真的接起来了没有。
+func TestMultiChildLoginSwitchThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	adminToken := app.loginAdmin(t, "13800000001")
+	var sibling learning.Student
+	app.doJSON(t, http.MethodPost, "/api/students", adminToken, map[string]any{
+		"name": "小明妹妹", "phone": "18500009069", "grade": "五年级", "accountStatus": "正常",
+	}, http.StatusOK, &sibling)
+
+	selection := app.doJSON(t, http.MethodPost, "/api/auth/wechat-login", "", map[string]any{
+		"code": "multi-child-router-test", "phone": "18500009069", "studentName": "小明", "schoolName": "星河小学", "grade": "五年级",
+	}, http.StatusOK, nil)
+	var needsSelection struct {
+		NeedsSelection bool                      `json:"needsSelection"`
+		Candidates     []learning.StudentAccount `json:"candidates"`
+	}
+	if err := json.Unmarshal(selection.Data, &needsSelection); err != nil {
+		t.Fatalf("decode selection payload: %v", err)
+	}
+	if !needsSelection.NeedsSelection || len(needsSelection.Candidates) != 2 {
+		t.Fatalf("expected a two-candidate selection prompt, got %#v", needsSelection)
+	}
+
+	var auth authResponse
+	app.doJSON(t, http.MethodPost, "/api/auth/wechat-login", "", map[string]any{
+		"code": "multi-child-router-test-2", "phone": "18500009069", "studentName": "小明", "schoolName": "星河小学", "grade": "五年级",
+		"selectedStudentId": "stu-001",
+	}, http.StatusOK, &auth)
+	if auth.User.GuardianID == "" || auth.User.StudentID != "stu-001" {
+		t.Fatalf("expected a guardian-linked login for stu-001, got %#v", auth.User)
+	}
+
+	var accounts []learning.StudentAccount
+	app.doJSON(t, http.MethodGet, "/api/student/accounts", auth.Token, nil, http.StatusOK, &accounts)
+	if len(accounts) != 2 {
+		t.Fatalf("expected two switchable accounts, got %#v", accounts)
+	}
+
+	var switched authResponse
+	app.doJSON(t, http.MethodPost, "/api/student/accounts/"+sibling.ID+"/switch", auth.Token, nil, http.StatusOK, &switched)
+	if switched.User.StudentID != sibling.ID || switched.User.GuardianID != auth.User.GuardianID {
+		t.Fatalf("expected switch to move to the sibling under the same guardian, got %#v", switched.User)
+	}
+
+	var home learning.StudentHome
+	app.doJSON(t, http.MethodGet, "/api/student/home", switched.Token, nil, http.StatusOK, &home)
+	if home.Student.ID != sibling.ID {
+		t.Fatalf("expected the switched token to read the sibling's own data, got student %#v", home.Student)
+	}
+
+	// 反过来也要成立：切完之后，老 token（还停在 stu-001 上）应该继续正常工作，
+	// 而不是被这次切换顶掉——多子女场景下家长可能两个孩子的页面都开着。
+	var stillFirst learning.StudentHome
+	app.doJSON(t, http.MethodGet, "/api/student/home", auth.Token, nil, http.StatusOK, &stillFirst)
+	if stillFirst.Student.ID != "stu-001" {
+		t.Fatalf("expected the original token to keep reading stu-001, got %#v", stillFirst.Student)
+	}
+}

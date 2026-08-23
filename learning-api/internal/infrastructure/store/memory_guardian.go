@@ -1,11 +1,63 @@
 package store
 
 import (
+	"sort"
 	"strings"
 	"time"
 
 	"starline/learning-api/internal/domain/learning"
 )
+
+// backfillGuardianLinksForPhone 把一个手机号能匹配到的所有学生（不管是已经有
+// 登录账号的，还是只有学生档案、还没绑过微信的）都关联到同一个家长身份下。
+// 调用方必须已经持有 s.mu（跟包里其它 xxxUnlocked 入口一样），自己按 s.db 是否
+// 配置决定要不要包一层持久化事务，遵循这个包里现有的写入函数统一采用的写法。
+func (s *MemoryStore) backfillGuardianLinksForPhone(phone string) error {
+	if s.db == nil {
+		return s.backfillGuardianLinksForPhoneUnlocked(phone)
+	}
+	return persistentMutationError(s, func(work *MemoryStore) error {
+		return work.backfillGuardianLinksForPhoneUnlocked(phone)
+	})
+}
+
+// backfillGuardianLinksForPhoneUnlocked 只在命中两个及以上学生时才动手——命中
+// 0 个或 1 个的情况交给登录成功那一步的 ensureGuardianLink 处理就够了，不需要
+// 在这里抢跑。命中多个的时候必须在这里就把关系建好并落库（而不是等家长选完
+// 具体登录哪一个），因为"需要选择"那个分支会直接返回 error，外层事务一看到
+// error 就把整个函数调用期间的写入全部丢弃——晚一步做，关系就建不起来。
+func (s *MemoryStore) backfillGuardianLinksForPhoneUnlocked(phone string) error {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return nil
+	}
+	found := map[string]bool{}
+	studentIDs := make([]string, 0, 2)
+	addStudent := func(id string) {
+		if id != "" && !found[id] {
+			found[id] = true
+			studentIDs = append(studentIDs, id)
+		}
+	}
+	for _, user := range s.users {
+		if user.Phone == phone && hasRole(user.Roles, learning.RoleStudent) {
+			addStudent(user.StudentID)
+		}
+	}
+	for _, student := range s.students {
+		if phoneSame(student.Phone, phone) {
+			addStudent(student.ID)
+		}
+	}
+	if len(studentIDs) < 2 {
+		return nil
+	}
+	sort.Strings(studentIDs) // 让"谁是默认主关系人"这种细节不随 map/切片遍历顺序抖动。
+	for _, studentID := range studentIDs {
+		s.ensureGuardianLink(phone, "", studentID)
+	}
+	return nil
+}
 
 // ensureGuardianLink 维护"手机号 -> 家长 -> 学生"的关系，登录成功、确定了具体
 // 是哪个学生之后调用。优先按手机号找家长（同一个手机号只应该对应一个家长），
