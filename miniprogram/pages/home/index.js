@@ -266,9 +266,6 @@ Page({
   goLogin() {
     wx.navigateTo({ url: "/pages/login/index" });
   },
-  goStarlineIntro() {
-    wx.navigateTo({ url: "/pages/starline-intro/index" });
-  },
   goOpen() {
     if (!this.data.home) {
       this.goLogin();
