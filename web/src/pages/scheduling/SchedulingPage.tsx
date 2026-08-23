@@ -629,24 +629,26 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   </button>
                   {hiddenSubjects.length > 0 && <Button type="link" size="small" onClick={() => setHiddenSubjects([])}>全部显示</Button>}
                 </div>
-                <div className="schedule-subject-list" hidden={!subjectLegendOpen}>
-                  {scheduleSubjects.map((subject) => {
-                    const color = subjectColor(subject);
-                    const hidden = hiddenSubjects.includes(subject);
-                    return (
-                      <button
-                        type="button"
-                        className={`schedule-subject-toggle ${hidden ? 'is-muted' : ''}`}
-                        key={subject}
-                        style={{ '--subject-color': color.accent } as CSSProperties}
-                        onClick={() => setHiddenSubjects((values) => values.includes(subject) ? values.filter((item) => item !== subject) : [...values, subject])}
-                      >
-                        <i />
-                        <span>{subject}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {subjectLegendOpen && (
+                  <div className="schedule-subject-list">
+                    {scheduleSubjects.map((subject) => {
+                      const color = subjectColor(subject);
+                      const hidden = hiddenSubjects.includes(subject);
+                      return (
+                        <button
+                          type="button"
+                          className={`schedule-subject-toggle ${hidden ? 'is-muted' : ''}`}
+                          key={subject}
+                          style={{ '--subject-color': color.accent } as CSSProperties}
+                          onClick={() => setHiddenSubjects((values) => values.includes(subject) ? values.filter((item) => item !== subject) : [...values, subject])}
+                        >
+                          <i />
+                          <span>{subject}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="schedule-sidebar-section">
