@@ -72,4 +72,4 @@ ADMIN_PASSWORD_LOGIN_ENABLED=true
   ```
 - 当前可先启用 `nginx-http.conf`
 - HTTPS 证书签发完成后，把证书放到 `/etc/ssl/starline/sa.starlineeducation.com.cn.pem`、`/etc/ssl/starline/sa.starlineeducation.com.cn.key`、`/etc/ssl/starline/gate.starlineeducation.com.cn.pem`、`/etc/ssl/starline/gate.starlineeducation.com.cn.key`，再把 `nginx-https.conf` 合并进 Nginx 站点配置并 reload。
-- 两份 Nginx 配置都已设置 `client_max_body_size 50m`，与后端课件上传上限一致；轮播图接口仍会限制单张图片不超过 5MB。每次发布还会把 `nginx-upload-limits.conf` 安装到 `/etc/nginx/conf.d/`，确保已有站点配置也能获得该上限。
+- 两份 Nginx 配置都已设置 `client_max_body_size 50m`，与后端课件上传上限一致；轮播图接口仍会限制单张图片不超过 5MB。每次发布还会定位当前生效的网关站点配置，并写入同样的上限。

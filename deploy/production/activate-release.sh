@@ -118,12 +118,19 @@ for attempt in $(seq 1 30); do
 done
 
 if command -v nginx >/dev/null 2>&1; then
-	# 站点配置在首次部署时会复制到 /etc/nginx，后续 release 只切换应用目录，
-	# 因此不能只更新 release 内的站点文件。把上传上限作为独立 http 级配置安装，
-	# 不覆盖现有 HTTPS 证书、域名或其他人工维护的站点配置。
-	NGINX_UPLOAD_LIMIT_CONF="$RELEASE_DIR/deploy/production/nginx-upload-limits.conf"
-	if [ -f "$NGINX_UPLOAD_LIMIT_CONF" ] && [ -d /etc/nginx/conf.d ]; then
-		install -m 0644 "$NGINX_UPLOAD_LIMIT_CONF" /etc/nginx/conf.d/starline-upload-limits.conf
+	# release 内的 Nginx 文件不会自动覆盖 /etc/nginx。直接定位实际承载网关域名的
+	# server 配置，只在该块加入上限，避免 http 级同名指令与服务器既有配置重复。
+	rm -f /etc/nginx/conf.d/starline-upload-limits.conf
+	NGINX_GATEWAY_CONFIG="$(nginx -T 2>&1 | awk '
+		/^# configuration file / { file = $4; sub(/:$/, "", file); next }
+		/server_name[[:space:]]+gate\.starlineeducation\.com\.cn[[:space:];]/ { print file; exit }
+	')"
+	if [ -z "$NGINX_GATEWAY_CONFIG" ] || [ ! -f "$NGINX_GATEWAY_CONFIG" ]; then
+		echo "Unable to locate the active Nginx gateway server configuration." >&2
+		exit 1
+	fi
+	if ! grep -q 'starline-upload-limit' "$NGINX_GATEWAY_CONFIG"; then
+		sed -i '/server_name gate\.starlineeducation\.com\.cn;/a\    client_max_body_size 50m; # starline-upload-limit' "$NGINX_GATEWAY_CONFIG"
 	fi
 	nginx -t
 	if command -v systemctl >/dev/null 2>&1; then
