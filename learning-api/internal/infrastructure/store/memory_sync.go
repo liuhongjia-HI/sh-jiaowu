@@ -158,6 +158,12 @@ func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Princip
 	return result1, err
 }
 
+func (s *MemoryStore) DeleteMaterial(operator string, principal learning.Principal, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deleteMaterialUnlocked(operator, principal, id)
+}
+
 func (s *MemoryStore) Homework(principal learning.Principal) []learning.Homework {
 	s.mu.Lock()
 	defer s.mu.Unlock()

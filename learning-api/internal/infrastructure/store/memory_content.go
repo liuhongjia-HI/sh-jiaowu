@@ -174,6 +174,40 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 	return learning.Material{}, errors.New("学习资料不存在")
 }
 
+// deleteMaterialUnlocked 删的是学习资料这条记录本身，不动它背后的文件资产——
+// 上传错了、传重了这种误操作，删掉列表条目就够用；物理文件留着不清理，
+// 万一以后要恢复或者审计还能找回来，不会因为一次误删连底层文件都丢了。
+// 顺手把学生端收藏里指向这条资料的收藏也删掉，不留一个点开就 404 的收藏项。
+func (s *MemoryStore) deleteMaterialUnlocked(operator string, principal learning.Principal, id string) error {
+	if s.db != nil {
+		return persistentMutationError(s, func(work *MemoryStore) error {
+			return work.deleteMaterialUnlocked(operator, principal, id)
+		})
+	}
+	id = strings.TrimSpace(id)
+	if !canUploadHandout(principal) {
+		return errors.New("当前账号没有维护学习资料权限，请联系管理员开通")
+	}
+	for index := range s.materials {
+		if s.materials[index].ID != id {
+			continue
+		}
+		if !canSeeCourse(principal, learning.Course{ID: s.materials[index].CourseID, LearningSpaceID: s.materials[index].LearningSpaceID}) {
+			return errors.New("不能删除未负责的学习资料")
+		}
+		title := s.materials[index].Title
+		s.materials = append(s.materials[:index:index], s.materials[index+1:]...)
+		for key, favorite := range s.favorites {
+			if favorite.TargetType == "material" && favorite.TargetID == id {
+				delete(s.favorites, key)
+			}
+		}
+		s.prependLogDetail(operator, "删除学习资料", title, "")
+		return nil
+	}
+	return errors.New("学习资料不存在")
+}
+
 func (s *MemoryStore) homeworkUnlocked(principal learning.Principal) []learning.Homework {
 	courses := courseNames(s.coursesUnlocked(principal))
 	return s.homeworkForCourses(courses)

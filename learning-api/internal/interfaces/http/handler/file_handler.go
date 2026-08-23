@@ -69,6 +69,16 @@ func (h *LearningHandler) UpdateMaterial(c *gin.Context) {
 	OK(c, updated)
 }
 
+func (h *LearningHandler) DeleteMaterial(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.DeleteMaterial(operator.(string), principal, c.Param("id")); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"deleted": true})
+}
+
 func (h *LearningHandler) CreateHomework(c *gin.Context) {
 	if !strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
 		var req learning.HomeworkUploadRequest

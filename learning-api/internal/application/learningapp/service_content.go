@@ -25,6 +25,9 @@ func (s *Service) CreateMaterial(o string, p learning.Principal, r learning.Mate
 func (s *Service) UpdateMaterial(o string, p learning.Principal, id string, r learning.MaterialUpdateRequest) (learning.Material, error) {
 	return s.content.UpdateMaterial(o, p, id, r)
 }
+func (s *Service) DeleteMaterial(o string, p learning.Principal, id string) error {
+	return s.content.DeleteMaterial(o, p, id)
+}
 func (s *Service) Homework(p learning.Principal) []learning.Homework { return s.content.Homework(p) }
 func (s *Service) HomeworkSubmissions(p learning.Principal, id string) (learning.HomeworkSubmissionSummary, error) {
 	return s.content.HomeworkSubmissions(p, id)
