@@ -118,9 +118,16 @@ for attempt in $(seq 1 30); do
 done
 
 if command -v nginx >/dev/null 2>&1; then
-  nginx -t
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl reload nginx || systemctl restart nginx
+	# 站点配置在首次部署时会复制到 /etc/nginx，后续 release 只切换应用目录，
+	# 因此不能只更新 release 内的站点文件。把上传上限作为独立 http 级配置安装，
+	# 不覆盖现有 HTTPS 证书、域名或其他人工维护的站点配置。
+	NGINX_UPLOAD_LIMIT_CONF="$RELEASE_DIR/deploy/production/nginx-upload-limits.conf"
+	if [ -f "$NGINX_UPLOAD_LIMIT_CONF" ] && [ -d /etc/nginx/conf.d ]; then
+		install -m 0644 "$NGINX_UPLOAD_LIMIT_CONF" /etc/nginx/conf.d/starline-upload-limits.conf
+	fi
+	nginx -t
+	if command -v systemctl >/dev/null 2>&1; then
+		systemctl reload nginx || systemctl restart nginx
 	fi
 fi
 
