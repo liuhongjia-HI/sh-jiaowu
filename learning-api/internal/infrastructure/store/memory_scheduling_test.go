@@ -521,3 +521,77 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 		t.Fatalf("expected republished material favorite to be visible again, got %#v", favoritesAfterRepublish)
 	}
 }
+
+// 上传错了、传重了这类误操作，之前唯一的补救是编辑成"停用"——但列表的
+// 状态列显示的是转换状态不是发布状态，停用了列表上完全看不出来，运营
+// 只会觉得"这功能没用"。这条测试锁的是删除的真实效果：从管理端列表和
+// 学生端都消失，且不留一个点开 404 的收藏项。
+func TestDeleteMaterialRemovesItFromAdminAndStudentAndCleansFavorites(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	courses := store.Courses(teacher)
+	if len(courses) == 0 {
+		t.Fatal("expected teacher to see courses")
+	}
+	created, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title:    "待删除学习资料",
+		CourseID: courses[0].ID,
+		File: learning.FileAsset{
+			ID:            "file-delete-test",
+			FileName:      "material.pdf",
+			FileType:      "PDF",
+			PreviewStatus: "可预览",
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected material creation to succeed: %v", err)
+	}
+	for index := range store.materials {
+		if store.materials[index].ID == created.ID {
+			store.materials[index].Status = learning.Status("已发布")
+			store.materials[index].PublishStatus = "已发布"
+		}
+	}
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	favorite, err := store.AddFavorite("小明", student, learning.FavoriteRequest{TargetType: "material", TargetID: created.ID})
+	if err != nil {
+		t.Fatalf("expected visible material to be favorited: %v", err)
+	}
+
+	if err := store.DeleteMaterial("英语老师", teacher, "material-does-not-exist"); err == nil {
+		t.Fatal("expected deleting a nonexistent material to fail")
+	}
+
+	if err := store.DeleteMaterial("英语老师", teacher, created.ID); err != nil {
+		t.Fatalf("expected delete to succeed: %v", err)
+	}
+
+	adminAfterDelete := store.Materials(teacher)
+	if materialVisible(adminAfterDelete, created.ID) {
+		t.Fatalf("expected deleted material to disappear from admin list, got %#v", adminAfterDelete)
+	}
+	studyAfterDelete, err := store.StudentStudy(student)
+	if err != nil {
+		t.Fatalf("expected student study board after delete: %v", err)
+	}
+	if materialVisible(studyAfterDelete.Materials, created.ID) {
+		t.Fatalf("expected deleted material to disappear from student view, got %#v", studyAfterDelete.Materials)
+	}
+	favoritesAfterDelete, err := store.StudentFavorites(student)
+	if err != nil {
+		t.Fatalf("expected favorites after delete: %v", err)
+	}
+	if favoriteListContains(favoritesAfterDelete, favorite.ID) {
+		t.Fatalf("expected the dangling favorite to be cleaned up, got %#v", favoritesAfterDelete)
+	}
+
+	if err := store.DeleteMaterial("英语老师", teacher, created.ID); err == nil {
+		t.Fatal("expected deleting an already-deleted material to fail")
+	}
+}
