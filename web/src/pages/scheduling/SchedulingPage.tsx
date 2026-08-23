@@ -24,7 +24,6 @@ import {
   weekOptions
 } from './scheduling-utils';
 import { CandidatePanel, CoordinationPanel } from './CandidatePanel';
-import type { ResourceLaneMode } from './SchedulingViews';
 import {
   MiniMonthCalendar,
   MonthScheduleBoard,
@@ -142,6 +141,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [candidateForm] = Form.useForm<CandidateFormValues>();
   const [editForm] = Form.useForm<ScheduleClassFormValues>();
   const [candidateRequest, setCandidateRequest] = useState<CandidateFormValues | null>(null);
+  // 侧栏（迷你日历 / 学科日历 / 筛选）默认收起：它们是「偶尔用一次」的辅助工具，
+  // 常驻展开会占掉 260px，把真正要看的排班网格挤窄一档。收起后留一条竖栏可随时展开，
+  // 并在上面标出生效中的筛选条数——否则筛选被藏起来，结果变少却看不出原因。
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<ScheduleCandidate | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedCampusId, setSelectedCampusId] = useState(user.campusId || 'campus-main');
@@ -151,7 +154,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
   // 默认停在资源泳道日视图：这是排课场景真正读得清的密度，周视图退居总览。
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month' | 'list'>('day');
-  const [laneMode, setLaneMode] = useState<ResourceLaneMode>('teacher');
   const [classGradeFilter, setClassGradeFilter] = useState<string>();
   const [classSubjectFilter, setClassSubjectFilter] = useState<string>();
   const [classTeacherFilter, setClassTeacherFilter] = useState<string>();
@@ -358,6 +360,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const availabilitySummary = useMemo(() => availabilityStats(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const activeClassCount = subjectVisibleClasses.filter((item) => item.status === '已确认').length;
   const totalConfirmedClassCount = (classes.data ?? []).filter((item) => item.status === '已确认').length;
+  const activeFilterCount = [classGradeFilter, classSubjectFilter, classTeacherFilter, classStudentFilter, classCampusFilter, classCourseFilter, classTypeFilter]
+    .filter(Boolean).length + (statusFilter !== '全部' ? 1 : 0) + (hiddenSubjects.length > 0 ? 1 : 0);
   const hasClassFilters = Boolean(classGradeFilter || classSubjectFilter || classTeacherFilter || classStudentFilter || classCampusFilter || classCourseFilter || classTypeFilter || hiddenSubjects.length > 0 || statusFilter !== '全部');
   const classResultNote = scheduleResultNote(subjectVisibleClasses, totalConfirmedClassCount, hasClassFilters, classGradeFilter);
   const recommendedCount = readyCandidates.length;
@@ -595,8 +599,23 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             </div>
           </div>
 
-          <div className="schedule-outlook-shell">
-            <aside className="schedule-outlook-sidebar">
+          <div className={sidebarOpen ? 'schedule-outlook-shell' : 'schedule-outlook-shell is-collapsed'}>
+            {!sidebarOpen && (
+              <button
+                type="button"
+                className="schedule-sidebar-rail"
+                aria-expanded={false}
+                onClick={() => setSidebarOpen(true)}
+              >
+                <RightOutlined />
+                <span>日历与筛选</span>
+                {activeFilterCount > 0 && <em>{activeFilterCount}</em>}
+              </button>
+            )}
+            <aside className="schedule-outlook-sidebar" hidden={!sidebarOpen}>
+              <div className="schedule-sidebar-collapse">
+                <Button type="text" size="small" icon={<LeftOutlined />} onClick={() => setSidebarOpen(false)}>收起</Button>
+              </div>
               <div className="schedule-sidebar-section">
                 <div className="schedule-sidebar-head">
                   <strong>{calendarMonth.getFullYear()} 年 {calendarMonth.getMonth() + 1} 月</strong>
@@ -710,7 +729,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                 <ScheduleDayResourceTimeline
                   loading={classes.isFetching || candidates.isFetching || availabilityOverview.isFetching}
                   selectedDate={selectedDate}
-                  laneMode={laneMode}
                   availabilityByDay={availabilityByDay}
                   candidatesByDay={candidatesByDay}
                   classesByDay={classesByDay}
@@ -722,7 +740,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   emptyTips={emptyTips}
                   canManage={canCreateClass}
                   nearestClassDate={nearestClassDate}
-                  onLaneModeChange={setLaneMode}
                   onPreviousDay={() => goToDate(addDays(selectedDate, -1))}
                   onNextDay={() => goToDate(addDays(selectedDate, 1))}
                   onToday={() => goToDate(new Date())}

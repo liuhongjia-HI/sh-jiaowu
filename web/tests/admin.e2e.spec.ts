@@ -183,6 +183,9 @@ test('校区管理员可以从周历入口新建排课', async ({ page }) => {
   await page.locator('.ant-segmented-item-label', { hasText: '周视图' }).click();
   await expect(page.locator('.schedule-timeline-grid')).toBeVisible();
   await expect(page.locator('.schedule-day-head')).toHaveCount(7);
+  // 侧栏默认收起，展开后才该看到学科日历。
+  await expect(page.getByText('学科日历')).toBeHidden();
+  await page.locator('.schedule-sidebar-rail').click();
   await expect(page.getByText('学科日历')).toBeVisible();
   await expect(page.getByText('老师可授课').first()).toBeVisible();
   await expect(page.getByText('学生可上课').first()).toBeVisible();
