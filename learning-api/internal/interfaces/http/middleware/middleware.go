@@ -29,6 +29,11 @@ type auditOperator struct {
 
 type PrincipalResolver interface {
 	PrincipalByUserID(userID string) (learning.Principal, error)
+	// GuardianStudentActive 校验家长-学生关系是否仍然"在读"。PrincipalByUserID
+	// 是从 users/roles 表重建 principal 的权威来源，但它不知道 GuardianID——
+	// 这个字段是家长身份特有的，必须单独从 token 里取出来后再逐请求校验一次，
+	// 否则关系被后台解除之后，旧 token 还能继续读那个孩子的数据。
+	GuardianStudentActive(guardianID, studentID string) bool
 }
 
 func RequestLogger(log *logger.Logger) gin.HandlerFunc {
@@ -89,6 +94,17 @@ func AuthRequired(tokens *auth.TokenManager, resolver PrincipalResolver, roles .
 		if tokenPrincipal.TokenVersion != principal.TokenVersion {
 			c.AbortWithStatusJSON(401, gin.H{"code": 401, "message": "登录状态已更新，请重新登录", "data": nil})
 			return
+		}
+		if tokenPrincipal.GuardianID != "" {
+			// GuardianID/当前查看的学生 是家长登录特有的状态，PrincipalByUserID
+			// 从 users 表重建 principal 时并不知道它，必须从 token 里取出来并且
+			// 每次请求都重新校验关系还在——这是切换账号能不能被后台实时收回权限
+			// 的关键一步，不能只在切换的那一刻校验一次就完事。
+			if !resolver.GuardianStudentActive(tokenPrincipal.GuardianID, principal.StudentID) {
+				c.AbortWithStatusJSON(401, gin.H{"code": 401, "message": "登录状态已更新，请重新登录", "data": nil})
+				return
+			}
+			principal.GuardianID = tokenPrincipal.GuardianID
 		}
 		principal.AuthMethod = tokenPrincipal.AuthMethod
 		if len(allowed) > 0 && !hasAnyRole(principal.Roles, allowed) {

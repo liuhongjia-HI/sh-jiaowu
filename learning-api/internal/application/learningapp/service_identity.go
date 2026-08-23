@@ -11,6 +11,7 @@ type AuthRepository interface {
 	ResetPassword(operator string, principal learning.Principal, userID string) (learning.PasswordResetResult, error)
 	RecordSecurityEvent(operator, action, target, detail string) error
 	PrincipalByUserID(userID string) (learning.Principal, error)
+	GuardianStudentActive(guardianID, studentID string) bool
 	StudentAccounts(learning.Principal) ([]learning.StudentAccount, error)
 	SwitchStudentAccount(learning.Principal, string) (learning.Principal, error)
 }
@@ -45,6 +46,9 @@ func (s *Service) RecordSecurityEvent(operator, action, target, detail string) e
 }
 func (s *Service) PrincipalByUserID(userID string) (learning.Principal, error) {
 	return s.auth.PrincipalByUserID(userID)
+}
+func (s *Service) GuardianStudentActive(guardianID, studentID string) bool {
+	return s.auth.GuardianStudentActive(guardianID, studentID)
 }
 func (s *Service) StudentAccounts(principal learning.Principal) ([]learning.StudentAccount, error) {
 	return s.auth.StudentAccounts(principal)

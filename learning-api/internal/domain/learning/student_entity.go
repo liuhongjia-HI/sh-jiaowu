@@ -83,6 +83,10 @@ const (
 	GuardianRelationFather GuardianRelation = "爸爸"
 	GuardianRelationMother GuardianRelation = "妈妈"
 	GuardianRelationOther  GuardianRelation = "其他家长"
+	// GuardianRelationGuardian 是登录时自动建立关系的默认值——系统不知道
+	// 登录的人是爸爸、妈妈还是本人，只知道"是这个孩子的家长"。具体是谁由
+	// 家长自己在后续管理里改，不强求登录那一刻就填清楚。
+	GuardianRelationGuardian GuardianRelation = "家长"
 )
 
 // GuardianStudentStatus 决定这个孩子还出不出现在家长的切换器里。结课/退费不能

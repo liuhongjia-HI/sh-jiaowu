@@ -30,11 +30,15 @@ type User struct {
 }
 
 type Principal struct {
-	UserID             string   `json:"userId"`
-	Name               string   `json:"name"`
-	Phone              string   `json:"phone,omitempty"`
-	AuthMethod         string   `json:"authMethod,omitempty"`
-	StudentID          string   `json:"studentId,omitempty"`
+	UserID     string `json:"userId"`
+	Name       string `json:"name"`
+	Phone      string `json:"phone,omitempty"`
+	AuthMethod string `json:"authMethod,omitempty"`
+	StudentID  string `json:"studentId,omitempty"`
+	// GuardianID 只在学生端登录（家长身份）时有值，标记这个 principal 背后是
+	// 哪个家长；StudentID 仍然是当前查看哪个孩子——多子女切换只换 StudentID，
+	// 不换 GuardianID。老师/管理员登录不涉及家长身份，这个字段留空。
+	GuardianID         string   `json:"guardianId,omitempty"`
 	CampusID           string   `json:"campusId,omitempty"`
 	Roles              []Role   `json:"roles"`
 	MustChangePassword bool     `json:"mustChangePassword,omitempty"`

@@ -77,7 +77,13 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 			action = "绑定后台人员微信"
 		}
 		s.prependLog(user.Name, action, user.Name)
-		return principalFromUser(s.users[i]), nil
+		principal := principalFromUser(s.users[i])
+		if hasRole(user.Roles, learning.RoleStudent) {
+			// 家长身份只对学生登录有意义，老师/管理员用手机号绑定跟"家长-孩子"
+			// 关系表完全无关。
+			principal.GuardianID = s.ensureGuardianLink(req.Phone, openID, s.users[i].StudentID)
+		}
+		return principal, nil
 	}
 	for _, user := range s.users {
 		if user.OpenID != openID {
@@ -86,7 +92,26 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 		if user.AccountStatus != "正常" {
 			return learning.Principal{}, errors.New("账号已停用，请联系管理员")
 		}
-		return principalFromUser(user), nil
+		if !hasRole(user.Roles, learning.RoleStudent) {
+			return principalFromUser(user), nil
+		}
+		// 静默重新登录（只带 openID，不带手机号）：优先恢复家长上次查看的孩子，
+		// 而不是死认最初完成手机号绑定时用的那个 user 记录——不然家长在"我的"
+		// 页切到老二之后，小程序一重启又跳回老大，跟切换器承诺的行为对不上。
+		principal := principalFromUser(user)
+		if idx, ok := s.findGuardianByOpenIDIndex(openID); ok {
+			guardian := s.guardians[idx]
+			principal.GuardianID = guardian.ID
+			if guardian.LastStudentID != "" && guardian.LastStudentID != user.StudentID &&
+				s.guardianStudentActive(guardian.ID, guardian.LastStudentID) {
+				if lastUser, ok := s.findUserByStudentID(guardian.LastStudentID); ok && lastUser.AccountStatus == "正常" {
+					resumed := principalFromUser(lastUser)
+					resumed.GuardianID = guardian.ID
+					return resumed, nil
+				}
+			}
+		}
+		return principal, nil
 	}
 	return learning.Principal{}, errors.New("微信账号未绑定，请先填写学生信息并授权手机号完成身份绑定")
 }
@@ -168,7 +193,9 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 	s.applyStudentBindingProfile(student.ID, req)
 	s.removeWechatOnlyStudent(openID, student.ID)
 	s.prependLog(user.Name, "绑定学生微信", user.Name)
-	return principalFromUser(user), true, nil
+	principal := principalFromUser(user)
+	principal.GuardianID = s.ensureGuardianLink(req.Phone, openID, student.ID)
+	return principal, true, nil
 }
 
 // createWechatStudentAccount 曾经会在手机号匹配不到任何后台档案时自动建一个学生账号。
