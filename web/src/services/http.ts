@@ -40,16 +40,31 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+// 文件类接口用 responseType: 'blob' 请求，出错时 response.data 是 Blob 而不是对象，
+// 直接读 data.message 永远拿不到后端文案，报错会退化成通用的“操作失败”。
+async function readErrorMessage(error: { response?: { data?: unknown } }) {
+  if (!error.response) return '网络连接异常，请稍后重试。';
+  let data: unknown = error.response.data;
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+  }
+  const message = (data as { message?: unknown } | null)?.message;
+  return typeof message === 'string' && message.trim() ? message : '操作失败，请检查后重试。';
+}
+
 http.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
     }
-    const message =
-      error.response?.data?.message ||
-      (error.response ? '操作失败，请检查后重试。' : '网络连接异常，请稍后重试。');
+    const message = await readErrorMessage(error);
     const normalized = new Error(message);
     Object.assign(normalized, {
       response: error.response,

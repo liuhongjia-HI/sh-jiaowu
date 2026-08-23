@@ -121,6 +121,7 @@ export type ResourceLane = {
 
 const studentAvailabilityLaneKey = '__student-availability__';
 const unassignedLaneKey = '__unassigned__';
+const placeholderLaneKey = '__placeholder__';
 
 // 单个课程块低于这个宽度就只剩一两个字，并排再多也读不出是什么课，
 // 超出的部分折叠成 "+N"。数值来自实测：约 64px 时课程名可显示 3 个汉字。
@@ -443,10 +444,22 @@ export function ScheduleDayResourceTimeline({
     };
   }, [loading, lanes.length]);
 
-  const laidOutLanes = useMemo(
-    () => lanes.map((lane) => ({ ...lane, layout: layoutOverlappingItems(lane.items, laneWidth) })),
-    [lanes, laneWidth]
-  );
+  // 这一天什么都没有时也要把时间轴画出来。原来直接用空态整块替掉网格，进页面看到的
+  // 是一张插画，既读不出「这天是几点到几点、每个时段是空的」，也丢掉了双击空白建课的入口——
+  // 用户得先跳到有课的一天才能看见排班表长什么样。日历产品的通行做法是空日子照画网格，
+  // 把「没有内容」降级成一条提示条。泳道由数据推出来，空的时候补一条占位列撑住网格。
+  const laidOutLanes = useMemo(() => {
+    const laid = lanes.map((lane) => ({ ...lane, layout: layoutOverlappingItems(lane.items, laneWidth) }));
+    if (laid.length > 0) return laid;
+    return [{
+      key: placeholderLaneKey,
+      title: laneMode === 'teacher' ? '暂无老师排课' : '暂无教室占用',
+      subtitle: '这一天还没有安排',
+      droppable: false,
+      items: [],
+      layout: []
+    }];
+  }, [lanes, laneWidth, laneMode]);
 
   // 时间轴固定 08:00-22:00，但课通常集中在傍晚，打开后上方是大片空白，
   // 得手动往下翻好几屏才看得到课。日历产品的通行做法是保留完整时间轴（否则拖不到
@@ -499,18 +512,17 @@ export function ScheduleDayResourceTimeline({
           否则用户只能盲点上一天/下一天去撞。候选查找的提示（emptyTips）只在真的
           发起过查找时才展示：没查找时那句「先选择学科和年级」和「这天没课」无关，是误导。 */}
       {!hasAnyItem && (
-        <div className="schedule-day-empty">
-          <Empty
-            description={candidateRequest
+        <div className="schedule-day-empty-bar">
+          <span>
+            {candidateRequest
               ? `${formatDayTitle(selectedDate)} 没有符合条件的排课结果。`
               : `${formatDayTitle(selectedDate)} 没有课程，也没有收集到可排时间。`}
-          >
-            {nearestClassDate && (
-              <Button type="primary" onClick={() => onJumpToDate(nearestClassDate.date)}>
-                最近的排课在 {formatDayTitle(nearestClassDate.date)}（{nearestClassDate.count} 节），去看看
-              </Button>
-            )}
-          </Empty>
+          </span>
+          {nearestClassDate && (
+            <Button type="link" size="small" onClick={() => onJumpToDate(nearestClassDate.date)}>
+              最近的排课在 {formatDayTitle(nearestClassDate.date)}（{nearestClassDate.count} 节），去看看
+            </Button>
+          )}
           {candidateRequest && emptyTips.length > 0 && (
             <div className="schedule-tip-list">
               {emptyTips.map((tip) => <div key={tip}>{tip}</div>)}
@@ -519,86 +531,89 @@ export function ScheduleDayResourceTimeline({
         </div>
       )}
 
-      {hasAnyItem && (
-        <div ref={scrollRef} className="schedule-timeline-scroll">
-          <div
-            className="schedule-timeline-grid is-resource"
-            style={{
-              '--timeline-height': `${boardHeight}px`,
-              '--lane-count': laidOutLanes.length,
-              // 「学生可上课」是跨老师的参考信息，不是一条真资源，给它和老师同等宽度
-              // 会把它抬到和老师一样的地位，老师少的时候还会被拉得特别宽。固定窄一档。
-              gridTemplateColumns: `64px ${laidOutLanes
-                .map((lane) => (lane.key === studentAvailabilityLaneKey ? '200px' : 'minmax(190px, 1fr)'))
-                .join(' ')}`
-            } as CSSProperties}
-          >
-            <div className="schedule-time-gutter schedule-day-head-spacer" />
-            {laidOutLanes.map((lane) => (
-              <div className="schedule-day-head schedule-lane-head" key={lane.key}>
-                <strong title={lane.title}>{lane.title}</strong>
-                <span title={lane.subtitle}>{lane.subtitle}</span>
-                {/* 学生可上课那条泳道里一节课都没有，写「0 节课」会被读成「今天没课」，
-                    它该报的是覆盖了几个可排时段。 */}
-                <small>
-                  {lane.key === studentAvailabilityLaneKey
-                    ? `${lane.items.length} 个可排时段`
-                    : `${lane.items.filter((item) => item.kind === 'class' && item.status !== '已取消').length} 节课`}
-                </small>
-              </div>
-            ))}
-            <div className="schedule-time-gutter schedule-time-axis" style={{ height: boardHeight }}>
-              {rows.map((row) => (
-                <div className="schedule-time-label" key={row.minute} style={{ top: row.top }}>
-                  {row.label}
-                </div>
-              ))}
+      <div ref={scrollRef} className="schedule-timeline-scroll">
+        <div
+          className="schedule-timeline-grid is-resource"
+          style={{
+            '--timeline-height': `${boardHeight}px`,
+            '--lane-count': laidOutLanes.length,
+            // 「学生可上课」是跨老师的参考信息，不是一条真资源，给它和老师同等宽度
+            // 会把它抬到和老师一样的地位，老师少的时候还会被拉得特别宽。固定窄一档。
+            gridTemplateColumns: `64px ${laidOutLanes
+              .map((lane) => (lane.key === studentAvailabilityLaneKey ? '200px' : 'minmax(190px, 1fr)'))
+              .join(' ')}`
+          } as CSSProperties}
+        >
+          <div className="schedule-time-gutter schedule-day-head-spacer" />
+          {laidOutLanes.map((lane) => (
+            <div className="schedule-day-head schedule-lane-head" key={lane.key}>
+              <strong title={lane.title}>{lane.title}</strong>
+              <span title={lane.subtitle}>{lane.subtitle}</span>
+              {/* 学生可上课那条泳道里一节课都没有，写「0 节课」会被读成「今天没课」，
+                  它该报的是覆盖了几个可排时段。 */}
+              <small>
+                {lane.key === studentAvailabilityLaneKey
+                  ? `${lane.items.length} 个可排时段`
+                  : `${lane.items.filter((item) => item.kind === 'class' && item.status !== '已取消').length} 节课`}
+              </small>
             </div>
-            {laidOutLanes.map((lane) => (
-              <div
-                className="schedule-day-column"
-                key={lane.key}
-                style={{ height: boardHeight }}
-                onDragOver={(event) => canManage && lane.droppable ? event.preventDefault() : undefined}
-                onDrop={(event) => {
-                  const classID = event.dataTransfer.getData('text/schedule-class-id');
-                  // 只接受本泳道内的课程：调课接口不带老师/教室，跨泳道拖动无法真正改归属，
-                  // 放行只会让人以为换了老师其实只改了时间。跨泳道请走编辑弹窗。
-                  const record = lane.items.find((item) => item.kind === 'class' && item.id === classID)?.record as ScheduleClass | undefined;
-                  if (!record) return;
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  const offsetMinutes = Math.round((event.clientY - bounds.top) / timelineSlotHeight) * timelineSlotMinutes;
-                  const startMinute = clampTimelineStart(timelineRange.start + offsetMinutes, record.durationMinutes);
-                  const startTime = formatMinute(startMinute);
-                  const endTime = formatMinute(startMinute + record.durationMinutes);
-                  onMoveClass(record, {
-                    dayOfWeek,
-                    startTime,
-                    endTime,
-                    label: `${weekLabel(dayOfWeek)} ${startTime}-${endTime}`
-                  });
-                }}
-                onDoubleClick={(event) => {
-                  if (event.currentTarget === event.target && canManage) onCreateClass(dayOfWeek);
-                }}
-              >
-                {rows.map((row) => <span className="schedule-time-line" key={row.minute} style={{ top: row.top }} />)}
-                {lane.layout.map((item) => (
-                  <TimelineBlock
-                    key={`${item.kind}-${item.id}`}
-                    item={item}
-                    rangeStart={timelineRange.start}
-                    selectedCandidateId={selectedCandidateId}
-                    canManage={canManage}
-                    onPickCandidate={onPickCandidate}
-                    onEditClass={onEditClass}
-                  />
-                ))}
+          ))}
+          <div className="schedule-time-gutter schedule-time-axis" style={{ height: boardHeight }}>
+            {rows.map((row) => (
+              <div className="schedule-time-label" key={row.minute} style={{ top: row.top }}>
+                {row.label}
               </div>
             ))}
           </div>
+          {laidOutLanes.map((lane) => (
+            <div
+              className="schedule-day-column"
+              key={lane.key}
+              style={{ height: boardHeight }}
+              onDragOver={(event) => canManage && lane.droppable ? event.preventDefault() : undefined}
+              onDrop={(event) => {
+                const classID = event.dataTransfer.getData('text/schedule-class-id');
+                // 只接受本泳道内的课程：调课接口不带老师/教室，跨泳道拖动无法真正改归属，
+                // 放行只会让人以为换了老师其实只改了时间。跨泳道请走编辑弹窗。
+                const record = lane.items.find((item) => item.kind === 'class' && item.id === classID)?.record as ScheduleClass | undefined;
+                if (!record) return;
+                const bounds = event.currentTarget.getBoundingClientRect();
+                const offsetMinutes = Math.round((event.clientY - bounds.top) / timelineSlotHeight) * timelineSlotMinutes;
+                const startMinute = clampTimelineStart(timelineRange.start + offsetMinutes, record.durationMinutes);
+                const startTime = formatMinute(startMinute);
+                const endTime = formatMinute(startMinute + record.durationMinutes);
+                onMoveClass(record, {
+                  dayOfWeek,
+                  startTime,
+                  endTime,
+                  label: `${weekLabel(dayOfWeek)} ${startTime}-${endTime}`
+                });
+              }}
+              onDoubleClick={(event) => {
+                if (event.currentTarget === event.target && canManage) onCreateClass(dayOfWeek);
+              }}
+            >
+              {rows.map((row) => <span className="schedule-time-line" key={row.minute} style={{ top: row.top }} />)}
+              {lane.key === placeholderLaneKey && (
+                <button type="button" className="schedule-day-empty-slot" onClick={() => canManage ? onCreateClass(dayOfWeek) : undefined}>
+                  {canManage ? '新建课程' : '暂无安排'}
+                </button>
+              )}
+              {lane.layout.map((item) => (
+                <TimelineBlock
+                  key={`${item.kind}-${item.id}`}
+                  item={item}
+                  rangeStart={timelineRange.start}
+                  selectedCandidateId={selectedCandidateId}
+                  canManage={canManage}
+                  onPickCandidate={onPickCandidate}
+                  onEditClass={onEditClass}
+                />
+              ))}
+            </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

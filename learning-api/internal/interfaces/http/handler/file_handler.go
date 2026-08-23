@@ -134,7 +134,10 @@ func (h *LearningHandler) PreviewFile(c *gin.Context) {
 		return
 	}
 	if _, err := os.Stat(asset.PreviewPath); err != nil {
-		BadRequest(c, "预览文件不存在，请下载原文件查看")
+		// 预览文件已经从磁盘消失（例如历史发布把它写在被清理的 release 目录里）。
+		// 回写成转换失败，列表里才会出现「重新生成预览」入口。
+		_ = h.service.MarkPreviewFileMissing(asset.ID, "预览文件已丢失，请重新生成预览")
+		BadRequest(c, "预览文件不存在，请重新生成预览或下载原文件查看")
 		return
 	}
 	c.Header("Content-Disposition", "inline; filename=\"preview.pdf\"")

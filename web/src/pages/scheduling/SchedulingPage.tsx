@@ -1,4 +1,4 @@
-import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
+import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, DownOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -166,6 +166,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [hiddenSubjects, setHiddenSubjects] = useState<string[]>([]);
+  // 图例是「偶尔来关掉某个学科」的工具，不是每次进页面都要读的信息，展开着会把下面的
+  // 筛选区整块顶出首屏。默认折叠，折叠时在标题上直接写清「隐藏了几个学科」——
+  // 否则收起后颜色对不上号，用户看到少了课程也不知道是自己关掉的。
+  const [subjectLegendOpen, setSubjectLegendOpen] = useState(false);
   const queryClient = useQueryClient();
   const canCreateClass = user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 
@@ -613,10 +617,19 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
               <div className="schedule-sidebar-section">
                 <div className="schedule-sidebar-head">
-                  <strong>学科日历</strong>
+                  <button
+                    type="button"
+                    className={`schedule-sidebar-toggle ${subjectLegendOpen ? 'is-open' : ''}`}
+                    aria-expanded={subjectLegendOpen}
+                    onClick={() => setSubjectLegendOpen((open) => !open)}
+                  >
+                    <DownOutlined />
+                    <strong>学科日历</strong>
+                    {hiddenSubjects.length > 0 && <em>已隐藏 {hiddenSubjects.length} 个</em>}
+                  </button>
                   {hiddenSubjects.length > 0 && <Button type="link" size="small" onClick={() => setHiddenSubjects([])}>全部显示</Button>}
                 </div>
-                <div className="schedule-subject-list">
+                <div className="schedule-subject-list" hidden={!subjectLegendOpen}>
                   {scheduleSubjects.map((subject) => {
                     const color = subjectColor(subject);
                     const hidden = hiddenSubjects.includes(subject);

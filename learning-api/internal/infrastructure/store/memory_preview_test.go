@@ -76,3 +76,30 @@ func TestRecoverPreviewJobsReturnsInterruptedWorkToQueue(t *testing.T) {
 		t.Fatalf("recovered job = %#v", got)
 	}
 }
+
+func TestMarkPreviewFileMissingReopensRetryForLostPreview(t *testing.T) {
+	store := NewMemoryStore()
+	store.fileAssets["file-lost"] = learning.FileAsset{ID: "file-lost", FileName: "lost.pdf", PreviewStatus: "可预览", PreviewPath: "/opt/starline/releases/old/uploads/preview/lost.pdf", PreviewPageDir: "/opt/starline/releases/old/uploads/pages/file-lost", PreviewPageCount: 3}
+	store.materials = append(store.materials, learning.Material{ID: "material-lost", Course: store.courses[0].Name, CourseID: store.courses[0].ID, LearningSpaceID: store.courses[0].LearningSpaceID, FileID: "file-lost", PreviewStatus: "可预览"})
+
+	if err := store.MarkPreviewFileMissing("file-lost", "预览文件已丢失，请重新生成预览"); err != nil {
+		t.Fatalf("mark preview file missing: %v", err)
+	}
+	asset := store.fileAssets["file-lost"]
+	if asset.PreviewStatus != "转换失败" || asset.PreviewPath != "" || asset.PreviewPageCount != 0 {
+		t.Fatalf("asset after mark = %#v", asset)
+	}
+	if got := store.materials[len(store.materials)-1].PreviewStatus; got != "转换失败" {
+		t.Fatalf("material preview status = %q", got)
+	}
+
+	// 早期课件没有预览任务，标记时补建的失败任务必须能被重试入口重置。
+	principal := learning.Principal{UserID: "user-super", Roles: []learning.Role{learning.RoleSuperAdmin}}
+	if err := store.RetryPreviewJob("超级管理员", principal, "file-lost"); err != nil {
+		t.Fatalf("manual retry after mark: %v", err)
+	}
+	claimed, ok, err := store.ClaimPreviewJob()
+	if err != nil || !ok || claimed.FileID != "file-lost" {
+		t.Fatalf("claim after retry: job=%#v ok=%v err=%v", claimed, ok, err)
+	}
+}

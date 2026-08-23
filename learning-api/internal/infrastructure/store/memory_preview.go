@@ -187,3 +187,54 @@ func (s *MemoryStore) syncContentPreviewStatus(fileID, status string) {
 		}
 	}
 }
+
+// MarkPreviewFileMissing 在预览文件已经从磁盘上消失时把课件回写成「转换失败」。
+// 历史发布把预览文件写在 release 目录里，旧 release 被清理后数据库仍然记着
+// 「可预览」，管理端既打不开预览、也看不到「重新生成」按钮。这里把状态和任务
+// 一起改成转换失败，让运营可以直接重试。
+func (s *MemoryStore) MarkPreviewFileMissing(fileID, message string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return persistentMutationError(s, func(work *MemoryStore) error {
+		fileID = strings.TrimSpace(fileID)
+		asset, ok := work.fileAssets[fileID]
+		if !ok {
+			return errors.New("课件文件不存在，请重新上传")
+		}
+		if asset.PreviewStatus == "转换失败" {
+			return nil
+		}
+		message = strings.TrimSpace(message)
+		if len([]rune(message)) > 500 {
+			message = string([]rune(message)[:500])
+		}
+		asset.PreviewStatus = "转换失败"
+		asset.PreviewError = message
+		asset.PreviewPath = ""
+		asset.PreviewPageDir = ""
+		asset.PreviewPageCount = 0
+		work.fileAssets[fileID] = asset
+		work.syncContentPreviewStatus(fileID, "转换失败")
+		now := time.Now().Format("2006-01-02 15:04:05")
+		for index := range work.previewJobs {
+			job := &work.previewJobs[index]
+			if job.FileID != fileID {
+				continue
+			}
+			job.Status = "转换失败"
+			job.ErrorMessage = message
+			job.FinishedAt = now
+			return nil
+		}
+		// 早期上传的课件可能没有留下预览任务，补一条失败任务，重试入口才可用。
+		work.previewJobs = append(work.previewJobs, learning.PreviewJob{
+			ID:           "preview-job-" + time.Now().Format("20060102150405.000000000"),
+			FileID:       fileID,
+			Status:       "转换失败",
+			ErrorMessage: message,
+			CreatedAt:    now,
+			FinishedAt:   now,
+		})
+		return nil
+	})
+}

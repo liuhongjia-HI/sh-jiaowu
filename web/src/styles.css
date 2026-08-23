@@ -837,6 +837,38 @@ body {
   font-size: 14px;
 }
 
+.schedule-sidebar-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: #111827;
+}
+
+.schedule-sidebar-toggle .anticon {
+  color: #94a3b8;
+  font-size: 11px;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.schedule-sidebar-toggle.is-open .anticon {
+  transform: rotate(0deg);
+}
+
+.schedule-sidebar-toggle em {
+  color: #94a3b8;
+  font-size: 12px;
+  font-style: normal;
+}
+
 .schedule-mini-calendar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -914,13 +946,21 @@ body {
   background: #fff;
 }
 
-.schedule-day-empty {
-  display: grid;
-  gap: 12px;
-  padding: 28px 16px;
+.schedule-day-empty-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 12px;
   border: 1px solid #e1e7f0;
   border-radius: 8px;
-  background: #fff;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.schedule-day-empty-bar .schedule-tip-list {
+  flex-basis: 100%;
 }
 
 .schedule-subject-list,

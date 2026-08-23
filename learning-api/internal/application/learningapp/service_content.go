@@ -51,6 +51,9 @@ func (s *Service) CompletePreviewJob(id string, result learning.PreviewResult) e
 func (s *Service) FailPreviewJob(id, message string) error {
 	return s.content.FailPreviewJob(id, message)
 }
+func (s *Service) MarkPreviewFileMissing(fileID, message string) error {
+	return s.content.MarkPreviewFileMissing(fileID, message)
+}
 func (s *Service) RetryPreviewJob(operator string, principal learning.Principal, fileID string) error {
 	return s.content.RetryPreviewJob(operator, principal, fileID)
 }

@@ -59,6 +59,7 @@ type ContentRepository interface {
 	PreviewJobFile(string) (learning.FileAsset, error)
 	CompletePreviewJob(string, learning.PreviewResult) error
 	FailPreviewJob(string, string) error
+	MarkPreviewFileMissing(string, string) error
 	RetryPreviewJob(string, learning.Principal, string) error
 	CompleteReview(string, learning.Principal, string, learning.ReviewCompleteRequest) (learning.Submission, error)
 }
