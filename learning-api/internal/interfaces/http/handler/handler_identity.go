@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strings"
 
 	"starline/learning-api/internal/domain/learning"
@@ -32,6 +33,14 @@ func (h *LearningHandler) WechatLogin(c *gin.Context) {
 	}
 	principal, err := h.service.LoginWithWechatCode(req)
 	if err != nil {
+		var selectionErr *learning.StudentSelectionRequiredError
+		if errors.As(err, &selectionErr) {
+			// 多子女：手机号命中多个学生档案，需要家长选一个再重新提交，
+			// 这是正常的登录步骤而不是失败，不计入登录失败限流也不记安全审计。
+			h.loginProtector.RegisterSuccess(key)
+			OK(c, gin.H{"needsSelection": true, "candidates": selectionErr.Candidates})
+			return
+		}
 		h.loginProtector.RegisterFailure(key)
 		if auditErr := h.recordSecurityEvent(c, "微信登录失败", req.Code, err.Error()); auditErr != nil {
 			BadRequest(c, auditErr.Error())

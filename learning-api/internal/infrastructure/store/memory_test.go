@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -195,37 +196,40 @@ func TestWechatStudentBindingValidatesProfile(t *testing.T) {
 	}
 }
 
-func TestWechatStudentBindingCreatesStudentForUnmatchedPhone(t *testing.T) {
-	store := NewMemoryStore()
-	user, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
-		Code: "missing-phone", Phone: "19900000000", StudentName: "小明", SchoolName: "星河小学", Grade: "五年级",
+// 多子女的另一条路径：两个孩子都已经在后台建了学生档案，但都还没有登录账号
+// （家长第一次授权）。这是机构最常见的操作顺序——先建档，家长再来绑，
+// 所以这条路径比"两个都已经绑过"的路径更该测。
+func TestWechatLoginWithSharedPhoneAcrossUnboundStudentsOffersSelection(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	const phone = "13700002222"
+	store.students = []learning.Student{
+		{ID: "stu-a", Name: "大娃", Grade: "五年级", Phone: phone, SchoolName: "星河小学", AccountStatus: "正常"},
+		{ID: "stu-b", Name: "二娃", Grade: "三年级", Phone: phone, SchoolName: "星河小学", AccountStatus: "正常"},
+	}
+
+	_, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "unbound-siblings", Phone: phone, StudentName: "大娃", SchoolName: "星河小学", Grade: "五年级",
+	})
+	var selectionErr *learning.StudentSelectionRequiredError
+	if !errors.As(err, &selectionErr) {
+		t.Fatalf("expected StudentSelectionRequiredError for two unbound siblings, got %v", err)
+	}
+	if len(selectionErr.Candidates) != 2 {
+		t.Fatalf("expected 2 candidates, got %#v", selectionErr.Candidates)
+	}
+
+	principal, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "unbound-siblings-2", Phone: phone, StudentName: "二娃", SchoolName: "星河小学", Grade: "三年级",
+		SelectedStudentID: "stu-b",
 	})
 	if err != nil {
-		t.Fatalf("expected unmatched phone to create a student account: %v", err)
+		t.Fatalf("expected selecting a candidate to complete first-time binding: %v", err)
 	}
-	if user.StudentID == "" || user.Phone != "19900000000" || !hasRole(user.Roles, learning.RoleStudent) {
-		t.Fatalf("unexpected principal for new wechat student: %#v", user)
+	if principal.StudentID != "stu-b" {
+		t.Fatalf("expected binding to resolve to the selected sibling, got %#v", principal)
 	}
-	stored, ok := store.findRawStudent(user.StudentID)
-	if !ok {
-		t.Fatalf("expected created student %q to be persisted in store", user.StudentID)
-	}
-	if stored.Name != "小明" || stored.SchoolName != "星河小学" || stored.EnrollmentGrade != "五年级" || stored.LearningStatus != "待开通" || stored.BindStatus != "已绑定" {
-		t.Fatalf("unexpected created student: %#v", stored)
-	}
-	home, err := store.StudentHome(user)
-	if err != nil {
-		t.Fatalf("expected newly authorized student to enter mini program home: %v", err)
-	}
-	if home.Student.ID != user.StudentID || home.Student.Grade != "五年级" || len(home.Materials) != 0 || len(home.PendingHomework) != 0 {
-		t.Fatalf("new student should enter without learning permissions, got %#v", home)
-	}
-	again, err := store.LoginWithWechatCode(learning.WechatLoginRequest{Code: "missing-phone"})
-	if err != nil {
-		t.Fatalf("expected repeated login with same wechat to succeed: %v", err)
-	}
-	if again.StudentID != user.StudentID {
-		t.Fatalf("expected repeated login to return the same student, got %#v", again)
+	if len(store.students) != 2 {
+		t.Fatalf("selecting a sibling must not create a duplicate student, got %d students", len(store.students))
 	}
 }
 
@@ -307,23 +311,96 @@ func TestWechatStudentBindingUsesExistingMaskedPhoneStudent(t *testing.T) {
 	}
 }
 
-func TestWechatStudentBindingRejectsDuplicatePhone(t *testing.T) {
+// 多子女：同一个手机号命中两个已经各自建过登录账号的学生（比如兄妹俩都已经在小程序
+// 绑定过），家长应该拿到候选列表去选，而不是被直接拒之门外。
+func TestWechatLoginWithSharedPhoneAcrossTwoStudentsOffersSelection(t *testing.T) {
+	store := NewMemoryStore()
+	var sibling learning.User
+	for _, user := range store.users {
+		if user.ID == "user-student-001" {
+			sibling = user
+			break
+		}
+	}
+	sibling.ID = "user-student-001-sibling"
+	sibling.Name = "小明妹妹"
+	sibling.StudentID = "stu-001-sibling"
+	sibling.OpenID = ""
+	store.students = append(store.students, learning.Student{
+		ID: "stu-001-sibling", Name: "小明妹妹", Grade: "三年级", Phone: sibling.Phone,
+		SchoolName: "星河小学", AccountStatus: "正常",
+	})
+	store.users = append(store.users, sibling)
+
+	_, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "shared-phone", Phone: sibling.Phone, StudentName: "任意学生", SchoolName: "星河小学", Grade: "五年级",
+	})
+	var selectionErr *learning.StudentSelectionRequiredError
+	if !errors.As(err, &selectionErr) {
+		t.Fatalf("expected StudentSelectionRequiredError for shared phone across students, got %v", err)
+	}
+	if len(selectionErr.Candidates) != 2 {
+		t.Fatalf("expected 2 sibling candidates, got %#v", selectionErr.Candidates)
+	}
+
+	principal, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "shared-phone-2", Phone: sibling.Phone, StudentName: "小明妹妹", SchoolName: "星河小学", Grade: "三年级",
+		SelectedStudentID: "stu-001-sibling",
+	})
+	if err != nil {
+		t.Fatalf("expected selecting a candidate to complete login: %v", err)
+	}
+	if principal.StudentID != "stu-001-sibling" {
+		t.Fatalf("expected login to resolve to the selected sibling, got %#v", principal)
+	}
+}
+
+// 真正的账号冲突（手机号命中的账号里混进了非学生角色）仍然要拒绝，多子女的
+// 宽松处理只适用于命中账号全部是纯学生角色的情况。
+func TestWechatStudentBindingRejectsDuplicatePhoneWithNonStudentAccount(t *testing.T) {
 	duplicateStore := NewMemoryStore()
 	var duplicate learning.User
 	for _, user := range duplicateStore.users {
-		if user.ID == "user-student-001" {
+		if user.ID == "user-teacher" {
 			duplicate = user
 			break
 		}
 	}
+	if duplicate.ID == "" {
+		t.Fatal("expected a seeded teacher account to build the conflict scenario")
+	}
 	duplicate.ID = "user-duplicate-phone"
 	duplicate.StudentID = "stu-duplicate-phone"
 	duplicate.OpenID = ""
+	duplicate.Roles = []learning.Role{learning.RoleStudent}
+	duplicateStore.students = append(duplicateStore.students, learning.Student{
+		ID: "stu-duplicate-phone", Name: "任意学生", Grade: "五年级", Phone: duplicate.Phone,
+		SchoolName: "星河小学", AccountStatus: "正常",
+	})
 	duplicateStore.users = append(duplicateStore.users, duplicate)
 	if _, err := duplicateStore.LoginWithWechatCode(learning.WechatLoginRequest{
 		Code: "duplicate-phone", Phone: duplicate.Phone, StudentName: "任意学生", SchoolName: "星河小学", Grade: "五年级",
 	}); err == nil || !strings.Contains(err.Error(), "手机号匹配到多个账号") {
-		t.Fatalf("expected duplicate phone to be rejected, got %v", err)
+		t.Fatalf("expected duplicate phone mixed with a non-student account to be rejected, got %v", err)
+	}
+}
+
+// 阶段 0 的核心止血点：手机号在后台完全查不到任何学生档案时，不能再静默建一个
+// "待开通"的影子学生——这是过去多子女/多家长脏数据的根源。
+func TestWechatLoginNoLongerAutoCreatesStudentOnUnmatchedPhone(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	studentCount := len(store.students)
+	userCount := len(store.users)
+
+	_, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "unmatched-phone", Phone: "13600001234", StudentName: "新学生", SchoolName: "星河小学", Grade: "五年级",
+	})
+	if err == nil || !strings.Contains(err.Error(), "请联系老师") {
+		t.Fatalf("expected a clear 联系老师 message instead of silent auto-create, got %v", err)
+	}
+	if len(store.students) != studentCount || len(store.users) != userCount {
+		t.Fatalf("expected no student/user to be created, students %d->%d users %d->%d",
+			studentCount, len(store.students), userCount, len(store.users))
 	}
 }
 

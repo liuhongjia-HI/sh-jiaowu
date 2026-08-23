@@ -141,11 +141,41 @@ Page({
     this.setData({ binding: true });
     request(path, { method: "POST", data: payload })
       .then((result) => {
+        // 多子女：手机号命中多个学生档案时后端不报错，而是返回候选列表，
+        // 这里弹出选择框，选中后带着 selectedStudentId 重新提交同一份登录请求。
+        // binding 必须在调起选择框之前就复位——resubmit 会再走一次 doLogin，
+        // 如果复位挂在链条末尾的公共 .then 里，会在 resubmit 的请求还没回来
+        // 时就把它的 binding:true 覆盖掉。
+        if (result && result.needsSelection) {
+          this.setData({ binding: false });
+          this.promptStudentSelection(result.candidates || [], payload, path);
+          return;
+        }
         wx.setStorageSync("starline_token", result.token);
         wx.showToast({ title: "绑定成功", icon: "success" });
         wx.switchTab({ url: "/pages/home/index" });
+        this.setData({ binding: false });
       })
-      .catch((error) => this.showLoginError(error))
-      .then(() => this.setData({ binding: false }));
+      .catch((error) => {
+        this.showLoginError(error);
+        this.setData({ binding: false });
+      });
+  },
+  promptStudentSelection(candidates, payload, path) {
+    if (!candidates.length) {
+      wx.showToast({ title: "未找到可绑定的学生，请联系老师", icon: "none" });
+      return;
+    }
+    wx.showActionSheet({
+      itemList: candidates.map((item) => `${item.name} · ${item.grade}`),
+      success: (res) => {
+        const picked = candidates[res.tapIndex];
+        if (!picked) {
+          return;
+        }
+        this.doLogin({ ...payload, selectedStudentId: picked.studentId }, path);
+      }
+      // fail：家长取消选择，不做任何事，允许重新点击登录按钮。
+    });
   }
 });

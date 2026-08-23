@@ -212,6 +212,59 @@ test("login page keeps the network error instead of overwriting it with generic 
   assert.equal(calls.some((item) => item[1] === "登录失败"), false);
 });
 
+test("login page offers a picker and resubmits with selectedStudentId when the phone matches multiple children", async () => {
+  const calls = [];
+  const requests = [];
+  const page = loadLoginPage((path, options) => {
+    requests.push(options.data);
+    calls.push(["request", path, options]);
+    if (requests.length === 1) {
+      return Promise.resolve({
+        needsSelection: true,
+        candidates: [
+          { studentId: "stu-a", name: "大娃", grade: "五年级" },
+          { studentId: "stu-b", name: "二娃", grade: "三年级" }
+        ]
+      });
+    }
+    return Promise.resolve({ token: "sibling-token" });
+  }, {
+    login(args) {
+      args.success({ code: "wx-login-code" });
+    },
+    setStorageSync(key, value) {
+      calls.push(["setStorageSync", key, value]);
+    },
+    showToast(args) {
+      calls.push(["showToast", args]);
+    },
+    showActionSheet(args) {
+      calls.push(["showActionSheet", args.itemList]);
+      args.success({ tapIndex: 1 });
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    }
+  });
+  page.setData({
+    "form.studentName": "大娃",
+    "form.schoolName": "星河小学",
+    "form.grade": "五年级"
+  });
+
+  page.bindPhone({ detail: { errMsg: "getPhoneNumber:ok", code: "phone-code" } });
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(requests.length, 2, "expected a first request and a resubmission after picking");
+  assert.equal(requests[0].selectedStudentId, undefined);
+  assert.equal(requests[1].selectedStudentId, "stu-b");
+  assert.deepEqual(calls.find((item) => item[0] === "showActionSheet"), ["showActionSheet", ["大娃 · 五年级", "二娃 · 三年级"]]);
+  assert.deepEqual(calls.find((item) => item[0] === "setStorageSync"), ["setStorageSync", "starline_token", "sibling-token"]);
+  assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/home/index"]);
+  assert.equal(page.data.binding, false);
+});
+
 test("login page does not submit binding when wx.login returns no code", async () => {
   const calls = [];
   const page = loadLoginPage((path, options) => {
