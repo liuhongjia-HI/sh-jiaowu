@@ -405,7 +405,17 @@ func (s *MemoryStore) principalByUserIDUnlocked(userID string) (learning.Princip
 		if user.AccountStatus != "正常" {
 			return learning.Principal{}, errors.New("账号已停用，请联系管理员")
 		}
-		return principalFromUser(user), nil
+		principal := principalFromUser(user)
+		// 家长身份要在这里补回来，不能只依赖 token 里带的那一份：多子女上线
+		// 之前签发的 token 里根本没有 GuardianID，而小程序只要本地 token 还
+		// 没过期就不会重新登录，家长自己没有任何办法触发刷新——不补的话，
+		// 存量家长要等到 token 自然过期才看得到切换器。
+		// token 里带了 GuardianID 时仍以 token 为准（见中间件），那是家长在
+		// 一孩多家长场景下明确切换过身份的结果，不能被这里的推断覆盖。
+		if principal.GuardianID == "" && principal.StudentID != "" {
+			principal.GuardianID = s.primaryGuardianIDForStudent(principal.StudentID)
+		}
+		return principal, nil
 	}
 	return learning.Principal{}, errors.New("账号不存在，请重新登录")
 }

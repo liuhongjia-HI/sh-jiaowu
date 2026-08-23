@@ -170,3 +170,26 @@ func (s *MemoryStore) GuardianStudentActive(guardianID, studentID string) bool {
 	defer s.mu.Unlock()
 	return s.guardianStudentActive(guardianID, studentID)
 }
+
+// primaryGuardianIDForStudent 反查"这个孩子属于哪个家长"。一个孩子可能同时
+// 关联爸爸和妈妈两个家长身份，所以这里的选择必须是确定性的：优先 is_primary，
+// 否则按 guardianID 字典序取第一个，避免同一个 token 在不同请求之间拿到不同的
+// 家长身份、切换器时有时无。
+//
+// 这只是给"token 里没有 GuardianID"的存量会话兜底用的推断值；token 里带了
+// GuardianID 的一律以 token 为准（见中间件）。
+func (s *MemoryStore) primaryGuardianIDForStudent(studentID string) string {
+	best := ""
+	bestPrimary := false
+	for _, relation := range s.guardianStudents {
+		if relation.StudentID != studentID || relation.Status != learning.GuardianStudentActive {
+			continue
+		}
+		if best == "" || (relation.IsPrimary && !bestPrimary) ||
+			(relation.IsPrimary == bestPrimary && relation.GuardianID < best) {
+			best = relation.GuardianID
+			bestPrimary = relation.IsPrimary
+		}
+	}
+	return best
+}
