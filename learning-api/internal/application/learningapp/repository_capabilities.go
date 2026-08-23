@@ -13,6 +13,7 @@ type StudentRepository interface {
 	StudentLearningRecords(learning.Principal, string) ([]learning.StudentLearningRecord, error)
 	StudentScores(learning.Principal, string) ([]learning.StudentScoreSummary, error)
 	RemindStudent(string, learning.Principal, string) (learning.StudentRemindResult, error)
+	GenerateStudentBindCode(string, learning.Principal, string) (learning.Student, error)
 	ImportStudents(string, learning.Principal, []learning.StudentUpsertRequest) (learning.StudentImportResult, error)
 	CreateStudentScore(string, learning.Principal, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	UpdateStudentScore(string, learning.Principal, string, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)

@@ -275,6 +275,8 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"students", "effective_until", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "enrollment_academic_year", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "enrollment_grade", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"students", "bind_code", "VARCHAR(16) NOT NULL DEFAULT ''"},
+		{"students", "bind_code_expires_at", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"study_packages", "summary", "TEXT NOT NULL"},
 		{"courses", "chapter_count", "INT NOT NULL DEFAULT 0"},
 		{"materials", "view_count", "INT NOT NULL DEFAULT 0"},
@@ -305,6 +307,8 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"starline_file_assets", "preview_error", "TEXT NOT NULL"},
 		{"schedule_classes", "campus_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "room_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"schedule_classes", "academic_year", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"schedule_classes", "semester", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "external_id", mysqlNoticeExternalIDDefinition},
@@ -373,7 +377,67 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 			return err
 		}
 	}
+	if err := s.ensureIndex("schedule_classes", "idx_schedule_term", "academic_year, semester, status"); err != nil {
+		return err
+	}
+	if err := s.backfillScheduleClassTerms(); err != nil {
+		return err
+	}
 	return nil
+}
+
+// backfillScheduleClassTerms 给升级前建的历史排课记录一次性补上学年、学期，
+// 判定口径和新建排课时（见 resolveScheduleTerm）完全一致：按开课日期落校历，
+// 落不进任何学期时兜底用课程所属学习空间的学期 + 开课日期本身的 7 月 1 日规则。
+// 只补 academic_year 为空的行，重复执行是安全的、不会覆盖已判定过的记录。
+func (s *MemoryStore) backfillScheduleClassTerms() error {
+	rows, err := s.db.Query(`SELECT sc.id, sc.start_date, ls.semester
+		FROM schedule_classes sc
+		LEFT JOIN courses c ON c.id = sc.course_id
+		LEFT JOIN learning_spaces ls ON ls.id = c.learning_space_id
+		WHERE sc.academic_year = ''`)
+	if err != nil {
+		return err
+	}
+	type pending struct {
+		id, startDate, fallbackSemester string
+	}
+	items := make([]pending, 0)
+	for rows.Next() {
+		var item pending
+		var startDate sql.NullTime
+		var fallbackSemester sql.NullString
+		if err := rows.Scan(&item.id, &startDate, &fallbackSemester); err != nil {
+			rows.Close()
+			return err
+		}
+		item.startDate = dateString(startDate)
+		item.fallbackSemester = fallbackSemester.String
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	for _, item := range items {
+		academicYear, semester := s.resolveScheduleTerm(item.startDate, item.fallbackSemester)
+		if _, err := s.db.Exec(`UPDATE schedule_classes SET academic_year = ?, semester = ? WHERE id = ?`, academicYear, semester, item.id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *MemoryStore) ensureIndex(table, name, columns string) error {
+	var count int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`, table, name).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err := s.db.Exec("CREATE INDEX " + name + " ON " + table + " (" + columns + ")")
+	return err
 }
 
 func (s *MemoryStore) ensureUniqueIndex(table, name, columns string) error {

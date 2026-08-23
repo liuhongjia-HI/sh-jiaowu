@@ -73,6 +73,11 @@ type WechatLoginRequest struct {
 	// 后端先返回 StudentSelectionRequiredError 里的候选列表，小程序弹选择框，
 	// 家长选中后带着这个字段重新提交同一个登录请求完成绑定/登录。
 	SelectedStudentID string `json:"selectedStudentId"`
+	// BindCode 是第二个家长（比如已经有一个家长绑过的孩子，妈妈想用自己的
+	// 手机号也关联上）用来关联学生的邀请码，后台在学生详情页生成。带了这个
+	// 字段就完全走"凭码关联"这条路，不走手机号匹配已有档案那条路——所以
+	// 允许她的手机号跟任何已有档案都不一样，也不会因为"查不到"被拒绝。
+	BindCode string `json:"bindCode,omitempty"`
 }
 
 // StudentSelectionRequiredError 表示同一个手机号下匹配到多个学生档案（多子女），

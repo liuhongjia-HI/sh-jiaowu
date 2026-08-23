@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1081,5 +1082,72 @@ func TestMultiChildLoginSwitchThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodGet, "/api/student/home", auth.Token, nil, http.StatusOK, &stillFirst)
 	if stillFirst.Student.ID != "stu-001" {
 		t.Fatalf("expected the original token to keep reading stu-001, got %#v", stillFirst.Student)
+	}
+}
+
+// 一孩多家长：爸爸已经绑过了，妈妈自己的手机号跟任何已有档案都不一样——
+// 走绑定码这条路而不是手机号匹配。走真实 HTTP：后台生成码 -> 妈妈凭码登录
+// -> 她的切换器只看到这一个孩子、且是她自己独立的 guardian 身份，不影响
+// 爸爸已有的登录状态。
+func TestBindCodeSecondGuardianClaimThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	fatherToken := app.login(t, "/api/auth/wechat-login", map[string]any{
+		"code": "father-login", "phone": "18500009069", "studentName": "小明", "schoolName": "星河小学", "grade": "五年级",
+	})
+	var fatherMe learning.Principal
+	app.doJSON(t, http.MethodGet, "/api/auth/me", fatherToken, nil, http.StatusOK, &fatherMe)
+
+	adminToken := app.loginAdmin(t, "13800000001")
+	var withCode learning.Student
+	app.doJSON(t, http.MethodPost, "/api/students/stu-001/bind-code", adminToken, nil, http.StatusOK, &withCode)
+	if withCode.BindCode == "" {
+		t.Fatalf("expected a generated bind code, got %#v", withCode)
+	}
+
+	var motherAuth authResponse
+	app.doJSON(t, http.MethodPost, "/api/auth/wechat-login", "", map[string]any{
+		"code": "mother-claim", "phone": "13911119999", "bindCode": withCode.BindCode,
+	}, http.StatusOK, &motherAuth)
+	if motherAuth.User.StudentID != "stu-001" || motherAuth.User.GuardianID == "" || motherAuth.User.GuardianID == fatherMe.GuardianID {
+		t.Fatalf("expected the mother to get her own guardian identity for stu-001, mother=%#v father guardian=%q", motherAuth.User, fatherMe.GuardianID)
+	}
+
+	var motherAccounts []learning.StudentAccount
+	app.doJSON(t, http.MethodGet, "/api/student/accounts", motherAuth.Token, nil, http.StatusOK, &motherAccounts)
+	if len(motherAccounts) != 1 || motherAccounts[0].StudentID != "stu-001" {
+		t.Fatalf("expected the mother's switcher to show exactly stu-001, got %#v", motherAccounts)
+	}
+
+	// 爸爸的登录状态没被打扰。
+	var fatherHome learning.StudentHome
+	app.doJSON(t, http.MethodGet, "/api/student/home", fatherToken, nil, http.StatusOK, &fatherHome)
+	if fatherHome.Student.ID != "stu-001" {
+		t.Fatalf("expected father's token to keep working, got %#v", fatherHome.Student)
+	}
+}
+
+// 绑定码猜测要能被限流拦住——攻击者每次换一个新的 wx.login code 提交，
+// 不能靠"code 变了"绕开限流，必须按 IP 单独限一道。
+func TestBindCodeGuessingIsRateLimited(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	// 前 5 次都是"绑定码不存在"的正常失败；第 5 次失败会把这个 IP 锁住，
+	// 所以第 6 次应该直接被挡在校验绑定码之前，拿到锁定消息而不是查库结果。
+	for i := 0; i < 5; i++ {
+		resp := app.doJSON(t, http.MethodPost, "/api/auth/wechat-login", "", map[string]any{
+			"code": fmt.Sprintf("guess-attempt-%d", i), "phone": "13911119999", "bindCode": "WRONGCODE",
+		}, http.StatusUnauthorized, nil)
+		if strings.Contains(resp.Message, "失败次数过多") {
+			t.Fatalf("expected attempt %d to fail on an invalid code, not a lockout, got message=%q", i, resp.Message)
+		}
+	}
+	final := app.doJSON(t, http.MethodPost, "/api/auth/wechat-login", "", map[string]any{
+		"code": "guess-attempt-final", "phone": "13911119999", "bindCode": "WRONGCODE",
+	}, http.StatusUnauthorized, nil)
+	if !strings.Contains(final.Message, "失败次数过多") {
+		t.Fatalf("expected the account to be locked after repeated failures, got message=%q", final.Message)
 	}
 }

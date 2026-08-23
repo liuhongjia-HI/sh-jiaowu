@@ -265,6 +265,63 @@ test("login page offers a picker and resubmits with selectedStudentId when the p
   assert.equal(page.data.binding, false);
 });
 
+test("login page claims a child by bind code with only the guardian's own phone, no profile fields", async () => {
+  const calls = [];
+  const page = loadLoginPage((path, options) => {
+    calls.push(["request", path, options]);
+    return Promise.resolve({ token: "claimed-token" });
+  }, {
+    login(args) {
+      calls.push(["login"]);
+      args.success({ code: "wx-login-code" });
+    },
+    setStorageSync(key, value) {
+      calls.push(["setStorageSync", key, value]);
+    },
+    showToast(args) {
+      calls.push(["showToast", args]);
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    }
+  });
+
+  page.onBindCodeInput({ detail: { value: " ab3d9k7m " } });
+  assert.equal(page.data.bindCode, "AB3D9K7M", "expected the code to be trimmed and upper-cased as the user types");
+
+  page.claimByBindCode({ detail: { errMsg: "getPhoneNumber:ok", code: "mother-phone-code" } });
+  await flushPromises();
+
+  assert.deepEqual(calls.find((item) => item[0] === "request"), [
+    "request",
+    "/auth/wechat-login",
+    { method: "POST", data: { code: "wx-login-code", phoneCode: "mother-phone-code", bindCode: "AB3D9K7M" } }
+  ]);
+  assert.deepEqual(calls.find((item) => item[0] === "setStorageSync"), ["setStorageSync", "starline_token", "claimed-token"]);
+  assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/home/index"]);
+});
+
+test("login page blocks claiming by bind code when the code field is empty", async () => {
+  const calls = [];
+  const page = loadLoginPage((path, options) => {
+    calls.push(["request", path, options]);
+    return Promise.resolve({ token: "claimed-token" });
+  }, {
+    login(args) {
+      args.success({ code: "wx-login-code" });
+    },
+    showToast(args) {
+      calls.push(["showToast", args]);
+    }
+  });
+
+  page.claimByBindCode({ detail: { errMsg: "getPhoneNumber:ok", code: "mother-phone-code" } });
+  await flushPromises();
+
+  assert.equal(calls.some((item) => item[0] === "request"), false);
+  assert.equal(calls.some((item) => item[1] && item[1].title === "请输入绑定码"), true);
+});
+
 test("login page does not submit binding when wx.login returns no code", async () => {
   const calls = [];
   const page = loadLoginPage((path, options) => {

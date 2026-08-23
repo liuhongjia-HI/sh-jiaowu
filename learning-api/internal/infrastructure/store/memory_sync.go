@@ -237,6 +237,7 @@ func (s *MemoryStore) LoginWithWechatCode(req learning.WechatLoginRequest) (lear
 	req.StudentName = strings.TrimSpace(req.StudentName)
 	req.SchoolName = strings.TrimSpace(req.SchoolName)
 	req.Grade = strings.TrimSpace(req.Grade)
+	req.BindCode = strings.ToUpper(strings.TrimSpace(req.BindCode))
 	s.mu.Lock()
 	wechatResolver := s.wechatResolver
 	phoneResolver := s.phoneResolver
@@ -599,6 +600,12 @@ func (s *MemoryStore) RemindStudent(operator string, principal learning.Principa
 	return noticeMutation(s, func(work *MemoryStore) (learning.StudentRemindResult, error) {
 		return work.remindStudentUnlocked(operator, principal, id)
 	}, refreshStudentReminder)
+}
+
+func (s *MemoryStore) GenerateStudentBindCode(operator string, principal learning.Principal, id string) (learning.Student, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.generateStudentBindCodeUnlocked(operator, principal, id)
 }
 
 func (s *MemoryStore) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) (learning.StudentImportResult, error) {

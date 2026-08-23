@@ -179,6 +179,8 @@ export type Student = {
   lastSubmittedAt?: string;
   lastSubmissionStatus?: string;
   effectiveUntil?: string;
+  bindCode?: string;
+  bindCodeExpiresAt?: string;
 };
 
 export type StudentUpsertRequest = {

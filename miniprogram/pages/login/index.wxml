@@ -23,5 +23,16 @@
   </view>
 </view>
 <view class="section">
+  <view class="card login-card">
+    <view class="mascot">🔗</view>
+    <view class="title">已经有孩子在用？</view>
+    <view class="sub">如果老师给了您一个绑定码，输入后可以用您自己的手机号关联这个孩子，不用占用对方已经绑定的微信号。</view>
+    <view class="form-line">
+      <input value="{{bindCode}}" bindinput="onBindCodeInput" placeholder="请输入绑定码" maxlength="8" />
+    </view>
+    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="claimByBindCode" loading="{{binding}}" disabled="{{binding || !bindCode}}">授权手机号并关联</button>
+  </view>
+</view>
+<view class="section">
   <view class="bubble">账号被停用或暂未开通学习星球时，请联系老师或管理员处理。</view>
 </view>

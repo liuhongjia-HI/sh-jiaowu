@@ -13,7 +13,8 @@ Page({
       studentName: "",
       schoolName: "",
       grade: ""
-    }
+    },
+    bindCode: ""
   },
   onLoad() {
     this.silentLogin();
@@ -130,6 +131,39 @@ Page({
           schoolName: (form.schoolName || "").trim(),
           grade: (form.grade || "").trim()
         });
+      },
+      fail: () => wx.showToast({ title: "微信登录失败", icon: "none" })
+    });
+  },
+  onBindCodeInput(event) {
+    this.setData({ bindCode: (event.detail.value || "").trim().toUpperCase() });
+  },
+  // 一孩多家长：这个家长的手机号大概率跟任何已有档案都不一样，凭码关联走
+  // 完全独立的一条路，不需要像 bindPhone 那样先填学生姓名/学校/年级——
+  // 绑定码本身就是已经验证过身份的凭证，多要那些信息只会增加流失。
+  claimByBindCode(event) {
+    const bindCode = (this.data.bindCode || "").trim();
+    if (!bindCode) {
+      wx.showToast({ title: "请输入绑定码", icon: "none" });
+      return;
+    }
+    const detail = event.detail || {};
+    if (isCancel(detail)) {
+      wx.showToast({ title: "已取消手机号授权", icon: "none" });
+      return;
+    }
+    if (!detail.code) {
+      showPhoneAuthFailed();
+      return;
+    }
+    wx.login({
+      success: (res) => {
+        const code = res.code;
+        if (!code) {
+          wx.showToast({ title: "微信登录失败，请重试", icon: "none" });
+          return;
+        }
+        this.doLogin({ code, phoneCode: detail.code, bindCode });
       },
       fail: () => wx.showToast({ title: "微信登录失败", icon: "none" })
     });

@@ -99,6 +99,7 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.POST("/students", h.CreateStudent)
 	g.PUT("/students/:id", h.UpdateStudent)
 	g.POST("/students/:id/remind", h.RemindStudent)
+	g.POST("/students/:id/bind-code", h.GenerateStudentBindCode)
 	g.POST("/students/import", h.ImportStudents)
 	g.GET("/commercial/summary", h.CommercialSummary)
 	g.GET("/commercial/orders", h.CommercialOrders)

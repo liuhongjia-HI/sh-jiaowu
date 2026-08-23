@@ -149,6 +149,16 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: () => message.error('提醒失败，请稍后重试。')
   });
 
+  const generateBindCode = useMutation({
+    mutationFn: (studentId: string) => postData<Student>(`/students/${studentId}/bind-code`, {}),
+    onSuccess: (result) => {
+      message.success('绑定码已生成，7 天内有效');
+      queryClient.invalidateQueries({ queryKey: ['students', result.id, 'detail'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: () => message.error('绑定码生成失败，请稍后重试。')
+  });
+
   const createGrant = useMutation({
     mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', grantBody(grantStudent, values)),
     onSuccess: (result) => {
@@ -475,7 +485,18 @@ export default function Students({ user }: { user: CurrentUser }) {
         {detail.data && (
           <Tabs
             items={[
-              { key: 'profile', label: '基础信息', children: <StudentProfile detail={detail.data} /> },
+              {
+                key: 'profile',
+                label: '基础信息',
+                children: (
+                  <StudentProfile
+                    detail={detail.data}
+                    writable={writable}
+                    generatingBindCode={generateBindCode.isPending}
+                    onGenerateBindCode={() => generateBindCode.mutate(detail.data!.student.id)}
+                  />
+                )
+              },
               { key: 'records', label: '学习记录', children: <RecordTable detail={detail.data} /> },
               { key: 'scores', label: '成绩对比', children: selected ? <ScorePanel student={selected} canEdit={canManageScores(user)} /> : null },
               { key: 'logs', label: '操作记录', children: <LogTable detail={detail.data} /> }
@@ -663,7 +684,18 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
   );
 }
 
-function StudentProfile({ detail }: { detail: StudentDetail }) {
+function StudentProfile({
+  detail,
+  writable,
+  generatingBindCode,
+  onGenerateBindCode
+}: {
+  detail: StudentDetail;
+  writable: boolean;
+  generatingBindCode: boolean;
+  onGenerateBindCode: () => void;
+}) {
+  const codeExpired = Boolean(detail.student.bindCodeExpiresAt && detail.student.bindCodeExpiresAt < new Date().toISOString().slice(0, 10));
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Descriptions column={2} bordered size="small">
@@ -683,6 +715,33 @@ function StudentProfile({ detail }: { detail: StudentDetail }) {
         </Descriptions.Item>
         <Descriptions.Item label="备注" span={2}>{detail.student.remark || '-'}</Descriptions.Item>
       </Descriptions>
+      <Card size="small" title="关联其他家长">
+        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+          {detail.student.bindCode ? (
+            <>
+              <Typography.Text
+                copyable={{ text: detail.student.bindCode, tooltips: ['复制绑定码', '已复制'] }}
+                style={{ fontSize: 22, fontWeight: 600, letterSpacing: 4, fontFamily: 'monospace' }}
+              >
+                {detail.student.bindCode}
+              </Typography.Text>
+              <Typography.Text type={codeExpired ? 'danger' : 'secondary'}>
+                {codeExpired ? '已过期，需要重新生成。' : `有效期至 ${detail.student.bindCodeExpiresAt}`}
+              </Typography.Text>
+              <Typography.Text type="secondary">
+                分享给其他家长（比如妈妈也想用自己的手机号关联），对方在小程序"我的 - 关联其他孩子"里输入这个码即可，不需要占用您已绑定的微信。
+              </Typography.Text>
+            </>
+          ) : (
+            <Typography.Text type="secondary">还没有生成过绑定码，生成后可以分享给其他家长关联这个学生。</Typography.Text>
+          )}
+          {writable && (
+            <Button size="small" loading={generatingBindCode} onClick={onGenerateBindCode}>
+              {detail.student.bindCode ? '重新生成（旧码立即失效）' : '生成绑定码'}
+            </Button>
+          )}
+        </Space>
+      </Card>
       <CardList
         rows={detail.grants}
         rowKey={(record) => record.packageId}

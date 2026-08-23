@@ -58,6 +58,17 @@ func (h *LearningHandler) UpdateStudent(c *gin.Context) {
 	}
 	OK(c, updated)
 }
+func (h *LearningHandler) GenerateStudentBindCode(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	student, err := h.service.GenerateStudentBindCode(operator.(string), principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, student)
+}
+
 func (h *LearningHandler) RemindStudent(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)

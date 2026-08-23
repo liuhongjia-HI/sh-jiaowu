@@ -27,6 +27,11 @@ type Student struct {
 	LastSubmittedAt        string   `json:"lastSubmittedAt,omitempty"`
 	LastSubmissionStatus   string   `json:"lastSubmissionStatus,omitempty"`
 	EffectiveUntil         string   `json:"effectiveUntil,omitempty"`
+	// BindCode/BindCodeExpiresAt 是"关联第二个家长"用的邀请码：机构后台生成，
+	// 分享给爸爸/妈妈/其他家长后，对方在小程序里输入即可关联到这个学生，
+	// 不需要走"手机号命中已有档案"那条路。到期后需要在后台重新生成。
+	BindCode          string `json:"bindCode,omitempty"`
+	BindCodeExpiresAt string `json:"bindCodeExpiresAt,omitempty"`
 }
 
 type StudentUpsertRequest struct {
