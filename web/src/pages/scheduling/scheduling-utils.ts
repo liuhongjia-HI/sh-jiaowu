@@ -1,4 +1,4 @@
-import type { ScheduleCandidate, ScheduleClass } from '../../types/starline';
+import type { AvailabilitySlot, ScheduleCandidate, ScheduleClass } from '../../types/starline';
 
 export const weekOptions = [
   { label: '周一', value: 1 },
@@ -81,4 +81,21 @@ export function scheduleClassOccursOn(item: ScheduleClass, date: Date) {
   if (item.dayOfWeek !== dayOfWeek) return false;
   const dateText = localDateText(date);
   return (!item.startDate || dateText >= item.startDate) && (!item.endDate || dateText <= item.endDate);
+}
+
+// 后端建课时除了查冲突，还硬性要求老师和每个学生都有一条覆盖该星期、时段、日期的可上课时间
+// （见 buildScheduleClass 的 teacherAvailable/studentAvailable），否则直接 400。
+// 这里用同一套判定在提交前提示，避免「周视图明明是空的却说时间冲突」。
+export function availabilityCovers(slot: AvailabilitySlot, dayOfWeek: number, startTime: string, endTime: string, date: string) {
+  if (slot.dayOfWeek !== dayOfWeek) return false;
+  if (slot.startTime > startTime || slot.endTime < endTime) return false;
+  if (date) {
+    if (slot.startDate && date < slot.startDate) return false;
+    if (slot.endDate && date > slot.endDate) return false;
+  }
+  return true;
+}
+
+export function isClockText(value?: string) {
+  return /^\d{2}:\d{2}$/.test(value || '');
 }

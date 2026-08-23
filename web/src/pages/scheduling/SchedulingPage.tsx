@@ -214,7 +214,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['availability-overview'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
-    onError: () => message.error('保存失败，请检查星期和时间段。')
+    onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请检查星期和时间段。')
   });
 
   const createClass = useMutation({
@@ -244,7 +244,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
-    onError: () => message.error('确认排课失败，请检查人数和时间冲突。')
+    onError: (error) => message.error(error instanceof Error ? error.message : '确认排课失败，请检查人数和时间冲突。')
   });
 
   const cancelClass = useMutation({
@@ -255,7 +255,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
-    onError: () => message.error('取消课程失败，请稍后重试。')
+    onError: (error) => message.error(error instanceof Error ? error.message : '取消课程失败，请稍后重试。')
   });
 
   const createManualClass = useMutation({
@@ -267,7 +267,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
-    onError: () => message.error('创建课程失败，请检查学生、老师和时间冲突。')
+    onError: (error) => message.error(error instanceof Error ? error.message : '创建课程失败，请稍后重试。')
   });
 
   const updateClass = useMutation({
@@ -281,7 +281,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
-    onError: () => message.error('调课失败，请检查可上课时间和冲突。')
+    onError: (error) => message.error(error instanceof Error ? error.message : '调课失败，请稍后重试。')
   });
 
   const moveClass = useMutation({
@@ -292,7 +292,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
-    onError: () => message.error('调课失败，请检查老师、学生时间冲突。')
+    onError: (error) => message.error(error instanceof Error ? error.message : '调课失败，请稍后重试。')
   });
 
   const ownerOptions = useMemo(() => {
@@ -412,7 +412,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       startTime: record.startTime,
       endTime: record.endTime,
       startDate: record.startDate,
-      endDate: record.endDate,
       studentIds: record.students.map((student) => student.id),
       expectedStudentCount: record.expectedStudentCount,
       reservationNote: record.reservationNote
@@ -434,7 +433,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       startTime: '19:00',
       endTime: '20:30',
       startDate: new Date().toISOString().slice(0, 10),
-      endDate: '',
       studentIds: [],
       expectedStudentCount: 1,
       reservationNote: ''
@@ -914,11 +912,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         )}
       >
         <Form form={editForm} layout="vertical" onFinish={(values) => {
+          // 课外辅导不跨天：这里只让家长/老师选一个上课日期，结束日期在提交时直接等于开始日期，不再单独收集。
+          const payload = { ...values, endDate: values.startDate };
           if (creatingClass) {
-            createManualClass.mutate(values);
+            createManualClass.mutate(payload);
             return;
           }
-          updateClass.mutate(values);
+          updateClass.mutate(payload);
         }}>
           <Form.Item name="courseId" label="课程" rules={[{ required: true, message: '请选择课程' }]}>
             <Select showSearch optionFilterProp="label" options={courseOptions} />
@@ -948,14 +948,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Input placeholder="20:30" />
             </Form.Item>
           </Space.Compact>
-          <Space.Compact block>
-            <Form.Item name="startDate" style={{ width: '50%' }}>
-              <Input placeholder="开始日期" />
-            </Form.Item>
-            <Form.Item name="endDate" style={{ width: '50%' }}>
-              <Input placeholder="结束日期" />
-            </Form.Item>
-          </Space.Compact>
+          <Form.Item name="startDate">
+            <Input placeholder="上课日期" />
+          </Form.Item>
           <Form.Item
             name="studentIds"
             label={`学生（已选 ${editingStudentIDs.length}/${classCapacity(editingClassType)}）`}
