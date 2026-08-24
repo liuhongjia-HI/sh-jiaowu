@@ -577,42 +577,6 @@ body {
   object-fit: contain;
 }
 
-.schedule-search-form {
-  display: grid;
-  gap: 4px;
-}
-
-.schedule-search-main {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(160px, 220px) 120px auto;
-  gap: 12px;
-  align-items: end;
-}
-
-.schedule-search-main .ant-form-item,
-.schedule-more-settings .ant-form-item {
-  margin-bottom: 0;
-}
-
-.schedule-search-main > .ant-btn {
-  min-height: 40px;
-}
-
-.schedule-more-toggle {
-  width: fit-content;
-  padding-left: 0;
-}
-
-.schedule-more-settings {
-  display: grid;
-  grid-template-columns: 160px 160px 160px;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #e8ecf3;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
 .schedule-grid {
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
@@ -658,12 +622,6 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
-}
-
-.schedule-candidate-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
 }
 
 .schedule-candidate-card {
@@ -1028,10 +986,6 @@ body {
   background: #f8fafc;
   color: #64748b;
   font-size: 13px;
-}
-
-.schedule-day-empty-bar .schedule-tip-list {
-  flex-basis: 100%;
 }
 
 .schedule-subject-list,
@@ -1536,10 +1490,6 @@ button.schedule-timeline-block:hover {
   font-size: 12px;
 }
 
-.schedule-timeline-block.is-candidate {
-  opacity: .86;
-}
-
 .schedule-timeline-block.is-selected {
   box-shadow: inset 0 0 0 1px var(--subject-accent), 0 8px 18px rgba(15, 23, 42, .12);
 }
@@ -1571,20 +1521,7 @@ button.schedule-timeline-block:hover {
   );
 }
 
-.schedule-timeline-action {
-  margin-top: 2px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #1d4ed8;
-  font-weight: 700;
-}
-
 @container (max-width: 118px) {
-  .schedule-timeline-action {
-    display: none;
-  }
 }
 
 .week-board {
@@ -1813,19 +1750,6 @@ button.schedule-block:hover {
   padding: 12px;
 }
 
-.schedule-tip-list {
-  display: grid;
-  gap: 8px;
-  color: #475569;
-  font-size: 13px;
-}
-
-.schedule-tip-list div {
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #f1f5f9;
-}
-
 .schedule-action-summary {
   display: grid;
   gap: 8px;
@@ -1910,6 +1834,14 @@ button.schedule-block:hover {
 .month-class strong {
   font-size: 13px;
   line-height: 1.35;
+}
+
+/* 学生名可能很长（1V4 就是四个名字），月视图格子窄，超出就省略，
+   完整名单在课程详情里看。不换行是为了保住「一格＝一节课」的高度节奏。 */
+.month-class-students {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .month-class.is-canceled {
@@ -2416,14 +2348,6 @@ button.schedule-block:hover {
     grid-template-columns: 1fr;
   }
 
-  .schedule-search-main {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .schedule-search-main > .ant-btn {
-    grid-column: 1 / -1;
-  }
-
   .schedule-filterbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2470,7 +2394,6 @@ button.schedule-block:hover {
     text-align: left;
   }
 
-  .schedule-more-settings,
   .schedule-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -2583,10 +2506,6 @@ button.schedule-block:hover {
   }
 
   .schedule-filterbar {
-    grid-template-columns: 1fr;
-  }
-
-  .schedule-search-main {
     grid-template-columns: 1fr;
   }
 

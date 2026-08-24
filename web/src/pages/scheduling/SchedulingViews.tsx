@@ -1,5 +1,5 @@
-import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Skeleton, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { CalendarOutlined, CloseCircleOutlined, CopyOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Dropdown, Modal, Popconfirm, Popover, Select, Skeleton, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import type { FormInstance, TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -7,12 +7,10 @@ import type { CSSProperties, ReactNode } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import { gradeOptions, subjectOptions } from '../../utils/curriculum';
-import type { AvailabilitySlot, Course, CurrentUser, ScheduleCandidate, ScheduleClass, Student, Teacher } from '../../types/starline';
+import type { AvailabilitySlot, Course, CurrentUser, ScheduleClass, Student, Teacher } from '../../types/starline';
 import {
   addDays,
   addMonths,
-  candidateLevel,
-  candidateLevelMeta,
   classCapacity,
   formatWeekRange,
   localDateText,
@@ -24,16 +22,7 @@ import {
   weekOptions,
   weekdayOfDateText
 } from './scheduling-utils';
-import { CandidatePanel, CoordinationPanel } from './CandidatePanel';
-
-type CandidateFormValues = {
-  subject: string;
-  grade: string;
-  classType: string;
-  durationMinutes: number;
-  startDate: string;
-  endDate: string;
-};
+import { subjectPalette, type SubjectPalette } from '../../utils/subject-colors';
 
 type AvailabilityFormValues = {
   ownerKey: string;
@@ -89,7 +78,7 @@ export type ScheduleMoveTarget = {
 };
 
 type CourseLookup = Record<string, Course>;
-type TimelineKind = 'class' | 'candidate' | 'availability' | 'overflow';
+type TimelineKind = 'class' | 'availability' | 'overflow';
 type TimelineItem = {
   id: string;
   kind: TimelineKind;
@@ -106,7 +95,7 @@ type TimelineItem = {
   // 只画底色不画字：背景带的文字在顶部，常被压在上面的课程块裁掉半行，
   // 留下一截读不通的残字。详情仍在悬浮提示里。
   quiet?: boolean;
-  record: ScheduleClass | ScheduleCandidate | AvailabilitySlot;
+  record: ScheduleClass | AvailabilitySlot;
 };
 type TimelineLayoutItem = TimelineItem & {
   column: number;
@@ -138,6 +127,10 @@ const placeholderLaneKey = '__placeholder__';
 // 超出的部分折叠成 "+N"。数值来自实测：约 64px 时课程名可显示 3 个汉字。
 const minReadableBlockWidth = 64;
 const maxTimelineColumns = 4;
+// 周视图单格最多渲染三块（对标 Outlook）。超过三节时，前两节正常显示、
+// 第三格变成 "+N"，点开能看到被折叠的全部课程——这样「最多三个」是字面意义上的
+// 三个可视块，不会因为再挤一个加号变成四个。
+const weekCellMaxLessons = 3;
 // 已取消课程的幽灵条：只画出「这个时段原本有课、现在空出来了」，不需要能读字。
 const canceledGhostWidth = 10;
 const canceledGhostGap = 3;
@@ -166,20 +159,16 @@ export function ScheduleWeekTimeline({
   weekDays,
   selectedWeekStart,
   availabilityByDay,
-  candidatesByDay,
   classesByDay,
   courseById,
   teacherById,
   studentById,
-  candidateRequest,
-  selectedCandidateId,
-  emptyTips,
   canManage,
   onPreviousWeek,
   onNextWeek,
   onToday,
-  onPickCandidate,
   onEditClass,
+  onCopyClass,
   onMoveClass,
   onCreateClass
 }: {
@@ -187,24 +176,20 @@ export function ScheduleWeekTimeline({
   weekDays: WeekDay[];
   selectedWeekStart: Date;
   availabilityByDay: Record<number, AvailabilitySlot[]>;
-  candidatesByDay: Record<number, ScheduleCandidate[]>;
   classesByDay: Record<number, ScheduleClass[]>;
   courseById: CourseLookup;
   teacherById: Record<string, Teacher>;
   studentById: Record<string, Student>;
-  candidateRequest: CandidateFormValues | null;
-  selectedCandidateId?: string;
-  emptyTips: string[];
   canManage: boolean;
   onPreviousWeek: () => void;
   onNextWeek: () => void;
   onToday: () => void;
-  onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
+  onCopyClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
   onCreateClass: (lessonDate: string) => void;
 }) {
-  const timelineItems = useMemo(() => buildTimelineItems(weekDays, availabilityByDay, candidatesByDay, classesByDay, courseById, teacherById, studentById), [weekDays, availabilityByDay, candidatesByDay, classesByDay, courseById, teacherById, studentById]);
+  const timelineItems = useMemo(() => buildTimelineItems(weekDays, availabilityByDay, classesByDay, courseById, teacherById, studentById), [weekDays, availabilityByDay, classesByDay, courseById, teacherById, studentById]);
   const hasAnyItem = timelineItems.length > 0;
   const timelineRange = useMemo(() => buildTimelineRange(timelineItems), [timelineItems]);
   const rows = useMemo(() => buildTimelineRows(timelineRange.start, timelineRange.end), [timelineRange]);
@@ -241,7 +226,7 @@ export function ScheduleWeekTimeline({
   // 否则上面永远是几屏空白。两个视图行为保持一致，切换时不会一个自动定位一个不定位。
   const firstItemMinute = useMemo(() => {
     const starts = timelineItems
-      .filter((item) => item.kind === 'class' || item.kind === 'candidate')
+      .filter((item) => item.kind === 'class')
       .map((item) => timeToMinutes(item.startTime));
     return starts.length > 0 ? Math.min(...starts) : null;
   }, [timelineItems]);
@@ -254,7 +239,7 @@ export function ScheduleWeekTimeline({
 
   const itemsByDay = useMemo(() => {
     return weekDays.reduce<Record<number, TimelineLayoutItem[]>>((result, day) => {
-      result[day.dayOfWeek] = layoutOverlappingItems(timelineItems.filter((item) => item.dayOfWeek === day.dayOfWeek), dayColumnWidth);
+      result[day.dayOfWeek] = layoutOverlappingItems(timelineItems.filter((item) => item.dayOfWeek === day.dayOfWeek), dayColumnWidth, weekCellMaxLessons);
       return result;
     }, {});
   }, [weekDays, timelineItems, dayColumnWidth]);
@@ -265,13 +250,9 @@ export function ScheduleWeekTimeline({
     <div className="schedule-timeline-wrap">
       {!hasAnyItem && (
         <ScheduleEmptyTips
-          description={candidateRequest ? '暂时没有可展示的排课结果。' : '选择课程和老师后，查找可排时间。'}
-          tips={emptyTips}
+          description="这一周还没有课程。双击空白格即可直接排一节。"
           compact
         />
-      )}
-      {candidateRequest && !hasGroupedItems(candidatesByDay) && (
-        <ScheduleEmptyTips description="没有找到推荐时间。" tips={emptyTips} compact />
       )}
       <div className="schedule-timeline-toolbar">
         <Space size={8}>
@@ -341,10 +322,9 @@ export function ScheduleWeekTimeline({
                     key={`${item.kind}-${item.id}`}
                     item={item}
                     rangeStart={timelineRange.start}
-                    selectedCandidateId={selectedCandidateId}
                     canManage={canManage}
-                    onPickCandidate={onPickCandidate}
                     onEditClass={onEditClass}
+                    onCopyClass={onCopyClass}
                   />
                 ))}
               </div>
@@ -370,22 +350,18 @@ export function ScheduleDayResourceTimeline({
   loading,
   selectedDate,
   availabilityByDay,
-  candidatesByDay,
   classesByDay,
   courseById,
   teacherById,
   studentById,
-  candidateRequest,
-  selectedCandidateId,
-  emptyTips,
   canManage,
   nearestClassDate,
   onPreviousDay,
   onNextDay,
   onToday,
   onJumpToDate,
-  onPickCandidate,
   onEditClass,
+  onCopyClass,
   onMoveClass,
   onCreateClass
 }: {
@@ -393,21 +369,17 @@ export function ScheduleDayResourceTimeline({
   selectedDate: Date;
   nearestClassDate: { date: Date; count: number } | null;
   availabilityByDay: Record<number, AvailabilitySlot[]>;
-  candidatesByDay: Record<number, ScheduleCandidate[]>;
   classesByDay: Record<number, ScheduleClass[]>;
   courseById: CourseLookup;
   teacherById: Record<string, Teacher>;
   studentById: Record<string, Student>;
-  candidateRequest: CandidateFormValues | null;
-  selectedCandidateId?: string;
-  emptyTips: string[];
   canManage: boolean;
   onPreviousDay: () => void;
   onNextDay: () => void;
   onToday: () => void;
   onJumpToDate: (date: Date) => void;
-  onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
+  onCopyClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
   onCreateClass: (lessonDate: string) => void;
 }) {
@@ -416,13 +388,12 @@ export function ScheduleDayResourceTimeline({
     () => buildResourceLanes(
       dayOfWeek,
       availabilityByDay[dayOfWeek] ?? [],
-      candidatesByDay[dayOfWeek] ?? [],
       (classesByDay[dayOfWeek] ?? []).filter((item) => scheduleClassOccursOn(item, selectedDate)),
       courseById,
       teacherById,
       studentById
     ),
-    [dayOfWeek, availabilityByDay, candidatesByDay, classesByDay, selectedDate, courseById, teacherById, studentById]
+    [dayOfWeek, availabilityByDay, classesByDay, selectedDate, courseById, teacherById, studentById]
   );
   const allItems = useMemo(() => lanes.flatMap((lane) => lane.items), [lanes]);
   const hasAnyItem = allItems.length > 0;
@@ -441,10 +412,9 @@ export function ScheduleDayResourceTimeline({
   );
   const emptyReason = useMemo(() => {
     const dayText = formatDayTitle(selectedDate);
-    if (candidateRequest) return `${dayText} 没有符合条件的排课结果。`;
-    if (totalAvailabilityCount === 0) return `${dayText} 没有课程——目前还没有收到任何老师或学生填报的可上课时间，先把时间收上来才能匹配出可排方案。`;
+    if (totalAvailabilityCount === 0) return `${dayText} 没有课程。还没有收到任何老师或学生填报的可上课时间，排课时不会有参考底纹，但仍可直接双击空白格排课。`;
     return `${dayText} 没有课程：已收到的 ${totalAvailabilityCount} 个可上课时段都不在这一天。`;
-  }, [candidateRequest, selectedDate, totalAvailabilityCount]);
+  }, [selectedDate, totalAvailabilityCount]);
 
   // 与周视图同一套测量逻辑：泳道内真出现冲突时，按泳道实际宽度决定并排几块。
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -490,7 +460,7 @@ export function ScheduleDayResourceTimeline({
   const firstItemMinute = useMemo(() => {
     const starts = lanes
       .flatMap((lane) => lane.items)
-      .filter((item) => item.kind === 'class' || item.kind === 'candidate')
+      .filter((item) => item.kind === 'class')
       .map((item) => timeToMinutes(item.startTime));
     return starts.length > 0 ? Math.min(...starts) : null;
   }, [lanes]);
@@ -522,11 +492,8 @@ export function ScheduleDayResourceTimeline({
         </div>
       </div>
 
-      {/* 空态要给出路。「这天没课」本身没有信息量——排课的主路径是「师生填报可上课时间
-          → 匹配出可排方案 → 确认成班」，手动建课只是逃生通道。所以空态该回答的是
-          「卡在这条链路的哪一环」：时间还没收上来，还是收上来了但没落在这一天。
-          候选查找的提示（emptyTips）只在真的发起过查找时才展示：没查找时那句
-          「先选择学科和年级」和「这天没课」无关，是误导。 */}
+      {/* 空态要给出路。「这天没课」本身没有信息量：要么是可上课时间还没收上来，
+          要么是收上来了但没落在这一天——两种情况的下一步动作完全不同。 */}
       {!hasAnyItem && (
         <div className="schedule-day-empty-bar">
           <span>{emptyReason}</span>
@@ -534,11 +501,6 @@ export function ScheduleDayResourceTimeline({
             <Button type="link" size="small" onClick={() => onJumpToDate(nearestClassDate.date)}>
               最近的排课在 {formatDayTitle(nearestClassDate.date)}（{nearestClassDate.count} 节），去看看
             </Button>
-          )}
-          {candidateRequest && emptyTips.length > 0 && (
-            <div className="schedule-tip-list">
-              {emptyTips.map((tip) => <div key={tip}>{tip}</div>)}
-            </div>
           )}
         </div>
       )}
@@ -611,10 +573,9 @@ export function ScheduleDayResourceTimeline({
                   key={`${item.kind}-${item.id}`}
                   item={item}
                   rangeStart={timelineRange.start}
-                  selectedCandidateId={selectedCandidateId}
                   canManage={canManage}
-                  onPickCandidate={onPickCandidate}
                   onEditClass={onEditClass}
+                  onCopyClass={onCopyClass}
                 />
               ))}
             </div>
@@ -625,15 +586,10 @@ export function ScheduleDayResourceTimeline({
   );
 }
 
-export function ScheduleEmptyTips({ description, tips, compact = false }: { description: string; tips: string[]; compact?: boolean }) {
+export function ScheduleEmptyTips({ description, compact = false }: { description: string; compact?: boolean }) {
   return (
     <div className={compact ? 'schedule-empty-tips compact' : 'schedule-empty-tips'}>
       <Empty description={description} />
-      {tips.length > 0 && (
-        <div className="schedule-tip-list">
-          {tips.map((tip) => <div key={tip}>{tip}</div>)}
-        </div>
-      )}
     </div>
   );
 }
@@ -696,17 +652,15 @@ export function MiniMonthCalendar({
 export function TimelineBlock({
   item,
   rangeStart,
-  selectedCandidateId,
   canManage,
-  onPickCandidate,
-  onEditClass
+  onEditClass,
+  onCopyClass
 }: {
   item: TimelineLayoutItem;
   rangeStart: number;
-  selectedCandidateId?: string;
   canManage: boolean;
-  onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
+  onCopyClass?: (record: ScheduleClass) => void;
 }) {
   const start = timeToMinutes(item.startTime);
   const end = Math.max(timeToMinutes(item.endTime), start + timelineSlotMinutes);
@@ -745,8 +699,7 @@ export function TimelineBlock({
     'schedule-timeline-block',
     `is-${item.kind}`,
     item.status === '已取消' ? 'is-canceled' : '',
-    isGhost ? 'is-ghost' : '',
-    item.kind === 'candidate' && item.id === selectedCandidateId ? 'is-selected' : ''
+    isGhost ? 'is-ghost' : ''
   ].filter(Boolean).join(' ');
   // 内容包一层 body：容器查询只能作用于容器的后代，不能作用于容器自身，
   // 所以内边距必须挂在这一层才能随块宽收窄（挂在外层块上会被静默忽略）。
@@ -813,7 +766,6 @@ export function TimelineBlock({
                 className="schedule-overflow-entry"
                 onClick={() => {
                   if (hiddenItem.kind === 'class') onEditClass(hiddenItem.record as ScheduleClass);
-                  if (hiddenItem.kind === 'candidate') onPickCandidate(hiddenItem.record as ScheduleCandidate);
                 }}
               >
                 <strong>{hiddenItem.title}</strong>
@@ -835,32 +787,36 @@ export function TimelineBlock({
 
   if (item.kind === 'class') {
     const record = item.record as ScheduleClass;
-    return (
+    const editable = canManage && record.status !== '已取消';
+    const block = (
       <button
         type="button"
         className={className}
         style={style}
         title={title}
-        draggable={canManage && record.status !== '已取消'}
+        draggable={editable}
         onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', record.id)}
-        onClick={() => canManage && record.status !== '已取消' ? onEditClass(record) : undefined}
+        onClick={() => editable ? onEditClass(record) : undefined}
       >
         {renderBody()}
       </button>
     );
-  }
-
-  if (item.kind === 'candidate') {
+    if (!editable || !onCopyClass) return block;
+    // 右键复制：把这节课的课程、老师、学生、班型原样带进新建表单，
+    // 只需要改时间就能再排一节。重复录入一模一样的信息是排课里最费时的部分。
     return (
-      <button
-        type="button"
-        className={className}
-        style={style}
-        title={title}
-        onClick={() => onPickCandidate(item.record as ScheduleCandidate)}
+      <Dropdown
+        trigger={['contextMenu']}
+        menu={{
+          items: [
+            { key: 'copy', icon: <CopyOutlined />, label: '复制这节课' },
+            { key: 'edit', icon: <EditOutlined />, label: '调整这节课' }
+          ],
+          onClick: ({ key }) => key === 'copy' ? onCopyClass(record) : onEditClass(record)
+        }}
       >
-        {renderBody(<span className="schedule-timeline-action">确认这个时间</span>)}
-      </button>
+        {block}
+      </Dropdown>
     );
   }
 
@@ -878,6 +834,7 @@ export function MonthScheduleBoard({
   teacherById,
   canManage,
   onEditClass,
+  onCopyClass,
   onMoveClass
 }: {
   month: Date;
@@ -886,6 +843,7 @@ export function MonthScheduleBoard({
   teacherById: Record<string, Teacher>;
   canManage: boolean;
   onEditClass: (record: ScheduleClass) => void;
+  onCopyClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
 }) {
   // 之前这里写死 new Date() 且依赖数组为空，月视图翻页翻不动，永远停在当前月。
@@ -918,19 +876,44 @@ export function MonthScheduleBoard({
                 <span className="month-day-empty">暂无课程</span>
               ) : sortByStartTime(dayClasses).map((item) => {
                 const course = courseById[item.courseId];
-                return (
+                const editable = canManage && item.status !== '已取消';
+                const cell = (
                   <button
                     type="button"
                     className={`month-class ${item.status === '已取消' ? 'is-canceled' : ''}`}
                     key={item.id}
-                    draggable={canManage && item.status !== '已取消'}
+                    draggable={editable}
                     onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
-                    onClick={() => canManage && item.status !== '已取消' ? onEditClass(item) : undefined}
+                    onClick={() => editable ? onEditClass(item) : undefined}
                   >
+                    {/* 客户要求月视图一眼看全：开始时间、科目年级、教师姓名、学生姓名。
+                        教师用 resourceLaneTeacherName 而不是 teacherDisplay——后者会带上
+                        「教师：」前缀和任教范围，在月视图这种窄格子里会把名字挤没。 */}
                     <span>{item.startTime}</span>
                     <strong>{courseSubjectGradeText(course, item.courseName)}</strong>
-                    <small>{teacherDisplay(item.teacherName, course, teacherById[item.teacherId])}</small>
+                    <small>{resourceLaneTeacherName(item.teacherId, item.teacherName, teacherById[item.teacherId])}</small>
+                    {item.students.length > 0 && (
+                      <small className="month-class-students">{studentSummaryText(item.students)}</small>
+                    )}
                   </button>
+                );
+                if (!editable) return cell;
+                // 右键复制在月视图同样可用：月视图是「看全貌顺手补一节」的场景，
+                // 复制现有课比从空表单重填一遍快得多。
+                return (
+                  <Dropdown
+                    key={item.id}
+                    trigger={['contextMenu']}
+                    menu={{
+                      items: [
+                        { key: 'copy', icon: <CopyOutlined />, label: '复制这节课' },
+                        { key: 'edit', icon: <EditOutlined />, label: '调整这节课' }
+                      ],
+                      onClick: ({ key }) => key === 'copy' ? onCopyClass(item) : onEditClass(item)
+                    }}
+                  >
+                    {cell}
+                  </Dropdown>
                 );
               })}
             </div>
@@ -1039,7 +1022,6 @@ export function studentDisplayNames(students: { name: string; grade?: string }[]
 export function buildTimelineItems(
   weekDays: WeekDay[],
   availabilityByDay: Record<number, AvailabilitySlot[]>,
-  candidatesByDay: Record<number, ScheduleCandidate[]>,
   classesByDay: Record<number, ScheduleClass[]>,
   courseById: CourseLookup,
   teacherById: Record<string, Teacher>,
@@ -1059,25 +1041,6 @@ export function buildTimelineItems(
       countText: group.countText,
       record: group.record
     }));
-    const candidateItems = sortByStartTime(candidatesByDay[day.dayOfWeek] ?? []).map<TimelineItem>((candidate) => {
-      const course = courseById[candidate.courseId];
-      const level = candidateLevelMeta(candidateLevel(candidate));
-      return {
-        id: candidate.id,
-        kind: 'candidate',
-        dayOfWeek: day.dayOfWeek,
-        startTime: candidate.startTime,
-        endTime: candidate.endTime,
-        subject: candidate.subject || course?.subject || '其他',
-        title: courseSubjectGradeText(course, candidate.courseName),
-        subtitle: candidate.courseName,
-        meta: `${teacherDisplay(candidate.teacherName, course, teacherById[candidate.teacherId])} · 学生：${studentDisplayNames(candidate.availableStudents)}`,
-        classType: candidate.classType,
-        countText: `${candidate.studentCount}/${candidate.capacity}`,
-        status: level.label,
-        record: candidate
-      };
-    });
     const classItems = sortByStartTime(classesByDay[day.dayOfWeek] ?? []).map<TimelineItem>((item) => {
       const course = courseById[item.courseId];
       return {
@@ -1096,7 +1059,7 @@ export function buildTimelineItems(
         record: item
       };
     });
-    return [...availabilityItems, ...candidateItems, ...classItems];
+    return [...availabilityItems, ...classItems];
   });
 }
 
@@ -1127,9 +1090,6 @@ function resourceLaneMeta(item: TimelineItem) {
   if (item.kind === 'class') {
     return studentSummaryText((item.record as ScheduleClass).students);
   }
-  if (item.kind === 'candidate') {
-    return studentSummaryText((item.record as ScheduleCandidate).availableStudents);
-  }
   return item.meta;
 }
 
@@ -1141,7 +1101,6 @@ function studentSummaryText(students: { name: string; grade?: string }[]) {
 export function buildResourceLanes(
   dayOfWeek: number,
   availabilitySlots: AvailabilitySlot[],
-  candidates: ScheduleCandidate[],
   classes: ScheduleClass[],
   courseById: CourseLookup,
   teacherById: Record<string, Teacher>,
@@ -1158,7 +1117,6 @@ export function buildResourceLanes(
   const primaryItems = buildTimelineItems(
     [syntheticDay],
     {},
-    { [dayOfWeek]: candidates },
     { [dayOfWeek]: classes },
     courseById,
     teacherById,
@@ -1175,7 +1133,7 @@ export function buildResourceLanes(
   };
 
   primaryItems.forEach((item) => {
-    const record = item.record as ScheduleClass | ScheduleCandidate;
+    const record = item.record as ScheduleClass;
     const teacherId = record.teacherId || '';
     const teacher = teacherById[teacherId];
     const key = teacherId || unassignedLaneKey;
@@ -1272,7 +1230,11 @@ export function aggregateAvailabilitySlots(slots: AvailabilitySlot[], teacherByI
 // 它铺满整列垫在课程下层，重叠的合并成一条：原来它和课程分左右车道，
 // 一列 139px 时自己只剩 10px 宽，只画得出虚线边框、一个字也放不下，
 // 同时还白白占掉课程五分之一的宽度。
-export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
+// columnLimit 用来硬性限定一格里最多渲染几块。周视图按客户要求固定为 3
+// （对标 Outlook：单格最多三个课时，超出折叠成加号）；日视图的泳道不传，
+// 仍按列宽推算——那里一个泳道就是一个老师，同时段重叠本身就是排课错误，
+// 数量极少，用宽度决定更合适。
+export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0, columnLimit?: number) {
   const availability = items.filter((item) => item.kind === 'availability');
   const primary = items.filter((item) => item.kind !== 'availability');
   // 已取消的课不该和在排的课抢横向空间：一节真课旁边挂着两节已取消的，
@@ -1304,7 +1266,9 @@ export function layoutOverlappingItems(items: TimelineItem[], columnWidth = 0) {
   }
 
   // 可读列数按扣掉幽灵条之后的净宽算，否则末列会被挤到读不出课程名。
-  const liveItems = layoutOverlappingGroup(live, maxColumnsForWidth(Math.max(0, columnWidth - reserveRightPx))).map((item) => ({
+  const widthLimit = maxColumnsForWidth(Math.max(0, columnWidth - reserveRightPx));
+  const effectiveLimit = columnLimit ? Math.min(columnLimit, widthLimit) : widthLimit;
+  const liveItems = layoutOverlappingGroup(live, effectiveLimit).map((item) => ({
     ...item,
     leftPct: (100 / item.columns) * item.column,
     widthPct: 100 / item.columns,
@@ -1342,8 +1306,8 @@ export function mergeAvailabilityBands(items: TimelineItem[]) {
         id: `availability-band-${first.id}`,
         startTime: formatMinute(start),
         endTime: formatMinute(end),
-        // 「N 个可排时段」和图例里的「可排方案」（推荐课程）只差一个字，容易被读成推荐结果。
-        // 合并带说的是「师生填报的可上课时间」，标题里就把这层意思写全。
+        // 合并带说的是「师生填报的可上课时间」，标题里把这层意思写全，
+        // 免得被当成已经排好的课。
         title: `可上课时间 · ${group.length} 段`,
         subtitle: detail.join('、'),
         meta: '',
@@ -1485,23 +1449,18 @@ export function formatMinute(value: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-export function subjectColor(subject: string) {
-  const normalized = subject.toLowerCase();
-  if (normalized.includes('eng') || subject.includes('英文') || subject.includes('英语')) return { bg: '#d8ebfb', border: '#a9cdea', accent: '#2f7dcc', text: '#14395d' };
-  if (normalized.includes('math') || subject.includes('数学')) return { bg: '#fff5c9', border: '#f1d673', accent: '#d4a900', text: '#594700' };
-  if (normalized.includes('geo') || normalized.includes('his') || subject.includes('地理') || subject.includes('历史')) return { bg: '#d8f0f5', border: '#9ed4df', accent: '#32899b', text: '#164e59' };
-  if (normalized.includes('sci') || subject.includes('科学') || subject.includes('物理') || subject.includes('化学') || subject.includes('生物')) return { bg: '#dfe6ff', border: '#adbdf4', accent: '#3556c4', text: '#1e2d68' };
-  if (normalized.includes('chn') || subject.includes('语文') || subject.includes('中文')) return { bg: '#efd9f6', border: '#d7a9e6', accent: '#9b43bd', text: '#552066' };
-  if (subject.includes('老师')) return { bg: '#eef9f1', border: '#b8e2c4', accent: '#32975a', text: '#19542f' };
-  if (subject.includes('学生')) return { bg: '#eef6ff', border: '#b9d8fb', accent: '#347fc4', text: '#1e4d78' };
-  const palette = [
-    { bg: '#f1e9dc', border: '#d8c5a5', accent: '#9a6b2f', text: '#553712' },
-    { bg: '#e5f3e8', border: '#b8d9c1', accent: '#3d8d58', text: '#1f5130' },
-    { bg: '#f6e2e2', border: '#e5b5b5', accent: '#b24b4b', text: '#672323' },
-    { bg: '#e8edf4', border: '#c3ccd9', accent: '#5d6f89', text: '#2e3b4f' }
-  ];
-  const index = Math.abs([...subject].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % palette.length;
-  return palette[index];
+// 课程块配色统一走学科元数据（见 utils/subject-colors）。
+//
+// 「老师可授课」「学生可上课」不是学科，是可上课时间底纹用的伪类目，
+// 它们要的是「一眼看出这是背景参考、不是已排的课」，所以留在这里单独给色，
+// 不进学科元数据——否则运营会在学科配色表里看到两条没法解释的条目。
+const availabilityPalettes: Record<string, SubjectPalette> = {
+  老师可授课: { bg: '#eef9f1', border: '#b8e2c4', accent: '#32975a', text: '#19542f' },
+  学生可上课: { bg: '#eef6ff', border: '#b9d8fb', accent: '#347fc4', text: '#1e4d78' }
+};
+
+export function subjectColor(subject: string): SubjectPalette {
+  return availabilityPalettes[subject] ?? subjectPalette(subject);
 }
 
 export function shortList(values: string[], limit = 2) {
@@ -1537,10 +1496,9 @@ export function uniqueScheduleCampuses(items: ScheduleClass[]) {
   return Array.from(new Set(values)).sort();
 }
 
-export function uniqueScheduleSubjects(classes: ScheduleClass[], candidates: ScheduleCandidate[], courseById: CourseLookup) {
+export function uniqueScheduleSubjects(classes: ScheduleClass[], courseById: CourseLookup) {
   const values = [
     ...classes.map((item) => scheduleClassSubject(item, courseById)),
-    ...candidates.map((item) => item.subject || courseById[item.courseId]?.subject),
     '老师可授课',
     '学生可上课'
   ].map((value) => value || '其他');
@@ -1673,23 +1631,10 @@ export function findNearestClassDate(classes: ScheduleClass[], fromDate: Date, m
   return null;
 }
 
-export function hasGroupedItems<T>(groups: Record<number, T[]>) {
-  return Object.values(groups).some((items) => items.length > 0);
-}
-
 export function sortByStartTime<T extends { startTime: string }>(items: T[]) {
   return [...items].sort((left, right) => left.startTime.localeCompare(right.startTime));
 }
 
-export function candidateEmptyTips(request: CandidateFormValues | null, candidates: ScheduleCandidate[]) {
-  if (!request) return ['先选择学科和年级，再查找可排时间。'];
-  if (candidates.length > 0) return [];
-  return [
-    '确认该学科 + 年级已有开通学生，且老师授课范围覆盖该学科年级。',
-    '让相关老师和学生补充可上课时间后再查找。',
-    '可缩短课长或更换班型，更容易凑齐时间。'
-  ];
-}
 
 // 审核状态标签。被驳回时把理由挂在 Tooltip 上——老师得知道要改什么。
 export function auditStatusTag(record: ScheduleClass) {

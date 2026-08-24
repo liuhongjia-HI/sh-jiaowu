@@ -7,14 +7,12 @@ import type { CSSProperties } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import { gradeOptions, subjectOptions } from '../../utils/curriculum';
-import type { AvailabilitySlot, Course, CurrentUser, ScheduleCandidate, ScheduleClass, Student, Teacher } from '../../types/starline';
+import type { AvailabilitySlot, Course, CurrentUser, ScheduleClass, Student, Teacher } from '../../types/starline';
 import {
   addDays,
   addMonths,
   availabilityCovers,
   weekdayOfDateText,
-  candidateLevel,
-  candidateLevelMeta,
   classCapacity,
   formatWeekRange,
   isClockText,
@@ -34,7 +32,6 @@ import {
   availabilityStats,
   buildMiniMonthDays,
   buildWeekDays,
-  candidateEmptyTips,
   classColumns,
   findNearestClassDate,
   courseSubjectGradeText,
@@ -105,7 +102,7 @@ type ScheduleFilters = {
 };
 
 type CourseLookup = Record<string, Course>;
-type TimelineKind = 'class' | 'candidate' | 'availability';
+type TimelineKind = 'class' | 'availability';
 type TimelineItem = {
   id: string;
   kind: TimelineKind;
@@ -119,7 +116,7 @@ type TimelineItem = {
   status?: string;
   classType?: string;
   countText?: string;
-  record: ScheduleClass | ScheduleCandidate | AvailabilitySlot;
+  record: ScheduleClass | AvailabilitySlot;
 };
 type TimelineLayoutItem = TimelineItem & {
   column: number;
@@ -229,7 +226,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const cancelClass = useMutation({
     mutationFn: (id: string) => postData<ScheduleClass>(`/schedule-classes/${id}/cancel`, {}),
     onSuccess: () => {
-      message.success('课程已取消，可重新生成候选排课');
+      message.success('课程已取消，该时间可重新排课');
       setEditingClass(null);
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
     },
@@ -335,10 +332,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     }
     return gaps;
   }, [availabilityOverview.data, editingDayOfWeek, editingStartTime, editingEndTime, editingStartDate, editingTeacherId, editingStudentIDs, teacherById, studentById]);
-  const allCandidates = candidates.data ?? [];
-  const readyCandidates = useMemo(() => allCandidates.filter((item) => candidateLevel(item) !== 'short'), [allCandidates]);
-  const shortCandidates = useMemo(() => allCandidates.filter((item) => candidateLevel(item) === 'short'), [allCandidates]);
-  const scheduleSubjects = useMemo(() => uniqueScheduleSubjects(classes.data ?? [], allCandidates, courseById), [classes.data, allCandidates, courseById]);
+  const scheduleSubjects = useMemo(() => uniqueScheduleSubjects(classes.data ?? [], courseById), [classes.data, courseById]);
   const subjectVisibleClasses = useMemo(
     () => filteredClasses.filter((item) => !hiddenSubjects.includes(scheduleClassSubject(item, courseById) || '其他')),
     [filteredClasses, hiddenSubjects, courseById]
@@ -363,7 +357,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     () => findNearestClassDate(subjectVisibleClasses, selectedDate),
     [subjectVisibleClasses, selectedDate]
   );
-  const candidatesByDay = useMemo(() => groupScheduleItems(readyCandidates), [readyCandidates]);
   const availabilityByDay = useMemo(() => groupScheduleItems(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const availabilitySummary = useMemo(() => availabilityStats(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const activeClassCount = subjectVisibleClasses.filter((item) => item.status === '已确认').length;
@@ -372,8 +365,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     .filter(Boolean).length + (statusFilter !== '全部' ? 1 : 0) + (hiddenSubjects.length > 0 ? 1 : 0);
   const hasClassFilters = Boolean(classGradeFilter || classSubjectFilter || classTeacherFilter || classStudentFilter || classCampusFilter || classCourseFilter || classTypeFilter || hiddenSubjects.length > 0 || statusFilter !== '全部');
   const classResultNote = scheduleResultNote(subjectVisibleClasses, totalConfirmedClassCount, hasClassFilters, classGradeFilter);
-  const recommendedCount = readyCandidates.length;
-  const emptyTips = candidateEmptyTips(candidateRequest, allCandidates);
 
   useEffect(() => {
     if (ownerOptions.length > 0 && !availabilityForm.getFieldValue('ownerKey')) {
@@ -384,14 +375,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   useEffect(() => {
     if (availability.data) availabilityForm.setFieldValue('slots', availability.data);
   }, [availability.data, availabilityForm]);
-
-  // 切换年级后，若已选学科在该年级不开设，则清空学科，避免排出无效组合。
-  useEffect(() => {
-    const subject = candidateForm.getFieldValue('subject');
-    if (subject && !subjectOptions(gradeWatch).some((item) => item.value === subject)) {
-      candidateForm.setFieldValue('subject', undefined);
-    }
-  }, [candidateForm, gradeWatch]);
 
   useEffect(() => {
     if (classSubjectFilter && !subjectOptions(classGradeFilter).some((item) => item.value === classSubjectFilter)) {
@@ -424,6 +407,34 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       expectedStudentCount: record.expectedStudentCount,
       reservationNote: record.reservationNote
     });
+  }
+
+  // 右键复制：把这节课的课程、老师、学生、班型、时段原样带进新建表单，
+  // 用户通常只需要改日期或时间就能再排一节。重复录入一模一样的信息
+  // 是排课里最费时的部分，也是客户点名要的「快捷排课」。
+  //
+  // 复制出来的是一节全新的单次课：不带 seriesId，也不继承审核状态——
+  // 老师复制出来的课同样要走审核，否则复制就成了绕过审核的后门。
+  function openCopy(record: ScheduleClass) {
+    if (!canCreateClass) return;
+    setEditingClass(null);
+    setCreatingClass(true);
+    setRepeatEnabled(false);
+    editForm.setFieldsValue({
+      courseId: record.courseId,
+      teacherId: record.teacherId,
+      campusId: record.campusId || user.campusId || 'campus-main',
+      roomName: record.roomName,
+      classType: record.classType,
+      durationMinutes: record.durationMinutes,
+      startTime: record.startTime,
+      endTime: record.endTime,
+      startDate: record.lessonDate,
+      studentIds: record.students.map((student) => student.id),
+      expectedStudentCount: record.expectedStudentCount,
+      reservationNote: record.reservationNote
+    });
+    message.info('已复制课程内容，改好时间后提交即可');
   }
 
   // 视图里点空白格新建：格子对应的是具体某一天，直接用那天的日期开表单。
@@ -488,7 +499,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>排课管理</Typography.Title>
-          <Typography.Text type="secondary">选学科和年级，系统按「同年级同学科」匹配师生填报的时间，凑出可排方案再确认成班。</Typography.Text>
+          <Typography.Text type="secondary">在日/周/月视图里直接排课：双击空白格新建，拖拽调整时间。灰色底纹是师生填报的可上课时间，作为参考范围。</Typography.Text>
         </div>
         <Space wrap>
           <Button icon={<SaveOutlined />} onClick={() => setAvailabilityOpen(true)}>维护可上课时间</Button>
@@ -673,7 +684,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <div className="schedule-legend">
                 <span><i className="legend-dot legend-available-teacher" />老师可授课</span>
                 <span><i className="legend-dot legend-available-student" />学生可上课</span>
-                <span><i className="legend-dot legend-candidate" />可排方案</span>
                 <span><i className="legend-dot legend-candidate" />待确认</span>
                 <span><i className="legend-dot legend-confirmed" />已确认</span>
                 <span><i className="legend-dot legend-canceled" />已取消</span>
@@ -681,56 +691,40 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
               {viewMode === 'day' ? (
                 <ScheduleDayResourceTimeline
-                  loading={classes.isFetching || candidates.isFetching || availabilityOverview.isFetching}
+                  loading={classes.isFetching || availabilityOverview.isFetching}
                   selectedDate={selectedDate}
                   availabilityByDay={availabilityByDay}
-                  candidatesByDay={candidatesByDay}
                   classesByDay={classesByDay}
                   courseById={courseById}
                   teacherById={teacherById}
                   studentById={studentById}
-                  candidateRequest={candidateRequest}
-                  selectedCandidateId={selectedCandidate?.id}
-                  emptyTips={emptyTips}
                   canManage={canCreateClass}
                   nearestClassDate={nearestClassDate}
                   onPreviousDay={() => goToDate(addDays(selectedDate, -1))}
                   onNextDay={() => goToDate(addDays(selectedDate, 1))}
                   onToday={() => goToDate(new Date())}
                   onJumpToDate={goToDate}
-                  onPickCandidate={(record) => {
-                    setSelectedCandidate(record);
-                    setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));
-                    setSelectedCampusId(user.campusId || 'campus-main');
-                  }}
                   onEditClass={openEdit}
+                  onCopyClass={openCopy}
                   onMoveClass={confirmMoveClass}
                   onCreateClass={openCreateClassForDay}
                 />
               ) : viewMode === 'week' ? (
                 <ScheduleWeekTimeline
-                  loading={classes.isFetching || candidates.isFetching || availabilityOverview.isFetching}
+                  loading={classes.isFetching || availabilityOverview.isFetching}
                   weekDays={selectedWeekDays}
                   selectedWeekStart={selectedWeekStart}
                   availabilityByDay={availabilityByDay}
-                  candidatesByDay={candidatesByDay}
                   classesByDay={classesByDay}
                   courseById={courseById}
                   teacherById={teacherById}
                   studentById={studentById}
-                  candidateRequest={candidateRequest}
-                  selectedCandidateId={selectedCandidate?.id}
-                  emptyTips={emptyTips}
                   canManage={canCreateClass}
                   onPreviousWeek={() => goToDate(addDays(selectedDate, -7))}
                   onNextWeek={() => goToDate(addDays(selectedDate, 7))}
                   onToday={() => goToDate(new Date())}
-                  onPickCandidate={(record) => {
-                    setSelectedCandidate(record);
-                    setSelectedStudentIds(record.availableStudents.slice(0, record.capacity).map((student) => student.id));
-                    setSelectedCampusId(user.campusId || 'campus-main');
-                  }}
                   onEditClass={openEdit}
+                  onCopyClass={openCopy}
                   onMoveClass={confirmMoveClass}
                   onCreateClass={openCreateClassForDay}
                 />
@@ -742,6 +736,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   teacherById={teacherById}
                   canManage={canCreateClass}
                   onEditClass={openEdit}
+                  onCopyClass={openCopy}
                   onMoveClass={confirmMoveClass}
                 />
               ) : (

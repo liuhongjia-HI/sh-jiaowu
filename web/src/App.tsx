@@ -24,6 +24,7 @@ import { Alert, Button, Dropdown, Form, Input, Layout, Menu, Modal, Result, Spac
 import type { MenuProps } from 'antd';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { loadSubjectColors } from './utils/subject-colors';
 import { changePassword, clearToken, getData, getToken, logout } from './services/http';
 import type { CurrentUser, Role } from './types/starline';
 
@@ -451,6 +452,18 @@ export default function App() {
     retry: false,
     queryFn: () => getData<CurrentUser>('/auth/me')
   });
+
+  // 学科颜色是全局视觉规范（课表块、学科圆点都用），登录后拉一次即可。
+  // 拉不到就用内置默认值，颜色不是关键路径，不该因为一个设置项失败就挡住整个后台。
+  const settings = useQuery({
+    queryKey: ['settings-for-subject-colors', token],
+    enabled: Boolean(token),
+    retry: false,
+    queryFn: () => getData<Record<string, string>>('/settings')
+  });
+  useEffect(() => {
+    if (settings.data) loadSubjectColors(settings.data.subjectColors);
+  }, [settings.data]);
 
   if (!token) {
     return loginRoutes;

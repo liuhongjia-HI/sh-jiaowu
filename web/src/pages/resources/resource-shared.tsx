@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
+import { subjectAccent } from '../../utils/subject-colors';
 import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
@@ -298,22 +299,11 @@ export function statusTag(text: string) {
   return <Tag color={color}>{text}</Tag>;
 }
 
+// 学科颜色统一走元数据。这里以前另有一份写死的调色板，
+// 同一门课在资源页和排课页会是两种颜色——现在两边共用同一个来源。
+// 圆点只需要一个主色，用 accent。
 export function subjectColor(subject: string) {
-  const colors: Record<string, string> = {
-    语文: '#ef4444',
-    数学: '#2563eb',
-    英文: '#16a34a',
-    英语: '#16a34a',
-    综合科学: '#15803d',
-    科学: '#15803d',
-    物理: '#7c3aed',
-    化学: '#0891b2',
-    生物: '#65a30d',
-    历史: '#b45309',
-    地理: '#0f766e',
-    政治: '#db2777'
-  };
-  return colors[subject] || '#64748b';
+  return subjectAccent(subject);
 }
 
 export function SubjectOption({ label }: { label: React.ReactNode }) {

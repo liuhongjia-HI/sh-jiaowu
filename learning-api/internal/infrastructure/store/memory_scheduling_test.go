@@ -1084,3 +1084,52 @@ func TestPendingLessonHiddenFromStudentTodo(t *testing.T) {
 		t.Fatal("待审核的课不能出现在学生首页的待办里")
 	}
 }
+
+// 右键复制走的是普通建课接口，所以必须照常跑全套校验：
+// 源课合法不代表复制到新时间也合法。
+func TestCopiedLessonStillRunsConflictChecks(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("运营教务", ops, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected schedule: %v", err)
+	}
+
+	// 原样复制到同一天同一时段，必须被撞课拦下。
+	copied := lessonUpdateRequest(created)
+	if _, err := store.CreateScheduleClass("运营教务", ops, copied); err == nil {
+		t.Fatal("复制到已占用的时段必须被拦下，不能因为源课合法就放行")
+	}
+
+	// 复制出来的是全新的单次课，不继承系列身份。
+	copied.StartDate = "2026-06-10"
+	fresh, err := store.CreateScheduleClass("运营教务", ops, copied)
+	if err != nil {
+		t.Fatalf("换到空闲时段应能复制成功: %v", err)
+	}
+	if fresh.SeriesID != "" {
+		t.Fatalf("复制出的课应是独立单次课，不该带系列身份，实际 %q", fresh.SeriesID)
+	}
+}
+
+// 老师复制出来的课同样要走审核，否则复制就成了绕过审核的后门。
+func TestTeacherCopiedLessonStillNeedsReview(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+	copied := lessonUpdateRequest(created)
+	copied.StartDate = "2026-06-10"
+	fresh, err := store.CreateScheduleClass("英语老师", teacher, copied)
+	if err != nil {
+		t.Fatalf("expected copy to succeed: %v", err)
+	}
+	if fresh.AuditStatus != learning.AuditPending {
+		t.Fatalf("老师复制出的课仍须待审核，实际 %q", fresh.AuditStatus)
+	}
+}
