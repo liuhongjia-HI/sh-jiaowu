@@ -39,6 +39,14 @@ type AvailabilityFormValues = {
   slots: AvailabilitySlot[];
 };
 
+type ScheduleRepeatValues = {
+  freq: 'daily' | 'weekly';
+  interval: number;
+  byDay?: number[];
+  until?: string;
+  count?: number;
+};
+
 type ScheduleClassFormValues = {
   courseId: string;
   teacherId: string;
@@ -46,14 +54,18 @@ type ScheduleClassFormValues = {
   roomName: string;
   classType: string;
   durationMinutes: number;
-  dayOfWeek: number;
   startTime: string;
   endTime: string;
+  /** 这节课的日期；重复排课时是第一节的日期。 */
   startDate: string;
-  endDate: string;
   studentIds: string[];
   expectedStudentCount: number;
   reservationNote?: string;
+  repeat?: ScheduleRepeatValues;
+  /** 改重复课次时必填，取值见 EDIT_SCOPE_*。 */
+  editScope?: string;
+  /** 用户已确认过越出可上课时间的提醒。 */
+  ignoreWarnings?: boolean;
 };
 
 type ScheduleFilters = {
@@ -67,13 +79,12 @@ type ScheduleFilters = {
   status?: string;
 };
 
-type ScheduleMoveTarget = {
-  dayOfWeek: number;
+export type ScheduleMoveTarget = {
+  /** 拖到哪一天。课次模型下这是唯一决定日期的字段，星期由它推导。 */
+  lessonDate: string;
   label: string;
   startTime?: string;
   endTime?: string;
-  startDate?: string;
-  endDate?: string;
 };
 
 type CourseLookup = Record<string, Course>;
@@ -190,7 +201,7 @@ export function ScheduleWeekTimeline({
   onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
-  onCreateClass: (dayOfWeek: number) => void;
+  onCreateClass: (lessonDate: string) => void;
 }) {
   const timelineItems = useMemo(() => buildTimelineItems(weekDays, availabilityByDay, candidatesByDay, classesByDay, courseById, teacherById, studentById), [weekDays, availabilityByDay, candidatesByDay, classesByDay, courseById, teacherById, studentById]);
   const hasAnyItem = timelineItems.length > 0;
@@ -308,19 +319,19 @@ export function ScheduleWeekTimeline({
                   const startTime = formatMinute(startMinute);
                   const endTime = formatMinute(startMinute + record.durationMinutes);
                   onMoveClass(record, {
-                    dayOfWeek: day.dayOfWeek,
+                    lessonDate: day.key,
                     startTime,
                     endTime,
                     label: `${day.label} ${startTime}-${endTime}`
                   });
                 }}
                 onDoubleClick={(event) => {
-                  if (event.currentTarget === event.target && canManage) onCreateClass(day.dayOfWeek);
+                  if (event.currentTarget === event.target && canManage) onCreateClass(day.key);
                 }}
               >
                 {rows.map((row) => <span className="schedule-time-line" key={row.minute} style={{ top: row.top }} />)}
                 {dayItems.length === 0 && (
-                  <button type="button" className="schedule-day-empty-slot" onClick={() => canManage ? onCreateClass(day.dayOfWeek) : undefined}>
+                  <button type="button" className="schedule-day-empty-slot" onClick={() => canManage ? onCreateClass(day.key) : undefined}>
                     {canManage ? '新建课程' : '暂无安排'}
                   </button>
                 )}
@@ -397,7 +408,7 @@ export function ScheduleDayResourceTimeline({
   onPickCandidate: (record: ScheduleCandidate) => void;
   onEditClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
-  onCreateClass: (dayOfWeek: number) => void;
+  onCreateClass: (lessonDate: string) => void;
 }) {
   const dayOfWeek = selectedDate.getDay() === 0 ? 7 : selectedDate.getDay();
   const lanes = useMemo(
@@ -502,7 +513,7 @@ export function ScheduleDayResourceTimeline({
           <Button icon={<RightOutlined />} onClick={onNextDay} />
           {/* 这一天一节课都没有时泳道整个不渲染，双击空白的入口也就没了，
               新建必须有一个不依赖泳道的常驻入口。 */}
-          {canManage && <Button icon={<PlusOutlined />} onClick={() => onCreateClass(dayOfWeek)}>新建课程</Button>}
+          {canManage && <Button icon={<PlusOutlined />} onClick={() => onCreateClass(localDateText(selectedDate))}>新建课程</Button>}
         </Space>
         <div>
           <Typography.Title level={4}>{formatDayTitle(selectedDate)}</Typography.Title>
@@ -583,14 +594,14 @@ export function ScheduleDayResourceTimeline({
                 const startTime = formatMinute(startMinute);
                 const endTime = formatMinute(startMinute + record.durationMinutes);
                 onMoveClass(record, {
-                  dayOfWeek,
+                  lessonDate: localDateText(selectedDate),
                   startTime,
                   endTime,
                   label: `${weekLabel(dayOfWeek)} ${startTime}-${endTime}`
                 });
               }}
               onDoubleClick={(event) => {
-                if (event.currentTarget === event.target && canManage) onCreateClass(dayOfWeek);
+                if (event.currentTarget === event.target && canManage) onCreateClass(localDateText(selectedDate));
               }}
             >
               {rows.map((row) => <span className="schedule-time-line" key={row.minute} style={{ top: row.top }} />)}
@@ -860,6 +871,7 @@ export function TimelineBlock({
 }
 
 export function MonthScheduleBoard({
+  month,
   classes,
   courseById,
   teacherById,
@@ -867,6 +879,7 @@ export function MonthScheduleBoard({
   onEditClass,
   onMoveClass
 }: {
+  month: Date;
   classes: ScheduleClass[];
   courseById: CourseLookup;
   teacherById: Record<string, Teacher>;
@@ -874,7 +887,8 @@ export function MonthScheduleBoard({
   onEditClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
 }) {
-  const days = useMemo(() => buildMonthDays(new Date()), []);
+  // 之前这里写死 new Date() 且依赖数组为空，月视图翻页翻不动，永远停在当前月。
+  const days = useMemo(() => buildMonthDays(month), [month]);
   if (classes.length === 0) return <Empty description="还没有可展示的课程。" />;
   return (
     <div className="month-board">
@@ -889,10 +903,8 @@ export function MonthScheduleBoard({
               const classID = event.dataTransfer.getData('text/schedule-class-id');
               const record = classes.find((item) => item.id === classID);
               if (record) onMoveClass(record, {
-                dayOfWeek: day.dayOfWeek,
-                label: day.label,
-                startDate: day.key,
-                endDate: day.key
+                lessonDate: day.key,
+                label: day.label
               });
             }}
           >
@@ -1565,7 +1577,10 @@ export function groupScheduleItems<T extends { dayOfWeek: number; startTime: str
   }, {});
 }
 
-export function scheduleClassPayload(record: ScheduleClass, target: ScheduleMoveTarget = { dayOfWeek: record.dayOfWeek, label: weekLabel(record.dayOfWeek) }): ScheduleClassFormValues {
+export function scheduleClassPayload(
+  record: ScheduleClass,
+  target: ScheduleMoveTarget = { lessonDate: record.lessonDate, label: record.lessonDate }
+): ScheduleClassFormValues {
   return {
     courseId: record.courseId,
     teacherId: record.teacherId,
@@ -1573,11 +1588,9 @@ export function scheduleClassPayload(record: ScheduleClass, target: ScheduleMove
     roomName: record.roomName,
     classType: record.classType,
     durationMinutes: record.durationMinutes,
-    dayOfWeek: target.dayOfWeek,
     startTime: target.startTime ?? record.startTime,
     endTime: target.endTime ?? record.endTime,
-    startDate: target.startDate ?? record.startDate,
-    endDate: target.endDate ?? record.endDate,
+    startDate: target.lessonDate,
     studentIds: record.students.map((student) => student.id),
     expectedStudentCount: record.expectedStudentCount,
     reservationNote: record.reservationNote

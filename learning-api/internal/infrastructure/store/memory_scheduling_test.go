@@ -1,8 +1,10 @@
 package store
 
 import (
+	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"starline/learning-api/internal/domain/learning"
 )
@@ -19,11 +21,9 @@ func TestScheduleClassCanReserveTimeWithoutRegisteredStudents(t *testing.T) {
 		CampusID:             "campus-main",
 		ClassType:            "1V2",
 		DurationMinutes:      90,
-		DayOfWeek:            3,
 		StartTime:            "19:00",
 		EndTime:              "20:30",
-		StartDate:            "2026-06-01",
-		EndDate:              "2026-08-31",
+		StartDate:            "2026-06-03",
 		ExpectedStudentCount: 2,
 		ReservationNote:      "待家长确认学生名单",
 	}
@@ -68,11 +68,9 @@ func TestScheduleClassKeepsRoomMetadataWithoutBlocking(t *testing.T) {
 		RoomName:        "A101",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
-		DayOfWeek:       3,
 		StartTime:       "19:00",
 		EndTime:         "20:30",
-		StartDate:       "2026-06-01",
-		EndDate:         "2026-08-31",
+		StartDate:       "2026-06-03",
 		StudentIDs:      []string{"stu-001"},
 	}
 	created, err := store.CreateScheduleClass("运营教务", ops, req)
@@ -113,11 +111,9 @@ func TestScheduleClassResolvesTermFromAcademicCalendar(t *testing.T) {
 		CampusID:        "campus-main",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
-		DayOfWeek:       3,
 		StartTime:       "19:00",
 		EndTime:         "20:30",
 		StartDate:       "2026-06-10",
-		EndDate:         "2026-07-10",
 	}
 	created, err := store.CreateScheduleClass("运营教务", ops, req)
 	if err != nil {
@@ -145,8 +141,7 @@ func TestScheduleClassResolvesTermFromAcademicCalendar(t *testing.T) {
 	// 学期标签 + 开课日期本身的 7 月 1 日规则，而不是阻塞建班。
 	req2 := req
 	req2.RoomName = ""
-	req2.StartDate = "2026-07-20"
-	req2.EndDate = "2026-08-20"
+	req2.StartDate = "2026-07-22"
 	holiday, err := store.CreateScheduleClass("运营教务", ops, req2)
 	if err != nil {
 		t.Fatalf("expected holiday schedule to succeed: %v", err)
@@ -180,11 +175,9 @@ func TestScheduleClassRejectsStudentConflict(t *testing.T) {
 		RoomName:        "A101",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
-		DayOfWeek:       3,
 		StartTime:       "19:00",
 		EndTime:         "20:30",
-		StartDate:       "2026-06-01",
-		EndDate:         "2026-08-31",
+		StartDate:       "2026-06-03",
 		StudentIDs:      []string{"stu-001"},
 	}
 	if _, err := store.CreateScheduleClass("运营教务", ops, req); err != nil {
@@ -212,14 +205,12 @@ func TestScheduleClassRejectsTeacherUnavailableTime(t *testing.T) {
 		RoomName:        "A101",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
-		DayOfWeek:       4,
 		StartTime:       "19:00",
 		EndTime:         "20:30",
-		StartDate:       "2026-06-01",
-		EndDate:         "2026-08-31",
+		StartDate:       "2026-06-04",
 		StudentIDs:      []string{"stu-001"},
 	}
-	if _, err := store.CreateScheduleClass("运营教务", ops, req); err == nil || !strings.Contains(err.Error(), "老师该时间不可授课") {
+	if _, err := store.CreateScheduleClass("运营教务", ops, req); err == nil || !strings.Contains(err.Error(), "超出 英语老师 的可上课时间") {
 		t.Fatalf("expected teacher unavailable time to be rejected, got %v", err)
 	}
 }
@@ -252,11 +243,9 @@ func TestScheduleClassConflictHonorsDateRanges(t *testing.T) {
 		RoomName:        "A101",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
-		DayOfWeek:       3,
 		StartTime:       "19:00",
 		EndTime:         "20:30",
-		StartDate:       "2026-06-01",
-		EndDate:         "2026-08-31",
+		StartDate:       "2026-06-03",
 		StudentIDs:      []string{"stu-001"},
 	}
 	if _, err := store.CreateScheduleClass("运营教务", ops, req); err != nil {
@@ -264,15 +253,13 @@ func TestScheduleClassConflictHonorsDateRanges(t *testing.T) {
 	}
 
 	fallReq := req
-	fallReq.StartDate = "2026-09-01"
-	fallReq.EndDate = "2026-12-31"
+	fallReq.StartDate = "2026-09-02"
 	if _, err := store.CreateScheduleClass("运营教务", ops, fallReq); err != nil {
 		t.Fatalf("expected same time outside date range to be allowed: %v", err)
 	}
 
 	overlapReq := req
-	overlapReq.StartDate = "2026-08-01"
-	overlapReq.EndDate = "2026-09-30"
+	overlapReq.StartDate = "2026-06-03"
 	if _, err := store.CreateScheduleClass("运营教务", ops, overlapReq); err == nil || !strings.Contains(err.Error(), "老师该时间已有课程") {
 		t.Fatalf("expected overlapping teacher conflict, got %v", err)
 	}
@@ -311,11 +298,9 @@ func TestScheduleClassAutoOfficialAccountNotices(t *testing.T) {
 		RoomName:        "A101",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
-		DayOfWeek:       3,
 		StartTime:       "19:00",
 		EndTime:         "20:30",
-		StartDate:       "2026-06-01",
-		EndDate:         "2026-08-31",
+		StartDate:       "2026-06-03",
 		StudentIDs:      []string{"stu-001"},
 	}
 	created, err := store.CreateScheduleClass("运营教务", ops, req)
@@ -324,7 +309,7 @@ func TestScheduleClassAutoOfficialAccountNotices(t *testing.T) {
 	}
 	assertScheduleNotice(t, findScheduleOfficialNotice(t, store.notices, created.ID, "课程已安排"), created.ID, "课程已安排", "周三")
 
-	req.DayOfWeek = 6
+	req.StartDate = "2026-06-06"
 	req.StartTime = "09:00"
 	req.EndTime = "10:30"
 	updated, err := store.UpdateScheduleClass("运营教务", ops, created.ID, req)
@@ -593,5 +578,296 @@ func TestDeleteMaterialRemovesItFromAdminAndStudentAndCleansFavorites(t *testing
 
 	if err := store.DeleteMaterial("英语老师", teacher, created.ID); err == nil {
 		t.Fatal("expected deleting an already-deleted material to fail")
+	}
+}
+
+// 重复排课应展开成一节一条的课次，而不是压成一条记录。
+func TestCreateRepeatingScheduleExpandsIntoLessons(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	req := learning.ScheduleClassCreateRequest{
+		CourseID:        "course-g05-english-s1-q1",
+		TeacherID:       "user-teacher",
+		CampusID:        "campus-main",
+		ClassType:       "1V1",
+		DurationMinutes: 90,
+		StartTime:       "19:00",
+		EndTime:         "20:30",
+		StartDate:       "2026-06-03",
+		StudentIDs:      []string{"stu-001"},
+		Repeat:          &learning.ScheduleRepeat{Freq: "weekly", Interval: 1, Count: 4},
+	}
+	first, err := store.CreateScheduleClass("运营教务", ops, req)
+	if err != nil {
+		t.Fatalf("expected repeating schedule to succeed: %v", err)
+	}
+	if first.SeriesID == "" {
+		t.Fatal("重复排课应带上 SeriesID，否则后续无法按系列批量调整")
+	}
+	lessons := seriesLessons(store, first.SeriesID)
+	if len(lessons) != 4 {
+		t.Fatalf("每周一节共 4 节，应生成 4 条课次，实际 %d", len(lessons))
+	}
+	want := []string{"2026-06-03", "2026-06-10", "2026-06-17", "2026-06-24"}
+	for i, lesson := range lessons {
+		if lesson.LessonDate != want[i] {
+			t.Fatalf("第 %d 节应在 %s，实际 %s", i+1, want[i], lesson.LessonDate)
+		}
+		if lesson.StartDate != lesson.LessonDate || lesson.EndDate != lesson.LessonDate {
+			t.Fatalf("课次的起止日期必须等于上课日期，实际 %#v", lesson)
+		}
+	}
+}
+
+// 整批校验通过才落库：任何一节排不下，整批都不能留在课表里。
+func TestCreateRepeatingScheduleIsAllOrNothing(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	base := learning.ScheduleClassCreateRequest{
+		CourseID:        "course-g05-english-s1-q1",
+		TeacherID:       "user-teacher",
+		CampusID:        "campus-main",
+		ClassType:       "1V1",
+		DurationMinutes: 90,
+		StartTime:       "19:00",
+		EndTime:         "20:30",
+		StartDate:       "2026-06-17",
+		StudentIDs:      []string{"stu-001"},
+	}
+	if _, err := store.CreateScheduleClass("运营教务", ops, base); err != nil {
+		t.Fatalf("expected single lesson to succeed: %v", err)
+	}
+	before := len(store.scheduleClasses)
+
+	// 6/17 已经有课，这一批的第三节必然撞上。
+	repeating := base
+	repeating.StartDate = "2026-06-03"
+	repeating.Repeat = &learning.ScheduleRepeat{Freq: "weekly", Interval: 1, Count: 4}
+	if _, err := store.CreateScheduleClass("运营教务", ops, repeating); err == nil {
+		t.Fatal("批次内有一节撞课时必须整批拒绝")
+	}
+	if len(store.scheduleClasses) != before {
+		t.Fatalf("整批拒绝后不应残留半截课表，课次数从 %d 变成 %d", before, len(store.scheduleClasses))
+	}
+}
+
+// 这是重构要修掉的现网问题：拖动重复课程里的某一节，
+// 不能把整个系列一起挪走。
+func TestUpdateScopeThisOnlyMovesOneLesson(t *testing.T) {
+	store, ops, seriesID := seedWeeklySeries(t)
+	lessons := seriesLessons(store, seriesID)
+	target := lessons[1] // 2026-06-10
+
+	req := lessonUpdateRequest(target)
+	req.StartDate = seriesDatePlusDays(1, 1)
+	req.EditScope = learning.EditScopeThis
+	req.IgnoreWarnings = true
+	moved, err := store.UpdateScheduleClass("运营教务", ops, target.ID, req)
+	if err != nil {
+		t.Fatalf("expected single lesson move to succeed: %v", err)
+	}
+	if moved.LessonDate != seriesDatePlusDays(1, 1) {
+		t.Fatalf("这一节应挪到 %s，实际 %s", seriesDatePlusDays(1, 1), moved.LessonDate)
+	}
+	if !moved.Detached {
+		t.Fatal("单独改过的课次应标记为已脱离系列")
+	}
+	after := seriesLessons(store, seriesID)
+	want := []string{seriesDate(0), seriesDatePlusDays(1, 1), seriesDate(2), seriesDate(3)}
+	for i, lesson := range after {
+		if lesson.LessonDate != want[i] {
+			t.Fatalf("只应挪动一节，第 %d 节却变成了 %s（期望 %s）", i+1, lesson.LessonDate, want[i])
+		}
+	}
+}
+
+// 「此课次及后续」按整体平移处理，且不碰这节之前的课次。
+func TestUpdateScopeThisAndFutureShiftsRemainingLessons(t *testing.T) {
+	store, ops, seriesID := seedWeeklySeries(t)
+	lessons := seriesLessons(store, seriesID)
+	target := lessons[1] // 2026-06-10
+
+	req := lessonUpdateRequest(target)
+	req.StartDate = seriesDatePlusDays(1, 1)
+	req.EditScope = learning.EditScopeThisAndFuture
+	req.IgnoreWarnings = true
+	if _, err := store.UpdateScheduleClass("运营教务", ops, target.ID, req); err != nil {
+		t.Fatalf("expected series shift to succeed: %v", err)
+	}
+	after := seriesLessons(store, seriesID)
+	// 后三节整体 +1 天，第一节不动。
+	want := []string{seriesDate(0), seriesDatePlusDays(1, 1), seriesDatePlusDays(2, 1), seriesDatePlusDays(3, 1)}
+	for i, lesson := range after {
+		if lesson.LessonDate != want[i] {
+			t.Fatalf("第 %d 节应为 %s，实际 %s", i+1, want[i], lesson.LessonDate)
+		}
+	}
+}
+
+// 已经单独调整过的课次不再跟随系列的批量改动。
+func TestSeriesUpdateSkipsDetachedLesson(t *testing.T) {
+	store, ops, seriesID := seedWeeklySeries(t)
+	lessons := seriesLessons(store, seriesID)
+
+	detachReq := lessonUpdateRequest(lessons[2])
+	detachReq.StartDate = seriesDatePlusDays(2, 2)
+	detachReq.EditScope = learning.EditScopeThis
+	detachReq.IgnoreWarnings = true
+	if _, err := store.UpdateScheduleClass("运营教务", ops, lessons[2].ID, detachReq); err != nil {
+		t.Fatalf("expected detach to succeed: %v", err)
+	}
+
+	shiftReq := lessonUpdateRequest(lessons[0])
+	shiftReq.StartDate = seriesDatePlusDays(0, 1)
+	shiftReq.EditScope = learning.EditScopeAll
+	shiftReq.IgnoreWarnings = true
+	if _, err := store.UpdateScheduleClass("运营教务", ops, lessons[0].ID, shiftReq); err != nil {
+		t.Fatalf("expected series shift to succeed: %v", err)
+	}
+
+	after := seriesLessons(store, seriesID)
+	// 未脱离的三节整体 +1 天；已脱离的那节停在自己被挪到的位置上。
+	want := []string{seriesDatePlusDays(0, 1), seriesDatePlusDays(1, 1), seriesDatePlusDays(2, 2), seriesDatePlusDays(3, 1)}
+	for i, lesson := range after {
+		if lesson.LessonDate != want[i] {
+			t.Fatalf("第 %d 节应为 %s，实际 %s（已脱离的那节不应跟着平移）", i+1, want[i], lesson.LessonDate)
+		}
+	}
+}
+
+// 重复课次必须显式指定修改范围。不给就报错，而不是替用户挑一个——
+// 「拖一节课挪走整学期」正是因为以前没有这个必答项。
+func TestUpdateRepeatingLessonRequiresExplicitScope(t *testing.T) {
+	store, ops, seriesID := seedWeeklySeries(t)
+	lessons := seriesLessons(store, seriesID)
+
+	req := lessonUpdateRequest(lessons[1])
+	req.StartDate = seriesDatePlusDays(1, 1)
+	req.IgnoreWarnings = true
+	_, err := store.UpdateScheduleClass("运营教务", ops, lessons[1].ID, req)
+	if err == nil || !strings.Contains(err.Error(), "请选择修改范围") {
+		t.Fatalf("重复课次未指定修改范围时必须拒绝，实际 %v", err)
+	}
+}
+
+// 单次课没有系列，不该逼用户选范围。
+func TestUpdateSingleLessonNeedsNoScope(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("运营教务", ops, learning.ScheduleClassCreateRequest{
+		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
+		ClassType: "1V1", DurationMinutes: 90, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-03", StudentIDs: []string{"stu-001"},
+	})
+	if err != nil {
+		t.Fatalf("expected single lesson to succeed: %v", err)
+	}
+	req := lessonUpdateRequest(created)
+	req.StartDate = "2026-06-10"
+	if _, err := store.UpdateScheduleClass("运营教务", ops, created.ID, req); err != nil {
+		t.Fatalf("单次课不该要求修改范围: %v", err)
+	}
+}
+
+// 可上课时间是软提醒：默认仍然拦，确认后放行并留痕。
+func TestAvailabilityIsSoftWarningWithOverrideTrail(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	// 2026-06-04 是周四，种子里没有任何人填报过周四的可上课时间。
+	req := learning.ScheduleClassCreateRequest{
+		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
+		ClassType: "1V1", DurationMinutes: 90, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-04", StudentIDs: []string{"stu-001"},
+	}
+	if _, err := store.CreateScheduleClass("运营教务", ops, req); err == nil {
+		t.Fatal("未确认时越出可上课时间仍应拦下")
+	}
+
+	req.IgnoreWarnings = true
+	created, err := store.CreateScheduleClass("运营教务", ops, req)
+	if err != nil {
+		t.Fatalf("确认后应放行（管理员可能已线下约好时间）: %v", err)
+	}
+	if created.OverrideNote == "" || !strings.Contains(created.OverrideNote, "可上课时间") {
+		t.Fatalf("越界必须留痕，实际 OverrideNote=%q", created.OverrideNote)
+	}
+}
+
+// 「整个系列」和「此课次及后续」都只动未来的课次，边界是当天。
+// 所以用例里的日期必须相对今天算，不能写死——写死的未来日期迟早会变成过去，
+// 用例会在某天毫无征兆地开始失败。
+func seriesBaseDate() time.Time {
+	return time.Now().AddDate(0, 0, 30)
+}
+
+func seriesDate(weekOffset int) string {
+	return seriesBaseDate().AddDate(0, 0, 7*weekOffset).Format("2006-01-02")
+}
+
+func seriesDatePlusDays(weekOffset, days int) string {
+	return seriesBaseDate().AddDate(0, 0, 7*weekOffset+days).Format("2006-01-02")
+}
+
+func seedWeeklySeries(t *testing.T) (*MemoryStore, learning.Principal, string) {
+	t.Helper()
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	// IgnoreWarnings：这些日期落在种子可上课时间窗口之外，
+	// 这里要验的是系列调整语义，不是可上课时间匹配。
+	first, err := store.CreateScheduleClass("运营教务", ops, learning.ScheduleClassCreateRequest{
+		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
+		ClassType: "1V1", DurationMinutes: 90, StartTime: "19:00", EndTime: "20:30",
+		StartDate: seriesDate(0), StudentIDs: []string{"stu-001"}, IgnoreWarnings: true,
+		Repeat: &learning.ScheduleRepeat{Freq: "weekly", Interval: 1, Count: 4},
+	})
+	if err != nil {
+		t.Fatalf("expected weekly series to succeed: %v", err)
+	}
+	return store, ops, first.SeriesID
+}
+
+// seriesLessons 按上课日期升序返回一个系列的全部课次。
+func seriesLessons(store *MemoryStore, seriesID string) []learning.ScheduleClass {
+	out := make([]learning.ScheduleClass, 0, 8)
+	for _, item := range store.scheduleClasses {
+		if item.SeriesID == seriesID {
+			out = append(out, item)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].LessonDate < out[j].LessonDate })
+	return out
+}
+
+func lessonUpdateRequest(lesson learning.ScheduleClass) learning.ScheduleClassCreateRequest {
+	studentIDs := make([]string, 0, len(lesson.Students))
+	for _, student := range lesson.Students {
+		studentIDs = append(studentIDs, student.ID)
+	}
+	return learning.ScheduleClassCreateRequest{
+		CourseID:        lesson.CourseID,
+		TeacherID:       lesson.TeacherID,
+		CampusID:        lesson.CampusID,
+		RoomName:        lesson.RoomName,
+		ClassType:       lesson.ClassType,
+		DurationMinutes: lesson.DurationMinutes,
+		StartTime:       lesson.StartTime,
+		EndTime:         lesson.EndTime,
+		StartDate:       lesson.LessonDate,
+		StudentIDs:      studentIDs,
 	}
 }

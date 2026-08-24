@@ -791,11 +791,9 @@ func TestSchedulingCandidateAndCreateClassThroughAPI(t *testing.T) {
 		TeacherID:       "user-teacher",
 		ClassType:       "1V1",
 		DurationMinutes: 90,
-		DayOfWeek:       3,
 		StartTime:       "19:00",
 		EndTime:         "20:30",
-		StartDate:       "2026-06-01",
-		EndDate:         "2026-08-31",
+		StartDate:       "2026-06-03",
 		StudentIDs:      []string{"stu-001"},
 	}, http.StatusOK, &class)
 	if class.ID == "" || len(class.Students) != 1 {

@@ -717,11 +717,20 @@ export type ScheduleClass = {
   classType: string;
   capacity: number;
   durationMinutes: number;
+  /** 星期由 lessonDate 推导，后端只读不写，前端不要拿它当排课依据。 */
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  /** 这节课的具体日期。一条记录 = 一节课，startDate/endDate 恒等于它。 */
+  lessonDate: string;
   startDate: string;
   endDate: string;
+  /** 同一次重复排课生成的课次共享它；为空表示单次课。 */
+  seriesId?: string;
+  /** 已被单独调整过，此后不再跟随系列的批量改动。 */
+  detached?: boolean;
+  /** 排这节课时越过了哪些可上课时间（软提醒），留痕用。 */
+  overrideNote?: string;
   /** 建班时按开课日期落校历判定一次，此后固定不变，不随校历调整或学年切换漂移。 */
   academicYear?: string;
   semester?: string;

@@ -893,8 +893,8 @@ func TestSchedulingRejectsDisabledTeacher(t *testing.T) {
 
 	_, err = store.CreateScheduleClass("运营教务", ops, learning.ScheduleClassCreateRequest{
 		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
-		ClassType: "1V1", DurationMinutes: 90, DayOfWeek: 3, StartTime: "19:00", EndTime: "20:30",
-		StartDate: "2026-06-01", EndDate: "2026-08-31", StudentIDs: []string{"stu-001"},
+		ClassType: "1V1", DurationMinutes: 90, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-03", StudentIDs: []string{"stu-001"},
 	})
 	if err == nil || !strings.Contains(err.Error(), "教师账号已停用") {
 		t.Fatalf("expected disabled teacher class creation to be rejected, got %v", err)
@@ -907,8 +907,8 @@ func TestSchedulingRejectsDisabledTeacher(t *testing.T) {
 	}
 	existing, err := store.CreateScheduleClass("运营教务", ops, learning.ScheduleClassCreateRequest{
 		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
-		ClassType: "1V1", DurationMinutes: 90, DayOfWeek: 3, StartTime: "19:00", EndTime: "20:30",
-		StartDate: "2026-06-01", EndDate: "2026-08-31", StudentIDs: []string{"stu-001"},
+		ClassType: "1V1", DurationMinutes: 90, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-03", StudentIDs: []string{"stu-001"},
 	})
 	if err != nil {
 		t.Fatalf("expected active teacher class creation to succeed: %v", err)
@@ -920,8 +920,8 @@ func TestSchedulingRejectsDisabledTeacher(t *testing.T) {
 	}
 	if _, err := store.UpdateScheduleClass("运营教务", ops, existing.ID, learning.ScheduleClassCreateRequest{
 		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
-		ClassType: "1V1", DurationMinutes: 90, DayOfWeek: 3, StartTime: "19:00", EndTime: "20:30",
-		StartDate: "2026-06-01", EndDate: "2026-08-31", StudentIDs: []string{"stu-001"},
+		ClassType: "1V1", DurationMinutes: 90, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-03", StudentIDs: []string{"stu-001"},
 	}); err == nil || !strings.Contains(err.Error(), "教师账号已停用") {
 		t.Fatalf("expected disabled teacher schedule update to be rejected, got %v", err)
 	}

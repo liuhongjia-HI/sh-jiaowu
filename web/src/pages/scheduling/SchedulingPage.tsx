@@ -12,6 +12,7 @@ import {
   addDays,
   addMonths,
   availabilityCovers,
+  weekdayOfDateText,
   candidateLevel,
   candidateLevelMeta,
   classCapacity,
@@ -42,6 +43,7 @@ import {
   groupScheduleItems,
   parseOwnerKey,
   scheduleClassPayload,
+  type ScheduleMoveTarget,
   scheduleClassSubject,
   scheduleResultNote,
   studentDisplayName,
@@ -68,6 +70,14 @@ type AvailabilityFormValues = {
   slots: AvailabilitySlot[];
 };
 
+type ScheduleRepeatValues = {
+  freq: 'daily' | 'weekly';
+  interval: number;
+  byDay?: number[];
+  until?: string;
+  count?: number;
+};
+
 type ScheduleClassFormValues = {
   courseId: string;
   teacherId: string;
@@ -75,14 +85,16 @@ type ScheduleClassFormValues = {
   roomName: string;
   classType: string;
   durationMinutes: number;
-  dayOfWeek: number;
   startTime: string;
   endTime: string;
+  /** 这节课的日期；重复排课时是第一节的日期。 */
   startDate: string;
-  endDate: string;
   studentIds: string[];
   expectedStudentCount: number;
   reservationNote?: string;
+  repeat?: ScheduleRepeatValues;
+  editScope?: string;
+  ignoreWarnings?: boolean;
 };
 
 type ScheduleFilters = {
@@ -94,15 +106,6 @@ type ScheduleFilters = {
   courseId?: string;
   classType?: string;
   status?: string;
-};
-
-type ScheduleMoveTarget = {
-  dayOfWeek: number;
-  label: string;
-  startTime?: string;
-  endTime?: string;
-  startDate?: string;
-  endDate?: string;
 };
 
 type CourseLookup = Record<string, Course>;
@@ -151,6 +154,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedCampusId, setSelectedCampusId] = useState(user.campusId || 'campus-main');
   const [editingClass, setEditingClass] = useState<ScheduleClass | null>(null);
+  // 拖动重复课次时挂起这次调整，等用户选完影响范围再提交。
+  const [moveScopeRequest, setMoveScopeRequest] = useState<{ record: ScheduleClass; target: ScheduleMoveTarget } | null>(null);
+  const [moveScope, setMoveScope] = useState<'this' | 'thisAndFuture' | 'all'>('this');
   const [creatingClass, setCreatingClass] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
@@ -188,10 +194,11 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const editingClassType = Form.useWatch('classType', editForm);
   const editingStudentIDs = Form.useWatch('studentIds', editForm) ?? [];
   const editingTeacherId = Form.useWatch('teacherId', editForm);
-  const editingDayOfWeek = Form.useWatch('dayOfWeek', editForm);
   const editingStartTime = Form.useWatch('startTime', editForm);
   const editingEndTime = Form.useWatch('endTime', editForm);
   const editingStartDate = Form.useWatch('startDate', editForm);
+  // 星期不再是独立表单项：课次的日期决定星期，从日期推出来即可。
+  const editingDayOfWeek = useMemo(() => weekdayOfDateText(editingStartDate), [editingStartDate]);
   const owner = parseOwnerKey(ownerKey);
   const availability = useQuery({
     queryKey: ['availability', owner?.ownerType, owner?.ownerId],
@@ -292,8 +299,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   });
 
   const moveClass = useMutation({
-    mutationFn: ({ record, target }: { record: ScheduleClass; target: ScheduleMoveTarget }) =>
-      putData<ScheduleClass>(`/schedule-classes/${record.id}`, scheduleClassPayload(record, target)),
+    mutationFn: ({ record, target, editScope }: { record: ScheduleClass; target: ScheduleMoveTarget; editScope?: string }) =>
+      putData<ScheduleClass>(`/schedule-classes/${record.id}`, { ...scheduleClassPayload(record, target), editScope }),
     onSuccess: () => {
       message.success('调课已保存');
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
@@ -437,17 +444,18 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       roomName: record.roomName,
       classType: record.classType,
       durationMinutes: record.durationMinutes,
-      dayOfWeek: record.dayOfWeek,
       startTime: record.startTime,
       endTime: record.endTime,
-      startDate: record.startDate,
+      startDate: record.lessonDate,
       studentIds: record.students.map((student) => student.id),
       expectedStudentCount: record.expectedStudentCount,
       reservationNote: record.reservationNote
     });
   }
 
-  function openCreateClassForDay(dayOfWeek: number) {
+  // 视图里点空白格新建：格子对应的是具体某一天，直接用那天的日期开表单。
+  // 星期不再由用户单独选，避免出现「星期三」和「6月4日」互相打架的状态。
+  function openCreateClassForDay(lessonDate: string) {
     if (!canCreateClass) return;
     setEditingClass(null);
     setCreatingClass(true);
@@ -458,10 +466,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       roomName: '',
       classType: '1V1',
       durationMinutes: 90,
-      dayOfWeek,
       startTime: '19:00',
       endTime: '20:30',
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: lessonDate,
       studentIds: [],
       expectedStudentCount: 1,
       reservationNote: ''
@@ -477,17 +484,26 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   }
 
   function confirmMoveClass(record: ScheduleClass, target: ScheduleMoveTarget) {
-    const isSameTarget = record.dayOfWeek === target.dayOfWeek &&
-      (!target.startTime || (record.startTime === target.startTime && record.endTime === target.endTime)) &&
-      (!target.startDate || (record.startDate === target.startDate && record.endDate === (target.endDate || target.startDate)));
+    const isSameTarget = record.lessonDate === target.lessonDate &&
+      (!target.startTime || (record.startTime === target.startTime && record.endTime === target.endTime));
     if (!canCreateClass || record.status === '已取消' || isSameTarget) return;
-    Modal.confirm({
-      title: '确认调课',
-      content: `将「${record.name}」调整到${target.label}。`,
-      okText: '确认调整',
-      cancelText: '取消',
-      onOk: () => moveClass.mutate({ record, target })
-    });
+
+    // 单次课，以及已经单独调整过、不再跟随系列的课次，都只影响它自己，不必问范围。
+    const isRepeating = Boolean(record.seriesId) && !record.detached;
+    if (!isRepeating) {
+      Modal.confirm({
+        title: '确认调课',
+        content: `将「${record.name}」调整到${target.label}。`,
+        okText: '确认调整',
+        cancelText: '取消',
+        onOk: () => moveClass.mutate({ record, target, editScope: 'this' })
+      });
+      return;
+    }
+
+    // 重复课程必须先问清改哪些课次。以前没有这一步，拖一节课会把整学期一起挪走。
+    // 「此课次及后续」和「整个系列」按整体平移处理，已上过的课次不动。
+    setMoveScopeRequest({ record, target });
   }
 
   if (teachers.isLoading || students.isLoading || courses.isLoading || classes.isLoading || availabilityOverview.isLoading) return <Skeleton active />;
@@ -809,6 +825,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                 />
               ) : viewMode === 'month' ? (
                 <MonthScheduleBoard
+                  month={calendarMonth}
                   classes={subjectVisibleClasses}
                   courseById={courseById}
                   teacherById={teacherById}
@@ -945,11 +962,12 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             type="warning"
             showIcon
             style={{ marginBottom: 16 }}
-            message="该时段没有可上课时间，直接提交会被拒绝"
+            message="该时段超出已登记的可上课时间"
             description={(
               <Space direction="vertical" size={4} style={{ width: '100%' }}>
                 <Typography.Text type="secondary">
-                  下列老师/学生在 {weekLabel(editingDayOfWeek)} {editingStartTime}-{editingEndTime} 没有登记可上课时间，先补一条再建课。
+                  下列老师/学生在 {weekLabel(editingDayOfWeek)} {editingStartTime}-{editingEndTime} 没有登记可上课时间。
+                  可上课时间只是参考范围——如果已经线下约好，勾选下方确认后可以照排，系统会记录这次越界。
                 </Typography.Text>
                 {availabilityGaps.map((gap) => (
                   <Space key={`${gap.ownerType}-${gap.ownerId}`} size={8}>
@@ -962,13 +980,16 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           />
         )}
         <Form form={editForm} layout="vertical" onFinish={(values) => {
-          // 课外辅导不跨天：这里只让家长/老师选一个上课日期，结束日期在提交时直接等于开始日期，不再单独收集。
-          const payload = { ...values, endDate: values.startDate };
+          // 一条记录就是一节课，日期只收 startDate；重复排课由 repeat 展开成多节。
+          // ignoreWarnings：越出可上课时间只是软提醒，用户看到上面的提示后仍可继续，
+          // 后端会把这次越界记进 overrideNote。
+          const payload = { ...values, ignoreWarnings: availabilityGaps.length > 0 };
           if (creatingClass) {
             createManualClass.mutate(payload);
             return;
           }
-          updateClass.mutate(payload);
+          // 改重复课次时要带上影响范围；这里是抽屉里的逐项修改，只作用于这一节。
+          updateClass.mutate({ ...payload, editScope: 'this' });
         }}>
           <Form.Item name="courseId" label="课程" rules={[{ required: true, message: '请选择课程' }]}>
             <Select showSearch optionFilterProp="label" options={courseOptions} />
@@ -986,9 +1007,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             <Form.Item name="durationMinutes" rules={[{ required: true, message: '请输入课长' }]} style={{ width: '34%' }}>
               <InputNumber min={30} step={30} addonAfter="分钟" style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="dayOfWeek" rules={[{ required: true, message: '请选择星期' }]} style={{ width: '34%' }}>
-              <Select options={weekOptions} />
-            </Form.Item>
           </Space.Compact>
           <Space.Compact block>
             <Form.Item name="startTime" rules={[{ required: true, message: '请输入开始时间' }]} style={{ width: '50%' }}>
@@ -998,8 +1016,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Input placeholder="20:30" />
             </Form.Item>
           </Space.Compact>
-          <Form.Item name="startDate">
-            <Input placeholder="上课日期" />
+          <Form.Item name="startDate" label="上课日期" rules={[{ required: true, message: '请选择上课日期' }]}>
+            <Input placeholder="2026-06-03" />
           </Form.Item>
           <Form.Item
             name="studentIds"
@@ -1024,6 +1042,46 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           <Typography.Text type="secondary">可先不绑定学生来锁定时间段，课程将标记为“待确认”；补足最低人数后自动转为“已确认”。</Typography.Text>
         </Form>
       </Drawer>
+
+      {/* 拖动重复课次时先问清影响范围。以前没有这一步，
+          拖一节课会把整个学期的课一起挪走，而且没有任何提示。 */}
+      <Modal
+        title="调整重复课程"
+        open={Boolean(moveScopeRequest)}
+        okText="确认调整"
+        cancelText="取消"
+        confirmLoading={moveClass.isPending}
+        onCancel={() => setMoveScopeRequest(null)}
+        onOk={() => {
+          if (!moveScopeRequest) return;
+          moveClass.mutate(
+            { record: moveScopeRequest.record, target: moveScopeRequest.target, editScope: moveScope },
+            { onSettled: () => setMoveScopeRequest(null) }
+          );
+        }}
+        afterClose={() => setMoveScope('this')}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Typography.Text>
+            将「{moveScopeRequest?.record.name}」调整到{moveScopeRequest?.target.label}。这是一门重复课程，请选择本次调整影响哪些课次：
+          </Typography.Text>
+          <Select
+            value={moveScope}
+            onChange={setMoveScope}
+            style={{ width: '100%' }}
+            options={[
+              { label: '仅此课次', value: 'this' },
+              { label: '此课次及后续', value: 'thisAndFuture' },
+              { label: '整个系列', value: 'all' }
+            ]}
+          />
+          <Typography.Text type="secondary">
+            {moveScope === 'this'
+              ? '只改这一节，这节课此后不再跟随系列的批量调整。'
+              : '按相同的天数整体平移，已经上过的课次不会被改动。'}
+          </Typography.Text>
+        </Space>
+      </Modal>
     </div>
   );
 }

@@ -341,7 +341,7 @@ func (s *MemoryStore) loadAvailabilitySlots() ([]learning.AvailabilitySlot, erro
 }
 
 func (s *MemoryStore) loadScheduleClasses() ([]learning.ScheduleClass, error) {
-	rows, err := s.db.Query(`SELECT id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, expected_student_count, reservation_note, academic_year, semester, status, created_at FROM schedule_classes ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name, class_type, capacity, duration_minutes, day_of_week, start_time, end_time, start_date, end_date, expected_student_count, reservation_note, academic_year, semester, status, created_at, series_id, lesson_date, detached, override_note FROM schedule_classes ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -349,13 +349,21 @@ func (s *MemoryStore) loadScheduleClasses() ([]learning.ScheduleClass, error) {
 	out := make([]learning.ScheduleClass, 0)
 	for rows.Next() {
 		var item learning.ScheduleClass
-		var startDate, endDate, createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.Name, &item.CourseID, &item.CourseName, &item.TeacherID, &item.TeacherName, &item.CampusID, &item.RoomName, &item.ClassType, &item.Capacity, &item.DurationMinutes, &item.DayOfWeek, &item.StartTime, &item.EndTime, &startDate, &endDate, &item.ExpectedStudentCount, &item.ReservationNote, &item.AcademicYear, &item.Semester, &item.Status, &createdAt); err != nil {
+		var startDate, endDate, createdAt, lessonDate sql.NullTime
+		var overrideNote sql.NullString
+		if err := rows.Scan(&item.ID, &item.Name, &item.CourseID, &item.CourseName, &item.TeacherID, &item.TeacherName, &item.CampusID, &item.RoomName, &item.ClassType, &item.Capacity, &item.DurationMinutes, &item.DayOfWeek, &item.StartTime, &item.EndTime, &startDate, &endDate, &item.ExpectedStudentCount, &item.ReservationNote, &item.AcademicYear, &item.Semester, &item.Status, &createdAt, &item.SeriesID, &lessonDate, &item.Detached, &overrideNote); err != nil {
 			return nil, err
 		}
 		item.StartDate = dateString(startDate)
 		item.EndDate = dateString(endDate)
 		item.CreatedAt = dateTimeString(createdAt)
+		item.LessonDate = dateString(lessonDate)
+		item.OverrideNote = overrideNote.String
+		if item.LessonDate == "" {
+			// 迁移前写入的老数据没有 lesson_date，退回 start_date，
+			// 保证升级后立刻可读，不依赖迁移脚本先跑完。
+			item.LessonDate = item.StartDate
+		}
 		students, err := s.loadScheduleClassStudents(item.ID)
 		if err != nil {
 			return nil, err

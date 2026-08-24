@@ -272,23 +272,79 @@ func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal lea
 			return work.createScheduleClassUnlocked(operator, principal, req)
 		})
 	}
-	item, err := s.buildScheduleClass(principal, "", req)
+	repeat, err := normalizeRepeat(req.Repeat)
 	if err != nil {
 		return learning.ScheduleClass{}, err
 	}
-	item.ID = "schedule-" + time.Now().Format("20060102150405.000000000")
-	item.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
-	s.scheduleClasses = append([]learning.ScheduleClass{cloneScheduleClass(item)}, s.scheduleClasses...)
-	if item.Status == "已确认" {
-		s.notifyScheduleClass(item, "课程已安排", "已安排")
-		s.prependLog(operator, "确认排课", item.Name+" / "+item.TeacherName)
-	} else {
-		s.prependLog(operator, "创建待确认排课", item.Name+" / "+item.TeacherName)
+	dates, err := expandRepeatDates(repeat, strings.TrimSpace(req.StartDate))
+	if err != nil {
+		return learning.ScheduleClass{}, err
 	}
-	return cloneScheduleClass(item), nil
+	stamp := time.Now().Format("20060102150405.000000000")
+	seriesID := ""
+	if repeat.Freq != "" {
+		seriesID = "series-" + stamp
+	}
+	createdAt := time.Now().Format("2006-01-02 15:04:05")
+
+	// 先把每一节都构造并校验一遍，任何一节不合法就整批拒绝。
+	// 不能边建边校验：那样会在课表里留下半截课程，用户既看不出排到哪断了，
+	// 也没法一键回退。
+	built := make([]learning.ScheduleClass, 0, len(dates))
+	for index, date := range dates {
+		item, err := s.buildScheduleClass(principal, "", date, req)
+		if err != nil {
+			return learning.ScheduleClass{}, err
+		}
+		item.SeriesID = seriesID
+		item.ID = "schedule-" + stamp + "-" + itoa(index)
+		item.CreatedAt = createdAt
+		built = append(built, item)
+	}
+
+	prepended := make([]learning.ScheduleClass, 0, len(built))
+	for _, item := range built {
+		prepended = append(prepended, cloneScheduleClass(item))
+	}
+	s.scheduleClasses = append(prepended, s.scheduleClasses...)
+
+	first := built[0]
+	// 通知按课次发，但一次重复排课只给学生发一条汇总，避免一口气排 40 节
+	// 就往家长那边推 40 条模板消息。
+	if first.Status == "已确认" {
+		s.notifyScheduleClass(first, "课程已安排", "已安排")
+		s.prependLog(operator, "确认排课", scheduleBatchLogTarget(first, len(built)))
+	} else {
+		s.prependLog(operator, "创建待确认排课", scheduleBatchLogTarget(first, len(built)))
+	}
+	return cloneScheduleClass(first), nil
 }
 
-func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID string, req learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error) {
+func scheduleBatchLogTarget(item learning.ScheduleClass, count int) string {
+	target := item.Name + " / " + item.TeacherName
+	if count > 1 {
+		target += "（共 " + itoa(count) + " 节）"
+	}
+	return target
+}
+
+// buildScheduleClass 构造「一节课」。lessonDate 是这节课的具体日期，
+// StartDate/EndDate 对课次而言恒等于它——这样既有的冲突判定与日期区间
+// helper（hasScheduleConflictExcept / dateRangesOverlap 等）不用改就继续成立。
+func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID, lessonDate string, req learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error) {
+	lessonDate = strings.TrimSpace(lessonDate)
+	if lessonDate == "" {
+		return learning.ScheduleClass{}, errors.New("请选择上课日期")
+	}
+	parsedDate, hasDate, ok := parseDateBound(lessonDate)
+	if !ok || !hasDate {
+		return learning.ScheduleClass{}, errors.New("上课日期格式应为 YYYY-MM-DD")
+	}
+	// 课次自己就是一天，星期由日期推导，不再由调用方传 DayOfWeek 决定，
+	// 从根上杜绝「拖动一节课却改掉整个学期星期」这类问题。
+	req.DayOfWeek = weekdayOf(parsedDate)
+	req.StartDate = lessonDate
+	req.EndDate = lessonDate
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.TeacherID = strings.TrimSpace(req.TeacherID)
 	req.CampusID = strings.TrimSpace(req.CampusID)
@@ -296,8 +352,6 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	req.ClassType = strings.TrimSpace(req.ClassType)
 	req.StartTime = strings.TrimSpace(req.StartTime)
 	req.EndTime = strings.TrimSpace(req.EndTime)
-	req.StartDate = strings.TrimSpace(req.StartDate)
-	req.EndDate = strings.TrimSpace(req.EndDate)
 	req.ReservationNote = strings.TrimSpace(req.ReservationNote)
 	if req.DurationMinutes <= 0 {
 		req.DurationMinutes = 90
@@ -366,27 +420,31 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	if !ok || endMin <= startMin {
 		return learning.ScheduleClass{}, errors.New("结束时间必须晚于开始时间")
 	}
-	if err := validateDateRange(req.StartDate, req.EndDate); err != nil {
-		return learning.ScheduleClass{}, err
-	}
-	if req.DayOfWeek < 1 || req.DayOfWeek > 7 {
-		return learning.ScheduleClass{}, errors.New("请选择星期")
-	}
+	// 硬拦截：物理上不可能的事。撞课、超容量、学科年级不符一律当场拒绝。
+	// 教室不在硬拦截之列——现有产品决策是教室只作为登记信息、不阻塞排课，
+	// 见 TestScheduleClassKeepsRoomMetadataWithoutBlocking。
 	if s.hasScheduleConflictExcept("teacher", teacher.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate, exceptID) {
-		return learning.ScheduleClass{}, errors.New("老师该时间已有课程")
+		return learning.ScheduleClass{}, errors.New(lessonDate + " 老师该时间已有课程")
 	}
 	for _, student := range students {
 		if s.hasScheduleConflictExcept("student", student.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate, exceptID) {
-			return learning.ScheduleClass{}, errors.New(student.Name + " 该时间已有课程")
+			return learning.ScheduleClass{}, errors.New(lessonDate + " " + student.Name + " 该时间已有课程")
 		}
 	}
+	// 软提醒：越出可上课时间。客户明确管理员可能线下已跟师生约好时间，
+	// 可上课时间是匹配与监管的参考范围，不是排课的硬约束，所以这里不再直接
+	// 拒绝，而是交由调用方确认（IgnoreWarnings），越界内容写进 OverrideNote 留痕。
+	warnings := make([]string, 0, 2)
 	if !s.teacherAvailable(teacher.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate) {
-		return learning.ScheduleClass{}, errors.New("老师该时间不可授课")
+		warnings = append(warnings, lessonDate+" 超出 "+teacher.Name+" 的可上课时间")
 	}
 	for _, student := range students {
 		if !s.studentAvailable(student.ID, req.DayOfWeek, startMin, endMin, req.StartDate, req.EndDate) {
-			return learning.ScheduleClass{}, errors.New(student.Name + " 该时间不可上课")
+			warnings = append(warnings, lessonDate+" 超出 "+student.Name+" 的可上课时间")
 		}
+	}
+	if len(warnings) > 0 && !req.IgnoreWarnings {
+		return learning.ScheduleClass{}, errors.New(strings.Join(warnings, "；") + "。确认要继续排这节课，请再次提交确认。")
 	}
 	status := "待确认"
 	if len(students) >= minClassStudents(capacity) {
@@ -400,6 +458,8 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID 
 	}
 	academicYear, semester := s.resolveScheduleTerm(req.StartDate, fallbackSemester)
 	return learning.ScheduleClass{
+		LessonDate:           lessonDate,
+		OverrideNote:         strings.Join(warnings, "；"),
 		Name:                 course.Subject + " " + req.ClassType + " 小班",
 		CourseID:             course.ID,
 		CourseName:           course.Name,
@@ -447,12 +507,27 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 		if existing.Status == "已取消" {
 			return learning.ScheduleClass{}, errors.New("已取消课程不能调课")
 		}
-		item, err := s.buildScheduleClass(principal, id, req)
+		scope, err := resolveEditScope(existing, req.EditScope)
+		if err != nil {
+			return learning.ScheduleClass{}, err
+		}
+		if scope != learning.EditScopeThis {
+			return s.updateScheduleSeriesUnlocked(operator, principal, existing, scope, req)
+		}
+		lessonDate := strings.TrimSpace(req.StartDate)
+		if lessonDate == "" {
+			lessonDate = existing.LessonDate
+		}
+		item, err := s.buildScheduleClass(principal, id, lessonDate, req)
 		if err != nil {
 			return learning.ScheduleClass{}, err
 		}
 		item.ID = existing.ID
 		item.CreatedAt = existing.CreatedAt
+		item.SeriesID = existing.SeriesID
+		// 单独改过的课次就此脱离系列，之后对系列的批量改动一律绕开它。
+		// 这是 split-series 的落点：不必再维护一张例外表和它的一致性。
+		item.Detached = existing.Detached || existing.SeriesID != ""
 		// 开课日期和课程都没变时，学年/学期沿用原判定，不因为校历后来被
 		// 改过、或者只是调了教室/人数这类无关字段而跟着漂移；
 		// 真正改了开课日期或课程才重新按 resolveScheduleTerm 落一次。
@@ -527,4 +602,107 @@ func (s *MemoryStore) notifyScheduleClass(item learning.ScheduleClass, title, ac
 		notice = s.deliverNotice(notice)
 		s.prependNoticeRecord(notice)
 	}
+}
+
+// updateScheduleSeriesUnlocked 处理「此课次及后续」和「整个系列」两种范围。
+//
+// 两条硬规则：
+//  1. 已上过的课次一律不动。历史课次背后挂着考勤和课时消耗，改它等于篡改已发生的事实。
+//     所以「整个系列」的实际含义是「未来所有未脱离的课次」。
+//  2. 改期按整体平移处理，不是把所有课次改到同一天——后者会把一学期的课压在一天上。
+func (s *MemoryStore) updateScheduleSeriesUnlocked(operator string, principal learning.Principal, anchor learning.ScheduleClass, scope string, req learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error) {
+	newDate := strings.TrimSpace(req.StartDate)
+	if newDate == "" {
+		newDate = anchor.LessonDate
+	}
+	offset, err := dayOffset(anchor.LessonDate, newDate)
+	if err != nil {
+		return learning.ScheduleClass{}, err
+	}
+
+	today := time.Now().Format("2006-01-02")
+	// 「整个系列」也从今天算起：历史课次不参与重排。
+	boundary := today
+	if scope == learning.EditScopeThisAndFuture && anchor.LessonDate > boundary {
+		boundary = anchor.LessonDate
+	}
+
+	original := s.scheduleClasses
+	targets := make([]learning.ScheduleClass, 0, 8)
+	targetIDs := map[string]bool{}
+	for _, item := range original {
+		if item.SeriesID != anchor.SeriesID || item.Detached || item.Status == "已取消" {
+			continue
+		}
+		if item.LessonDate < boundary {
+			continue
+		}
+		targets = append(targets, item)
+		targetIDs[item.ID] = true
+	}
+	if len(targets) == 0 {
+		return learning.ScheduleClass{}, errors.New("这个系列没有可调整的未来课次")
+	}
+
+	// 先把待重排的课次从课表里摘掉再逐节重建，否则系列整体平移时，
+	// 还没挪的兄弟课次会跟已挪的课次互相判为撞课。
+	// 重建过程中逐节放回，这样批内真撞上了仍然查得出来。
+	remaining := make([]learning.ScheduleClass, 0, len(original))
+	for _, item := range original {
+		if !targetIDs[item.ID] {
+			remaining = append(remaining, item)
+		}
+	}
+	s.scheduleClasses = remaining
+
+	rebuilt := make(map[string]learning.ScheduleClass, len(targets))
+	for _, target := range targets {
+		date, err := shiftDate(target.LessonDate, offset)
+		if err != nil {
+			s.scheduleClasses = original
+			return learning.ScheduleClass{}, err
+		}
+		item, err := s.buildScheduleClass(principal, target.ID, date, req)
+		if err != nil {
+			s.scheduleClasses = original
+			return learning.ScheduleClass{}, err
+		}
+		item.ID = target.ID
+		item.CreatedAt = target.CreatedAt
+		item.SeriesID = target.SeriesID
+		if target.LessonDate == item.LessonDate && target.CourseID == item.CourseID {
+			item.AcademicYear = target.AcademicYear
+			item.Semester = target.Semester
+		}
+		rebuilt[target.ID] = item
+		s.scheduleClasses = append(s.scheduleClasses, cloneScheduleClass(item))
+	}
+
+	// 按原顺序写回，避免整批课次因为重排而跑到列表末尾。
+	final := make([]learning.ScheduleClass, 0, len(original))
+	for _, item := range original {
+		if replacement, ok := rebuilt[item.ID]; ok {
+			final = append(final, cloneScheduleClass(replacement))
+			continue
+		}
+		final = append(final, item)
+	}
+	s.scheduleClasses = final
+
+	result := rebuilt[anchor.ID]
+	if result.ID == "" {
+		result = rebuilt[targets[0].ID]
+	}
+	if result.Status == "已确认" {
+		s.notifyScheduleClass(result, "课程调整提醒", "已调整")
+	}
+	s.prependLogDetail(operator, scheduleScopeLogAction(scope), scheduleBatchLogTarget(result, len(targets)), auditChangeDetail(scheduleClassAuditSnapshot(anchor), scheduleClassAuditSnapshot(result)))
+	return cloneScheduleClass(result), nil
+}
+
+func scheduleScopeLogAction(scope string) string {
+	if scope == learning.EditScopeAll {
+		return "调整整个系列排课"
+	}
+	return "调整本次及后续排课"
 }

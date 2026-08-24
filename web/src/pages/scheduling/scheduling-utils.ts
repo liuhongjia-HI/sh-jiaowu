@@ -76,16 +76,23 @@ export function candidateLevelMeta(level: CandidateLevel) {
   return { label: '人数不足', color: 'default' };
 }
 
+// 一条记录就是一节课，落在哪天由 lessonDate 说了算。
 export function scheduleClassOccursOn(item: ScheduleClass, date: Date) {
-  const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
-  if (item.dayOfWeek !== dayOfWeek) return false;
-  const dateText = localDateText(date);
-  return (!item.startDate || dateText >= item.startDate) && (!item.endDate || dateText <= item.endDate);
+  return item.lessonDate === localDateText(date);
 }
 
-// 后端建课时除了查冲突，还硬性要求老师和每个学生都有一条覆盖该星期、时段、日期的可上课时间
-// （见 buildScheduleClass 的 teacherAvailable/studentAvailable），否则直接 400。
-// 这里用同一套判定在提交前提示，避免「周视图明明是空的却说时间冲突」。
+// 从 YYYY-MM-DD 推星期（1=周一 … 7=周日），与后端 weekdayOf 保持同一套约定。
+export function weekdayOfDateText(value?: string) {
+  const text = (value ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return 0;
+  const [year, month, day] = text.split('-').map(Number);
+  const weekday = new Date(year, month - 1, day).getDay();
+  return weekday === 0 ? 7 : weekday;
+}
+
+// 与后端 buildScheduleClass 的 teacherAvailable/studentAvailable 同一套判定。
+// 可上课时间是软提醒而不是硬约束：越界不会被直接拒绝，但要用户确认后才放行，
+// 所以这里提前把「谁没登记这个时段」列出来，让用户在提交前就看得见。
 export function availabilityCovers(slot: AvailabilitySlot, dayOfWeek: number, startTime: string, endTime: string, date: string) {
   if (slot.dayOfWeek !== dayOfWeek) return false;
   if (slot.startTime > startTime || slot.endTime < endTime) return false;

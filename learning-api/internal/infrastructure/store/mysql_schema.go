@@ -309,6 +309,12 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"schedule_classes", "room_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "academic_year", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "semester", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		// 课次模型：一行 = 一节课。lesson_date 是这节课的具体日期，
+		// series_id 标出同一次重复排课生成的课次，detached 表示已被单独调整过。
+		{"schedule_classes", "series_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"schedule_classes", "lesson_date", "DATE NULL"},
+		{"schedule_classes", "detached", "TINYINT NOT NULL DEFAULT 0"},
+		{"schedule_classes", "override_note", "TEXT NULL"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "external_id", mysqlNoticeExternalIDDefinition},
@@ -382,6 +388,95 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 	}
 	if err := s.backfillScheduleClassTerms(); err != nil {
 		return err
+	}
+	if err := s.expandScheduleClassesIntoLessons(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// expandScheduleClassesIntoLessons 把升级前的排课记录展开成课次。
+//
+// 升级前一条记录 = 「每周三 19:30，3/1 到 6/30」的一整串课；升级后一条记录 = 一节课。
+// 展开时第一节沿用原记录的 id，这一点很关键：schedule_class_students 和
+// lesson_consumptions 都靠这个 id 挂着，换 id 会把学生名单和课时消耗记录甩掉。
+//
+// 只处理 lesson_date 为空的行，所以重复执行是安全的。
+func (s *MemoryStore) expandScheduleClassesIntoLessons() error {
+	rows, err := s.db.Query(`SELECT id, day_of_week, start_date, end_date FROM schedule_classes WHERE lesson_date IS NULL`)
+	if err != nil {
+		return err
+	}
+	type pending struct {
+		id        string
+		dayOfWeek int
+		startDate string
+		endDate   string
+	}
+	items := make([]pending, 0)
+	for rows.Next() {
+		var item pending
+		var startDate, endDate sql.NullTime
+		if err := rows.Scan(&item.id, &item.dayOfWeek, &startDate, &endDate); err != nil {
+			rows.Close()
+			return err
+		}
+		item.startDate = dateString(startDate)
+		item.endDate = dateString(endDate)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	for _, item := range items {
+		dates := weeklyLessonDates(item.dayOfWeek, item.startDate, item.endDate)
+		if len(dates) == 0 {
+			// 连开始日期都解析不出来的脏数据：标成单节并保留原样，
+			// 不要因为一条坏记录让整个迁移卡死。
+			if _, err := s.db.Exec(`UPDATE schedule_classes SET lesson_date = start_date WHERE id = ?`, item.id); err != nil {
+				return err
+			}
+			continue
+		}
+		seriesID := ""
+		if len(dates) > 1 {
+			seriesID = "series-migrated-" + item.id
+		}
+		// 第一节就地改写，保住原 id 上挂的学生名单与课时消耗。
+		if _, err := s.db.Exec(
+			`UPDATE schedule_classes SET lesson_date = ?, start_date = ?, end_date = ?, series_id = ? WHERE id = ?`,
+			dates[0], dates[0], dates[0], seriesID, item.id,
+		); err != nil {
+			return err
+		}
+		for index, date := range dates[1:] {
+			newID := item.id + "-l" + itoa(index+1)
+			if _, err := s.db.Exec(`INSERT INTO schedule_classes (
+				id, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name,
+				class_type, capacity, duration_minutes, day_of_week, start_time, end_time,
+				start_date, end_date, expected_student_count, reservation_note, academic_year,
+				semester, status, created_at, series_id, lesson_date, detached, override_note)
+				SELECT ?, name, course_id, course_name, teacher_id, teacher_name, campus_id, room_name,
+				class_type, capacity, duration_minutes, day_of_week, start_time, end_time,
+				?, ?, expected_student_count, reservation_note, academic_year,
+				semester, status, created_at, ?, ?, 0, override_note
+				FROM schedule_classes WHERE id = ?
+				ON DUPLICATE KEY UPDATE lesson_date = VALUES(lesson_date)`,
+				newID, date, date, seriesID, date, item.id,
+			); err != nil {
+				return err
+			}
+			if _, err := s.db.Exec(
+				`INSERT IGNORE INTO schedule_class_students (schedule_class_id, student_id, student_name)
+				SELECT ?, student_id, student_name FROM schedule_class_students WHERE schedule_class_id = ?`,
+				newID, item.id,
+			); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
