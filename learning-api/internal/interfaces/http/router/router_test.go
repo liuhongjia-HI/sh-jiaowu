@@ -1149,3 +1149,58 @@ func TestBindCodeGuessingIsRateLimited(t *testing.T) {
 		t.Fatalf("expected the account to be locked after repeated failures, got message=%q", final.Message)
 	}
 }
+
+// 排课权限下放走到 HTTP 这一层是否真的分开了：
+// 老师能建课但建出来的是待审核，且审核接口对老师关闭。
+func TestTeacherSchedulingPermissionsThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	teacherToken := app.loginAdmin(t, "13800000004")
+	opsToken := app.loginAdmin(t, "13800000003")
+
+	var created learning.ScheduleClass
+	app.doJSON(t, http.MethodPost, "/api/schedule-classes", teacherToken, learning.ScheduleClassCreateRequest{
+		CourseID:        "course-g05-english-s1-q1",
+		TeacherID:       "user-teacher",
+		ClassType:       "1V1",
+		DurationMinutes: 90,
+		StartTime:       "19:00",
+		EndTime:         "20:30",
+		StartDate:       "2026-06-03",
+		StudentIDs:      []string{"stu-001"},
+	}, http.StatusOK, &created)
+	if created.AuditStatus != learning.AuditPending {
+		t.Fatalf("老师建课应落待审核，实际 %q", created.AuditStatus)
+	}
+
+	// 学生这时候不该看到这节课。
+	studentToken := app.loginStudent(t)
+	var studentSchedule []learning.ScheduleClass
+	app.doJSON(t, http.MethodGet, "/api/student/schedule", studentToken, nil, http.StatusOK, &studentSchedule)
+	for _, item := range studentSchedule {
+		if item.ID == created.ID {
+			t.Fatal("待审核的课不能出现在学生课表接口里")
+		}
+	}
+
+	// 审核接口对老师关闭。
+	app.doJSON(t, http.MethodPost, "/api/schedule-classes/"+created.ID+"/approve", teacherToken, nil, http.StatusForbidden, nil)
+
+	var approved learning.ScheduleClass
+	app.doJSON(t, http.MethodPost, "/api/schedule-classes/"+created.ID+"/approve", opsToken, nil, http.StatusOK, &approved)
+	if approved.AuditStatus != learning.AuditApproved {
+		t.Fatalf("管理员通过后应为已通过，实际 %q", approved.AuditStatus)
+	}
+
+	app.doJSON(t, http.MethodGet, "/api/student/schedule", studentToken, nil, http.StatusOK, &studentSchedule)
+	found := false
+	for _, item := range studentSchedule {
+		if item.ID == created.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("审核通过后学生应该能看到这节课")
+	}
+}
