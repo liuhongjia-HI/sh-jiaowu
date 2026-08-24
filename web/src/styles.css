@@ -1084,10 +1084,13 @@ body {
   background: #fff;
 }
 
+/* 列数由实际天数决定，不写死 7：工作周视图只有 5 列，
+   写死 7 会多出两条空列，而且 min-width 撐着不放会让 5 列被压窄。 */
 .schedule-timeline-grid {
-  min-width: 980px;
+  --day-count: 7;
+  min-width: calc(64px + var(--day-count) * 128px);
   display: grid;
-  grid-template-columns: 64px repeat(7, minmax(128px, 1fr));
+  grid-template-columns: 64px repeat(var(--day-count), minmax(128px, 1fr));
   grid-template-rows: 74px var(--timeline-height);
 }
 
@@ -1812,36 +1815,53 @@ button.schedule-block:hover {
   font-size: 12px;
 }
 
+/* 月视图条目是单行的：一格要放得下四条，多行 grid 一条就占掉整格。
+   学科主色只做左侧色条和底色，不整块上色——月视图一格四条，
+   四块饱和色排在一起会盖掉「哪天忙」这个总览信息。 */
 .month-class {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
-  border: 1px solid #a9dfbd;
-  border-radius: 8px;
-  background: #f1fbf4;
-  padding: 8px;
+  border: 1px solid transparent;
+  border-left: 3px solid var(--subject-color, #94a3b8);
+  border-radius: 4px;
+  background: var(--subject-bg, #f8fafc);
+  padding: 3px 6px;
   color: #1f2937;
   text-align: left;
   cursor: pointer;
-}
-
-.month-class span,
-.month-class small {
-  color: #64748b;
   font-size: 12px;
+  line-height: 1.5;
+  min-width: 0;
 }
 
-.month-class strong {
-  font-size: 13px;
-  line-height: 1.35;
+.month-class:hover {
+  border-color: var(--subject-color, #94a3b8);
 }
 
-/* 学生名可能很长（1V4 就是四个名字），月视图格子窄，超出就省略，
-   完整名单在课程详情里看。不换行是为了保住「一格＝一节课」的高度节奏。 */
-.month-class-students {
+.month-class-time {
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+/* 教师/年级/科目/学生挤在一行，超宽省略；完整内容在 title 里。 */
+.month-class-text {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.month-class-text em {
+  color: #64748b;
+  font-style: normal;
+}
+
+.month-class-text em::before {
+  content: ' · ';
 }
 
 .month-class.is-canceled {
@@ -2512,4 +2532,72 @@ button.schedule-block:hover {
   .week-day-header {
     align-items: flex-start;
   }
+}
+
+/* 月视图超出四条时的 "+N"。做成和条目同宽的一行，
+   点开是当天完整列表（Popover），和周视图的折叠块行为一致。 */
+.month-overflow-toggle {
+  width: 100%;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  background: transparent;
+  color: #475569;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.month-overflow-toggle:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.month-overflow-list {
+  display: grid;
+  gap: 4px;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+/* 重复课次标记。客户的 Outlook 里每个重复课次右下角都有这个图标。 */
+.schedule-recurrence-mark {
+  color: #64748b;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.schedule-recurrence-mark.is-detached {
+  color: #b45309;
+}
+
+/* 课程块下沿的拉伸手柄。平时几乎不可见，悬浮到块上才显出来——
+   常驻一条实线会在密排的课表里变成视觉噪音。
+   高度 8px 是可点击的下限，再窄就抓不住。 */
+.schedule-timeline-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.schedule-timeline-resize::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 2px;
+  width: 24px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--subject-color, #94a3b8);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.schedule-timeline-block:hover .schedule-timeline-resize::after {
+  opacity: 0.7;
 }

@@ -1133,3 +1133,55 @@ func TestTeacherCopiedLessonStillNeedsReview(t *testing.T) {
 		t.Fatalf("老师复制出的课仍须待审核，实际 %q", fresh.AuditStatus)
 	}
 }
+
+// 拖下沿改时长走的是同一条调课链路，所以重复课次的范围规则必须照样生效：
+// 不给范围要报错，「仅此课次」只改这一节的时长。
+func TestResizeRepeatingLessonRespectsScope(t *testing.T) {
+	store, ops, seriesID := seedWeeklySeries(t)
+	lessons := seriesLessons(store, seriesID)
+	target := lessons[1]
+
+	req := lessonUpdateRequest(target)
+	req.EndTime = "21:30"
+	req.IgnoreWarnings = true
+	if _, err := store.UpdateScheduleClass("运营教务", ops, target.ID, req); err == nil {
+		t.Fatal("拉伸重复课次未给范围时必须拒绝，否则等于绕过三选一")
+	}
+
+	req.EditScope = learning.EditScopeThis
+	resized, err := store.UpdateScheduleClass("运营教务", ops, target.ID, req)
+	if err != nil {
+		t.Fatalf("expected resize to succeed: %v", err)
+	}
+	if resized.EndTime != "21:30" {
+		t.Fatalf("这一节应延长到 21:30，实际 %s", resized.EndTime)
+	}
+	after := seriesLessons(store, seriesID)
+	for i, lesson := range after {
+		want := "20:30"
+		if lesson.ID == target.ID {
+			want = "21:30"
+		}
+		if lesson.EndTime != want {
+			t.Fatalf("第 %d 节结束时间应为 %s，实际 %s（只应改这一节的时长）", i+1, want, lesson.EndTime)
+		}
+	}
+}
+
+// 结束时间必须晚于开始时间：拉伸到零长度或倒挂要被拦住。
+func TestResizeRejectsNonPositiveDuration(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("运营教务", ops, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected schedule: %v", err)
+	}
+	req := lessonUpdateRequest(created)
+	req.EndTime = req.StartTime
+	if _, err := store.UpdateScheduleClass("运营教务", ops, created.ID, req); err == nil {
+		t.Fatal("结束时间等于开始时间必须被拒绝")
+	}
+}

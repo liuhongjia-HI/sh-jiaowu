@@ -1,4 +1,4 @@
-import { CalendarOutlined, CloseCircleOutlined, CopyOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
+import { CalendarOutlined, CloseCircleOutlined, CopyOutlined, DeleteOutlined, DisconnectOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RetweetOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Dropdown, Modal, Popconfirm, Popover, Select, Skeleton, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import type { FormInstance, TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,7 +22,7 @@ import {
   weekOptions,
   weekdayOfDateText
 } from './scheduling-utils';
-import { subjectPalette, type SubjectPalette } from '../../utils/subject-colors';
+import { subjectPalette, subjectShortLabel, type SubjectPalette } from '../../utils/subject-colors';
 
 type AvailabilityFormValues = {
   ownerKey: string;
@@ -131,6 +131,9 @@ const maxTimelineColumns = 4;
 // 第三格变成 "+N"，点开能看到被折叠的全部课程——这样「最多三个」是字面意义上的
 // 三个可视块，不会因为再挤一个加号变成四个。
 const weekCellMaxLessons = 3;
+// 月视图一格最多列 4 条，与客户 Outlook 月视图的密度一致（图上是 4 条 + "+2"）。
+// 超过时列前 3 条 + "+N"，保证「+N」本身也算在 4 个格位里。
+const monthCellMaxLessons = 4;
 // 已取消课程的幽灵条：只画出「这个时段原本有课、现在空出来了」，不需要能读字。
 const canceledGhostWidth = 10;
 const canceledGhostGap = 3;
@@ -169,6 +172,7 @@ export function ScheduleWeekTimeline({
   onToday,
   onEditClass,
   onCopyClass,
+  onResizeClass,
   onMoveClass,
   onCreateClass
 }: {
@@ -186,6 +190,7 @@ export function ScheduleWeekTimeline({
   onToday: () => void;
   onEditClass: (record: ScheduleClass) => void;
   onCopyClass: (record: ScheduleClass) => void;
+  onResizeClass: (record: ScheduleClass, endTime: string) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
   onCreateClass: (lessonDate: string) => void;
 }) {
@@ -267,7 +272,10 @@ export function ScheduleWeekTimeline({
       </div>
 
       <div ref={scrollRef} className="schedule-timeline-scroll">
-        <div className="schedule-timeline-grid" style={{ '--timeline-height': `${boardHeight}px` } as CSSProperties}>
+        <div
+          className="schedule-timeline-grid"
+          style={{ '--timeline-height': `${boardHeight}px`, '--day-count': weekDays.length } as CSSProperties}
+        >
           <div className="schedule-time-gutter schedule-day-head-spacer" />
           {weekDays.map((day) => (
             <div className="schedule-day-head" key={day.key}>
@@ -325,6 +333,7 @@ export function ScheduleWeekTimeline({
                     canManage={canManage}
                     onEditClass={onEditClass}
                     onCopyClass={onCopyClass}
+                  onResizeClass={onResizeClass}
                   />
                 ))}
               </div>
@@ -362,6 +371,7 @@ export function ScheduleDayResourceTimeline({
   onJumpToDate,
   onEditClass,
   onCopyClass,
+  onResizeClass,
   onMoveClass,
   onCreateClass
 }: {
@@ -380,6 +390,7 @@ export function ScheduleDayResourceTimeline({
   onJumpToDate: (date: Date) => void;
   onEditClass: (record: ScheduleClass) => void;
   onCopyClass: (record: ScheduleClass) => void;
+  onResizeClass: (record: ScheduleClass, endTime: string) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
   onCreateClass: (lessonDate: string) => void;
 }) {
@@ -576,6 +587,7 @@ export function ScheduleDayResourceTimeline({
                   canManage={canManage}
                   onEditClass={onEditClass}
                   onCopyClass={onCopyClass}
+                  onResizeClass={onResizeClass}
                 />
               ))}
             </div>
@@ -600,11 +612,15 @@ export function ScheduleEmptyTips({ description, compact = false }: { descriptio
 //
 // highlight 区分两种视图：周视图选中的是一整周，日视图选中的是具体某一天。
 // 日视图下仍然高亮整周的话，点 19 号和点 21 号看起来完全一样，等于没有反馈。
+//
+// weekDayCount 让高亮只覆盖实际显示的那几天：工作周视图只有周一到周五，
+// 把周六日也点亮会让人以为那两天在视图里，点进去却什么都没有。
 export function MiniMonthCalendar({
   month,
   selectedWeekStart,
   selectedDate,
   highlight = 'week',
+  weekDayCount = 7,
   classCountByDate,
   onPickDate
 }: {
@@ -612,6 +628,7 @@ export function MiniMonthCalendar({
   selectedWeekStart: Date;
   selectedDate?: Date;
   highlight?: 'week' | 'day';
+  weekDayCount?: number;
   classCountByDate?: Record<string, number>;
   onPickDate: (date: Date) => void;
 }) {
@@ -622,7 +639,10 @@ export function MiniMonthCalendar({
     <div className="schedule-mini-calendar">
       {['一', '二', '三', '四', '五', '六', '日'].map((item) => <span className="schedule-mini-week" key={item}>{item}</span>)}
       {days.map((day) => {
-        const weekSelected = highlight === 'week' && localDateText(startOfWeek(day.date)) === selectedWeekKey;
+        const weekSelected = highlight === 'week'
+          && localDateText(startOfWeek(day.date)) === selectedWeekKey
+          // 周一=1…周日=7；工作周下第 6、7 天不在视图里，不该点亮。
+          && (day.date.getDay() === 0 ? 7 : day.date.getDay()) <= weekDayCount;
         const daySelected = highlight === 'day' && day.key === selectedDayKey;
         const count = classCountByDate?.[day.key] ?? 0;
         const className = [
@@ -654,13 +674,15 @@ export function TimelineBlock({
   rangeStart,
   canManage,
   onEditClass,
-  onCopyClass
+  onCopyClass,
+  onResizeClass
 }: {
   item: TimelineLayoutItem;
   rangeStart: number;
   canManage: boolean;
   onEditClass: (record: ScheduleClass) => void;
   onCopyClass?: (record: ScheduleClass) => void;
+  onResizeClass?: (record: ScheduleClass, endTime: string) => void;
 }) {
   const start = timeToMinutes(item.startTime);
   const end = Math.max(timeToMinutes(item.endTime), start + timelineSlotMinutes);
@@ -713,6 +735,7 @@ export function TimelineBlock({
         {item.classType && <Tag>{item.classType}</Tag>}
         {item.countText && <Tag>{item.countText}</Tag>}
         {item.status && <Tag color={item.status === '已取消' ? 'default' : item.status === '待确认' ? 'gold' : 'green'}>{item.status}</Tag>}
+        {item.kind === 'class' && <RecurrenceMark item={item.record as ScheduleClass} />}
       </span>
       {extra}
     </span>
@@ -798,7 +821,22 @@ export function TimelineBlock({
         onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', record.id)}
         onClick={() => editable ? onEditClass(record) : undefined}
       >
-        {renderBody()}
+        {renderBody(
+          // 下沿拉伸改时长。整块拖动只能平移时段、时长不变，
+          // 而「这节课上到几点」是排课时经常要单独调的一件事。
+          editable && onResizeClass ? (
+            <span
+              className="schedule-timeline-resize"
+              title="拖动下沿调整课程时长"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                startTimelineResize(event, record, onResizeClass);
+              }}
+            />
+          ) : undefined
+        )}
       </button>
     );
     if (!editable || !onCopyClass) return block;
@@ -874,53 +912,197 @@ export function MonthScheduleBoard({
             <div className="month-day-body">
               {dayClasses.length === 0 ? (
                 <span className="month-day-empty">暂无课程</span>
-              ) : sortByStartTime(dayClasses).map((item) => {
-                const course = courseById[item.courseId];
-                const editable = canManage && item.status !== '已取消';
-                const cell = (
-                  <button
-                    type="button"
-                    className={`month-class ${item.status === '已取消' ? 'is-canceled' : ''}`}
-                    key={item.id}
-                    draggable={editable}
-                    onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
-                    onClick={() => editable ? onEditClass(item) : undefined}
-                  >
-                    {/* 客户要求月视图一眼看全：开始时间、科目年级、教师姓名、学生姓名。
-                        教师用 resourceLaneTeacherName 而不是 teacherDisplay——后者会带上
-                        「教师：」前缀和任教范围，在月视图这种窄格子里会把名字挤没。 */}
-                    <span>{item.startTime}</span>
-                    <strong>{courseSubjectGradeText(course, item.courseName)}</strong>
-                    <small>{resourceLaneTeacherName(item.teacherId, item.teacherName, teacherById[item.teacherId])}</small>
-                    {item.students.length > 0 && (
-                      <small className="month-class-students">{studentSummaryText(item.students)}</small>
-                    )}
-                  </button>
-                );
-                if (!editable) return cell;
-                // 右键复制在月视图同样可用：月视图是「看全貌顺手补一节」的场景，
-                // 复制现有课比从空表单重填一遍快得多。
+              ) : (() => {
+                const sorted = sortByStartTime(dayClasses);
+                // 一格里最多列 4 条，其余折叠成 "+N"，与客户 Outlook 月视图一致。
+                // 不折叠的话，最忙的那天会把整个月的行高一起撑高。
+                const visible = sorted.length > monthCellMaxLessons
+                  ? sorted.slice(0, monthCellMaxLessons - 1)
+                  : sorted;
+                const hidden = sorted.slice(visible.length);
                 return (
-                  <Dropdown
-                    key={item.id}
-                    trigger={['contextMenu']}
-                    menu={{
-                      items: [
-                        { key: 'copy', icon: <CopyOutlined />, label: '复制这节课' },
-                        { key: 'edit', icon: <EditOutlined />, label: '调整这节课' }
-                      ],
-                      onClick: ({ key }) => key === 'copy' ? onCopyClass(item) : onEditClass(item)
-                    }}
-                  >
-                    {cell}
-                  </Dropdown>
+                  <>
+                    {visible.map((item) => (
+                      <MonthClassEntry
+                        key={item.id}
+                        item={item}
+                        course={courseById[item.courseId]}
+                        teacher={teacherById[item.teacherId]}
+                        canManage={canManage}
+                        onEditClass={onEditClass}
+                        onCopyClass={onCopyClass}
+                      />
+                    ))}
+                    {hidden.length > 0 && (
+                      <Popover
+                        trigger="click"
+                        placement="right"
+                        title={`${day.label} 还有 ${hidden.length} 节课`}
+                        content={(
+                          <div className="month-overflow-list">
+                            {hidden.map((item) => (
+                              <MonthClassEntry
+                                key={item.id}
+                                item={item}
+                                course={courseById[item.courseId]}
+                                teacher={teacherById[item.teacherId]}
+                                canManage={canManage}
+                                onEditClass={onEditClass}
+                                onCopyClass={onCopyClass}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      >
+                        <button type="button" className="month-overflow-toggle">+{hidden.length}</button>
+                      </Popover>
+                    )}
+                  </>
                 );
-              })}
+              })()}
             </div>
           </div>
         );
       })}
     </div>
+  );
+}
+
+// 拖动课程块下沿改结束时间。
+//
+// 用 pointer 事件而不是 HTML5 drag：drag 那套是给「把东西挪到别处」用的，
+// 拉伸要的是连续跟随鼠标的实时反馈，而且和块本身的 draggable 会互相抢事件。
+// setPointerCapture 保证鼠标划出块外仍然跟手。
+//
+// 只在松手时回调一次：拉伸过程中每 30 分钟就发一次请求，等于把一次调课
+// 变成十几次写库，还会被后端的冲突校验一路拒绝。
+function startTimelineResize(
+  event: React.PointerEvent<HTMLElement>,
+  record: ScheduleClass,
+  onResizeClass: (record: ScheduleClass, endTime: string) => void
+) {
+  const target = event.currentTarget;
+  const startY = event.clientY;
+  const originalEnd = timeToMinutes(record.endTime);
+  const startMinute = timeToMinutes(record.startTime);
+  let latestEnd = originalEnd;
+
+  const compute = (clientY: number) => {
+    const deltaSlots = Math.round((clientY - startY) / timelineSlotHeight);
+    // 最短一个档位：不允许把课拉成零长度或负长度。
+    const next = originalEnd + deltaSlots * timelineSlotMinutes;
+    return Math.min(24 * 60, Math.max(startMinute + timelineSlotMinutes, next));
+  };
+
+  const move = (moveEvent: PointerEvent) => {
+    latestEnd = compute(moveEvent.clientY);
+    // 拉伸过程中只动这一块的高度，不重排整个网格——重排会让块在手底下跳。
+    const block = target.closest('.schedule-timeline-block') as HTMLElement | null;
+    if (block) {
+      block.style.height = `${((latestEnd - startMinute) / timelineSlotMinutes) * timelineSlotHeight}px`;
+    }
+  };
+
+  const finish = () => {
+    target.removeEventListener('pointermove', move);
+    target.removeEventListener('pointerup', finish);
+    target.removeEventListener('pointercancel', finish);
+    if (latestEnd !== originalEnd) onResizeClass(record, formatMinute(latestEnd));
+  };
+
+  target.setPointerCapture(event.pointerId);
+  target.addEventListener('pointermove', move);
+  target.addEventListener('pointerup', finish);
+  target.addEventListener('pointercancel', finish);
+}
+
+// 重复课次的标记。客户的 Outlook 里每个重复课次右下角都有这个回环图标。
+//
+// 这不只是好看：拖动重复课次时会弹「仅此课次 / 此课次及后续 / 整个系列」，
+// 用户事先必须能看出哪节是重复课，否则那个弹窗会显得莫名其妙。
+// 已单独调整过的课次（detached）用断开的图标区分——它已经不跟随系列了，
+// 拖它不会问范围，标记必须诚实反映这一点。
+export function RecurrenceMark({ item }: { item: ScheduleClass }) {
+  if (!item.seriesId) return null;
+  if (item.detached) {
+    return (
+      <Tooltip title="重复课程中已单独调整过的一节，不再跟随系列">
+        <DisconnectOutlined className="schedule-recurrence-mark is-detached" />
+      </Tooltip>
+    );
+  }
+  return (
+    <Tooltip title="重复课程的一节，调整时会询问影响范围">
+      <RetweetOutlined className="schedule-recurrence-mark" />
+    </Tooltip>
+  );
+}
+
+// 月视图的单个课次。排版对标客户的 Outlook：一行放完
+// 「开始时间 · 教师 · 年级 · 科目短标签 · 学生」，超宽省略，完整内容挂 title。
+//
+// 之前这里是四行 grid（时间/科目年级/教师/学生各一行），一条占 4 行高，
+// 一格连两条都放不下——那才是月视图放不下几节课的真正原因，
+// 光加折叠不压排版等于把阈值设成 1。
+function MonthClassEntry({
+  item,
+  course,
+  teacher,
+  canManage,
+  onEditClass,
+  onCopyClass
+}: {
+  item: ScheduleClass;
+  course?: Course;
+  teacher?: Teacher;
+  canManage: boolean;
+  onEditClass: (record: ScheduleClass) => void;
+  onCopyClass: (record: ScheduleClass) => void;
+}) {
+  const editable = canManage && item.status !== '已取消';
+  const teacherName = resourceLaneTeacherName(item.teacherId, item.teacherName, teacher);
+  const grade = course?.grade ?? '';
+  const subject = scheduleClassSubject(item, course ? { [course.id]: course } : {});
+  // 学科用短标签（Eng/Math/Geo/…），这是客户能把一节课塞进一行的关键。
+  const subjectText = subject ? subjectShortLabel(subject) : '';
+  const students = item.students.map(studentDisplayName).join('、');
+  const palette = subjectColor(subject || item.courseName);
+  const full = [item.startTime, teacherName, grade, subjectText, students].filter(Boolean).join(' · ');
+
+  const entry = (
+    <button
+      type="button"
+      className={`month-class ${item.status === '已取消' ? 'is-canceled' : ''}`}
+      title={full}
+      draggable={editable}
+      style={{ '--subject-color': palette.accent, '--subject-bg': palette.bg } as CSSProperties}
+      onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
+      onClick={() => editable ? onEditClass(item) : undefined}
+    >
+      <span className="month-class-time">{item.startTime}</span>
+      <span className="month-class-text">
+        {[teacherName, grade, subjectText].filter(Boolean).join(' ')}
+        {students && <em>{students}</em>}
+      </span>
+      <RecurrenceMark item={item} />
+    </button>
+  );
+  if (!editable) return entry;
+  // 右键复制在月视图同样可用：月视图是「看全貌顺手补一节」的场景，
+  // 复制现有课比从空表单重填一遍快得多。
+  return (
+    <Dropdown
+      trigger={['contextMenu']}
+      menu={{
+        items: [
+          { key: 'copy', icon: <CopyOutlined />, label: '复制这节课' },
+          { key: 'edit', icon: <EditOutlined />, label: '调整这节课' }
+        ],
+        onClick: ({ key }) => key === 'copy' ? onCopyClass(item) : onEditClass(item)
+      }}
+    >
+      {entry}
+    </Dropdown>
   );
 }
 
@@ -1412,9 +1594,30 @@ export function layoutOverlappingGroup(items: TimelineItem[], maxColumns = maxTi
   return result;
 }
 
+// 时间轴范围 = 默认窗口 ∪ 实际内容。
+//
+// 不能改成「紧贴内容」：这条时间轴同时是拖拽落点，范围收紧到只包住现有课程后，
+// 就再也没法把一节课往更早的时间挪了——这也是当初写死 08:00-22:00 的原因。
+// 但写死同样有问题：22:00 之后开始的课算出来的 top 超过 boardHeight，
+// 会直接渲染到列外面，用户看不到这节课，还以为那个时段是空的。
+//
+// 所以按内容单向外扩：早于默认起点的往前扩，晚于默认终点的往后扩，
+// 两端都对齐到整小时，保证刻度线还是整点。空日子仍然是默认窗口。
 export function buildTimelineRange(items: TimelineItem[]) {
-  void items;
-  return { start: defaultTimelineStart, end: defaultTimelineEnd };
+  let start = defaultTimelineStart;
+  let end = defaultTimelineEnd;
+  for (const item of items) {
+    const itemStart = timeToMinutes(item.startTime);
+    const itemEnd = timeToMinutes(item.endTime);
+    if (Number.isFinite(itemStart)) start = Math.min(start, Math.floor(itemStart / 60) * 60);
+    if (Number.isFinite(itemEnd)) end = Math.max(end, Math.ceil(itemEnd / 60) * 60);
+  }
+  return {
+    start: Math.max(0, start),
+    // 24:00 是一天的上界；跨零点的课不在业务范围内（课外辅导不跨天），
+    // 真出现脏数据也钉在 24:00，不让它把整块画布拉到几千像素高。
+    end: Math.min(24 * 60, Math.max(end, start + 60))
+  };
 }
 
 export function buildTimelineRows(start: number, end: number) {
@@ -1559,8 +1762,11 @@ export function scheduleClassPayload(
   };
 }
 
-export function buildWeekDays(weekStart: Date): WeekDay[] {
-  return Array.from({ length: 7 }, (_, index) => {
+// dayCount=5 就是「工作周」（周一至周五）。周视图仍然是 7 天：
+// 校外教培周末恰恰是排课高峰，默认砍掉周六日会把最忙的两天藏起来，
+// 所以工作周是额外一个视图，不是把周视图改窄。
+export function buildWeekDays(weekStart: Date, dayCount = 7): WeekDay[] {
+  return Array.from({ length: dayCount }, (_, index) => {
     const date = addDays(weekStart, index);
     const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
     return {

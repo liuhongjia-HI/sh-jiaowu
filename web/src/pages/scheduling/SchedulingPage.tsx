@@ -152,7 +152,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   // 默认停在资源泳道日视图：这是排课场景真正读得清的密度，周视图退居总览。
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month' | 'list'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'workweek' | 'week' | 'month' | 'list'>('day');
   const [classGradeFilter, setClassGradeFilter] = useState<string>();
   const [classSubjectFilter, setClassSubjectFilter] = useState<string>();
   const [classTeacherFilter, setClassTeacherFilter] = useState<string>();
@@ -337,7 +337,12 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     () => filteredClasses.filter((item) => !hiddenSubjects.includes(scheduleClassSubject(item, courseById) || '其他')),
     [filteredClasses, hiddenSubjects, courseById]
   );
-  const selectedWeekDays = useMemo(() => buildWeekDays(selectedWeekStart), [selectedWeekStart]);
+  // 工作周只看周一到周五；周视图仍然是完整 7 天——校外教培周末是排课高峰，
+  // 不能把周六日从默认视图里砍掉。
+  const selectedWeekDays = useMemo(
+    () => buildWeekDays(selectedWeekStart, viewMode === 'workweek' ? 5 : 7),
+    [selectedWeekStart, viewMode]
+  );
   const selectedWeekClasses = useMemo(
     () => subjectVisibleClasses.filter((item) => selectedWeekDays.some((day) => scheduleClassOccursOn(item, day.date))),
     [subjectVisibleClasses, selectedWeekDays]
@@ -435,6 +440,24 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       reservationNote: record.reservationNote
     });
     message.info('已复制课程内容，改好时间后提交即可');
+  }
+
+  // 拖块下沿改时长。走的是同一条调课链路，所以重复课次同样要问影响范围——
+  // 少了这一步，拉伸就成了绕过三选一的后门，又变回「改一节动整个学期」。
+  function confirmResizeClass(record: ScheduleClass, endTime: string) {
+    if (!canCreateClass || record.status === '已取消' || endTime === record.endTime) return;
+    const target: ScheduleMoveTarget = {
+      lessonDate: record.lessonDate,
+      startTime: record.startTime,
+      endTime,
+      label: `${record.lessonDate} ${record.startTime}-${endTime}`
+    };
+    const isRepeating = Boolean(record.seriesId) && !record.detached;
+    if (!isRepeating) {
+      moveClass.mutate({ record, target, editScope: 'this' });
+      return;
+    }
+    setMoveScopeRequest({ record, target });
   }
 
   // 视图里点空白格新建：格子对应的是具体某一天，直接用那天的日期开表单。
@@ -538,13 +561,14 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
       <Card
         // 标题跟着视图走：默认已经是日视图，再顶着「周排班」会让人以为切错了。
-        title={viewMode === 'day' ? '排班工作台 · 按老师看一天' : viewMode === 'week' ? '排班工作台 · 周总览' : '排班工作台'}
+        title={viewMode === 'day' ? '排班工作台 · 按老师看一天' : viewMode === 'workweek' ? '排班工作台 · 工作周（周一至周五）' : viewMode === 'week' ? '排班工作台 · 周总览' : '排班工作台'}
         extra={(
           <Segmented
             value={viewMode}
-            onChange={(value) => setViewMode(value as 'day' | 'week' | 'month' | 'list')}
+            onChange={(value) => setViewMode(value as 'day' | 'workweek' | 'week' | 'month' | 'list')}
             options={[
               { label: '日视图', value: 'day', icon: <CalendarOutlined /> },
+              { label: '工作周', value: 'workweek', icon: <CalendarOutlined /> },
               { label: '周视图', value: 'week', icon: <CalendarOutlined /> },
               { label: '月视图', value: 'month', icon: <CalendarOutlined /> },
               { label: '列表视图', value: 'list', icon: <TableOutlined /> }
@@ -594,6 +618,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   selectedWeekStart={selectedWeekStart}
                   selectedDate={selectedDate}
                   highlight={viewMode === 'day' ? 'day' : 'week'}
+                  weekDayCount={selectedWeekDays.length}
                   classCountByDate={classCountByDate}
                   onPickDate={goToDate}
                 />
@@ -706,10 +731,11 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   onJumpToDate={goToDate}
                   onEditClass={openEdit}
                   onCopyClass={openCopy}
+                  onResizeClass={confirmResizeClass}
                   onMoveClass={confirmMoveClass}
                   onCreateClass={openCreateClassForDay}
                 />
-              ) : viewMode === 'week' ? (
+              ) : viewMode === 'week' || viewMode === 'workweek' ? (
                 <ScheduleWeekTimeline
                   loading={classes.isFetching || availabilityOverview.isFetching}
                   weekDays={selectedWeekDays}
@@ -725,6 +751,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   onToday={() => goToDate(new Date())}
                   onEditClass={openEdit}
                   onCopyClass={openCopy}
+                  onResizeClass={confirmResizeClass}
                   onMoveClass={confirmMoveClass}
                   onCreateClass={openCreateClassForDay}
                 />
