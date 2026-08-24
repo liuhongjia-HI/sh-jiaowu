@@ -42,6 +42,7 @@ import {
   filterClasses,
   groupScheduleItems,
   parseOwnerKey,
+  pendingReviewColumns,
   scheduleClassPayload,
   type ScheduleMoveTarget,
   scheduleClassSubject,
@@ -181,13 +182,22 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   // 否则收起后颜色对不上号，用户看到少了课程也不知道是自己关掉的。
   const [subjectLegendOpen, setSubjectLegendOpen] = useState(false);
   const queryClient = useQueryClient();
-  const canCreateClass = user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
+  // 排课权限下放：老师也能建课，但落「待审核」，通过后才对学生可见。
+  const canCreateClass = user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));
+  // 审核仍然只归管理员。
+  const canReviewClass = user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 
   const teachers = useQuery({ queryKey: ['teachers'], queryFn: () => getData<Teacher[]>('/teachers') });
   const students = useQuery({ queryKey: ['students'], queryFn: () => getData<Student[]>('/students') });
   const courses = useQuery({ queryKey: ['courses'], queryFn: () => getData<Course[]>('/courses') });
   const classes = useQuery({ queryKey: ['schedule-classes'], queryFn: () => getData<ScheduleClass[]>('/schedule-classes') });
   const availabilityOverview = useQuery({ queryKey: ['availability-overview'], queryFn: () => getData<AvailabilitySlot[]>('/availability/overview') });
+  // 待审核队列只有管理员看得到，老师侧不发这个请求。
+  const pendingClasses = useQuery({
+    queryKey: ['schedule-classes-pending'],
+    queryFn: () => getData<ScheduleClass[]>('/schedule-classes/pending'),
+    enabled: canReviewClass
+  });
 
   const ownerKey = Form.useWatch('ownerKey', availabilityForm);
   const gradeWatch = Form.useWatch('grade', candidateForm);
@@ -296,6 +306,17 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
     onError: (error) => message.error(error instanceof Error ? error.message : '调课失败，请稍后重试。')
+  });
+
+  const reviewClass = useMutation({
+    mutationFn: ({ id, approve, reason }: { id: string; approve: boolean; reason?: string }) =>
+      postData<ScheduleClass>(`/schedule-classes/${id}/${approve ? 'approve' : 'reject'}`, { reason }),
+    onSuccess: (record) => {
+      message.success(record.auditStatus === '已通过' ? '已通过，学生端已可见' : '已驳回，老师会看到理由');
+      queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
+      queryClient.invalidateQueries({ queryKey: ['schedule-classes-pending'] });
+    },
+    onError: (error) => message.error(error instanceof Error ? error.message : '审核失败，请稍后重试。')
   });
 
   const moveClass = useMutation({
@@ -521,6 +542,35 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()} />
         </Space>
       </div>
+
+      {/* 老师排的课在通过审核前学生端看不到，这里给老师一个明确的预期，
+          免得排完以为已经生效了。 */}
+      {!canReviewClass && canCreateClass && (
+        <Alert
+          type="info"
+          showIcon
+          message="你排的课需要教务确认后，学生端才能看到"
+          description="提交后课程进入待审核；被驳回时可以在列表里看到理由并直接修改。"
+        />
+      )}
+
+      {canReviewClass && (pendingClasses.data ?? []).length > 0 && (
+        <Card title={`待审核排课（${(pendingClasses.data ?? []).length}）`}>
+          <Table<ScheduleClass>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            dataSource={pendingClasses.data ?? []}
+            loading={pendingClasses.isFetching}
+            columns={pendingReviewColumns(
+              courseById,
+              (record) => reviewClass.mutate({ id: record.id, approve: true }),
+              (record, reason) => reviewClass.mutate({ id: record.id, approve: false, reason }),
+              reviewClass.isPending
+            )}
+          />
+        </Card>
+      )}
 
       <Card title="查找可排时间">
         {canCreateClass ? (

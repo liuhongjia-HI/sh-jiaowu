@@ -459,6 +459,18 @@ func (s *MemoryStore) CancelScheduleClass(operator string, principal learning.Pr
 	}, nil)
 }
 
+func (s *MemoryStore) ReviewScheduleClass(operator string, principal learning.Principal, id string, approve bool, reason string) (learning.ScheduleClass, error) {
+	return noticeMutation(s, func(work *MemoryStore) (learning.ScheduleClass, error) {
+		return work.reviewScheduleClassUnlocked(operator, principal, id, approve, reason)
+	}, nil)
+}
+
+func (s *MemoryStore) PendingScheduleClasses(principal learning.Principal) []learning.ScheduleClass {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pendingScheduleClassesUnlocked(principal)
+}
+
 func (s *MemoryStore) Dashboard() learning.DashboardOverview {
 	s.mu.Lock()
 	defer s.mu.Unlock()

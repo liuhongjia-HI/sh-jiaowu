@@ -1,5 +1,5 @@
 import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Skeleton, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -953,10 +953,13 @@ export function classColumns(courseById: CourseLookup, teacherById: Record<strin
     { title: '科目/年级', width: 130, render: (_, record) => courseSubjectGradeText(courseById[record.courseId], record.courseName) },
     { title: '课程', dataIndex: 'courseName', ellipsis: true },
     { title: '老师', width: 220, render: (_, record) => teacherDisplay(record.teacherName, courseById[record.courseId], teacherById[record.teacherId]) },
-    { title: '时间', width: 160, render: (_, record) => `${weekLabel(record.dayOfWeek)} ${record.startTime}-${record.endTime}` },
+    { title: '时间', width: 180, render: (_, record) => `${record.lessonDate} ${record.startTime}-${record.endTime}` },
     { title: '班型', dataIndex: 'classType', width: 90 },
     { title: '学生', render: (_, record) => tagList(record.students.map(studentDisplayName), 'blue') },
-    { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '已取消' ? 'default' : value === '待确认' ? 'gold' : 'green'}>{value}</Tag> }
+    // 成班状态：人数够不够、有没有被取消。
+    { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '已取消' ? 'default' : value === '待确认' ? 'gold' : 'green'}>{value}</Tag> },
+    // 审核状态：管理员认不认。与上一列是两个维度，不能合并显示。
+    { title: '审核', width: 150, render: (_, record) => auditStatusTag(record) }
   ];
   if (canManage) {
     columns.push({
@@ -1685,4 +1688,107 @@ export function candidateEmptyTips(request: CandidateFormValues | null, candidat
     '让相关老师和学生补充可上课时间后再查找。',
     '可缩短课长或更换班型，更容易凑齐时间。'
   ];
+}
+
+// 审核状态标签。被驳回时把理由挂在 Tooltip 上——老师得知道要改什么。
+export function auditStatusTag(record: ScheduleClass) {
+  if (record.auditStatus === '已驳回') {
+    return (
+      <Tooltip title={record.auditReason || '未填写理由'}>
+        <Tag color="red">已驳回</Tag>
+      </Tooltip>
+    );
+  }
+  if (record.auditStatus === '待审核') return <Tag color="gold">待审核</Tag>;
+  return <Tag color="green">已通过</Tag>;
+}
+
+// 待审核队列。管理员在这里逐条裁决老师提交的排课。
+export function pendingReviewColumns(
+  courseById: CourseLookup,
+  onApprove: (record: ScheduleClass) => void,
+  onReject: (record: ScheduleClass, reason: string) => void,
+  reviewing: boolean
+): TableColumnsType<ScheduleClass> {
+  return [
+    { title: '课程', width: 150, render: (_, record) => courseSubjectGradeText(courseById[record.courseId], record.courseName) },
+    { title: '老师', dataIndex: 'teacherName', width: 120 },
+    { title: '时间', width: 180, render: (_, record) => `${record.lessonDate} ${record.startTime}-${record.endTime}` },
+    { title: '学生', render: (_, record) => tagList(record.students.map(studentDisplayName), 'blue') },
+    {
+      title: '提交人',
+      width: 120,
+      render: (_, record) => record.createdBy || <Typography.Text type="secondary">-</Typography.Text>
+    },
+    {
+      // 老师排课时可上课时间只是软提醒，越界能提交。这里必须让管理员看见，
+      // 否则「越过谁的时间」这件事到审核环节就丢了。
+      title: '提示',
+      width: 220,
+      render: (_, record) => record.overrideNote
+        ? <Tooltip title={record.overrideNote}><Tag color="orange">超出可上课时间</Tag></Tooltip>
+        : <Typography.Text type="secondary">-</Typography.Text>
+    },
+    {
+      title: '操作',
+      width: 150,
+      render: (_, record) => (
+        <Space size={4}>
+          <Button size="small" type="primary" loading={reviewing} onClick={() => onApprove(record)}>通过</Button>
+          <RejectButton record={record} onReject={onReject} reviewing={reviewing} />
+        </Space>
+      )
+    }
+  ];
+}
+
+// 驳回必须填理由，所以单独做成带输入框的气泡，而不是一个直接生效的按钮。
+function RejectButton({
+  record,
+  onReject,
+  reviewing
+}: {
+  record: ScheduleClass;
+  onReject: (record: ScheduleClass, reason: string) => void;
+  reviewing: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setReason('');
+      }}
+      trigger="click"
+      title="驳回理由"
+      content={(
+        <Space direction="vertical" style={{ width: 240 }}>
+          <Input.TextArea
+            rows={3}
+            maxLength={255}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="例如：该时段教室已排满"
+          />
+          <Button
+            size="small"
+            danger
+            loading={reviewing}
+            disabled={reason.trim().length === 0}
+            onClick={() => {
+              onReject(record, reason.trim());
+              setOpen(false);
+              setReason('');
+            }}
+          >
+            确认驳回
+          </Button>
+        </Space>
+      )}
+    >
+      <Button size="small" danger>驳回</Button>
+    </Popover>
+  );
 }

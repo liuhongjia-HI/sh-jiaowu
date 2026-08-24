@@ -731,6 +731,17 @@ export type ScheduleClass = {
   detached?: boolean;
   /** 排这节课时越过了哪些可上课时间（软提醒），留痕用。 */
   overrideNote?: string;
+  /**
+   * 审核维度：待审核 / 已通过 / 已驳回。与 status 的成班维度是两件事——
+   * status 说的是人数够不够、有没有被取消，auditStatus 说的是管理员认不认。
+   * 只有已通过的课次才对学生可见。
+   */
+  auditStatus: string;
+  auditReason?: string;
+  auditedBy?: string;
+  auditedAt?: string;
+  createdBy?: string;
+  createdByRole?: string;
   /** 建班时按开课日期落校历判定一次，此后固定不变，不随校历调整或学年切换漂移。 */
   academicYear?: string;
   semester?: string;

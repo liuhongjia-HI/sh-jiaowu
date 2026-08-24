@@ -278,7 +278,8 @@ func homeworkTodoSummary(item learning.Homework) string {
 
 func (s *MemoryStore) nextScheduleTodoClass(studentID string) (learning.ScheduleClass, bool) {
 	for _, item := range s.scheduleClasses {
-		if item.Status == "已取消" {
+		// 与学生课表同一道闸门：待审核的课不能从「下一节课」待办漏出去。
+		if !scheduleVisibleToStudent(item) {
 			continue
 		}
 		for _, student := range item.Students {

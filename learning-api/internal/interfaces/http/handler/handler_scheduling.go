@@ -142,3 +142,35 @@ func (h *LearningHandler) StudentSchedule(c *gin.Context) {
 	}
 	OK(c, classes)
 }
+
+func (h *LearningHandler) PendingScheduleClasses(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	OK(c, h.service.PendingScheduleClasses(principal))
+}
+
+func (h *LearningHandler) ApproveScheduleClass(c *gin.Context) {
+	h.reviewScheduleClass(c, true)
+}
+
+func (h *LearningHandler) RejectScheduleClass(c *gin.Context) {
+	h.reviewScheduleClass(c, false)
+}
+
+func (h *LearningHandler) reviewScheduleClass(c *gin.Context, approve bool) {
+	var req learning.ScheduleAuditRequest
+	// 通过时可以不带 body，驳回理由由 store 层校验必填。
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			BadRequest(c, "invalid request")
+			return
+		}
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.ReviewScheduleClass(operator.(string), principal, c.Param("id"), approve, req.Reason)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}

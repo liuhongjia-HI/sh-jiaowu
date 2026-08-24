@@ -565,6 +565,7 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 		item.ID = existing.ID
 		item.CreatedAt = existing.CreatedAt
 		item.SeriesID = existing.SeriesID
+		carryScheduleAuditFields(existing, &item)
 		// 单独改过的课次就此脱离系列，之后对系列的批量改动一律绕开它。
 		// 这是 split-series 的落点：不必再维护一张例外表和它的一致性。
 		item.Detached = existing.Detached || existing.SeriesID != ""
@@ -710,6 +711,7 @@ func (s *MemoryStore) updateScheduleSeriesUnlocked(operator string, principal le
 		item.ID = target.ID
 		item.CreatedAt = target.CreatedAt
 		item.SeriesID = target.SeriesID
+		carryScheduleAuditFields(target, &item)
 		if target.LessonDate == item.LessonDate && target.CourseID == item.CourseID {
 			item.AcademicYear = target.AcademicYear
 			item.Semester = target.Semester
@@ -843,4 +845,21 @@ func (s *MemoryStore) pendingScheduleClassesUnlocked(principal learning.Principa
 		return out[i].LessonDate < out[j].LessonDate
 	})
 	return out
+}
+
+// carryScheduleAuditFields 把审核轨迹从旧课次搬到重建出来的课次上。
+//
+// buildScheduleClass 是从请求重新构造一节课的，不带审核信息。少了这一步，
+// 管理员改一节已通过的课会让它退回空审核状态，
+// 然后被 scheduleVisibleToStudent 判为不可见——课在学生端直接消失。
+//
+// 审核状态不因为改动而重置：管理员改自己已通过的课仍然有效；
+// 老师改自己待审核的课仍然待审核，改完还得走审核。
+func carryScheduleAuditFields(existing learning.ScheduleClass, item *learning.ScheduleClass) {
+	item.AuditStatus = existing.AuditStatus
+	item.AuditReason = existing.AuditReason
+	item.AuditedBy = existing.AuditedBy
+	item.AuditedAt = existing.AuditedAt
+	item.CreatedBy = existing.CreatedBy
+	item.CreatedByRole = existing.CreatedByRole
 }

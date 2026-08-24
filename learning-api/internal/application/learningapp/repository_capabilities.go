@@ -85,6 +85,8 @@ type SchedulingRepository interface {
 	CreateScheduleClass(string, learning.Principal, learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error)
 	UpdateScheduleClass(string, learning.Principal, string, learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error)
 	CancelScheduleClass(string, learning.Principal, string) (learning.ScheduleClass, error)
+	ReviewScheduleClass(string, learning.Principal, string, bool, string) (learning.ScheduleClass, error)
+	PendingScheduleClasses(learning.Principal) []learning.ScheduleClass
 }
 
 type CommercialRepository interface {

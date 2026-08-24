@@ -871,3 +871,216 @@ func lessonUpdateRequest(lesson learning.ScheduleClass) learning.ScheduleClassCr
 		StudentIDs:      studentIDs,
 	}
 }
+
+// —— 阶段二：排课权限下放与审核 ——
+
+func teacherPrincipal(t *testing.T, store *MemoryStore) learning.Principal {
+	t.Helper()
+	principal, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	return principal
+}
+
+func studentPrincipal() learning.Principal {
+	return learning.Principal{UserID: "stu-001", StudentID: "stu-001", Roles: []learning.Role{learning.RoleStudent}}
+}
+
+func teacherLessonRequest() learning.ScheduleClassCreateRequest {
+	return learning.ScheduleClassCreateRequest{
+		CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main",
+		ClassType: "1V1", DurationMinutes: 90, StartTime: "19:00", EndTime: "20:30",
+		StartDate: "2026-06-03", StudentIDs: []string{"stu-001"},
+	}
+}
+
+// 管理员排课不用再找老师确认，直接生效。
+func TestAdminScheduleIsApprovedImmediately(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("运营教务", ops, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected admin schedule to succeed: %v", err)
+	}
+	if created.AuditStatus != learning.AuditApproved {
+		t.Fatalf("管理员排课应直接通过，实际 %s", created.AuditStatus)
+	}
+}
+
+// 老师排课要经管理员确认，在通过之前学生端一律看不到。
+func TestTeacherScheduleIsPendingAndHiddenFromStudent(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("老师应该可以直接建课: %v", err)
+	}
+	if created.AuditStatus != learning.AuditPending {
+		t.Fatalf("老师排课应落待审核，实际 %s", created.AuditStatus)
+	}
+
+	schedule, err := store.StudentSchedule(studentPrincipal())
+	if err != nil {
+		t.Fatalf("expected student schedule: %v", err)
+	}
+	for _, item := range schedule {
+		if item.ID == created.ID {
+			t.Fatal("待审核的课不能出现在学生课表里")
+		}
+	}
+
+	// 待审核阶段也不该给家长推任何通知。
+	for _, notice := range store.notices {
+		if notice.RelatedType == "schedule" && notice.RelatedID == created.ID {
+			t.Fatalf("待审核的课不应发通知，实际发了 %s", notice.Title)
+		}
+	}
+}
+
+// 审核通过后学生才看得到。
+func TestApprovedTeacherScheduleBecomesVisible(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+
+	pending := store.PendingScheduleClasses(ops)
+	if len(pending) != 1 || pending[0].ID != created.ID {
+		t.Fatalf("待审核队列里应有这节课，实际 %#v", pending)
+	}
+
+	approved, err := store.ReviewScheduleClass("运营教务", ops, created.ID, true, "")
+	if err != nil {
+		t.Fatalf("expected approval to succeed: %v", err)
+	}
+	if approved.AuditStatus != learning.AuditApproved || approved.AuditedBy != "运营教务" {
+		t.Fatalf("通过后应记录审核人，实际 %#v", approved)
+	}
+
+	schedule, err := store.StudentSchedule(studentPrincipal())
+	if err != nil {
+		t.Fatalf("expected student schedule: %v", err)
+	}
+	found := false
+	for _, item := range schedule {
+		if item.ID == created.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("审核通过后学生应能看到这节课")
+	}
+}
+
+// 驳回必须给理由，并且驳回后学生依然看不到。
+func TestRejectRequiresReasonAndStaysHidden(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+	if _, err := store.ReviewScheduleClass("运营教务", ops, created.ID, false, "  "); err == nil {
+		t.Fatal("驳回没给理由时必须拒绝，否则老师不知道要改什么")
+	}
+	rejected, err := store.ReviewScheduleClass("运营教务", ops, created.ID, false, "该时段教室已排满")
+	if err != nil {
+		t.Fatalf("expected rejection to succeed: %v", err)
+	}
+	if rejected.AuditStatus != learning.AuditRejected || rejected.AuditReason != "该时段教室已排满" {
+		t.Fatalf("驳回应记录理由，实际 %#v", rejected)
+	}
+	schedule, _ := store.StudentSchedule(studentPrincipal())
+	for _, item := range schedule {
+		if item.ID == created.ID {
+			t.Fatal("被驳回的课不能出现在学生课表里")
+		}
+	}
+}
+
+// 老师不能审自己的课。
+func TestTeacherCannotApproveOwnSchedule(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+	if _, err := store.ReviewScheduleClass("英语老师", teacher, created.ID, true, ""); err == nil {
+		t.Fatal("老师不能审核自己提交的排课")
+	}
+}
+
+// 老师能改自己待审核的课，但通过之后就不能再单方面改了。
+func TestTeacherEditsOwnPendingLessonOnly(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+	req := lessonUpdateRequest(created)
+	req.StartDate = "2026-06-10"
+	if _, err := store.UpdateScheduleClass("英语老师", teacher, created.ID, req); err != nil {
+		t.Fatalf("老师应能调整自己待审核的课: %v", err)
+	}
+
+	if _, err := store.ReviewScheduleClass("运营教务", ops, created.ID, true, ""); err != nil {
+		t.Fatalf("expected approval: %v", err)
+	}
+	req.StartDate = "2026-06-17"
+	if _, err := store.UpdateScheduleClass("英语老师", teacher, created.ID, req); err == nil {
+		t.Fatal("审核通过后老师不能再单方面改课，否则等于绕过审核")
+	}
+}
+
+// 同一节课不能审两次。
+func TestReviewIsIdempotentGuarded(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+	if _, err := store.ReviewScheduleClass("运营教务", ops, created.ID, true, ""); err != nil {
+		t.Fatalf("expected approval: %v", err)
+	}
+	if _, err := store.ReviewScheduleClass("运营教务", ops, created.ID, false, "反悔了"); err == nil {
+		t.Fatal("已经审过的课不能再审一次")
+	}
+}
+
+// 学生端不止课表一个出口：首页「下一节课」待办也要过同一道闸门。
+func TestPendingLessonHiddenFromStudentTodo(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+	if lesson, ok := store.nextScheduleTodoClass("stu-001"); ok && lesson.ID == created.ID {
+		t.Fatal("待审核的课不能出现在学生首页的待办里")
+	}
+}

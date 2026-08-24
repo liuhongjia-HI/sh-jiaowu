@@ -85,6 +85,11 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/availability", h.Availability)
 	g.PUT("/availability", h.SaveAvailability)
 	g.GET("/schedule-classes", h.ScheduleClasses)
+	// 排课权限下放：老师可以直接建课，落「待审核」，通过后才对学生可见。
+	// 能不能改某一节由 scheduleEditPermission 判定，不靠路由分组区分。
+	g.POST("/schedule-classes", h.CreateScheduleClass)
+	g.PUT("/schedule-classes/:id", h.UpdateScheduleClass)
+	g.POST("/schedule-classes/:id/cancel", h.CancelScheduleClass)
 	g.GET("/banners", h.Banners)
 }
 
@@ -113,9 +118,10 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.POST("/commercial/renewal-reminders", h.CreateRenewalReminder)
 	g.POST("/commercial/parent-notices", h.CreateParentNotice)
 	g.POST("/scheduling/candidates", h.ScheduleCandidates)
-	g.POST("/schedule-classes", h.CreateScheduleClass)
-	g.PUT("/schedule-classes/:id", h.UpdateScheduleClass)
-	g.POST("/schedule-classes/:id/cancel", h.CancelScheduleClass)
+	// 审核动作只给管理员；建课/改课下放给老师，见 registerAdminRoutes。
+	g.GET("/schedule-classes/pending", h.PendingScheduleClasses)
+	g.POST("/schedule-classes/:id/approve", h.ApproveScheduleClass)
+	g.POST("/schedule-classes/:id/reject", h.RejectScheduleClass)
 	g.POST("/banners", h.CreateBanner)
 	g.PUT("/banners/:id", h.UpdateBanner)
 	g.DELETE("/banners/:id", h.DeleteBanner)

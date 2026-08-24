@@ -26,6 +26,12 @@ func (s *Service) UpdateScheduleClass(o string, p learning.Principal, id string,
 func (s *Service) CancelScheduleClass(o string, p learning.Principal, id string) (learning.ScheduleClass, error) {
 	return s.scheduling.CancelScheduleClass(o, p, id)
 }
+func (s *Service) ReviewScheduleClass(o string, p learning.Principal, id string, approve bool, reason string) (learning.ScheduleClass, error) {
+	return s.scheduling.ReviewScheduleClass(o, p, id, approve, reason)
+}
+func (s *Service) PendingScheduleClasses(p learning.Principal) []learning.ScheduleClass {
+	return s.scheduling.PendingScheduleClasses(p)
+}
 func (s *Service) StudentSchedule(p learning.Principal) ([]learning.ScheduleClass, error) {
 	return s.scheduling.StudentSchedule(p)
 }

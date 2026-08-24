@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+
+	"starline/learning-api/internal/domain/learning"
 )
 
 // mysqlIndexedExternalIDLength stays within the utf8mb4 index limit on both
@@ -315,6 +317,15 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"schedule_classes", "lesson_date", "DATE NULL"},
 		{"schedule_classes", "detached", "TINYINT NOT NULL DEFAULT 0"},
 		{"schedule_classes", "override_note", "TEXT NULL"},
+		// 审核维度，与 status 的成班维度分开存。存量数据统一按「已通过」补，
+		// 见 backfillScheduleAuditStatus——升级前排的课本来就是生效状态，
+		// 不能因为加了审核字段就在学生端集体消失。
+		{"schedule_classes", "audit_status", "VARCHAR(16) NOT NULL DEFAULT ''"},
+		{"schedule_classes", "audit_reason", "TEXT NULL"},
+		{"schedule_classes", "audited_by", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"schedule_classes", "audited_at", "DATETIME NULL"},
+		{"schedule_classes", "created_by", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"schedule_classes", "created_by_role", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "external_id", mysqlNoticeExternalIDDefinition},
@@ -392,7 +403,24 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 	if err := s.expandScheduleClassesIntoLessons(); err != nil {
 		return err
 	}
+	if err := s.backfillScheduleAuditStatus(); err != nil {
+		return err
+	}
 	return nil
+}
+
+// backfillScheduleAuditStatus 给升级前的排课补上审核状态。
+//
+// 存量课全部记为「已通过」：它们本来就是生效的安排，学生端也一直看得见。
+// 如果留空，scheduleVisibleToStudent 会把它们全部判为不可见——
+// 升级当天所有学生的课表会一起清空。
+// 只补 audit_status 为空的行，重复执行安全。
+func (s *MemoryStore) backfillScheduleAuditStatus() error {
+	_, err := s.db.Exec(
+		`UPDATE schedule_classes SET audit_status = ? WHERE audit_status = ''`,
+		learning.AuditApproved,
+	)
+	return err
 }
 
 // expandScheduleClassesIntoLessons 把升级前的排课记录展开成课次。
