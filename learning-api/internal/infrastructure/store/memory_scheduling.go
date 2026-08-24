@@ -299,6 +299,13 @@ func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal lea
 		item.SeriesID = seriesID
 		item.ID = "schedule-" + stamp + "-" + itoa(index)
 		item.CreatedAt = createdAt
+		item.CreatedBy = operator
+		item.CreatedByRole = schedulePrincipalRole(principal)
+		item.AuditStatus = initialAuditStatus(principal)
+		if item.AuditStatus == learning.AuditApproved {
+			item.AuditedBy = operator
+			item.AuditedAt = createdAt
+		}
 		built = append(built, item)
 	}
 
@@ -311,13 +318,46 @@ func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal lea
 	first := built[0]
 	// 通知按课次发，但一次重复排课只给学生发一条汇总，避免一口气排 40 节
 	// 就往家长那边推 40 条模板消息。
-	if first.Status == "已确认" {
+	// 待审核的课不发通知：还没被管理员认可的安排不能先惊动家长。
+	if first.AuditStatus == learning.AuditApproved && first.Status == "已确认" {
 		s.notifyScheduleClass(first, "课程已安排", "已安排")
-		s.prependLog(operator, "确认排课", scheduleBatchLogTarget(first, len(built)))
-	} else {
-		s.prependLog(operator, "创建待确认排课", scheduleBatchLogTarget(first, len(built)))
 	}
+	s.prependLog(operator, scheduleCreateLogAction(first), scheduleBatchLogTarget(first, len(built)))
 	return cloneScheduleClass(first), nil
+}
+
+// 老师排的课要经管理员确认；管理员自己排的课直接生效，不用再找老师确认。
+func initialAuditStatus(principal learning.Principal) string {
+	if scheduleCanApprove(principal) {
+		return learning.AuditApproved
+	}
+	return learning.AuditPending
+}
+
+func scheduleCanApprove(principal learning.Principal) bool {
+	return hasRole(principal.Roles, learning.RoleSuperAdmin) ||
+		hasRole(principal.Roles, learning.RoleCampusAdmin) ||
+		hasRole(principal.Roles, learning.RoleOpsStaff)
+}
+
+func schedulePrincipalRole(principal learning.Principal) string {
+	if scheduleCanApprove(principal) {
+		return "admin"
+	}
+	if hasRole(principal.Roles, learning.RoleTeacher) {
+		return string(learning.RoleTeacher)
+	}
+	return ""
+}
+
+func scheduleCreateLogAction(item learning.ScheduleClass) string {
+	if item.AuditStatus == learning.AuditPending {
+		return "提交待审核排课"
+	}
+	if item.Status == "已确认" {
+		return "确认排课"
+	}
+	return "创建待成班排课"
 }
 
 func scheduleBatchLogTarget(item learning.ScheduleClass, count int) string {
@@ -501,8 +541,8 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 		if !s.canSeeScheduleClass(principal, existing) {
 			return learning.ScheduleClass{}, errors.New("没有权限调整该课程")
 		}
-		if hasRole(principal.Roles, learning.RoleTeacher) || hasRole(principal.Roles, learning.RoleStudent) {
-			return learning.ScheduleClass{}, errors.New("请联系教务调整课程")
+		if err := scheduleEditPermission(principal, existing); err != nil {
+			return learning.ScheduleClass{}, err
 		}
 		if existing.Status == "已取消" {
 			return learning.ScheduleClass{}, errors.New("已取消课程不能调课")
@@ -562,8 +602,8 @@ func (s *MemoryStore) cancelScheduleClassUnlocked(operator string, principal lea
 		if !s.canSeeScheduleClass(principal, item) {
 			return learning.ScheduleClass{}, errors.New("没有权限取消该课程")
 		}
-		if hasRole(principal.Roles, learning.RoleTeacher) || hasRole(principal.Roles, learning.RoleStudent) {
-			return learning.ScheduleClass{}, errors.New("请联系教务调整课程")
+		if err := scheduleEditPermission(principal, item); err != nil {
+			return learning.ScheduleClass{}, err
 		}
 		if item.Status == "已取消" {
 			return cloneScheduleClass(item), nil
@@ -705,4 +745,102 @@ func scheduleScopeLogAction(scope string) string {
 		return "调整整个系列排课"
 	}
 	return "调整本次及后续排课"
+}
+
+// scheduleEditPermission 决定谁能改一节已经排好的课。
+//
+// 管理员随时可以改。老师只能改自己提交、且还没被审核通过的课：
+// 一旦通过，学生和家长已经看到并按这个时间安排了，再让老师单方面改
+// 等于绕过审核——那种情况走教务。
+func scheduleEditPermission(principal learning.Principal, item learning.ScheduleClass) error {
+	if scheduleCanApprove(principal) {
+		return nil
+	}
+	if hasRole(principal.Roles, learning.RoleTeacher) {
+		if item.TeacherID != principal.UserID {
+			return errors.New("只能调整自己的课程")
+		}
+		if item.AuditStatus != learning.AuditPending {
+			return errors.New("该课程已通过审核，请联系教务调整")
+		}
+		return nil
+	}
+	return errors.New("请联系教务调整课程")
+}
+
+// reviewScheduleClassUnlocked 是管理员对老师提交的排课作出裁决的唯一入口。
+// approve=false 时必须给理由，否则老师不知道要改什么。
+func (s *MemoryStore) reviewScheduleClassUnlocked(operator string, principal learning.Principal, id string, approve bool, reason string) (learning.ScheduleClass, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.ScheduleClass, error) {
+			return work.reviewScheduleClassUnlocked(operator, principal, id, approve, reason)
+		})
+	}
+	if !scheduleCanApprove(principal) {
+		return learning.ScheduleClass{}, errors.New("没有权限审核排课")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return learning.ScheduleClass{}, errors.New("请选择要审核的课程")
+	}
+	reason = strings.TrimSpace(reason)
+	if !approve && reason == "" {
+		return learning.ScheduleClass{}, errors.New("驳回时请填写理由")
+	}
+	if len([]rune(reason)) > 255 {
+		return learning.ScheduleClass{}, errors.New("审核理由最多255个字")
+	}
+	for index, existing := range s.scheduleClasses {
+		if existing.ID != id {
+			continue
+		}
+		if existing.Status == "已取消" {
+			return learning.ScheduleClass{}, errors.New("已取消课程不需要审核")
+		}
+		if existing.AuditStatus != learning.AuditPending {
+			return learning.ScheduleClass{}, errors.New("该课程已经审核过了")
+		}
+		item := existing
+		item.AuditReason = reason
+		item.AuditedBy = operator
+		item.AuditedAt = time.Now().Format("2006-01-02 15:04:05")
+		if approve {
+			item.AuditStatus = learning.AuditApproved
+		} else {
+			item.AuditStatus = learning.AuditRejected
+		}
+		s.scheduleClasses[index] = cloneScheduleClass(item)
+		// 通知只在通过之后才发：驳回的课学生本来就没见过，不该收到任何提醒。
+		if item.AuditStatus == learning.AuditApproved && item.Status == "已确认" {
+			s.notifyScheduleClass(item, "课程已安排", "已安排")
+		}
+		action := "驳回排课"
+		if approve {
+			action = "通过排课审核"
+		}
+		s.prependLogDetail(operator, action, item.Name+" / "+item.TeacherName+" / "+item.LessonDate, reason)
+		return cloneScheduleClass(item), nil
+	}
+	return learning.ScheduleClass{}, errors.New("课程不存在")
+}
+
+// pendingScheduleClassesUnlocked 返回待审核队列。
+func (s *MemoryStore) pendingScheduleClassesUnlocked(principal learning.Principal) []learning.ScheduleClass {
+	out := make([]learning.ScheduleClass, 0)
+	for _, item := range s.scheduleClasses {
+		if item.AuditStatus != learning.AuditPending || item.Status == "已取消" {
+			continue
+		}
+		if !s.canSeeScheduleClass(principal, item) {
+			continue
+		}
+		out = append(out, cloneScheduleClass(item))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].LessonDate == out[j].LessonDate {
+			return out[i].StartTime < out[j].StartTime
+		}
+		return out[i].LessonDate < out[j].LessonDate
+	})
+	return out
 }

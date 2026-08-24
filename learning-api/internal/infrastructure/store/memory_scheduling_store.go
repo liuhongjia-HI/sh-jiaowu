@@ -199,6 +199,11 @@ func (s *MemoryStore) canSeeScheduleClass(principal learning.Principal, item lea
 		return item.TeacherID == principal.UserID
 	}
 	if hasRole(principal.Roles, learning.RoleStudent) {
+		// 纵深防御：学生走的是 /student/schedule，够不到这个接口，
+		// 但这是个安全谓词，未通过审核的课在这里也一律不认。
+		if !scheduleVisibleToStudent(item) {
+			return false
+		}
 		for _, student := range item.Students {
 			if student.ID == principal.StudentID {
 				return true

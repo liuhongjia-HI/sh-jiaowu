@@ -18,6 +18,9 @@ func (s *MemoryStore) studentScheduleUnlocked(principal learning.Principal) ([]l
 	}
 	out := make([]learning.ScheduleClass, 0)
 	for _, item := range s.scheduleClasses {
+		if !scheduleVisibleToStudent(item) {
+			continue
+		}
 		for _, student := range item.Students {
 			if student.ID == principal.StudentID {
 				out = append(out, cloneScheduleClass(item))
@@ -26,6 +29,13 @@ func (s *MemoryStore) studentScheduleUnlocked(principal learning.Principal) ([]l
 		}
 	}
 	return out, nil
+}
+
+// scheduleVisibleToStudent 是学生端课表的唯一闸门。
+// 老师提交但管理员还没通过的课，学生和家长一律看不到——否则老师随手排一节，
+// 家长就当成板上钉钉的安排了。已取消的课同理不再露出。
+func scheduleVisibleToStudent(item learning.ScheduleClass) bool {
+	return item.AuditStatus == learning.AuditApproved && item.Status != "已取消"
 }
 
 func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, courseID string) (learning.StudentCourseDetail, error) {

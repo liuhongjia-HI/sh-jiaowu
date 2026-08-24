@@ -115,6 +115,18 @@ type ScheduleClass struct {
 	Students             []CandidateStudent `json:"students"`
 	ExpectedStudentCount int                `json:"expectedStudentCount"`
 	ReservationNote      string             `json:"reservationNote,omitempty"`
+	// 审核维度，与 Status 的「成班维度」是两件事，不要混用：
+	//   Status      = 待确认 / 已确认 / 已取消 —— 人数够不够、有没有被取消
+	//   AuditStatus = 待审核 / 已通过 / 已驳回 —— 管理员认不认这节课
+	// 两者共用「确认」二字会让谁都说不清，所以审核这边换一套词。
+	// 只有 AuditStatus == AuditApproved 的课次才对学生可见、才发通知。
+	AuditStatus string `json:"auditStatus"`
+	AuditReason string `json:"auditReason,omitempty"`
+	AuditedBy   string `json:"auditedBy,omitempty"`
+	AuditedAt   string `json:"auditedAt,omitempty"`
+	// CreatedBy/CreatedByRole 记录是谁排的这节课：老师排的要审，管理员排的直接生效。
+	CreatedBy     string `json:"createdBy,omitempty"`
+	CreatedByRole string `json:"createdByRole,omitempty"`
 	// OverrideNote 记录这节课越过了哪些软校验（谁的可上课时间）。
 	// 把可上课时间从硬拦截降级为软提醒的前提就是越界必须可追溯。
 	OverrideNote string `json:"overrideNote,omitempty"`
@@ -138,6 +150,19 @@ type ScheduleRepeat struct {
 // 需要「修改重复规则本身并重新展开」时才有价值，那是后续迭代的事；
 // 现阶段「整个系列」的语义是批量改属性（时间、老师、教室），
 // 改规则本身走「删了重排」——Outlook 实际也是这么做的。
+
+// 审核状态。管理员排课直接落 AuditApproved；老师排课落 AuditPending，
+// 经管理员通过后才对学生可见。
+const (
+	AuditPending  = "待审核"
+	AuditApproved = "已通过"
+	AuditRejected = "已驳回"
+)
+
+// 审核请求。驳回必须给理由，否则老师不知道要改什么。
+type ScheduleAuditRequest struct {
+	Reason string `json:"reason"`
+}
 
 // 编辑范围。拖动或修改重复课次时必须由调用方明确指定，
 // 与 Outlook 的「仅此课次 / 此课次及后续 / 整个系列」一一对应。
