@@ -26,7 +26,6 @@ import {
   weekLabel,
   weekOptions
 } from './scheduling-utils';
-import { CandidatePanel, CoordinationPanel } from './CandidatePanel';
 import {
   MiniMonthCalendar,
   MonthScheduleBoard,
@@ -42,6 +41,10 @@ import {
   filterClasses,
   groupScheduleItems,
   parseOwnerKey,
+  RepeatFields,
+  buildRepeatPayload,
+  type RepeatFormValues,
+  type ScheduleRepeatValues,
   pendingReviewColumns,
   scheduleClassPayload,
   type ScheduleMoveTarget,
@@ -69,14 +72,6 @@ type CandidateFormValues = {
 type AvailabilityFormValues = {
   ownerKey: string;
   slots: AvailabilitySlot[];
-};
-
-type ScheduleRepeatValues = {
-  freq: 'daily' | 'weekly';
-  interval: number;
-  byDay?: number[];
-  until?: string;
-  count?: number;
 };
 
 type ScheduleClassFormValues = {
@@ -144,14 +139,11 @@ type WeekDay = {
 const classTypeOptions = ['1V1', '1V2', '1V3', '1V4'].map((value) => ({ label: value, value }));
 export default function Scheduling({ user }: { user: CurrentUser }) {
   const [availabilityForm] = Form.useForm<AvailabilityFormValues>();
-  const [candidateForm] = Form.useForm<CandidateFormValues>();
   const [editForm] = Form.useForm<ScheduleClassFormValues>();
-  const [candidateRequest, setCandidateRequest] = useState<CandidateFormValues | null>(null);
   // 侧栏（迷你日历 / 学科日历 / 筛选）默认收起：它们是「偶尔用一次」的辅助工具，
   // 常驻展开会占掉 260px，把真正要看的排班网格挤窄一档。收起后留一条竖栏可随时展开，
   // 并在上面标出生效中的筛选条数——否则筛选被藏起来，结果变少却看不出原因。
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<ScheduleCandidate | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedCampusId, setSelectedCampusId] = useState(user.campusId || 'campus-main');
   const [editingClass, setEditingClass] = useState<ScheduleClass | null>(null);
@@ -159,8 +151,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [moveScopeRequest, setMoveScopeRequest] = useState<{ record: ScheduleClass; target: ScheduleMoveTarget } | null>(null);
   const [moveScope, setMoveScope] = useState<'this' | 'thisAndFuture' | 'all'>('this');
   const [creatingClass, setCreatingClass] = useState(false);
+  // 重复排课默认关闭：绝大多数排课是单节，默认展开一堆重复选项只会碍事。
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
   // 默认停在资源泳道日视图：这是排课场景真正读得清的密度，周视图退居总览。
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month' | 'list'>('day');
   const [classGradeFilter, setClassGradeFilter] = useState<string>();
@@ -200,7 +193,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   });
 
   const ownerKey = Form.useWatch('ownerKey', availabilityForm);
-  const gradeWatch = Form.useWatch('grade', candidateForm);
   const editingClassType = Form.useWatch('classType', editForm);
   const editingStudentIDs = Form.useWatch('studentIds', editForm) ?? [];
   const editingTeacherId = Form.useWatch('teacherId', editForm);
@@ -214,12 +206,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     queryKey: ['availability', owner?.ownerType, owner?.ownerId],
     enabled: Boolean(owner),
     queryFn: () => getData<AvailabilitySlot[]>('/availability', { ownerType: owner?.ownerType ?? '', ownerId: owner?.ownerId ?? '' })
-  });
-
-  const candidates = useQuery({
-    queryKey: ['schedule-candidates', candidateRequest],
-    enabled: Boolean(candidateRequest),
-    queryFn: () => postData<ScheduleCandidate[]>('/scheduling/candidates', candidateRequest)
   });
 
   const saveAvailability = useMutation({
@@ -236,39 +222,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       message.success('可上课时间已保存');
       queryClient.invalidateQueries({ queryKey: ['availability'] });
       queryClient.invalidateQueries({ queryKey: ['availability-overview'] });
-      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
     onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请检查星期和时间段。')
-  });
-
-  const createClass = useMutation({
-    mutationFn: () => {
-      if (!selectedCandidate || !candidateRequest) throw new Error('请选择候选方案');
-      return postData<ScheduleClass>('/schedule-classes', {
-        courseId: selectedCandidate.courseId,
-        teacherId: selectedCandidate.teacherId,
-        campusId: selectedCampusId,
-        roomName: '',
-        classType: selectedCandidate.classType,
-        durationMinutes: candidateRequest.durationMinutes,
-        dayOfWeek: selectedCandidate.dayOfWeek,
-        startTime: selectedCandidate.startTime,
-        endTime: selectedCandidate.endTime,
-        startDate: candidateRequest.startDate,
-        endDate: candidateRequest.endDate,
-        studentIds: selectedStudentIds,
-        expectedStudentCount: selectedCandidate.capacity,
-        reservationNote: ''
-      });
-    },
-    onSuccess: (record) => {
-      message.success(record.status === '待确认' ? '已锁定时间段，课程待确认' : '已确认成班，课表已生成');
-      setSelectedCandidate(null);
-      setSelectedStudentIds([]);
-      queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
-      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
-    },
-    onError: (error) => message.error(error instanceof Error ? error.message : '确认排课失败，请检查人数和时间冲突。')
   });
 
   const cancelClass = useMutation({
@@ -277,7 +232,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       message.success('课程已取消，可重新生成候选排课');
       setEditingClass(null);
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
-      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
     onError: (error) => message.error(error instanceof Error ? error.message : '取消课程失败，请稍后重试。')
   });
@@ -289,7 +243,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       setCreatingClass(false);
       editForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
-      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
     onError: (error) => message.error(error instanceof Error ? error.message : '创建课程失败，请稍后重试。')
   });
@@ -303,7 +256,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       message.success(record.status === '待确认' ? '调课已保存，当前课程待确认' : '调课已保存');
       setEditingClass(null);
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
-      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
     onError: (error) => message.error(error instanceof Error ? error.message : '调课失败，请稍后重试。')
   });
@@ -325,7 +277,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     onSuccess: () => {
       message.success('调课已保存');
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
-      queryClient.invalidateQueries({ queryKey: ['schedule-candidates'] });
     },
     onError: (error) => message.error(error instanceof Error ? error.message : '调课失败，请稍后重试。')
   });
@@ -457,6 +408,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
   function openEdit(record: ScheduleClass) {
     setCreatingClass(false);
+    setRepeatEnabled(false);
     setEditingClass(record);
     editForm.setFieldsValue({
       courseId: record.courseId,
@@ -480,6 +432,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     if (!canCreateClass) return;
     setEditingClass(null);
     setCreatingClass(true);
+    setRepeatEnabled(false);
     editForm.setFieldsValue({
       courseId: undefined,
       teacherId: undefined,
@@ -572,90 +525,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         </Card>
       )}
 
-      <Card title="查找可排时间">
-        {canCreateClass ? (
-          <Form
-            form={candidateForm}
-            layout="vertical"
-            className="schedule-search-form"
-            initialValues={{ classType: '1V4', durationMinutes: 90, startDate: new Date().toISOString().slice(0, 10) }}
-            onFinish={(values) => {
-              setSelectedCandidate(null);
-              setSelectedStudentIds([]);
-              setCandidateRequest(values);
-            }}
-          >
-            <div className="schedule-search-main">
-              <Form.Item name="grade" label="年级" rules={[{ required: true, message: '请选择年级' }]}>
-                <Select showSearch optionFilterProp="label" placeholder="选择年级" options={gradeOptions()} />
-              </Form.Item>
-              <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]}>
-                <Select showSearch optionFilterProp="label" placeholder="选择学科" options={subjectOptions(gradeWatch)} />
-              </Form.Item>
-              <Form.Item name="classType" label="班型">
-                <Select options={classTypeOptions} />
-              </Form.Item>
-              <Button type="primary" htmlType="submit" icon={<CalendarOutlined />} loading={candidates.isFetching}>查找可排时间</Button>
-            </div>
-
-            <Button type="link" icon={<SettingOutlined />} className="schedule-more-toggle" onClick={() => setMoreSettingsOpen((value) => !value)}>
-              {moreSettingsOpen ? '收起更多设置' : '更多设置'}
-            </Button>
-
-            {moreSettingsOpen && (
-              <div className="schedule-more-settings">
-                <Form.Item name="durationMinutes" label="课长">
-                  <InputNumber min={30} step={30} addonAfter="分钟" style={{ width: '100%' }} />
-                </Form.Item>
-                <Form.Item name="startDate" label="开始日期">
-                  <Input placeholder="2026-06-01" />
-                </Form.Item>
-                <Form.Item name="endDate" label="结束日期">
-                  <Input placeholder="2026-08-31" />
-                </Form.Item>
-              </div>
-            )}
-          </Form>
-        ) : (
-          <Alert type="info" message="当前账号可维护自己的可授课时间，并查看已确认课表。候选排班和确认成班由教务处理。" />
-        )}
-      </Card>
-
-      {canCreateClass && candidateRequest && readyCandidates.length > 0 && (
-        <Card title="可排方案" extra={<Typography.Text type="secondary">满班优先，点「确认成班」即可生成课表</Typography.Text>}>
-          <div className="schedule-candidate-list">
-            {readyCandidates.map((candidate) => (
-              <CandidatePanel
-                key={candidate.id}
-                candidate={candidate}
-                teacher={teacherById[candidate.teacherId]}
-                selected={candidate.id === selectedCandidate?.id}
-                teacherText={(name, teacher) => teacherDisplay(name, undefined, teacher)}
-                studentText={studentDisplayNames}
-                onPick={() => {
-                  setSelectedCandidate(candidate);
-                  setSelectedStudentIds(candidate.availableStudents.slice(0, candidate.capacity).map((student) => student.id));
-                  setSelectedCampusId(user.campusId || 'campus-main');
-                }}
-              />
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {canCreateClass && candidateRequest && shortCandidates.length > 0 && (
-        <Card title="协调建议" extra={<Typography.Text type="secondary">时间凑不齐成班，按下方提示协调师生时间后重新查找</Typography.Text>}>
-          <CoordinationPanel
-            candidates={shortCandidates}
-            teacherById={teacherById}
-            onCoordinate={openAvailabilityFor}
-            teacherText={(name, teacher) => teacherDisplay(name, undefined, teacher)}
-            studentText={studentDisplayNames}
-            studentLabel={studentDisplayName}
-          />
-        </Card>
-      )}
-
       <Card
         // 标题跟着视图走：默认已经是日视图，再顶着「周排班」会让人以为切错了。
         title={viewMode === 'day' ? '排班工作台 · 按老师看一天' : viewMode === 'week' ? '排班工作台 · 周总览' : '排班工作台'}
@@ -681,14 +550,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             <div className="schedule-summary-item">
               <span>可上课时间</span>
               <strong>{availabilitySummary.total}</strong>
-            </div>
-            <div className="schedule-summary-item">
-              <span>推荐方案</span>
-              <strong>{recommendedCount}</strong>
-            </div>
-            <div className="schedule-summary-item">
-              <span>待协调时段</span>
-              <strong>{shortCandidates.length}</strong>
             </div>
           </div>
 
@@ -951,42 +812,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       </Drawer>
 
       <Drawer
-        title="确认这个时间"
-        open={Boolean(selectedCandidate)}
-        width={480}
-        onClose={() => setSelectedCandidate(null)}
-        extra={<Button type="primary" loading={createClass.isPending} onClick={() => createClass.mutate()}>确认成班</Button>}
-      >
-        {selectedCandidate && (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <div className="schedule-action-summary">
-              <Tag color={candidateLevelMeta(candidateLevel(selectedCandidate)).color}>{candidateLevelMeta(candidateLevel(selectedCandidate)).label}</Tag>
-              <Typography.Title level={5}>{courseSubjectGradeText(courseById[selectedCandidate.courseId], selectedCandidate.courseName)}</Typography.Title>
-              <Typography.Text type="secondary">{selectedCandidate.courseName}</Typography.Text>
-              <Typography.Text>{weekLabel(selectedCandidate.dayOfWeek)} {selectedCandidate.startTime}-{selectedCandidate.endTime}</Typography.Text>
-              <Typography.Text type="secondary">{teacherDisplay(selectedCandidate.teacherName, courseById[selectedCandidate.courseId], teacherById[selectedCandidate.teacherId])} · {selectedCandidate.classType} · {selectedCandidate.studentCount}/{selectedCandidate.capacity}</Typography.Text>
-              <Typography.Text type="secondary">学生：{studentDisplayNames(selectedCandidate.availableStudents)}</Typography.Text>
-            </div>
-            <Form layout="vertical">
-              <Form.Item label="学生">
-                <Select
-                  mode="multiple"
-                  value={selectedStudentIds}
-                  onChange={setSelectedStudentIds}
-                  options={selectedCandidate.availableStudents.map((student) => ({ label: studentOptionLabel(student), value: student.id }))}
-                  maxCount={selectedCandidate.capacity}
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-              <Form.Item label="校区">
-                <Input value={selectedCampusId} onChange={(event) => setSelectedCampusId(event.target.value)} placeholder="campus-main" />
-              </Form.Item>
-            </Form>
-          </Space>
-        )}
-      </Drawer>
-
-      <Drawer
         title={creatingClass ? '新建课程' : '课程详情'}
         open={Boolean(editingClass) || creatingClass}
         width={560}
@@ -1033,9 +858,11 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           // 一条记录就是一节课，日期只收 startDate；重复排课由 repeat 展开成多节。
           // ignoreWarnings：越出可上课时间只是软提醒，用户看到上面的提示后仍可继续，
           // 后端会把这次越界记进 overrideNote。
-          const payload = { ...values, ignoreWarnings: availabilityGaps.length > 0 };
+          const { repeat, ...rest } = values as ScheduleClassFormValues & { repeat?: RepeatFormValues };
+          const payload = { ...rest, ignoreWarnings: availabilityGaps.length > 0 };
           if (creatingClass) {
-            createManualClass.mutate(payload);
+            // 开关关着时不带 repeat 字段，后端据此判定只排一节。
+            createManualClass.mutate(repeatEnabled && repeat ? { ...payload, repeat: buildRepeatPayload(repeat) } : payload);
             return;
           }
           // 改重复课次时要带上影响范围；这里是抽屉里的逐项修改，只作用于这一节。
@@ -1066,9 +893,20 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Input placeholder="20:30" />
             </Form.Item>
           </Space.Compact>
-          <Form.Item name="startDate" label="上课日期" rules={[{ required: true, message: '请选择上课日期' }]}>
+          <Form.Item name="startDate" label={creatingClass && repeatEnabled ? '首节上课日期' : '上课日期'} rules={[{ required: true, message: '请选择上课日期' }]}>
             <Input placeholder="2026-06-03" />
           </Form.Item>
+
+          {/* 重复规则只在新建时出现：一节已经排好的课谈不上「重复几次」，
+              要改重复方式就是删了重排。 */}
+          {creatingClass && (
+            <RepeatFields
+              enabled={repeatEnabled}
+              onToggle={setRepeatEnabled}
+              startDate={editingStartDate}
+              form={editForm}
+            />
+          )}
           <Form.Item
             name="studentIds"
             label={`学生（已选 ${editingStudentIDs.length}/${classCapacity(editingClassType)}）`}

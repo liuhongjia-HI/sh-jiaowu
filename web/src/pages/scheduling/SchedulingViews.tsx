@@ -1,6 +1,6 @@
 import { CalendarOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Skeleton, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import type { TableColumnsType } from 'antd';
+import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Skeleton, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import type { FormInstance, TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
@@ -21,7 +21,8 @@ import {
   startOfMonth,
   startOfWeek,
   weekLabel,
-  weekOptions
+  weekOptions,
+  weekdayOfDateText
 } from './scheduling-utils';
 import { CandidatePanel, CoordinationPanel } from './CandidatePanel';
 
@@ -39,7 +40,7 @@ type AvailabilityFormValues = {
   slots: AvailabilitySlot[];
 };
 
-type ScheduleRepeatValues = {
+export type ScheduleRepeatValues = {
   freq: 'daily' | 'weekly';
   interval: number;
   byDay?: number[];
@@ -1791,4 +1792,144 @@ function RejectButton({
       <Button size="small" danger>驳回</Button>
     </Popover>
   );
+}
+
+// 重复排课表单。对应后端 ScheduleRepeat（RRULE 的一个子集）。
+//
+// 结束方式必须二选一：只按次数、或只按日期。两个都留着的话，
+// 「每周一次、共 10 次、到 6 月 30 日止」这种输入没人说得清以谁为准，
+// 后端也会直接拒绝。
+export function RepeatFields({
+  enabled,
+  onToggle,
+  startDate,
+  form
+}: {
+  enabled: boolean;
+  onToggle: (next: boolean) => void;
+  startDate?: string;
+  form: FormInstance;
+}) {
+  const freq = Form.useWatch(['repeat', 'freq'], form) ?? 'weekly';
+  const endMode = Form.useWatch(['repeat', 'endMode'], form) ?? 'count';
+  const interval = Form.useWatch(['repeat', 'interval'], form) ?? 1;
+  const byDay = Form.useWatch(['repeat', 'byDay'], form) as number[] | undefined;
+  const startWeekday = weekdayOfDateText(startDate);
+
+  return (
+    <>
+      <Form.Item label="重复">
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Switch
+            checked={enabled}
+            onChange={onToggle}
+            checkedChildren="重复排课"
+            unCheckedChildren="只排一节"
+          />
+          {enabled && (
+            <>
+              <Space.Compact block>
+                <Form.Item name={['repeat', 'freq']} noStyle initialValue="weekly">
+                  <Select
+                    style={{ width: '34%' }}
+                    options={[
+                      { label: '按周', value: 'weekly' },
+                      { label: '按日', value: 'daily' }
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item name={['repeat', 'interval']} noStyle initialValue={1}>
+                  <InputNumber
+                    min={1}
+                    max={52}
+                    style={{ width: '33%' }}
+                    addonBefore="每"
+                    addonAfter={freq === 'daily' ? '天' : '周'}
+                  />
+                </Form.Item>
+                <Form.Item name={['repeat', 'endMode']} noStyle initialValue="count">
+                  <Select
+                    style={{ width: '33%' }}
+                    options={[
+                      { label: '按次数结束', value: 'count' },
+                      { label: '按日期结束', value: 'until' }
+                    ]}
+                  />
+                </Form.Item>
+              </Space.Compact>
+
+              {freq === 'weekly' && (
+                <Form.Item name={['repeat', 'byDay']} noStyle>
+                  <Select
+                    mode="multiple"
+                    allowClear
+                    style={{ width: '100%' }}
+                    placeholder={startWeekday ? `默认跟随首节：${weekLabel(startWeekday)}` : '默认跟随首节上课日期'}
+                    options={weekOptions}
+                  />
+                </Form.Item>
+              )}
+
+              {endMode === 'count' ? (
+                <Form.Item name={['repeat', 'count']} noStyle initialValue={4}>
+                  <InputNumber min={1} max={200} style={{ width: '100%' }} addonBefore="共" addonAfter="节" />
+                </Form.Item>
+              ) : (
+                <Form.Item name={['repeat', 'until']} noStyle>
+                  <Input placeholder="重复到（含）2026-06-30" />
+                </Form.Item>
+              )}
+
+              <Typography.Text type="secondary">
+                {repeatSummaryText(freq, interval, byDay, startWeekday, endMode)}
+                。不会自动跳过节假日和寒暑假，需要跳过的课次请排完后单独取消。单次最多生成 200 节。
+              </Typography.Text>
+            </>
+          )}
+        </Space>
+      </Form.Item>
+    </>
+  );
+}
+
+function repeatSummaryText(
+  freq: string,
+  interval: number,
+  byDay: number[] | undefined,
+  startWeekday: number,
+  endMode: string
+) {
+  const every = interval > 1 ? `每 ${interval} ` : '每';
+  if (freq === 'daily') {
+    return `${every}${interval > 1 ? '天' : '天'}排一节`;
+  }
+  const days = byDay && byDay.length > 0 ? byDay : (startWeekday ? [startWeekday] : []);
+  const dayText = days.length > 0 ? days.map(weekLabel).join('、') : '首节所在星期';
+  return `${every}${interval > 1 ? '周' : '周'}的 ${dayText} 各排一节，${endMode === 'count' ? '到指定节数为止' : '到指定日期为止'}`;
+}
+
+// endMode 是纯前端的开关，后端只认 until / count 二选一，不认这个字段。
+export type RepeatFormValues = {
+  freq?: string;
+  interval?: number;
+  byDay?: number[];
+  endMode?: string;
+  count?: number;
+  until?: string;
+};
+
+// 表单里的重复规则转成后端要的形状。
+export function buildRepeatPayload(values: RepeatFormValues): ScheduleRepeatValues {
+  const freq: ScheduleRepeatValues['freq'] = values.freq === 'daily' ? 'daily' : 'weekly';
+  const payload: ScheduleRepeatValues = {
+    freq,
+    interval: values.interval && values.interval > 0 ? values.interval : 1
+  };
+  if (freq === 'weekly' && values.byDay && values.byDay.length > 0) payload.byDay = values.byDay;
+  if (values.endMode === 'until') {
+    payload.until = (values.until ?? '').trim();
+  } else {
+    payload.count = values.count && values.count > 0 ? values.count : 1;
+  }
+  return payload;
 }
