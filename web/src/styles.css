@@ -1855,15 +1855,6 @@ button.schedule-block:hover {
   white-space: nowrap;
 }
 
-.month-class-text em {
-  color: #64748b;
-  font-style: normal;
-}
-
-.month-class-text em::before {
-  content: ' · ';
-}
-
 .month-class.is-canceled {
   border-color: #d1d5db;
   background: #f3f4f6;

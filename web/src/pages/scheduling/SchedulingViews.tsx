@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
-import { gradeOptions, subjectOptions } from '../../utils/curriculum';
+import { GRADES, gradeOptions, subjectOptions } from '../../utils/curriculum';
 import type { AvailabilitySlot, Course, CurrentUser, ScheduleClass, Student, Teacher } from '../../types/starline';
 import {
   addDays,
@@ -1016,6 +1016,31 @@ function startTimelineResize(
   target.addEventListener('pointercancel', finish);
 }
 
+// 课次在日历上的标题，按客户在 Outlook 里的约定拼：教师 年级 科目 学生
+//（对照 Clara G5 Eng Zoe&Arthur）。
+//
+// 这里实时派生，不用后端存的 record.name。标题是派生数据，存下来就会过时：
+// 老师改个名、班里加个学生，存的那份就和实际对不上了。后端仍然存一份，
+// 但那是给操作日志和通知用的历史快照，两者用途不同。
+export function scheduleLessonTitle(item: ScheduleClass, course?: Course, teacher?: Teacher) {
+  const teacherName = resourceLaneTeacherName(item.teacherId, item.teacherName, teacher);
+  const grade = gradeCode(course?.grade);
+  const subject = scheduleClassSubject(item, course ? { [course.id]: course } : {});
+  const subjectText = subject ? subjectShortLabel(subject) : '';
+  const students = item.students.map(studentDisplayName).filter(Boolean).join('&');
+  const parts = [teacherName, grade, subjectText, students].filter(Boolean);
+  // 一个字段都拼不出来时退回后端存的标题，宁可显示旧格式也不显示空白。
+  return parts.length > 0 ? parts.join(' ') : item.name;
+}
+
+// 「五年级」→「G5」，与后端 gradeCode 保持同一套记号。
+// 认不出的年级原样返回，不吞掉。
+export function gradeCode(grade?: string) {
+  const text = (grade ?? '').trim();
+  const index = GRADES.indexOf(text);
+  return index >= 0 ? `G${index + 1}` : text;
+}
+
 // 重复课次的标记。客户的 Outlook 里每个重复课次右下角都有这个回环图标。
 //
 // 这不只是好看：拖动重复课次时会弹「仅此课次 / 此课次及后续 / 整个系列」，
@@ -1060,14 +1085,12 @@ function MonthClassEntry({
   onCopyClass: (record: ScheduleClass) => void;
 }) {
   const editable = canManage && item.status !== '已取消';
-  const teacherName = resourceLaneTeacherName(item.teacherId, item.teacherName, teacher);
-  const grade = course?.grade ?? '';
+  // 与日/周视图共用同一个标题规则（教师 年级 科目短标签 学生），
+  // 月视图不该是另一套写法——同一节课在三个视图里读起来必须一致。
+  const label = scheduleLessonTitle(item, course, teacher);
   const subject = scheduleClassSubject(item, course ? { [course.id]: course } : {});
-  // 学科用短标签（Eng/Math/Geo/…），这是客户能把一节课塞进一行的关键。
-  const subjectText = subject ? subjectShortLabel(subject) : '';
-  const students = item.students.map(studentDisplayName).join('、');
   const palette = subjectColor(subject || item.courseName);
-  const full = [item.startTime, teacherName, grade, subjectText, students].filter(Boolean).join(' · ');
+  const full = `${item.startTime} · ${label}`;
 
   const entry = (
     <button
@@ -1080,10 +1103,7 @@ function MonthClassEntry({
       onClick={() => editable ? onEditClass(item) : undefined}
     >
       <span className="month-class-time">{item.startTime}</span>
-      <span className="month-class-text">
-        {[teacherName, grade, subjectText].filter(Boolean).join(' ')}
-        {students && <em>{students}</em>}
-      </span>
+      <span className="month-class-text">{label}</span>
       <RecurrenceMark item={item} />
     </button>
   );
@@ -1232,7 +1252,7 @@ export function buildTimelineItems(
         startTime: item.startTime,
         endTime: item.endTime,
         subject: scheduleClassSubject(item, courseById) || '其他',
-        title: item.name || courseSubjectGradeText(course, item.courseName),
+        title: scheduleLessonTitle(item, course, teacherById[item.teacherId]),
         subtitle: courseSubjectGradeText(course, item.courseName),
         meta: `${teacherDisplay(item.teacherName, course, teacherById[item.teacherId])} · 学生：${studentDisplayNames(item.students)}`,
         classType: item.classType,

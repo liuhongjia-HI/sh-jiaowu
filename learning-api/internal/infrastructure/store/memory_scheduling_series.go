@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
@@ -242,4 +243,75 @@ func weeklyLessonDates(dayOfWeek int, startDate, endDate string) []string {
 		dates = append(dates, cursor.Format("2006-01-02"))
 	}
 	return dates
+}
+
+// gradeCode 把「五年级」转成客户在 Outlook 里用的 G5 记号。
+// 认不出来的年级原样返回，不要吞掉——排课标题上出现一个陌生年级，
+// 比出现一个空白更容易被发现和纠正。
+func gradeCode(grade string) string {
+	index := gradeIndexOf(grade)
+	if index < 0 {
+		return strings.TrimSpace(grade)
+	}
+	return "G" + itoa(index+1)
+}
+
+// subjectColorEntries 读系统设置里的学科元数据。解析失败就退回内置默认值——
+// 一个手滑写坏的设置项不该让所有课次的标题丢掉科目。
+func (s *MemoryStore) subjectColorEntries() []subjectColorEntry {
+	raw := strings.TrimSpace(s.settings["subjectColors"])
+	if raw == "" {
+		return defaultSubjectColors()
+	}
+	var entries []subjectColorEntry
+	if err := json.Unmarshal([]byte(raw), &entries); err != nil || len(entries) == 0 {
+		return defaultSubjectColors()
+	}
+	return entries
+}
+
+// subjectShortLabel 取学科的短标签（Eng / Math / Geo / …）。
+// 标签维护在系统设置的 subjectColors 里，和前端共用同一份元数据；
+// 设置里查不到就退回学科全名。
+func (s *MemoryStore) subjectShortLabel(subject string) string {
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		return ""
+	}
+	for _, entry := range s.subjectColorEntries() {
+		if entry.Subject == subject {
+			if label := strings.TrimSpace(entry.ShortLabel); label != "" {
+				return label
+			}
+			return subject
+		}
+	}
+	return subject
+}
+
+// scheduleClassName 按客户的命名约定拼课次标题：教师 年级 科目 学生。
+//
+// 客户长期用 Outlook 排课，标题一直是这个顺序（Clara G5 Eng Zoe&Arthur）。
+// 这个顺序是有道理的：课表上一眼要认的是「谁的课、几年级、什么科」，
+// 我们原来的「英文 1V1 小班」把班型放在最前面，而班型恰恰是最不需要
+// 在标题里读的信息——它在课程块上已经有独立标签了。
+//
+// 学生还没定时（预留时段）就只到科目为止，不留空占位。
+func scheduleClassName(teacherName, grade, subjectLabel string, students []learning.CandidateStudent) string {
+	parts := make([]string, 0, 4)
+	for _, part := range []string{strings.TrimSpace(teacherName), gradeCode(grade), strings.TrimSpace(subjectLabel)} {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	names := make([]string, 0, len(students))
+	for _, student := range students {
+		if name := strings.TrimSpace(student.Name); name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) > 0 {
+		parts = append(parts, strings.Join(names, "&"))
+	}
+	return strings.Join(parts, " ")
 }

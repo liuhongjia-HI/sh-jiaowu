@@ -799,7 +799,8 @@ func TestSchedulingCandidateAndCreateClassThroughAPI(t *testing.T) {
 	if class.ID == "" || len(class.Students) != 1 {
 		t.Fatalf("unexpected created class: %#v", class)
 	}
-	if class.Name != "英文 1V1 小班" || class.CourseName != "五年级英文S1Q1课程" || class.TeacherName != "英语老师" || class.Status != "已确认" {
+	// 标题按客户在 Outlook 里的约定：教师 年级 科目 学生（对照 Clara G5 Eng Zoe&Arthur）。
+	if class.Name != "英语老师 G5 Eng 小明" || class.CourseName != "五年级英文S1Q1课程" || class.TeacherName != "英语老师" || class.Status != "已确认" {
 		t.Fatalf("unexpected class detail for student schedule: %#v", class)
 	}
 

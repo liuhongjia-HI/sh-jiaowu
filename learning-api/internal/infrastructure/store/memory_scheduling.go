@@ -498,9 +498,12 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 	}
 	academicYear, semester := s.resolveScheduleTerm(req.StartDate, fallbackSemester)
 	return learning.ScheduleClass{
-		LessonDate:           lessonDate,
-		OverrideNote:         strings.Join(warnings, "；"),
-		Name:                 course.Subject + " " + req.ClassType + " 小班",
+		LessonDate:   lessonDate,
+		OverrideNote: strings.Join(warnings, "；"),
+		// 标题按客户在 Outlook 里的约定拼：教师 年级 科目 学生，
+		// 见 scheduleClassName。原来是「英文 1V1 小班」，把班型放在最前面——
+		// 而班型在课程块上本来就有独立标签，不需要再占标题的开头。
+		Name:                 scheduleClassName(teacher.Name, course.Grade, s.subjectShortLabel(course.Subject), students),
 		CourseID:             course.ID,
 		CourseName:           course.Name,
 		TeacherID:            teacher.ID,

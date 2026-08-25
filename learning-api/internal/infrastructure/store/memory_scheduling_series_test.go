@@ -142,3 +142,57 @@ func TestWeeklyLessonDatesRejectsUnparsableStart(t *testing.T) {
 		t.Fatalf("开始日期解析不出来时应交给调用方兜底，实际 %v", dates)
 	}
 }
+
+func TestScheduleClassNameFollowsCustomerConvention(t *testing.T) {
+	students := []learning.CandidateStudent{{Name: "Zoe"}, {Name: "Arthur"}}
+	got := scheduleClassName("Clara", "五年级", "Eng", students)
+	// 对照客户 Outlook 里的标题：Clara G5 Eng Zoe&Arthur
+	if got != "Clara G5 Eng Zoe&Arthur" {
+		t.Fatalf("标题应为 Clara G5 Eng Zoe&Arthur，实际 %q", got)
+	}
+}
+
+func TestScheduleClassNameWithoutStudents(t *testing.T) {
+	// 预留时段（还没定学生）时只拼到科目，不留空占位。
+	got := scheduleClassName("Beth", "八年级", "Math", nil)
+	if got != "Beth G8 Math" {
+		t.Fatalf("无学生时应为 Beth G8 Math，实际 %q", got)
+	}
+}
+
+func TestScheduleClassNameKeepsUnknownGradeVisible(t *testing.T) {
+	// 认不出的年级原样保留：标题里出现一个陌生年级，
+	// 比出现一段空白更容易被发现和纠正。
+	got := scheduleClassName("Gavin", "预备班", "Geo", nil)
+	if got != "Gavin 预备班 Geo" {
+		t.Fatalf("未知年级应原样保留，实际 %q", got)
+	}
+}
+
+func TestGradeCodeMapsToOutlookNotation(t *testing.T) {
+	cases := map[string]string{"一年级": "G1", "五年级": "G5", "九年级": "G9"}
+	for grade, want := range cases {
+		if got := gradeCode(grade); got != want {
+			t.Fatalf("%s 应为 %s，实际 %s", grade, want, got)
+		}
+	}
+}
+
+func TestSubjectShortLabelFallsBackToFullName(t *testing.T) {
+	store := NewMemoryStore()
+	if got := store.subjectShortLabel("英文"); got != "Eng" {
+		t.Fatalf("英文应取短标签 Eng，实际 %q", got)
+	}
+	// 元数据里没有的学科退回全名，不能返回空——标题少一段比多一段难查。
+	if got := store.subjectShortLabel("音乐"); got != "音乐" {
+		t.Fatalf("未配置的学科应退回全名，实际 %q", got)
+	}
+}
+
+func TestSubjectShortLabelSurvivesBrokenSettings(t *testing.T) {
+	store := NewMemoryStore()
+	store.settings["subjectColors"] = "{ 这不是合法 JSON"
+	if got := store.subjectShortLabel("数学"); got != "Math" {
+		t.Fatalf("设置写坏时应退回内置默认值，实际 %q", got)
+	}
+}
