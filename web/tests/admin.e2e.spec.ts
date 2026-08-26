@@ -99,6 +99,21 @@ test('新增课程方案默认带出当前学年', async ({ page }) => {
   await expect(dialog.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
 
+test('点击课程方案名称可查看该方案的学习资料', async ({ page }) => {
+  await login(page, '13800000001');
+  await expectPageHeading(page, '/packages', '课程方案');
+
+  const firstRow = page.locator('.ant-table-tbody tr').first();
+  const packageLink = firstRow.getByRole('link');
+  const packageName = (await packageLink.innerText()).trim();
+  await packageLink.click();
+
+  await expect(page).toHaveURL(/\/content\?tab=materials&packageId=/);
+  await expect(page.getByRole('heading', { name: '学习资料' })).toBeVisible();
+  await expect(page.getByText(`正在查看“${packageName}”套餐包含的全部学习资料。`)).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看全部资料' })).toBeVisible();
+});
+
 test('教师账号不能进入运营和系统高权限功能', async ({ page }) => {
   await login(page, '13800000004');
 
