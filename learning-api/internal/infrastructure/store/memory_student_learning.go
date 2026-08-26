@@ -278,7 +278,10 @@ func (s *MemoryStore) studentMaterialPreviewFileUnlocked(principal learning.Prin
 		return learning.FileAsset{}, errors.New("资料正在生成安全预览，请稍后再试")
 	}
 	asset.WatermarkText = s.studentWatermarkText(principal)
-	s.prependLogDetail(studentAuditOperator(principal), "内容防盗版风控", material.Title, "eventType=material_preview; targetType=material; targetId="+material.ID)
+	generatedAt := time.Now().Truncate(5 * time.Minute)
+	stampText, traceCode := s.studentWatermarkStampText(principal, material.ID, generatedAt)
+	asset.WatermarkStampText = stampText
+	s.prependLogDetail(studentAuditOperator(principal), "内容防盗版风控", material.Title, "eventType=material_preview; targetType=material; targetId="+material.ID+"; watermarkTrace="+traceCode)
 	return asset, nil
 }
 

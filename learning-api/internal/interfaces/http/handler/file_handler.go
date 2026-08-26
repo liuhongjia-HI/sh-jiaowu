@@ -169,8 +169,15 @@ func (h *LearningHandler) StudentMaterialPreview(c *gin.Context) {
 		BadRequest(c, "历史课件文件不可用，请联系老师重新上传")
 		return
 	}
+	watermarkedPath, err := makeWatermarkedPDF(c.Request.Context(), asset)
+	if err != nil {
+		secureWatermarkFailure(c, err)
+		return
+	}
+	defer os.Remove(watermarkedPath)
+	c.Header("Cache-Control", "private, no-store")
 	c.Header("Content-Disposition", "inline; filename=\"secure-preview.pdf\"")
-	c.File(asset.PreviewPath)
+	c.File(watermarkedPath)
 }
 
 // StudentMaterialPreviewPages 返回上传后预生成的分页图片元信息。
@@ -217,12 +224,28 @@ func (h *LearningHandler) StudentMaterialPreviewPage(c *gin.Context) {
 		BadRequest(c, "页码超出课件范围")
 		return
 	}
-	imagePath := filepath.Join(asset.PreviewPageDir, fmt.Sprintf("page-%04d.jpg", page))
-	if _, err := os.Stat(imagePath); err != nil {
+	sourceImagePath := filepath.Join(asset.PreviewPageDir, fmt.Sprintf("page-%04d.jpg", page))
+	if _, err := os.Stat(sourceImagePath); err != nil {
 		BadRequest(c, "本页课件文件不可用，请联系老师重新生成")
 		return
 	}
-	c.Header("Cache-Control", "no-store")
+	imageFile, err := os.CreateTemp("", "starline-material-watermark-*.jpg")
+	if err != nil {
+		secureWatermarkFailure(c, err)
+		return
+	}
+	imagePath := imageFile.Name()
+	if err := imageFile.Close(); err != nil {
+		os.Remove(imagePath)
+		secureWatermarkFailure(c, err)
+		return
+	}
+	defer os.Remove(imagePath)
+	if err := rasterizeWatermarkedPDFPage(c.Request.Context(), asset.PreviewPath, imagePath, page, asset.WatermarkStampText); err != nil {
+		secureWatermarkFailure(c, err)
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
 	c.File(imagePath)
 }
 
@@ -254,16 +277,68 @@ func (h *LearningHandler) DownloadFile(c *gin.Context) {
 // StudentMaterialDownload 复用学生资料访问校验；套餐授权到期后下载地址立即失效。
 func (h *LearningHandler) StudentMaterialDownload(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
+	material, err := h.service.StudentMaterial(principal, c.Param("id"))
+	if err != nil {
+		Forbidden(c, err.Error())
+		return
+	}
+	if material.DownloadURL == "" {
+		Forbidden(c, "当前资料仅支持在线预览")
+		return
+	}
 	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
 	if err != nil {
 		Forbidden(c, err.Error())
 		return
 	}
-	if _, err := os.Stat(asset.OriginalPath); err != nil {
+	if _, err := os.Stat(asset.PreviewPath); err != nil {
 		BadRequest(c, "历史课件文件缺失，请联系老师重新上传")
 		return
 	}
-	c.FileAttachment(asset.OriginalPath, asset.FileName)
+	watermarkedPath, err := makeWatermarkedPDF(c.Request.Context(), asset)
+	if err != nil {
+		secureWatermarkFailure(c, err)
+		return
+	}
+	defer os.Remove(watermarkedPath)
+	c.Header("Cache-Control", "private, no-store")
+	c.FileAttachment(watermarkedPath, studentWatermarkedFileName(asset.FileName))
+}
+
+func makeWatermarkedPDF(ctx context.Context, asset learning.FileAsset) (string, error) {
+	if strings.TrimSpace(asset.WatermarkStampText) == "" {
+		return "", errors.New("课件缺少专属水印信息")
+	}
+	file, err := os.CreateTemp("", "starline-material-watermark-*.pdf")
+	if err != nil {
+		return "", err
+	}
+	targetPath := file.Name()
+	if err := file.Close(); err != nil {
+		os.Remove(targetPath)
+		return "", err
+	}
+	if err := watermarkPDF(ctx, asset.PreviewPath, targetPath, asset.WatermarkStampText); err != nil {
+		os.Remove(targetPath)
+		return "", err
+	}
+	return targetPath, nil
+}
+
+func secureWatermarkFailure(c *gin.Context, err error) {
+	if errors.Is(err, errGhostscriptUnavailable) {
+		BadRequest(c, "课件安全水印服务暂不可用，请稍后再试")
+		return
+	}
+	BadRequest(c, "课件安全水印生成失败，请稍后再试")
+}
+
+func studentWatermarkedFileName(fileName string) string {
+	base := strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
+	if base == "" || base == "." {
+		base = "学习资料"
+	}
+	return base + "-学习版.pdf"
 }
 
 func (h *LearningHandler) RetryFilePreview(c *gin.Context) {

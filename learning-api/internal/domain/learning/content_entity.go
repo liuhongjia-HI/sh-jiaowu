@@ -233,8 +233,10 @@ type FileAsset struct {
 	PreviewPageCount int
 	PreviewStatus    string
 	PreviewError     string
-	// WatermarkText 仅在学生端返回，用于小程序在分页图片上叠加专属水印。
+	// WatermarkText 仅在学生端返回，用于小程序展示专属水印提示。
 	WatermarkText string
+	// WatermarkStampText 是可被服务端稳定渲染的 ASCII 追溯文本，绝不包含完整手机号或学生 ID。
+	WatermarkStampText string
 }
 
 type PreviewJob struct {
