@@ -1138,17 +1138,24 @@ func TestTeacherCopiedLessonStillNeedsReview(t *testing.T) {
 // 排课自身的 created_by / audited_by 只应保存可读姓名，不能把整段审计载荷写进 VARCHAR(64)。
 func TestScheduleClassStoresReadableOperatorName(t *testing.T) {
 	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
 	ops, err := store.PrincipalByUserID("user-ops")
 	if err != nil {
 		t.Fatalf("expected ops principal: %v", err)
 	}
-	operator := middlewareAuditLabel("运营教务", ops.UserID)
-	created, err := store.CreateScheduleClass(operator, ops, teacherLessonRequest())
+	created, err := store.CreateScheduleClass(middlewareAuditLabel("英语老师", teacher.UserID), teacher, teacherLessonRequest())
 	if err != nil {
 		t.Fatalf("expected schedule: %v", err)
 	}
-	if created.CreatedBy != "运营教务" || created.AuditedBy != "运营教务" {
-		t.Fatalf("排课创建人与审核人应保存可读姓名，实际 createdBy=%q auditedBy=%q", created.CreatedBy, created.AuditedBy)
+	if created.CreatedBy != "英语老师" {
+		t.Fatalf("排课创建人应保存可读姓名，实际 createdBy=%q", created.CreatedBy)
+	}
+	approved, err := store.ReviewScheduleClass(middlewareAuditLabel("运营教务", ops.UserID), ops, created.ID, true, "")
+	if err != nil {
+		t.Fatalf("expected approval: %v", err)
+	}
+	if approved.AuditedBy != "运营教务" {
+		t.Fatalf("排课审核人应保存可读姓名，实际 auditedBy=%q", approved.AuditedBy)
 	}
 }
 
