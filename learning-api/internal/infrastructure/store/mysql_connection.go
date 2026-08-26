@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"starline/learning-api/internal/domain/learning"
@@ -44,6 +45,7 @@ func (s *MemoryStore) connectDatabaseUnlocked(dsn string) error {
 		return err
 	}
 	s.db = db
+	s.ensureDefaultSubjectMetadata()
 	if err := s.ensurePersistenceSchema(); err != nil {
 		db.Close()
 		s.db = nil
@@ -81,6 +83,9 @@ func (s *MemoryStore) connectDatabaseUnlocked(dsn string) error {
 }
 
 func (s *MemoryStore) reconcileDefaultSettings() error {
+	if err := s.reconcileSubjectMetadata(); err != nil {
+		return err
+	}
 	for key, value := range defaultSettings() {
 		if _, err := s.db.Exec(`INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)`, key, value); err != nil {
 			return err
@@ -94,6 +99,51 @@ func (s *MemoryStore) reconcileDefaultSettings() error {
 		}
 	}
 	return nil
+}
+
+// reconcileSubjectMetadata 先补齐默认行，再将旧版 subjectColors JSON 中已配置
+// 的展示值写入对应学科。迁移完成后删除旧设置，后续读写只经过 subjects 表。
+func (s *MemoryStore) reconcileSubjectMetadata() error {
+	for _, subject := range defaultSubjectMetadata() {
+		if _, err := s.db.Exec(`INSERT INTO subjects (id, name, short_label, color, sort_order, status)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE
+			name = VALUES(name),
+			short_label = IF(short_label = '', VALUES(short_label), short_label),
+			color = IF(color = '', VALUES(color), color),
+			sort_order = IF(sort_order = 0, VALUES(sort_order), sort_order)`,
+			subject.ID, subject.Name, subject.ShortLabel, subject.Color, subject.SortOrder, subject.Status); err != nil {
+			return err
+		}
+	}
+	var raw string
+	err := s.db.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'subjectColors'`).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var entries []struct {
+		Subject    string `json:"subject"`
+		ShortLabel string `json:"shortLabel"`
+		Color      string `json:"color"`
+		SortOrder  int    `json:"sortOrder"`
+	}
+	if err := json.Unmarshal([]byte(raw), &entries); err == nil {
+		for _, entry := range entries {
+			label := strings.TrimSpace(entry.ShortLabel)
+			color := strings.ToUpper(strings.TrimSpace(entry.Color))
+			if strings.TrimSpace(entry.Subject) == "" || label == "" || !subjectColorPattern.MatchString(color) || entry.SortOrder < 0 {
+				continue
+			}
+			if _, err := s.db.Exec(`UPDATE subjects SET short_label = ?, color = ?, sort_order = ? WHERE name = ?`, label, color, entry.SortOrder, strings.TrimSpace(entry.Subject)); err != nil {
+				return err
+			}
+		}
+	}
+	_, err = s.db.Exec(`DELETE FROM system_settings WHERE setting_key = 'subjectColors'`)
+	return err
 }
 
 // reconcileBaseLearningSpaces 补齐当前学年的系统学习空间。

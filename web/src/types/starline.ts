@@ -306,6 +306,17 @@ export type SettingUpdateRequest = {
   value: string;
 };
 
+export type SubjectMetadata = {
+  id: string;
+  name: string;
+  shortLabel: string;
+  color: string;
+  sortOrder: number;
+  status: '启用' | '停用';
+};
+
+export type SubjectMetadataUpdateRequest = Pick<SubjectMetadata, 'shortLabel' | 'color' | 'sortOrder' | 'status'>;
+
 export type Material = {
   id: string;
   title: string;

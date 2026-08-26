@@ -1,7 +1,7 @@
 package store
 
 func engagementRows(s *MemoryStore) []persistenceRow {
-	rows := make([]persistenceRow, 0, len(s.notices)+len(s.logs)+len(s.settings)+len(s.favorites)+len(s.subscriptionPreferences))
+	rows := make([]persistenceRow, 0, len(s.notices)+len(s.logs)+len(s.settings)+len(s.subjects)+len(s.favorites)+len(s.subscriptionPreferences))
 	for _, item := range s.notices {
 		rows = append(rows, simpleRow("notices", "external_id", item.ID, `INSERT INTO notices (external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, retry_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE notice_type=VALUES(notice_type), title=VALUES(title), target=VALUES(target), content=VALUES(content), channel=VALUES(channel), recipient_open_id=VALUES(recipient_open_id), status=VALUES(status), failure_reason=VALUES(failure_reason), related_type=VALUES(related_type), related_id=VALUES(related_id), retry_count=VALUES(retry_count)`, item.ID, item.Type, item.Title, item.Target, item.Summary, item.Channel, item.RecipientOpenID, item.Status, item.FailureReason, item.RelatedType, item.RelatedID, item.RetryCount))
 	}
@@ -10,6 +10,9 @@ func engagementRows(s *MemoryStore) []persistenceRow {
 	}
 	for key, value := range s.settings {
 		rows = append(rows, simpleRow("system_settings", "setting_key", key, `INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)`, key, value))
+	}
+	for _, subject := range s.subjects {
+		rows = append(rows, simpleRow("subjects", "id", subject.ID, `INSERT INTO subjects (id, name, short_label, color, sort_order, status) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), short_label=VALUES(short_label), color=VALUES(color), sort_order=VALUES(sort_order), status=VALUES(status)`, subject.ID, subject.Name, subject.ShortLabel, subject.Color, subject.SortOrder, subject.Status))
 	}
 	for _, item := range s.favorites {
 		rows = append(rows, simpleRow("student_favorites", "id", item.ID, `INSERT INTO student_favorites (id, student_id, target_type, target_id, title, course, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE student_id=VALUES(student_id), target_type=VALUES(target_type), target_id=VALUES(target_id), title=VALUES(title), course=VALUES(course), created_at=VALUES(created_at)`, item.ID, item.StudentID, item.TargetType, item.TargetID, item.Title, item.Course, nullableDateTime(item.CreatedAt)))

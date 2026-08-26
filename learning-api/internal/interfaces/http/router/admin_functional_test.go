@@ -271,13 +271,45 @@ func TestAdminSystemManagementThroughAPI(t *testing.T) {
 	var settings map[string]string
 	app.doJSON(t, http.MethodPut, "/api/settings", campusToken, learning.SettingUpdateRequest{
 		Key:   "downloadPolicy",
-		Value: "接口测试允许下载已发布学习资料",
+		Value: "允许下载带水印PDF",
 	}, http.StatusOK, &settings)
-	if settings["downloadPolicy"] != "接口测试允许下载已发布学习资料" || settings["academicCalendar"] == "" {
+	if settings["downloadPolicy"] != "允许下载带水印PDF" || settings["academicCalendar"] == "" {
 		t.Fatalf("unexpected settings: %#v", settings)
 	}
 
 	app.doJSON(t, http.MethodGet, "/api/admin-staff", campusToken, nil, http.StatusForbidden, nil)
+}
+
+func TestCampusAdminManagesSubjectMetadataThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginAdmin(t, "13800000002")
+
+	var subjects []learning.SubjectMetadata
+	app.doJSON(t, http.MethodGet, "/api/subjects", token, nil, http.StatusOK, &subjects)
+	if len(subjects) == 0 || subjects[0].ID == "" || subjects[0].Color == "" {
+		t.Fatalf("expected readable subject metadata, got %#v", subjects)
+	}
+	var settings map[string]string
+	app.doJSON(t, http.MethodGet, "/api/settings", token, nil, http.StatusOK, &settings)
+	if _, exists := settings["subjectColors"]; exists {
+		t.Fatalf("subjectColors should be removed from system settings: %#v", settings)
+	}
+
+	var updated learning.SubjectMetadata
+	app.doJSON(t, http.MethodPut, "/api/subjects/english", token, learning.SubjectMetadataUpdateRequest{
+		ShortLabel: "EN",
+		Color:      "#2357B8",
+		SortOrder:  12,
+		Status:     "启用",
+	}, http.StatusOK, &updated)
+	if updated.Name != "英文" || updated.ShortLabel != "EN" || updated.Color != "#2357B8" || updated.SortOrder != 12 {
+		t.Fatalf("unexpected updated subject: %#v", updated)
+	}
+
+	app.doJSON(t, http.MethodPut, "/api/subjects/english", token, learning.SubjectMetadataUpdateRequest{
+		ShortLabel: "EN", Color: "blue", SortOrder: 12, Status: "启用",
+	}, http.StatusBadRequest, nil)
 }
 
 func doMultipart(t *testing.T, app *testApp, method, path, token string, fields map[string]string, fileField string, fileName string, fileBody []byte, wantStatus int, out any) apiResponse {

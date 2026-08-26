@@ -23,3 +23,7 @@ func (s *Service) Settings() map[string]string { return s.system.Settings() }
 func (s *Service) UpdateSetting(o string, r learning.SettingUpdateRequest) (map[string]string, error) {
 	return s.system.UpdateSetting(o, r)
 }
+func (s *Service) Subjects() []learning.SubjectMetadata { return s.system.Subjects() }
+func (s *Service) UpdateSubjectMetadata(o, id string, r learning.SubjectMetadataUpdateRequest) (learning.SubjectMetadata, error) {
+	return s.system.UpdateSubjectMetadata(o, id, r)
+}

@@ -68,6 +68,23 @@ func (h *LearningHandler) UpdateSetting(c *gin.Context) {
 	OK(c, settings)
 }
 
+func (h *LearningHandler) Subjects(c *gin.Context) { OK(c, h.service.Subjects()) }
+
+func (h *LearningHandler) UpdateSubjectMetadata(c *gin.Context) {
+	var req learning.SubjectMetadataUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	subject, err := h.service.UpdateSubjectMetadata(operator.(string), c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, subject)
+}
+
 func (h *LearningHandler) StudentNotices(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	home, err := h.service.StudentHome(principal)

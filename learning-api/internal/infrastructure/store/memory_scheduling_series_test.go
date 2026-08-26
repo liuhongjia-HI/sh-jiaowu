@@ -189,10 +189,17 @@ func TestSubjectShortLabelFallsBackToFullName(t *testing.T) {
 	}
 }
 
-func TestSubjectShortLabelSurvivesBrokenSettings(t *testing.T) {
+func TestSubjectShortLabelUsesSubjectMetadata(t *testing.T) {
 	store := NewMemoryStore()
-	store.settings["subjectColors"] = "{ 这不是合法 JSON"
-	if got := store.subjectShortLabel("数学"); got != "Math" {
-		t.Fatalf("设置写坏时应退回内置默认值，实际 %q", got)
+	if _, err := store.UpdateSubjectMetadata("超级管理员", "math", learning.SubjectMetadataUpdateRequest{
+		ShortLabel: "MTH",
+		Color:      "#1A6FD4",
+		SortOrder:  2,
+		Status:     "启用",
+	}); err != nil {
+		t.Fatalf("更新学科元数据失败: %v", err)
+	}
+	if got := store.subjectShortLabel("数学"); got != "MTH" {
+		t.Fatalf("应读取学科元数据中的简称，实际 %q", got)
 	}
 }

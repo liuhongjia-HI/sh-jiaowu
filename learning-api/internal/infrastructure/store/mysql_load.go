@@ -11,6 +11,7 @@ import (
 
 func (s *MemoryStore) loadAllFromDatabase() error {
 	loaders := []func() error{
+		s.loadSubjectsFromDB,
 		s.loadLearningSpacesFromDB,
 		s.loadStudentsFromDB,
 		s.loadUsersFromDB,
@@ -51,6 +52,24 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 	}
 	s.scheduleClasses = classes
 	return nil
+}
+
+func (s *MemoryStore) loadSubjectsFromDB() error {
+	rows, err := s.db.Query(`SELECT id, name, short_label, color, sort_order, status FROM subjects ORDER BY sort_order, name`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.SubjectMetadata{}
+	for rows.Next() {
+		var item learning.SubjectMetadata
+		if err := rows.Scan(&item.ID, &item.Name, &item.ShortLabel, &item.Color, &item.SortOrder, &item.Status); err != nil {
+			return err
+		}
+		out = append(out, item)
+	}
+	s.subjects = out
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadLearningSpacesFromDB() error {

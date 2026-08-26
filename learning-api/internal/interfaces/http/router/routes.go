@@ -49,6 +49,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g := protected(api, service, tokens, learning.RoleTeacher, learning.RoleOpsStaff, learning.RoleCampusAdmin, learning.RoleSuperAdmin)
 	g.GET("/dashboard/overview", h.Dashboard)
 	g.GET("/settings", h.Settings)
+	g.GET("/subjects", h.Subjects)
 	g.GET("/packages", h.Packages)
 	g.GET("/learning-spaces", h.LearningSpaces)
 	g.GET("/students", h.Students)
@@ -136,6 +137,7 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g.GET("/logs", h.Logs)
 	g.GET("/system/readiness", h.SystemReadiness)
 	g.PUT("/settings", h.UpdateSetting)
+	g.PUT("/subjects/:id", h.UpdateSubjectMetadata)
 }
 
 func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {

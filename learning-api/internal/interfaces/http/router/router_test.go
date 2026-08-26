@@ -898,6 +898,53 @@ func TestStudentMaterialSecurePreviewRequiresAccess(t *testing.T) {
 	app.doJSON(t, http.MethodGet, "/api/student/materials/mat-g05-math-s1-q1/preview", token, nil, http.StatusBadRequest, nil)
 }
 
+func TestStudentMaterialDownloadNeverFallsBackToOriginalFile(t *testing.T) {
+	t.Setenv("PATH", "")
+	app := newTestApp(t)
+	defer app.close()
+
+	source := filepath.Join(t.TempDir(), "student-material.pdf")
+	original := []byte("%PDF-1.4 original-only-secret")
+	if err := os.WriteFile(source, original, 0600); err != nil {
+		t.Fatalf("write source file: %v", err)
+	}
+	teacher, err := app.store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("teacher principal: %v", err)
+	}
+	material, err := app.store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "学生下载水印测试", CourseID: "course-g05-english-s1-q1",
+		File: learning.FileAsset{
+			ID: "file-student-watermark-download", FileName: "lesson.pdf", FileSize: int64(len(original)), FileType: "PDF",
+			ContentType: "application/pdf", OriginalPath: source, PreviewPath: source, PreviewStatus: "可预览",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create material: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, app.server.URL+"/api/student/materials/"+material.ID+"/download", nil)
+	if err != nil {
+		t.Fatalf("new download request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+app.loginStudent(t))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("download request: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read download response: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected secure download failure without watermark service, got status=%d body=%s", resp.StatusCode, body)
+	}
+	if bytes.Contains(body, original) {
+		t.Fatalf("student response must never contain the original file, got %q", body)
+	}
+}
+
 func TestStudentSecurityEventIsLogged(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
