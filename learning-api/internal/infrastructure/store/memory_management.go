@@ -168,6 +168,7 @@ func (s *MemoryStore) learningSpacesUnlocked() []learning.LearningSpace {
 			Subject:      space.Subject,
 			Semester:     space.Semester,
 			Phase:        space.Phase,
+			Level:        space.Level,
 			Name:         space.Name,
 			Status:       space.Status,
 		})

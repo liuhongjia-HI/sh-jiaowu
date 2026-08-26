@@ -101,6 +101,7 @@ type learningSpace struct {
 	Subject      string
 	Semester     string
 	Phase        string
+	Level        string
 	Name         string
 	Status       learning.Status
 }
@@ -314,19 +315,22 @@ func (s *MemoryStore) seedBaseLearningSpaces() {
 }
 
 func baseLearningSpaces(academicYear string) []learningSpace {
-	spaces := make([]learningSpace, 0, 180)
+	spaces := make([]learningSpace, 0, 668)
 	for gradeIndex, grade := range demoGrades {
 		for _, subject := range demoSubjects {
-			if !subjectAppliesToGrade(gradeIndex, subject) {
+			levels := levelsForGradeSubject(gradeIndex, subject)
+			if len(levels) == 0 {
 				continue
 			}
-			for semesterIndex, semester := range demoSemesters {
-				for phaseIndex, phase := range demoPhases {
-					spaces = append(spaces, learningSpace{
-						ID: learningSpaceID(gradeIndex, subject, semesterIndex, phaseIndex), AcademicYear: academicYear,
-						Grade: grade, Subject: subject, Semester: semester, Phase: phase,
-						Name: grade + subject + semester + phase, Status: learning.StatusEnabled,
-					})
+			for _, level := range levels {
+				for semesterIndex, semester := range demoSemesters {
+					for phaseIndex, phase := range demoPhases {
+						spaces = append(spaces, learningSpace{
+							ID: learningSpaceIDForLevel(gradeIndex, subject, semesterIndex, phaseIndex, level), AcademicYear: academicYear,
+							Grade: grade, Subject: subject, Semester: semester, Phase: phase, Level: level,
+							Name: grade + subject + semester + phase + level, Status: learning.StatusEnabled,
+						})
+					}
 				}
 			}
 		}
@@ -407,33 +411,38 @@ type packageTypeSpec struct {
 
 var demoGrades = gradeSequence
 
-var demoSubjects = []string{"数学", "英文", "语文", "综合科学", "科学", "地理", "历史", "物理", "化学"}
+var demoSubjects = []string{"数学", "英文", "语文", "科学", "地理", "物理", "化学"}
 
-// demoGradeSubjects 是基础空间初始化使用的年级—学科矩阵。
-// 年级使用现有业务数据格式（一年级至九年级），学科名称按课程配置原文保留。
-var demoGradeSubjects = [][]string{
-	{"数学", "英文", "语文", "综合科学"},
-	{"数学", "英文", "语文", "综合科学"},
-	{"数学", "英文", "语文", "综合科学"},
-	{"数学", "英文", "语文", "科学", "地理"},
-	{"数学", "英文", "语文", "科学", "地理"},
-	{"数学", "英文", "语文", "科学", "历史"},
-	{"数学", "英文", "语文", "科学", "历史"},
-	{"数学", "英文", "语文", "科学", "地理", "物理"},
-	{"数学", "英文", "语文", "科学", "历史", "物理", "化学"},
+var standardLevels = []string{"S", "S+", "H"}
+var advancedLevels = []string{"S", "S+", "H", "H+"}
+
+// demoGradeSubjectLevels 是基础空间初始化使用的年级—学科—等级矩阵。
+// G1-G4 不分班，仅使用 S；G5 起按学科开放 S/S+/H/H+ 的子集。
+var demoGradeSubjectLevels = []map[string][]string{
+	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+	{"数学": standardLevels, "英文": standardLevels, "语文": standardLevels, "地理": {"S", "S+"}, "科学": {"S"}},
+	{"数学": standardLevels, "英文": standardLevels, "语文": standardLevels, "地理": {"S", "S+"}, "科学": {"S", "S+"}},
+	{"数学": advancedLevels, "英文": advancedLevels, "语文": standardLevels, "地理": standardLevels, "科学": standardLevels},
+	{"数学": advancedLevels, "英文": advancedLevels, "语文": standardLevels, "地理": standardLevels, "科学": standardLevels, "物理": {"S"}},
+	{"数学": advancedLevels, "英文": advancedLevels, "语文": standardLevels, "地理": standardLevels, "科学": standardLevels, "物理": standardLevels, "化学": {"S", "S+"}},
+	{"数学": advancedLevels, "英文": advancedLevels, "语文": standardLevels, "地理": standardLevels, "科学": standardLevels, "物理": standardLevels, "化学": standardLevels},
+	{"数学": advancedLevels, "英文": advancedLevels, "语文": standardLevels, "地理": standardLevels, "科学": standardLevels, "物理": standardLevels, "化学": standardLevels},
+	{"数学": advancedLevels, "英文": advancedLevels, "语文": standardLevels, "地理": standardLevels, "科学": standardLevels, "物理": standardLevels, "化学": standardLevels},
 }
 
 // subjectAppliesToGrade 判断某年级是否开设该学科，避免生成矩阵外的无效空间。
 func subjectAppliesToGrade(gradeIndex int, subject string) bool {
-	if gradeIndex < 0 || gradeIndex >= len(demoGradeSubjects) {
-		return false
+	return len(levelsForGradeSubject(gradeIndex, subject)) > 0
+}
+
+func levelsForGradeSubject(gradeIndex int, subject string) []string {
+	if gradeIndex < 0 || gradeIndex >= len(demoGradeSubjectLevels) {
+		return nil
 	}
-	for _, allowed := range demoGradeSubjects[gradeIndex] {
-		if allowed == subject {
-			return true
-		}
-	}
-	return false
+	return demoGradeSubjectLevels[gradeIndex][subject]
 }
 
 var demoSemesters = []string{"S1", "S2"}
@@ -519,6 +528,27 @@ func seedPermissionDemoData(s *MemoryStore) {
 
 func learningSpaceID(gradeIndex int, subject string, semesterIndex, phaseIndex int) string {
 	return "space-g" + twoDigit(gradeIndex+1) + "-" + subjectSlug(subject) + "-s" + strconv.Itoa(semesterIndex+1) + "-" + phaseSlug(phaseIndex)
+}
+
+func learningSpaceIDForLevel(gradeIndex int, subject string, semesterIndex, phaseIndex int, level string) string {
+	baseID := learningSpaceID(gradeIndex, subject, semesterIndex, phaseIndex)
+	if level == "S" {
+		return baseID
+	}
+	return baseID + "-" + levelSlug(level)
+}
+
+func levelSlug(level string) string {
+	switch level {
+	case "S+":
+		return "splus"
+	case "H":
+		return "h"
+	case "H+":
+		return "hplus"
+	default:
+		return strings.ToLower(strings.TrimSpace(level))
+	}
 }
 
 func packageID(gradeIndex int, subject string, semesterIndex int, packageType string) string {

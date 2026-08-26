@@ -73,7 +73,7 @@ func (s *MemoryStore) loadSubjectsFromDB() error {
 }
 
 func (s *MemoryStore) loadLearningSpacesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, academic_year, grade, subject, semester, phase, name, status FROM learning_spaces ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, academic_year, grade, subject, semester, phase, level, name, status FROM learning_spaces ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (s *MemoryStore) loadLearningSpacesFromDB() error {
 	out := []learningSpace{}
 	for rows.Next() {
 		var item learningSpace
-		if err := rows.Scan(&item.ID, &item.AcademicYear, &item.Grade, &item.Subject, &item.Semester, &item.Phase, &item.Name, &item.Status); err != nil {
+		if err := rows.Scan(&item.ID, &item.AcademicYear, &item.Grade, &item.Subject, &item.Semester, &item.Phase, &item.Level, &item.Name, &item.Status); err != nil {
 			return err
 		}
 		out = append(out, item)

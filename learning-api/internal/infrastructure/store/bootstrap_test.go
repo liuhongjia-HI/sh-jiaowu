@@ -37,46 +37,52 @@ func TestNewMemoryStoreCanStartWithoutDemoData(t *testing.T) {
 
 func TestBaseLearningSpacesFollowGradeSubjectMatrix(t *testing.T) {
 	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
-	want := map[string][]string{
-		"一年级": {"数学", "英文", "语文", "综合科学"},
-		"二年级": {"数学", "英文", "语文", "综合科学"},
-		"三年级": {"数学", "英文", "语文", "综合科学"},
-		"四年级": {"数学", "英文", "语文", "科学", "地理"},
-		"五年级": {"数学", "英文", "语文", "科学", "地理"},
-		"六年级": {"数学", "英文", "语文", "科学", "历史"},
-		"七年级": {"数学", "英文", "语文", "科学", "历史"},
-		"八年级": {"数学", "英文", "语文", "科学", "地理", "物理"},
-		"九年级": {"数学", "英文", "语文", "科学", "历史", "物理", "化学"},
+	want := map[string]map[string][]string{
+		"一年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+		"二年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+		"三年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+		"四年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+		"五年级":  {"数学": {"S", "S+", "H"}, "英文": {"S", "S+", "H"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+"}, "科学": {"S"}},
+		"六年级":  {"数学": {"S", "S+", "H"}, "英文": {"S", "S+", "H"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+"}, "科学": {"S", "S+"}},
+		"七年级":  {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}},
+		"八年级":  {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}, "物理": {"S"}},
+		"九年级":  {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}, "物理": {"S", "S+", "H"}, "化学": {"S", "S+"}},
+		"十年级":  {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}, "物理": {"S", "S+", "H"}, "化学": {"S", "S+", "H"}},
+		"十一年级": {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}, "物理": {"S", "S+", "H"}, "化学": {"S", "S+", "H"}},
+		"十二年级": {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}, "物理": {"S", "S+", "H"}, "化学": {"S", "S+", "H"}},
 	}
-	if len(store.learningSpaces) != 180 {
-		t.Fatalf("expected 180 learning spaces, got %d", len(store.learningSpaces))
+	if len(store.learningSpaces) != 668 {
+		t.Fatalf("expected 668 learning spaces, got %d", len(store.learningSpaces))
 	}
 
-	counts := map[string]map[string]int{}
+	counts := map[string]map[string]map[string]int{}
 	for _, space := range store.learningSpaces {
-		if _, ok := want[space.Grade]; !ok {
+		gradeSubjects, ok := want[space.Grade]
+		if !ok {
 			t.Fatalf("unexpected seeded grade %q", space.Grade)
 		}
-		allowed := false
-		for _, subject := range want[space.Grade] {
-			if subject == space.Subject {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
+		levels, ok := gradeSubjects[space.Subject]
+		if !ok {
 			t.Fatalf("unexpected subject %q for %s", space.Subject, space.Grade)
 		}
-		if counts[space.Grade] == nil {
-			counts[space.Grade] = map[string]int{}
+		if !containsString(levels, space.Level) {
+			t.Fatalf("unexpected level %q for %s %s", space.Level, space.Grade, space.Subject)
 		}
-		counts[space.Grade][space.Subject]++
+		if counts[space.Grade] == nil {
+			counts[space.Grade] = map[string]map[string]int{}
+		}
+		if counts[space.Grade][space.Subject] == nil {
+			counts[space.Grade][space.Subject] = map[string]int{}
+		}
+		counts[space.Grade][space.Subject][space.Level]++
 	}
 
 	for grade, subjects := range want {
-		for _, subject := range subjects {
-			if counts[grade][subject] != 4 {
-				t.Fatalf("expected %s %s to have 4 semester/phase spaces, got %d", grade, subject, counts[grade][subject])
+		for subject, levels := range subjects {
+			for _, level := range levels {
+				if counts[grade][subject][level] != 4 {
+					t.Fatalf("expected %s %s %s to have 4 semester/phase spaces, got %d", grade, subject, level, counts[grade][subject][level])
+				}
 			}
 		}
 	}
@@ -95,8 +101,8 @@ func TestAcademicYearForDateUsesJulyFirstBoundary(t *testing.T) {
 
 func TestBaseLearningSpacesUsesRequestedAcademicYear(t *testing.T) {
 	spaces := baseLearningSpaces("2026.2027学年")
-	if len(spaces) != 180 {
-		t.Fatalf("expected 180 base learning spaces, got %d", len(spaces))
+	if len(spaces) != 668 {
+		t.Fatalf("expected 668 base learning spaces, got %d", len(spaces))
 	}
 	for _, space := range spaces {
 		if space.AcademicYear != "2026.2027学年" {

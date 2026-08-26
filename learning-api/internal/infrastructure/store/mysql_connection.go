@@ -159,10 +159,10 @@ func (s *MemoryStore) reconcileBaseLearningSpaces() error {
 	}
 	for _, space := range baseLearningSpaces(academicYear) {
 		if _, err := tx.Exec(
-			`INSERT INTO learning_spaces (id, academic_year, grade, subject, semester, phase, name, status)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			 ON DUPLICATE KEY UPDATE academic_year = VALUES(academic_year), grade = VALUES(grade), subject = VALUES(subject), semester = VALUES(semester), phase = VALUES(phase), name = VALUES(name), status = VALUES(status)`,
-			space.ID, space.AcademicYear, space.Grade, space.Subject, space.Semester, space.Phase, space.Name, space.Status,
+			`INSERT INTO learning_spaces (id, academic_year, grade, subject, semester, phase, level, name, status)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			 ON DUPLICATE KEY UPDATE academic_year = VALUES(academic_year), grade = VALUES(grade), subject = VALUES(subject), semester = VALUES(semester), phase = VALUES(phase), level = VALUES(level), name = VALUES(name), status = VALUES(status)`,
+			space.ID, space.AcademicYear, space.Grade, space.Subject, space.Semester, space.Phase, space.Level, space.Name, space.Status,
 		); err != nil {
 			tx.Rollback()
 			return err

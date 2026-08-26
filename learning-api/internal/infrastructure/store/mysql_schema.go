@@ -289,6 +289,8 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"students", "bind_code", "VARCHAR(16) NOT NULL DEFAULT ''"},
 		{"students", "bind_code_expires_at", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"study_packages", "summary", "TEXT NOT NULL"},
+		{"learning_spaces", "level", "VARCHAR(16) NOT NULL DEFAULT 'S'"},
+		{"study_packages", "level", "VARCHAR(16) NOT NULL DEFAULT 'S'"},
 		{"courses", "chapter_count", "INT NOT NULL DEFAULT 0"},
 		{"materials", "view_count", "INT NOT NULL DEFAULT 0"},
 		{"materials", "file_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
@@ -406,6 +408,9 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 			return err
 		}
 	}
+	if err := s.ensureLearningSpaceUniqueIndex(); err != nil {
+		return err
+	}
 	if err := s.ensureIndex("schedule_classes", "idx_schedule_term", "academic_year, semester, status"); err != nil {
 		return err
 	}
@@ -419,6 +424,43 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 		return err
 	}
 	return nil
+}
+
+// ensureLearningSpaceUniqueIndex 将等级纳入空间业务唯一性，并去掉已停用的学年维度。
+// level 新列默认回填 S，因此升级不会改变存量空间的业务归属。
+func (s *MemoryStore) ensureLearningSpaceUniqueIndex() error {
+	const indexName = "uk_learning_space"
+	const expectedColumns = "grade,subject,semester,phase,level"
+	rows, err := s.db.Query(`SELECT column_name FROM information_schema.statistics
+		WHERE table_schema = DATABASE() AND table_name = 'learning_spaces' AND index_name = ?
+		ORDER BY seq_in_index`, indexName)
+	if err != nil {
+		return err
+	}
+	columns := make([]string, 0)
+	for rows.Next() {
+		var column string
+		if err := rows.Scan(&column); err != nil {
+			rows.Close()
+			return err
+		}
+		columns = append(columns, column)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	if strings.Join(columns, ",") == expectedColumns {
+		return nil
+	}
+	if len(columns) > 0 {
+		if _, err := s.db.Exec(`ALTER TABLE learning_spaces DROP INDEX uk_learning_space`); err != nil {
+			return err
+		}
+	}
+	_, err = s.db.Exec(`ALTER TABLE learning_spaces ADD UNIQUE KEY uk_learning_space (grade, subject, semester, phase, level)`)
+	return err
 }
 
 // backfillScheduleAuditStatus 给升级前的排课补上审核状态。

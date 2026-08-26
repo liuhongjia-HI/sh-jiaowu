@@ -8,8 +8,11 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
-// gradeSequence 是义务教育阶段的年级序列，年级推导与基础学习空间共用同一份定义。
-var gradeSequence = []string{"一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级"}
+// gradeSequence 是一至十二年级序列，年级推导与基础学习空间共用同一份定义。
+var gradeSequence = []string{
+	"一年级", "二年级", "三年级", "四年级", "五年级", "六年级",
+	"七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级",
+}
 
 // gradeIndexOf 返回年级在序列中的位置，无法识别时返回 -1。
 func gradeIndexOf(grade string) int {
@@ -37,7 +40,7 @@ func academicYearStart(academicYear string) (int, bool) {
 }
 
 // resolveGrade 按入学基准推导当前年级。
-// 每年 7 月 1 日随学年切换升一级，升到九年级封顶，超出后标记为已毕业。
+// 每年 7 月 1 日随学年切换升一级，升到十二年级封顶，超出后标记为已毕业。
 func resolveGrade(enrollmentAcademicYear, enrollmentGrade, currentAcademicYear string) (string, bool) {
 	baseIndex := gradeIndexOf(enrollmentGrade)
 	if baseIndex < 0 {

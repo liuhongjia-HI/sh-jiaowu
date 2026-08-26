@@ -47,6 +47,7 @@ type LearningSpace struct {
 	Subject      string `json:"subject"`
 	Semester     string `json:"semester"`
 	Phase        string `json:"phase"`
+	Level        string `json:"level"`
 	Name         string `json:"name"`
 	Status       Status `json:"status"`
 }

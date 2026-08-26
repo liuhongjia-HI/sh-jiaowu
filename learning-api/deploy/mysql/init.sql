@@ -150,12 +150,13 @@ CREATE TABLE IF NOT EXISTS learning_spaces (
   subject VARCHAR(32) NOT NULL,
   semester VARCHAR(32) NOT NULL,
   phase VARCHAR(32) NOT NULL,
+  level VARCHAR(16) NOT NULL DEFAULT 'S',
   name VARCHAR(128) NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT '启用',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_learning_space (academic_year, grade, subject, semester, phase),
-  KEY idx_learning_spaces_scope (grade, subject, semester, phase)
+  UNIQUE KEY uk_learning_space (grade, subject, semester, phase, level),
+  KEY idx_learning_spaces_scope (grade, subject, semester, phase, level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS courses (

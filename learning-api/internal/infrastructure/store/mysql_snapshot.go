@@ -90,8 +90,8 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, space := range s.learningSpaces {
 		if _, err := tx.Exec(
-			`INSERT INTO learning_spaces (id, academic_year, grade, subject, semester, phase, name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			space.ID, space.AcademicYear, space.Grade, space.Subject, space.Semester, space.Phase, space.Name, space.Status,
+			`INSERT INTO learning_spaces (id, academic_year, grade, subject, semester, phase, level, name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			space.ID, space.AcademicYear, space.Grade, space.Subject, space.Semester, space.Phase, space.Level, space.Name, space.Status,
 		); err != nil {
 			return err
 		}
