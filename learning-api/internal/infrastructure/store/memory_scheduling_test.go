@@ -1134,6 +1134,24 @@ func TestTeacherCopiedLessonStillNeedsReview(t *testing.T) {
 	}
 }
 
+// HTTP 中间件会把姓名、ID、IP 和 User-Agent 编码进 operator，供操作日志拆分留痕。
+// 排课自身的 created_by / audited_by 只应保存可读姓名，不能把整段审计载荷写进 VARCHAR(64)。
+func TestScheduleClassStoresReadableOperatorName(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	operator := middlewareAuditLabel("运营教务", ops.UserID)
+	created, err := store.CreateScheduleClass(operator, ops, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected schedule: %v", err)
+	}
+	if created.CreatedBy != "运营教务" || created.AuditedBy != "运营教务" {
+		t.Fatalf("排课创建人与审核人应保存可读姓名，实际 createdBy=%q auditedBy=%q", created.CreatedBy, created.AuditedBy)
+	}
+}
+
 // 拖下沿改时长走的是同一条调课链路，所以重复课次的范围规则必须照样生效：
 // 不给范围要报错，「仅此课次」只改这一节的时长。
 func TestResizeRepeatingLessonRespectsScope(t *testing.T) {

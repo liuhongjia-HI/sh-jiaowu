@@ -148,6 +148,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [moveScopeRequest, setMoveScopeRequest] = useState<{ record: ScheduleClass; target: ScheduleMoveTarget } | null>(null);
   const [moveScope, setMoveScope] = useState<'this' | 'thisAndFuture' | 'all'>('this');
   const [creatingClass, setCreatingClass] = useState(false);
+  const [copyingClass, setCopyingClass] = useState(false);
   // 重复排课默认关闭：绝大多数排课是单节，默认展开一堆重复选项只会碍事。
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
@@ -236,8 +237,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const createManualClass = useMutation({
     mutationFn: (values: ScheduleClassFormValues) => postData<ScheduleClass>('/schedule-classes', values),
     onSuccess: (record) => {
-      message.success(record.status === '待确认' ? '时间段已锁定，后续可补充学生' : '课程已创建，课表已更新');
+      if (copyingClass) {
+        message.success(record.auditStatus === '待审核' ? '复制课程已提交审核' : '复制课程已创建，课表已更新');
+      } else {
+        message.success(record.status === '待确认' ? '时间段已锁定，后续可补充学生' : '课程已创建，课表已更新');
+      }
       setCreatingClass(false);
+      setCopyingClass(false);
       editForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
     },
@@ -396,6 +402,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
   function openEdit(record: ScheduleClass) {
     setCreatingClass(false);
+    setCopyingClass(false);
     setRepeatEnabled(false);
     setEditingClass(record);
     editForm.setFieldsValue({
@@ -424,6 +431,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     if (!canCreateClass) return;
     setEditingClass(null);
     setCreatingClass(true);
+    setCopyingClass(true);
     setRepeatEnabled(false);
     editForm.setFieldsValue({
       courseId: record.courseId,
@@ -466,6 +474,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     if (!canCreateClass) return;
     setEditingClass(null);
     setCreatingClass(true);
+    setCopyingClass(false);
     setRepeatEnabled(false);
     editForm.setFieldsValue({
       courseId: undefined,
@@ -522,7 +531,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>排课管理</Typography.Title>
-          <Typography.Text type="secondary">在日/周/月视图里直接排课：双击空白格新建，拖拽调整时间。灰色底纹是师生填报的可上课时间，作为参考范围。</Typography.Text>
+          <Typography.Text type="secondary">在日/周/月视图里直接排课：双击空白格新建，拖拽调整时间，右键课程可快速复制。灰色底纹是师生填报的可上课时间，作为参考范围。</Typography.Text>
         </div>
         <Space wrap>
           <Button icon={<SaveOutlined />} onClick={() => setAvailabilityOpen(true)}>维护可上课时间</Button>
@@ -834,12 +843,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       </Drawer>
 
       <Drawer
-        title={creatingClass ? '新建课程' : '课程详情'}
+        title={copyingClass ? '复制课程' : creatingClass ? '新建课程' : '课程详情'}
         open={Boolean(editingClass) || creatingClass}
         width={560}
         onClose={() => {
           setEditingClass(null);
           setCreatingClass(false);
+          setCopyingClass(false);
         }}
         extra={(editingClass || creatingClass) && (
           <Space>
@@ -849,11 +859,19 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               </Popconfirm>
             )}
             <Button type="primary" loading={updateClass.isPending || createManualClass.isPending} onClick={() => editForm.submit()}>
-              {creatingClass ? '创建课程' : '保存调课'}
+              {copyingClass ? '创建复制课程' : creatingClass ? '创建课程' : '保存调课'}
             </Button>
           </Space>
         )}
       >
+        {copyingClass && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="已带入原课程信息，请修改上课日期、时间或其他属性。"
+          />
+        )}
         {availabilityGaps.length > 0 && (
           <Alert
             type="warning"

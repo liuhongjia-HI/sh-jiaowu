@@ -212,6 +212,66 @@ test('校区管理员可以从周历入口新建排课', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: '新建课程' }).getByText('教室/资源')).toHaveCount(0);
 });
 
+test('校区管理员可以右键复制课程并只修改日期创建新课', async ({ page }) => {
+  await login(page, '13800000002');
+
+  const { sourceDate, copiedDate } = await page.evaluate(async () => {
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const source = new Date();
+    const copied = new Date(source);
+    copied.setDate(copied.getDate() + 1);
+    const token = localStorage.getItem('starline_admin_token');
+    const user = JSON.parse(localStorage.getItem('starline_admin_user') ?? '{}') as { userId?: string; name?: string };
+    const response = await fetch('/api/schedule-classes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'X-Operator-ID': user.userId ?? '',
+        'X-Operator-Name': encodeURIComponent(user.name ?? '')
+      },
+      body: JSON.stringify({
+        courseId: 'course-g05-english-s1-q1',
+        teacherId: 'user-teacher',
+        campusId: 'campus-main',
+        classType: '1V1',
+        durationMinutes: 60,
+        startTime: '06:00',
+        endTime: '07:00',
+        startDate: formatDate(source),
+        studentIds: [],
+        expectedStudentCount: 1,
+        reservationNote: '快捷复制端到端验收源课程',
+        ignoreWarnings: true
+      })
+    });
+    if (!response.ok) throw new Error(`创建验收源课程失败：${await response.text()}`);
+    return { sourceDate: formatDate(source), copiedDate: formatDate(copied) };
+  });
+
+  await expectPageHeading(page, '/scheduling', '排课管理');
+  await expect(page.getByText('右键课程可快速复制')).toBeVisible();
+  const sourceClass = page.locator('.schedule-timeline-block.is-class').filter({ hasText: '06:00-07:00' }).first();
+  await expect(sourceClass).toBeVisible();
+  await sourceClass.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '复制这节课' }).click();
+
+  const drawer = page.getByRole('dialog', { name: '复制课程' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText('已带入原课程信息，请修改上课日期、时间或其他属性。')).toBeVisible();
+  await expect(drawer.getByLabel('上课日期')).toHaveValue(sourceDate);
+  await drawer.getByLabel('上课日期').fill(copiedDate);
+  await drawer.getByRole('button', { name: '创建复制课程' }).click();
+
+  await expect(drawer).toBeHidden();
+  await expect(page.getByText('复制课程已创建，课表已更新')).toBeVisible();
+});
+
 test('退出登录会清理后台访问态', async ({ page }) => {
   await login(page, '13800000002');
   await page.getByRole('button', { name: '账号菜单' }).click();

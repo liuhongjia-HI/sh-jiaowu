@@ -281,6 +281,7 @@ func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal lea
 		return learning.ScheduleClass{}, err
 	}
 	stamp := time.Now().Format("20060102150405.000000000")
+	operatorName := parseAuditOperator(operator).Name
 	seriesID := ""
 	if repeat.Freq != "" {
 		seriesID = "series-" + stamp
@@ -299,11 +300,11 @@ func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal lea
 		item.SeriesID = seriesID
 		item.ID = "schedule-" + stamp + "-" + itoa(index)
 		item.CreatedAt = createdAt
-		item.CreatedBy = operator
+		item.CreatedBy = operatorName
 		item.CreatedByRole = schedulePrincipalRole(principal)
 		item.AuditStatus = initialAuditStatus(principal)
 		if item.AuditStatus == learning.AuditApproved {
-			item.AuditedBy = operator
+			item.AuditedBy = operatorName
 			item.AuditedAt = createdAt
 		}
 		built = append(built, item)
@@ -807,7 +808,7 @@ func (s *MemoryStore) reviewScheduleClassUnlocked(operator string, principal lea
 		}
 		item := existing
 		item.AuditReason = reason
-		item.AuditedBy = operator
+		item.AuditedBy = parseAuditOperator(operator).Name
 		item.AuditedAt = time.Now().Format("2006-01-02 15:04:05")
 		if approve {
 			item.AuditStatus = learning.AuditApproved
