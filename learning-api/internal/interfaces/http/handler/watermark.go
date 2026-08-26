@@ -116,7 +116,7 @@ func watermarkEndPageScript(watermarkText string) string {
   20 750 moveto (` + escaped + `) show
   grestore
 } bind def
-<< /EndPage { 2 eq { StarlineWatermark } if true } >> setpagedevice`
+<< /EndPage { exch pop 2 eq { StarlineWatermark } if true } >> setpagedevice`
 }
 
 // countPDFPages 用 Ghostscript 内置的 runpdfbegin/pdfpagecount 探测页数，

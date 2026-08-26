@@ -13,6 +13,7 @@ func TestWatermarkEndPageScriptStampsTraceAndEscapesText(t *testing.T) {
 
 	for _, expected := range []string{
 		"/EndPage",
+		"exch pop 2 eq",
 		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
 		"rotate",
 		"show",
