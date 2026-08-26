@@ -4,8 +4,24 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestWatermarkEndPageScriptStampsTraceAndEscapesText(t *testing.T) {
+	script := watermarkEndPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
+
+	for _, expected := range []string{
+		"/EndPage",
+		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
+		"rotate",
+		"show",
+	} {
+		if !strings.Contains(script, expected) {
+			t.Fatalf("watermark script should contain %q, got %s", expected, script)
+		}
+	}
+}
 
 func TestRasterizePDFPageDegradesWhenGhostscriptMissing(t *testing.T) {
 	withEmptyPath(t)
