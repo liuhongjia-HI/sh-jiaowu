@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
-import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
+import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, levelOptions, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -44,12 +44,13 @@ function autoPackageName(values: {
   grade?: string;
   subject?: string;
   semester?: string;
+  level?: string;
   learningSpaceIds?: string[];
   contentTypeCodes?: string[];
   learningSpaces: LearningSpace[];
 }) {
-  const { academicYear, grade, subject, semester, learningSpaceIds, contentTypeCodes, learningSpaces } = values;
-  const parts = [academicYear, grade, semesterLabel(semester), subject].filter(Boolean).map(String);
+  const { academicYear, grade, subject, semester, level, learningSpaceIds, contentTypeCodes, learningSpaces } = values;
+  const parts = [academicYear, grade, semesterLabel(semester), subject, level].filter(Boolean).map(String);
   const selectedPhases = learningSpaces
     .filter((space) => learningSpaceIds?.includes(space.id))
     .map((space) => phaseLabel(space.phase))
@@ -489,22 +490,23 @@ export function PackageDialog({
   const grade = Form.useWatch('grade', form);
   const subject = Form.useWatch('subject', form);
   const semester = Form.useWatch('semester', form);
+  const level = Form.useWatch('level', form);
   const academicYear = Form.useWatch('academicYear', form);
   const learningSpaceIds = Form.useWatch('learningSpaceIds', form);
   const contentTypeCodes = Form.useWatch('contentTypeCodes', form);
   const [autoNameEnabled, setAutoNameEnabled] = useState(!editing);
   const lastAutoName = useRef('');
   const spaceOptions = learningSpaces
-    .filter((space) => (!grade || space.grade === grade) && (!subject || space.subject === subject) && (!semester || space.semester === semester))
+    .filter((space) => (!grade || space.grade === grade) && (!subject || space.subject === subject) && (!semester || space.semester === semester) && (!level || (space.level || 'S') === level))
     .map((space) => ({ label: `${phaseLabel(space.phase)} · ${formatLearningSpace(space)}`, value: space.id }));
 
   useEffect(() => {
     if (!open || editing || !autoNameEnabled) return;
-    const generated = autoPackageName({ academicYear, grade, subject, semester, learningSpaceIds, contentTypeCodes, learningSpaces });
+    const generated = autoPackageName({ academicYear, grade, subject, semester, level, learningSpaceIds, contentTypeCodes, learningSpaces });
     if (!generated) return;
     lastAutoName.current = generated;
     form.setFieldValue('name', generated);
-  }, [academicYear, autoNameEnabled, contentTypeCodes, editing, form, grade, learningSpaceIds, learningSpaces, open, semester, subject]);
+  }, [academicYear, autoNameEnabled, contentTypeCodes, editing, form, grade, learningSpaceIds, learningSpaces, level, open, semester, subject]);
 
   return (
     <Modal
@@ -548,12 +550,16 @@ export function PackageDialog({
                 if (currentSubject && !subjectsForGrade(value).includes(currentSubject)) {
                   form.setFieldValue('subject', undefined);
                 }
+                form.setFieldValue('level', 'S');
                 form.setFieldValue('learningSpaceIds', []);
               }}
             />
           </Form.Item>
           <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]}>
-            <Select style={{ width: 150 }} options={subjectOptions(grade)} onChange={() => form.setFieldValue('learningSpaceIds', [])} />
+            <Select style={{ width: 150 }} options={subjectOptions(grade)} onChange={(value) => { form.setFieldValue('level', levelOptions(grade, value)[0]?.value); form.setFieldValue('learningSpaceIds', []); }} />
+          </Form.Item>
+          <Form.Item name="level" label="等级" rules={[{ required: true, message: '请选择等级' }]}>
+            <Select style={{ width: 110 }} options={levelOptions(grade, subject)} onChange={() => form.setFieldValue('learningSpaceIds', [])} />
           </Form.Item>
           <Form.Item name="semester" label="学期" rules={[{ required: true, message: '请选择学期' }]}>
             <Select

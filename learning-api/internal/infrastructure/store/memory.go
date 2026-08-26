@@ -190,21 +190,16 @@ func (s *MemoryStore) seedBaseDictionaries() {
 // 每加一个新的“取代关系”就在这补一条。
 var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd", "academicYear", "academicPeriods", "subjectColors"}
 
-// 客户长期用 Outlook 排课，日历分类固定是这 8 个：
-// Eng / Math / Geo / Sci / CHN / His / Chem / Phy，色值按客户提供的截图取。
-//
-// 「综合科学」和「科学」是两个不同的业务学科（分别面向 1-3 年级和 4-9 年级，
-// 见 subjectAppliesToGrade），但客户的 Outlook 里只有一个 Sci——两者不会在同一
-// 年级同时出现，共用一个颜色既不会撞车，也贴合客户自己的用法。
+// 综合科学和历史仅为旧数据保留展示元数据，不再进入新课程矩阵。
 func defaultSubjectMetadata() []learning.SubjectMetadata {
 	return []learning.SubjectMetadata{
 		{ID: "english", Name: "英文", ShortLabel: "Eng", Color: "#1A6FD4", SortOrder: 1, Status: "启用"},
 		{ID: "math", Name: "数学", ShortLabel: "Math", Color: "#E8C400", SortOrder: 2, Status: "启用"},
 		{ID: "geography", Name: "地理", ShortLabel: "Geo", Color: "#3A9BBF", SortOrder: 3, Status: "启用"},
 		{ID: "science", Name: "科学", ShortLabel: "Sci", Color: "#1B3FA8", SortOrder: 4, Status: "启用"},
-		{ID: "integrated-science", Name: "综合科学", ShortLabel: "Sci", Color: "#1B3FA8", SortOrder: 5, Status: "启用"},
+		{ID: "integrated-science", Name: "综合科学", ShortLabel: "Sci", Color: "#1B3FA8", SortOrder: 5, Status: "停用"},
 		{ID: "chinese", Name: "语文", ShortLabel: "CHN", Color: "#A855D8", SortOrder: 6, Status: "启用"},
-		{ID: "history", Name: "历史", ShortLabel: "His", Color: "#8B5A2B", SortOrder: 7, Status: "启用"},
+		{ID: "history", Name: "历史", ShortLabel: "His", Color: "#8B5A2B", SortOrder: 7, Status: "停用"},
 		{ID: "chemistry", Name: "化学", ShortLabel: "Chem", Color: "#E8730C", SortOrder: 8, Status: "启用"},
 		{ID: "physics", Name: "物理", ShortLabel: "Phy", Color: "#C2185B", SortOrder: 9, Status: "启用"},
 	}
@@ -236,7 +231,7 @@ func defaultSettings() map[string]string {
 		// 可以提前把下一学年的校历也配好。套餐默认有效期跟着当前学年对应的
 		// 学期起止走，见 defaultGrantPeriod。
 		"academicCalendar":             string(calendar),
-		"grades":                       "G1-G9",
+		"grades":                       "G1-G12",
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "学生专属：姓名/昵称、手机尾号、时间、追溯码（服务端写入）",
 		"downloadPolicy":               "仅在线预览",
@@ -494,7 +489,7 @@ func seedPermissionDemoData(s *MemoryStore) {
 					s.packages = append(s.packages, learning.Package{
 						ID: pkgID, Name: academicYear + " " + grade + " " + semester + " " + subject + " " + pkgType.Label,
 						AcademicYear: academicYear, Grade: grade, Semester: semester, Subject: subject,
-						PhaseScope: "全学期", PackageType: pkgType.Label, Summary: pkgType.Summary, Status: learning.StatusEnabled,
+						Level: "S", PhaseScope: "全学期", PackageType: pkgType.Label, Summary: pkgType.Summary, Status: learning.StatusEnabled,
 					})
 					for phaseIndex := range demoPhases {
 						s.packageSpaces = append(s.packageSpaces, packageSpace{
@@ -681,7 +676,7 @@ func (s *MemoryStore) ensureDemoQuestionBank(grade, semester, subject string) []
 }
 
 func slugText(value string) string {
-	replacer := strings.NewReplacer("一年级", "g01", "二年级", "g02", "三年级", "g03", "四年级", "g04", "五年级", "g05", "六年级", "g06", "七年级", "g07", "八年级", "g08", "九年级", "g09", " ", "-")
+	replacer := strings.NewReplacer("一年级", "g01", "二年级", "g02", "三年级", "g03", "四年级", "g04", "五年级", "g05", "六年级", "g06", "七年级", "g07", "八年级", "g08", "九年级", "g09", "十年级", "g10", "十一年级", "g11", "十二年级", "g12", " ", "-")
 	return strings.ToLower(replacer.Replace(value))
 }
 

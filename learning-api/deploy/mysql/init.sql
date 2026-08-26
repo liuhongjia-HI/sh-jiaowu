@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS study_packages (
   grade VARCHAR(32) NOT NULL,
   semester VARCHAR(32) NOT NULL,
   subject VARCHAR(32) NOT NULL,
+  level VARCHAR(16) NOT NULL DEFAULT 'S',
   phase_scope VARCHAR(32) NOT NULL DEFAULT '全学期',
   package_type VARCHAR(32) NOT NULL DEFAULT 'full',
   sale_starts_at DATE NULL,
@@ -556,9 +557,9 @@ INSERT INTO subjects (id, name, short_label, color, sort_order, status) VALUES
   ('math', '数学', 'Math', '#E8C400', 2, '启用'),
   ('geography', '地理', 'Geo', '#3A9BBF', 3, '启用'),
   ('science', '科学', 'Sci', '#1B3FA8', 4, '启用'),
-  ('integrated-science', '综合科学', 'Sci', '#1B3FA8', 5, '启用'),
+  ('integrated-science', '综合科学', 'Sci', '#1B3FA8', 5, '停用'),
   ('chinese', '语文', 'CHN', '#A855D8', 6, '启用'),
-  ('history', '历史', 'His', '#8B5A2B', 7, '启用'),
+  ('history', '历史', 'His', '#8B5A2B', 7, '停用'),
   ('chemistry', '化学', 'Chem', '#E8730C', 8, '启用'),
   ('physics', '物理', 'Phy', '#C2185B', 9, '启用')
 ON DUPLICATE KEY UPDATE
@@ -579,7 +580,7 @@ SET @seed_academic_year = CONCAT(
 );
 
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
-  ('grades', 'G1-G9'),
+  ('grades', 'G1-G12'),
   ('semesters', 'S1 / S2'),
   ('watermarkRule', '姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀'),
   ('downloadPolicy', '学生端仅安全预览，不提供下载'),
@@ -587,7 +588,7 @@ INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('officialAccountBindingStatus', '待确认'),
   ('templateMessageStatus', '待确认'),
   ('productionApiDomain', '待配置');
-UPDATE system_settings SET setting_value = 'G1-G9' WHERE setting_key = 'grades';
+UPDATE system_settings SET setting_value = 'G1-G12' WHERE setting_key = 'grades';
 DELETE FROM system_settings WHERE setting_key IN ('academicYear', 'academicPeriods');
 
 DROP PROCEDURE IF EXISTS seed_starline_demo_data;
@@ -636,7 +637,7 @@ CREATE TEMPORARY TABLE seed_grades (
 INSERT INTO seed_grades (grade_no, grade_name) VALUES
   (1, '一年级'), (2, '二年级'), (3, '三年级'), (4, '四年级'),
   (5, '五年级'), (6, '六年级'), (7, '七年级'), (8, '八年级'),
-  (9, '九年级');
+  (9, '九年级'), (10, '十年级'), (11, '十一年级'), (12, '十二年级');
 
 DROP TEMPORARY TABLE IF EXISTS seed_subjects;
 CREATE TEMPORARY TABLE seed_subjects (
@@ -646,15 +647,13 @@ CREATE TEMPORARY TABLE seed_subjects (
 );
 INSERT INTO seed_subjects (subject_code, subject_name) VALUES
   ('math', '数学'), ('english', '英文'), ('chinese', '语文'),
-  ('integrated-science', '综合科学'), ('science', '科学'), ('geography', '地理'),
-  ('history', '历史'), ('physics', '物理'), ('chemistry', '化学');
+  ('science', '科学'), ('geography', '地理'), ('physics', '物理'), ('chemistry', '化学');
 
 -- 年级与学科的开设关系按业务课程矩阵显式维护：
--- G1-G3：数学、英文、语文、综合科学；
--- G4-G5：数学、英文、语文、科学、地理；
--- G6-G7：数学、英文、语文、科学、历史；
+-- G1-G4：数学、英文、语文、科学；
+-- G5-G7：数学、英文、语文、科学、地理；
 -- G8：数学、英文、语文、科学、地理、物理；
--- G9：数学、英文、语文、科学、历史、物理、化学。
+-- G9-G12：数学、英文、语文、科学、地理、物理、化学。
 DROP TEMPORARY TABLE IF EXISTS seed_grade_subjects;
 CREATE TEMPORARY TABLE seed_grade_subjects (
   grade_no INT NOT NULL,
@@ -662,15 +661,63 @@ CREATE TEMPORARY TABLE seed_grade_subjects (
   PRIMARY KEY (grade_no, subject_code)
 );
 INSERT INTO seed_grade_subjects (grade_no, subject_code) VALUES
-  (1, 'math'), (1, 'english'), (1, 'chinese'), (1, 'integrated-science'),
-  (2, 'math'), (2, 'english'), (2, 'chinese'), (2, 'integrated-science'),
-  (3, 'math'), (3, 'english'), (3, 'chinese'), (3, 'integrated-science'),
-  (4, 'math'), (4, 'english'), (4, 'chinese'), (4, 'science'), (4, 'geography'),
+  (1, 'math'), (1, 'english'), (1, 'chinese'), (1, 'science'),
+  (2, 'math'), (2, 'english'), (2, 'chinese'), (2, 'science'),
+  (3, 'math'), (3, 'english'), (3, 'chinese'), (3, 'science'),
+  (4, 'math'), (4, 'english'), (4, 'chinese'), (4, 'science'),
   (5, 'math'), (5, 'english'), (5, 'chinese'), (5, 'science'), (5, 'geography'),
-  (6, 'math'), (6, 'english'), (6, 'chinese'), (6, 'science'), (6, 'history'),
-  (7, 'math'), (7, 'english'), (7, 'chinese'), (7, 'science'), (7, 'history'),
+  (6, 'math'), (6, 'english'), (6, 'chinese'), (6, 'science'), (6, 'geography'),
+  (7, 'math'), (7, 'english'), (7, 'chinese'), (7, 'science'), (7, 'geography'),
   (8, 'math'), (8, 'english'), (8, 'chinese'), (8, 'science'), (8, 'geography'), (8, 'physics'),
-  (9, 'math'), (9, 'english'), (9, 'chinese'), (9, 'science'), (9, 'history'), (9, 'physics'), (9, 'chemistry');
+  (9, 'math'), (9, 'english'), (9, 'chinese'), (9, 'science'), (9, 'geography'), (9, 'physics'), (9, 'chemistry'),
+  (10, 'math'), (10, 'english'), (10, 'chinese'), (10, 'science'), (10, 'geography'), (10, 'physics'), (10, 'chemistry'),
+  (11, 'math'), (11, 'english'), (11, 'chinese'), (11, 'science'), (11, 'geography'), (11, 'physics'), (11, 'chemistry'),
+  (12, 'math'), (12, 'english'), (12, 'chinese'), (12, 'science'), (12, 'geography'), (12, 'physics'), (12, 'chemistry');
+
+DROP TEMPORARY TABLE IF EXISTS seed_levels;
+CREATE TEMPORARY TABLE seed_levels (
+  level_code VARCHAR(16) NOT NULL,
+  level_slug VARCHAR(16) NOT NULL,
+  PRIMARY KEY (level_code)
+);
+INSERT INTO seed_levels (level_code, level_slug) VALUES
+  ('S', 's'), ('S+', 'splus'), ('H', 'h'), ('H+', 'hplus');
+
+DROP TEMPORARY TABLE IF EXISTS seed_grade_subject_levels;
+CREATE TEMPORARY TABLE seed_grade_subject_levels AS
+SELECT gs.grade_no, gs.subject_code, l.level_code, l.level_slug
+FROM seed_grade_subjects gs
+CROSS JOIN seed_levels l
+WHERE
+  (gs.grade_no <= 4 AND l.level_code = 'S')
+  OR (gs.grade_no = 5 AND (
+    (gs.subject_code IN ('math', 'english', 'chinese') AND l.level_code IN ('S', 'S+', 'H'))
+    OR (gs.subject_code = 'geography' AND l.level_code IN ('S', 'S+'))
+    OR (gs.subject_code = 'science' AND l.level_code = 'S')
+  ))
+  OR (gs.grade_no = 6 AND (
+    (gs.subject_code IN ('math', 'english', 'chinese') AND l.level_code IN ('S', 'S+', 'H'))
+    OR (gs.subject_code IN ('geography', 'science') AND l.level_code IN ('S', 'S+'))
+  ))
+  OR (gs.grade_no = 7 AND (
+    (gs.subject_code IN ('math', 'english') AND l.level_code IN ('S', 'S+', 'H', 'H+'))
+    OR (gs.subject_code IN ('chinese', 'geography', 'science') AND l.level_code IN ('S', 'S+', 'H'))
+  ))
+  OR (gs.grade_no = 8 AND (
+    (gs.subject_code IN ('math', 'english') AND l.level_code IN ('S', 'S+', 'H', 'H+'))
+    OR (gs.subject_code IN ('chinese', 'geography', 'science') AND l.level_code IN ('S', 'S+', 'H'))
+    OR (gs.subject_code = 'physics' AND l.level_code = 'S')
+  ))
+  OR (gs.grade_no = 9 AND (
+    (gs.subject_code IN ('math', 'english') AND l.level_code IN ('S', 'S+', 'H', 'H+'))
+    OR (gs.subject_code IN ('chinese', 'geography', 'science', 'physics') AND l.level_code IN ('S', 'S+', 'H'))
+    OR (gs.subject_code = 'chemistry' AND l.level_code IN ('S', 'S+'))
+  ))
+  OR (gs.grade_no >= 10 AND (
+    (gs.subject_code IN ('math', 'english') AND l.level_code IN ('S', 'S+', 'H', 'H+'))
+    OR (gs.subject_code IN ('chinese', 'geography', 'science', 'physics', 'chemistry') AND l.level_code IN ('S', 'S+', 'H'))
+  ));
+ALTER TABLE seed_grade_subject_levels ADD PRIMARY KEY (grade_no, subject_code, level_code);
 
 DROP TEMPORARY TABLE IF EXISTS seed_semesters;
 CREATE TEMPORARY TABLE seed_semesters (
@@ -712,19 +759,21 @@ INSERT IGNORE INTO subjects (id, name, status)
 SELECT subject_code, subject_name, '启用'
 FROM seed_subjects;
 
-INSERT IGNORE INTO learning_spaces (id, academic_year, grade, subject, semester, phase, name, status)
+INSERT IGNORE INTO learning_spaces (id, academic_year, grade, subject, semester, phase, level, name, status)
 SELECT
-  CONCAT('space-g', LPAD(g.grade_no, 2, '0'), '-', s.subject_code, '-s', sem.semester_no, '-', p.phase_code),
+  CONCAT('space-g', LPAD(g.grade_no, 2, '0'), '-', s.subject_code, '-s', sem.semester_no, '-', p.phase_code,
+    CASE WHEN gsl.level_code = 'S' THEN '' ELSE CONCAT('-', gsl.level_slug) END),
   @seed_academic_year,
   g.grade_name,
   s.subject_name,
   sem.semester_name,
   p.phase_name,
-  CONCAT(g.grade_name, s.subject_name, sem.semester_name, p.phase_name),
+  gsl.level_code,
+  CONCAT(g.grade_name, s.subject_name, sem.semester_name, p.phase_name, gsl.level_code),
   '启用'
-FROM seed_grade_subjects gs
-JOIN seed_grades g ON g.grade_no = gs.grade_no
-JOIN seed_subjects s ON s.subject_code = gs.subject_code
+FROM seed_grade_subject_levels gsl
+JOIN seed_grades g ON g.grade_no = gsl.grade_no
+JOIN seed_subjects s ON s.subject_code = gsl.subject_code
 CROSS JOIN seed_semesters sem
 CROSS JOIN seed_phases p;
 
@@ -782,13 +831,13 @@ SELECT
   sort_order
 FROM (
   SELECT id, 'course' AS content_type, 'courses' AS source_table, 'course' AS source_prefix, CONCAT(name, '课程') AS title, 1 AS sort_order
-  FROM learning_spaces
+  FROM learning_spaces WHERE level = 'S'
   UNION ALL
   SELECT id, 'handout', 'materials', 'mat', CONCAT(name, '核心讲义'), 2
-  FROM learning_spaces
+  FROM learning_spaces WHERE level = 'S'
   UNION ALL
   SELECT id, 'question', 'homework_tasks', 'hw', CONCAT(name, '练习题'), 3
-  FROM learning_spaces
+  FROM learning_spaces WHERE level = 'S'
 ) generated_contents;
 
 INSERT IGNORE INTO courses (id, learning_space_id, name, subject, grade, status)

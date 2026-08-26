@@ -1,25 +1,51 @@
-// 年级与学科的开设关系，与后端保持一致。这里的学科名称是业务字典值，
-// “综合科学”和“科学”是两个不同学科，不能合并为一个选项。
+// 年级与学科的开设关系，与后端保持一致。综合科学和历史仅兼容旧数据，
+// 不再出现在新建课程与学习空间的选项中。
 // 规则对应 learning-api/internal/infrastructure/store/memory.go 的 subjectAppliesToGrade。
 
 export const GRADES = [
   '一年级', '二年级', '三年级', '四年级', '五年级',
-  '六年级', '七年级', '八年级', '九年级'
+  '六年级', '七年级', '八年级', '九年级', '十年级',
+  '十一年级', '十二年级'
 ];
 
-export const ALL_SUBJECTS = ['数学', '英文', '语文', '综合科学', '科学', '地理', '历史', '物理', '化学'];
+export const ALL_SUBJECTS = ['数学', '英文', '语文', '科学', '地理', '物理', '化学'];
 
 export const SUBJECTS_BY_GRADE: Record<string, string[]> = {
-  一年级: ['数学', '英文', '语文', '综合科学'],
-  二年级: ['数学', '英文', '语文', '综合科学'],
-  三年级: ['数学', '英文', '语文', '综合科学'],
-  四年级: ['数学', '英文', '语文', '科学', '地理'],
+  一年级: ['数学', '英文', '语文', '科学'],
+  二年级: ['数学', '英文', '语文', '科学'],
+  三年级: ['数学', '英文', '语文', '科学'],
+  四年级: ['数学', '英文', '语文', '科学'],
   五年级: ['数学', '英文', '语文', '科学', '地理'],
-  六年级: ['数学', '英文', '语文', '科学', '历史'],
-  七年级: ['数学', '英文', '语文', '科学', '历史'],
+  六年级: ['数学', '英文', '语文', '科学', '地理'],
+  七年级: ['数学', '英文', '语文', '科学', '地理'],
   八年级: ['数学', '英文', '语文', '科学', '地理', '物理'],
-  九年级: ['数学', '英文', '语文', '科学', '历史', '物理', '化学']
+  九年级: ['数学', '英文', '语文', '科学', '地理', '物理', '化学'],
+  十年级: ['数学', '英文', '语文', '科学', '地理', '物理', '化学'],
+  十一年级: ['数学', '英文', '语文', '科学', '地理', '物理', '化学'],
+  十二年级: ['数学', '英文', '语文', '科学', '地理', '物理', '化学']
 };
+
+export const LEARNING_LEVELS = ['S', 'S+', 'H', 'H+'];
+
+export function levelsForGradeSubject(grade?: string, subject?: string): string[] {
+  const index = gradeIndex(grade);
+  if (index < 0 || !subject || !subjectsForGrade(grade).includes(subject)) return [];
+  if (index <= 3) return ['S'];
+  if (index === 4) {
+    if (['数学', '英文', '语文'].includes(subject)) return ['S', 'S+', 'H'];
+    if (subject === '地理') return ['S', 'S+'];
+    return ['S'];
+  }
+  if (index === 5) return ['数学', '英文', '语文'].includes(subject) ? ['S', 'S+', 'H'] : ['S', 'S+'];
+  if (['数学', '英文'].includes(subject)) return ['S', 'S+', 'H', 'H+'];
+  if (index === 7 && subject === '物理') return ['S'];
+  if (index === 8 && subject === '化学') return ['S', 'S+'];
+  return ['S', 'S+', 'H'];
+}
+
+export function levelOptions(grade?: string, subject?: string) {
+  return levelsForGradeSubject(grade, subject).map((level) => ({ label: level, value: level }));
+}
 
 export const DEFAULT_ACADEMIC_YEAR = '2025.2026学年';
 
@@ -88,8 +114,8 @@ export function semesterOptions(settingValue?: string) {
   return parseSemesterSetting(settingValue).map((value) => ({ label: semesterLabel(value), value }));
 }
 
-export function formatLearningSpace(space: { grade: string; subject: string; semester: string; phase: string; name?: string }) {
-  return `${space.grade} · ${space.subject} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)}`;
+export function formatLearningSpace(space: { grade: string; subject: string; semester: string; phase: string; level?: string; name?: string }) {
+  return `${space.grade} · ${space.subject} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)} · ${space.level || 'S'}`;
 }
 
 // 校历（系统设置 academicCalendar）里的一条学期记录，是学年下拉的唯一权威来源——

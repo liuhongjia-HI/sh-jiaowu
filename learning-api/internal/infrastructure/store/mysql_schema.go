@@ -454,12 +454,15 @@ func (s *MemoryStore) ensureLearningSpaceUniqueIndex() error {
 	if strings.Join(columns, ",") == expectedColumns {
 		return nil
 	}
-	if len(columns) > 0 {
-		if _, err := s.db.Exec(`ALTER TABLE learning_spaces DROP INDEX uk_learning_space`); err != nil {
-			return err
-		}
+	if len(columns) == 0 {
+		_, err = s.db.Exec(`ALTER TABLE learning_spaces ADD UNIQUE KEY uk_learning_space (grade, subject, semester, phase, level)`)
+		return err
 	}
-	_, err = s.db.Exec(`ALTER TABLE learning_spaces ADD UNIQUE KEY uk_learning_space (grade, subject, semester, phase, level)`)
+	// MySQL 8 的单条 ALTER TABLE 是原子 DDL：如果新唯一键因存量重复数据创建失败，
+	// 旧唯一键也不会被单独删除，应用启动失败并保留原约束，便于先清理脏数据再重试。
+	_, err = s.db.Exec(`ALTER TABLE learning_spaces
+		DROP INDEX uk_learning_space,
+		ADD UNIQUE KEY uk_learning_space (grade, subject, semester, phase, level)`)
 	return err
 }
 

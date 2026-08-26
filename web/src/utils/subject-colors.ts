@@ -14,7 +14,7 @@ export type SubjectColorEntry = {
 
 // 与 learning-api 的 defaultSubjectColors 一一对应。客户长期用 Outlook 排课，
 // 日历分类固定是 Eng / Math / Geo / Sci / CHN / His / Chem / Phy 这 8 个。
-// 「综合科学」和「科学」面向不同年级、不会同时出现，共用 Sci 的颜色。
+// 「综合科学」仅兼容旧数据，与当前「科学」共用 Sci 的颜色。
 export const DEFAULT_SUBJECT_COLORS: SubjectColorEntry[] = [
   { subject: '英文', shortLabel: 'Eng', color: '#1A6FD4', sortOrder: 1 },
   { subject: '数学', shortLabel: 'Math', color: '#E8C400', sortOrder: 2 },

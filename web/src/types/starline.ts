@@ -79,6 +79,7 @@ export type LearningSpace = {
   subject: string;
   semester: string;
   phase: string;
+  level?: string;
   name: string;
   status: string;
 };
@@ -133,6 +134,7 @@ export type StudyPackage = {
   grade: string;
   semester: string;
   subject: string;
+  level?: string;
   phaseScope: string;
   packageType: string;
   summary: string;
@@ -150,6 +152,7 @@ export type PackageUpsertRequest = {
   grade: string;
   semester: string;
   subject: string;
+  level: string;
   phaseScope: string;
   packageType: string;
   summary: string;
@@ -707,6 +710,7 @@ export type ScheduleCandidate = {
   courseName: string;
   subject: string;
   grade: string;
+  level?: string;
   classType: string;
   capacity: number;
   availableStudents: CandidateStudent[];

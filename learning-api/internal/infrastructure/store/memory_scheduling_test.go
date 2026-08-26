@@ -42,6 +42,33 @@ func TestScheduleClassCanReserveTimeWithoutRegisteredStudents(t *testing.T) {
 	}
 }
 
+func TestScheduleClassRejectsStudentWithoutCourseLevelAccess(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("expected admin principal: %v", err)
+	}
+	hSpaceID := learningSpaceIDForLevel(4, "英文", 0, 0, "H")
+	hCourse := learning.Course{
+		ID: "course-g05-english-s1-q1-h", Name: "五年级英文 S1 Q1 H 课程",
+		Subject: "英文", Grade: "五年级", LearningSpaceID: hSpaceID, Status: learning.StatusEnabled,
+	}
+	store.courses = append(store.courses, hCourse)
+	for index := range store.users {
+		if store.users[index].ID == "user-teacher" {
+			store.users[index].LearningSpaceIDs = append(store.users[index].LearningSpaceIDs, hSpaceID)
+		}
+	}
+
+	req := teacherLessonRequest()
+	req.CourseID = hCourse.ID
+	req.StudentIDs = []string{"stu-001"}
+	_, err = store.CreateScheduleClass("超级管理员", admin, req)
+	if err == nil || !strings.Contains(err.Error(), "等级") {
+		t.Fatalf("expected H course to reject student with only S access, got %v", err)
+	}
+}
+
 func TestScheduleClassKeepsRoomMetadataWithoutBlocking(t *testing.T) {
 	store := NewMemoryStore()
 	store.users = append(store.users, learning.User{

@@ -22,6 +22,7 @@ type AvailabilityUpsertRequest struct {
 type ScheduleCandidateRequest struct {
 	Subject         string `json:"subject"`
 	Grade           string `json:"grade"`
+	Level           string `json:"level"`
 	CourseID        string `json:"courseId"`
 	TeacherID       string `json:"teacherId"`
 	ClassType       string `json:"classType"`
@@ -48,6 +49,7 @@ type ScheduleCandidate struct {
 	CourseName        string             `json:"courseName"`
 	Subject           string             `json:"subject"`
 	Grade             string             `json:"grade"`
+	Level             string             `json:"level"`
 	ClassType         string             `json:"classType"`
 	Capacity          int                `json:"capacity"`
 	AvailableStudents []CandidateStudent `json:"availableStudents"`

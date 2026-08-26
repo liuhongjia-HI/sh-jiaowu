@@ -88,6 +88,9 @@ func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principa
 
 	out := make([]learning.StudentPackageRecommendation, 0)
 	for _, pkg := range s.packages {
+		if strings.TrimSpace(pkg.Level) == "" {
+			pkg.Level = "S"
+		}
 		if pkg.Status != learning.StatusEnabled || !containsRecommendationContent(s.contentTypesForPackage(pkg.ID)) {
 			continue
 		}
@@ -114,6 +117,7 @@ func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principa
 			Grade:                pkg.Grade,
 			Semester:             pkg.Semester,
 			Subject:              pkg.Subject,
+			Level:                pkg.Level,
 			Summary:              pkg.Summary,
 			LearningSpaces:       s.learningSpaceNamesForPackage(pkg.ID),
 			CourseCount:          len(courses),
@@ -169,8 +173,16 @@ func containsRecommendationContent(contentTypes []string) bool {
 // sameRecommendationTerm 不比较学年，理由同 learningSpaceMatches：
 // 学习空间是跨学年复用的目录，学年只属于套餐。
 func sameRecommendationTerm(pkg learning.Package, spaces []learningSpace) bool {
+	pkgLevel := strings.TrimSpace(pkg.Level)
+	if pkgLevel == "" {
+		pkgLevel = "S"
+	}
 	for _, space := range spaces {
-		if space.Grade == pkg.Grade && space.Semester == pkg.Semester {
+		spaceLevel := strings.TrimSpace(space.Level)
+		if spaceLevel == "" {
+			spaceLevel = "S"
+		}
+		if space.Grade == pkg.Grade && space.Semester == pkg.Semester && spaceLevel == pkgLevel {
 			return true
 		}
 	}

@@ -7,7 +7,7 @@ const {
 Page({
   data: {
     binding: false,
-    gradeOptions: ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级"],
+    gradeOptions: ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级"],
     gradeIndex: -1,
     form: {
       studentName: "",

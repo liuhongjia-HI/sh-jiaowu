@@ -136,9 +136,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, pkg := range s.packages {
 		if _, err := tx.Exec(
-			`INSERT INTO study_packages (id, name, academic_year, grade, semester, subject, phase_scope, package_type, summary, status)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			pkg.ID, pkg.Name, pkg.AcademicYear, pkg.Grade, pkg.Semester, pkg.Subject, pkg.PhaseScope, pkg.PackageType, pkg.Summary, pkg.Status,
+			`INSERT INTO study_packages (id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, status)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			pkg.ID, pkg.Name, pkg.AcademicYear, pkg.Grade, pkg.Semester, pkg.Subject, pkg.Level, pkg.PhaseScope, pkg.PackageType, pkg.Summary, pkg.Status,
 		); err != nil {
 			return err
 		}

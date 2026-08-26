@@ -590,6 +590,7 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 	req.Grade = strings.TrimSpace(req.Grade)
 	req.Semester = strings.TrimSpace(req.Semester)
 	req.Subject = strings.TrimSpace(req.Subject)
+	req.Level = strings.TrimSpace(req.Level)
 	req.PhaseScope = strings.TrimSpace(req.PhaseScope)
 	req.PackageType = strings.TrimSpace(req.PackageType)
 	req.Summary = strings.TrimSpace(req.Summary)
@@ -620,13 +621,34 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 	if len(req.LearningSpaceIDs) == 0 {
 		return learning.Package{}, errors.New("请选择套餐开放的学习空间")
 	}
+	selectedLevel := ""
 	for _, spaceID := range req.LearningSpaceIDs {
-		if !s.learningSpaceExists(spaceID) {
+		space, exists := s.findLearningSpace(spaceID)
+		if !exists {
 			return learning.Package{}, errors.New("学习空间不存在：" + spaceID)
 		}
 		if !s.learningSpaceMatches(spaceID, req.Grade, req.Subject, req.Semester) {
 			return learning.Package{}, errors.New("学习空间需与套餐年级、学科和学期一致")
 		}
+		spaceLevel := strings.TrimSpace(space.Level)
+		if spaceLevel == "" {
+			spaceLevel = "S"
+		}
+		if selectedLevel == "" {
+			selectedLevel = spaceLevel
+		}
+		if selectedLevel != spaceLevel {
+			return learning.Package{}, errors.New("同一套餐不能混合不同等级的学习空间")
+		}
+	}
+	if req.Level == "" {
+		req.Level = selectedLevel
+	}
+	if !validLearningLevel(req.Level) {
+		return learning.Package{}, errors.New("请选择正确的课程等级")
+	}
+	if req.Level != selectedLevel {
+		return learning.Package{}, errors.New("套餐等级需与学习空间等级一致")
 	}
 	if len(req.ContentTypeCodes) == 0 {
 		return learning.Package{}, errors.New("请选择套餐开放的内容类型")
@@ -643,11 +665,21 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		Grade:        req.Grade,
 		Semester:     req.Semester,
 		Subject:      req.Subject,
+		Level:        req.Level,
 		PhaseScope:   req.PhaseScope,
 		PackageType:  req.PackageType,
 		Summary:      req.Summary,
 		Status:       req.Status,
 	}, nil
+}
+
+func validLearningLevel(level string) bool {
+	switch level {
+	case "S", "S+", "H", "H+":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *MemoryStore) packageNameExists(currentID, name string) bool {
@@ -789,6 +821,9 @@ func (s *MemoryStore) refreshSpaceAccessForPackage(packageID string) {
 }
 
 func (s *MemoryStore) decoratePackage(pkg learning.Package) learning.Package {
+	if strings.TrimSpace(pkg.Level) == "" {
+		pkg.Level = "S"
+	}
 	pkg.LearningSpaceIDs = s.learningSpaceIDsForPackage(pkg.ID)
 	pkg.LearningSpaces = s.learningSpaceNamesForPackage(pkg.ID)
 	pkg.ContentTypeCodes = s.contentTypesForPackage(pkg.ID)
@@ -955,14 +990,31 @@ func (s *MemoryStore) studentAccessibleSpaceIDs(studentID string) []string {
 
 // studentHasSubjectGrade 判断学生是否开通了某学科+年级，用于「只有同年级同学科才能排一起」。
 func (s *MemoryStore) studentHasSubjectGrade(studentID, subject, grade string) bool {
+	return s.studentHasSubjectGradeLevel(studentID, subject, grade, "")
+}
+
+// studentHasSubjectGradeLevel 把课程等级纳入分班资格。level 为空时保留旧调用的
+// “任意等级均可”语义；排课入口始终传入课程所属等级。
+func (s *MemoryStore) studentHasSubjectGradeLevel(studentID, subject, grade, level string) bool {
 	for _, id := range s.studentAccessibleSpaceIDs(studentID) {
 		for _, space := range s.learningSpaces {
-			if space.ID == id && space.Grade == grade && subjectsMatch(space.Subject, subject) {
+			spaceLevel := strings.TrimSpace(space.Level)
+			if spaceLevel == "" {
+				spaceLevel = "S"
+			}
+			if space.ID == id && space.Grade == grade && subjectsMatch(space.Subject, subject) && (level == "" || spaceLevel == level) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func (s *MemoryStore) learningSpaceLevel(id string) string {
+	if space, ok := s.findLearningSpace(id); ok && strings.TrimSpace(space.Level) != "" {
+		return strings.TrimSpace(space.Level)
+	}
+	return "S"
 }
 
 func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material {

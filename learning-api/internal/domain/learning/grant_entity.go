@@ -7,6 +7,7 @@ type Package struct {
 	Grade            string   `json:"grade"`
 	Semester         string   `json:"semester"`
 	Subject          string   `json:"subject"`
+	Level            string   `json:"level"`
 	PhaseScope       string   `json:"phaseScope"`
 	PackageType      string   `json:"packageType"`
 	Summary          string   `json:"summary"`
@@ -24,6 +25,7 @@ type PackageUpsertRequest struct {
 	Grade            string   `json:"grade"`
 	Semester         string   `json:"semester"`
 	Subject          string   `json:"subject"`
+	Level            string   `json:"level"`
 	PhaseScope       string   `json:"phaseScope"`
 	PackageType      string   `json:"packageType"`
 	Summary          string   `json:"summary"`
@@ -41,6 +43,7 @@ type StudentPackageRecommendation struct {
 	Grade                string   `json:"grade"`
 	Semester             string   `json:"semester"`
 	Subject              string   `json:"subject"`
+	Level                string   `json:"level"`
 	Summary              string   `json:"summary"`
 	LearningSpaces       []string `json:"learningSpaces"`
 	CourseCount          int      `json:"courseCount"`

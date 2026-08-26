@@ -182,6 +182,7 @@ func packageAuditSnapshot(item learning.Package) map[string]any {
 		"grade":            item.Grade,
 		"semester":         item.Semester,
 		"subject":          item.Subject,
+		"level":            item.Level,
 		"phaseScope":       item.PhaseScope,
 		"packageType":      item.PackageType,
 		"summary":          item.Summary,

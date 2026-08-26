@@ -126,15 +126,16 @@
 
 ```json
 {
-  "name": "2025.2026学年 五年级 S1 英语 题+学习资料",
+  "name": "2025.2026学年 五年级 S1 英语 S+ 题+学习资料",
   "academicYear": "2025.2026学年",
   "grade": "五年级",
   "semester": "S1",
   "subject": "英语",
+  "level": "S+",
   "phaseScope": "全学期",
   "packageType": "题+学习资料",
-  "summary": "开放 S1 Q1 和 S1 Q2 英语练习与学习资料。",
-  "learningSpaceIds": ["space-g05-english-s1-q1", "space-g05-english-s1-q2"],
+  "summary": "开放 S1 Q1 和 S1 Q2 英语 S+ 练习与学习资料。",
+  "learningSpaceIds": ["space-g05-english-s1-q1-splus", "space-g05-english-s1-q2-splus"],
   "contentTypeCodes": ["question", "handout"],
   "status": "启用"
 }
@@ -150,14 +151,15 @@
 
 ### 排课
 
-师生分别填报可上课时间（`GET/PUT /api/availability`，`ownerType` 为 `teacher` 或 `student`），教务按「学科 + 年级」协调成班。
+师生分别填报可上课时间（`GET/PUT /api/availability`，`ownerType` 为 `teacher` 或 `student`），教务按「学科 + 年级 + 等级」协调成班。
 
-`POST /api/scheduling/candidates` 按学科 + 年级查找可排时间，请求体：
+`POST /api/scheduling/candidates` 按学科 + 年级 + 等级查找可排时间，请求体：
 
 ```json
 {
   "subject": "英语",
   "grade": "五年级",
+  "level": "S+",
   "classType": "1V3",
   "durationMinutes": 90,
   "startDate": "2026-06-01",
@@ -165,11 +167,11 @@
 }
 ```
 
-- 系统只把**同年级 + 已开通同学科**的学生凑在一起，并匹配授课范围覆盖该学科年级的老师。
+- 系统只把**同年级 + 已开通同学科同等级**的学生凑在一起，并匹配授课范围覆盖该学科、年级和等级的老师；旧客户端不传 `level` 时按 `S` 处理。
 - 返回的每个候选含 `availableStudents`（该时段可上的学生）和 `missingStudents`（同学科同年级但该时段没空的学生），供「协调建议」面板提示教务协调时间。
 - 兼容旧入口：仅传 `courseId` + `teacherId` 时按单课程单老师查找。
 
-`POST /api/schedule-classes` 创建单次或重复课程，`PUT /api/schedule-classes/{id}` 调整已有课次。两者都会校验同年级同学科、老师/学生撞课和班型容量；`roomName` 仅登记，不阻塞排课。`startDate` 是单次课日期，重复排课时是首节日期，星期由日期自动推导。
+`POST /api/schedule-classes` 创建单次或重复课程，`PUT /api/schedule-classes/{id}` 调整已有课次。两者都会校验同年级、同学科、同等级、老师/学生撞课和班型容量；`roomName` 仅登记，不阻塞排课。`startDate` 是单次课日期，重复排课时是首节日期，星期由日期自动推导。
 
 ```json
 {

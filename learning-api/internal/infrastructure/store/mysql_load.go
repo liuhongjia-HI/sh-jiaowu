@@ -257,7 +257,7 @@ func (s *MemoryStore) loadTeacherScopes() (map[string]teacherDBScope, error) {
 }
 
 func (s *MemoryStore) loadPackagesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, name, academic_year, grade, semester, subject, phase_scope, package_type, summary, status FROM study_packages ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, status FROM study_packages ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func (s *MemoryStore) loadPackagesFromDB() error {
 	packages := []learning.Package{}
 	for rows.Next() {
 		var item learning.Package
-		if err := rows.Scan(&item.ID, &item.Name, &item.AcademicYear, &item.Grade, &item.Semester, &item.Subject, &item.PhaseScope, &item.PackageType, &item.Summary, &item.Status); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.AcademicYear, &item.Grade, &item.Semester, &item.Subject, &item.Level, &item.PhaseScope, &item.PackageType, &item.Summary, &item.Status); err != nil {
 			return err
 		}
 		packages = append(packages, item)

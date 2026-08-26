@@ -98,6 +98,16 @@ func TestStudentRecommendationsExcludeOpenedAndRankEligiblePackages(t *testing.T
 	}
 }
 
+func TestSameRecommendationTermRequiresSameLearningLevel(t *testing.T) {
+	spaces := []learningSpace{{Grade: "七年级", Semester: "S1", Level: "S"}}
+	if sameRecommendationTerm(learning.Package{Grade: "七年级", Semester: "S1", Level: "H"}, spaces) {
+		t.Fatal("H package must not be recommended from an S learning space")
+	}
+	if !sameRecommendationTerm(learning.Package{Grade: "七年级", Semester: "S1", Level: "S"}, spaces) {
+		t.Fatal("same grade, semester, and level should remain recommendable")
+	}
+}
+
 func hasRecommendation(items []learning.StudentPackageRecommendation, packageID string) bool {
 	for _, item := range items {
 		if item.PackageID == packageID {

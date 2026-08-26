@@ -110,6 +110,7 @@ func (s *MemoryStore) saveAvailabilityUnlocked(operator string, principal learni
 func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, req learning.ScheduleCandidateRequest) ([]learning.ScheduleCandidate, error) {
 	req.Subject = strings.TrimSpace(req.Subject)
 	req.Grade = strings.TrimSpace(req.Grade)
+	req.Level = strings.TrimSpace(req.Level)
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.TeacherID = strings.TrimSpace(req.TeacherID)
 	req.ClassType = strings.TrimSpace(req.ClassType)
@@ -137,17 +138,24 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 		targetCourses = []learning.Course{course}
 		req.Subject = course.Subject
 		req.Grade = course.Grade
+		req.Level = s.learningSpaceLevel(course.LearningSpaceID)
 	} else {
 		if req.Subject == "" || req.Grade == "" {
 			return nil, errors.New("请选择学科和年级")
 		}
+		if req.Level == "" {
+			req.Level = "S"
+		}
+		if !validLearningLevel(req.Level) {
+			return nil, errors.New("请选择正确的课程等级")
+		}
 		for _, course := range s.courses {
-			if course.Status == learning.StatusEnabled && subjectsMatch(course.Subject, req.Subject) && course.Grade == req.Grade && canSeeCourse(principal, course) {
+			if course.Status == learning.StatusEnabled && subjectsMatch(course.Subject, req.Subject) && course.Grade == req.Grade && s.learningSpaceLevel(course.LearningSpaceID) == req.Level && canSeeCourse(principal, course) {
 				targetCourses = append(targetCourses, course)
 			}
 		}
 		if len(targetCourses) == 0 {
-			return nil, errors.New("没有该学科 + 年级的可排课程")
+			return nil, errors.New("没有该学科 + 年级 + 等级的可排课程")
 		}
 	}
 	repCourse := targetCourses[0]
@@ -181,7 +189,7 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 		if !canSeeStudent(principal, decorated, s.coursesForStudent(student.ID)) {
 			continue
 		}
-		if decorated.Grade != req.Grade || !s.studentHasSubjectGrade(student.ID, req.Subject, req.Grade) {
+		if decorated.Grade != req.Grade || !s.studentHasSubjectGradeLevel(student.ID, req.Subject, req.Grade, req.Level) {
 			continue
 		}
 		eligible = append(eligible, learning.CandidateStudent{
@@ -233,6 +241,7 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 					CourseName:        repCourse.Name,
 					Subject:           req.Subject,
 					Grade:             req.Grade,
+					Level:             req.Level,
 					ClassType:         req.ClassType,
 					Capacity:          capacity,
 					AvailableStudents: available,
@@ -421,6 +430,7 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 	if len(req.StudentIDs) > capacity {
 		return learning.ScheduleClass{}, errors.New("学生人数超过班型容量")
 	}
+	courseLevel := s.learningSpaceLevel(course.LearningSpaceID)
 	students := make([]learning.CandidateStudent, 0, len(req.StudentIDs))
 	seen := map[string]bool{}
 	for _, studentID := range req.StudentIDs {
@@ -436,8 +446,8 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 		if student.Grade != course.Grade {
 			return learning.ScheduleClass{}, errors.New(student.Name + " 与班级年级不一致，只有同年级才能排一起")
 		}
-		if !s.studentHasSubjectGrade(student.ID, course.Subject, course.Grade) {
-			return learning.ScheduleClass{}, errors.New(student.Name + " 未开通该学科，只有同学科才能排一起")
+		if !s.studentHasSubjectGradeLevel(student.ID, course.Subject, course.Grade, courseLevel) {
+			return learning.ScheduleClass{}, errors.New(student.Name + " 未开通该学科等级，只有同学科同等级才能排一起")
 		}
 		students = append(students, learning.CandidateStudent{ID: student.ID, Name: student.Name, Grade: student.Grade, OpenedPackages: student.OpenedPackages})
 	}

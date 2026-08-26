@@ -440,3 +440,41 @@ func TestUpdateCourseSyncsContentReferences(t *testing.T) {
 		}
 	}
 }
+
+func TestPackageLevelIsDerivedAndCannotMixLearningSpaceLevels(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	hSpaceID := learningSpaceIDForLevel(6, "数学", 0, 0, "H")
+	sSpaceID := learningSpaceIDForLevel(6, "数学", 0, 0, "S")
+
+	pkg, err := store.packageFromRequest("pkg-level-h", learning.PackageUpsertRequest{
+		Name:             "七年级数学 H 套餐",
+		AcademicYear:     "2026.2027学年",
+		Grade:            "七年级",
+		Semester:         "S1",
+		Subject:          "数学",
+		LearningSpaceIDs: []string{hSpaceID},
+		ContentTypeCodes: []string{"course"},
+		Status:           learning.StatusEnabled,
+	})
+	if err != nil {
+		t.Fatalf("expected level to be derived from selected space: %v", err)
+	}
+	if pkg.Level != "H" {
+		t.Fatalf("expected derived level H, got %q", pkg.Level)
+	}
+
+	_, err = store.packageFromRequest("pkg-level-mixed", learning.PackageUpsertRequest{
+		Name:             "七年级数学混合等级套餐",
+		AcademicYear:     "2026.2027学年",
+		Grade:            "七年级",
+		Semester:         "S1",
+		Subject:          "数学",
+		Level:            "H",
+		LearningSpaceIDs: []string{hSpaceID, sSpaceID},
+		ContentTypeCodes: []string{"course"},
+		Status:           learning.StatusEnabled,
+	})
+	if err == nil || !strings.Contains(err.Error(), "等级") {
+		t.Fatalf("expected mixed levels to be rejected, got %v", err)
+	}
+}

@@ -38,9 +38,8 @@ type LearningSpace struct {
 	ID string `json:"id"`
 	// AcademicYear 不是业务数据，不参与任何匹配（见 learningSpaceMatches），
 	// 也不出现在任何筛选/展示逻辑里——纯粹是 learning_spaces 表建表时留下的
-	// 历史遗留列，且被绑进了 uk_learning_space 唯一键（academic_year, grade,
-	// subject, semester, phase），删列需要连带重建这个唯一索引，属于一次专门的
-	// 数据库迁移，不是这次清理的范围。前端不要用它拼学年下拉——校历
+	// 历史遗留列，已从 uk_learning_space 业务唯一键移除，但暂时保留字段兼容
+	// 存量数据。前端不要用它拼学年下拉——校历
 	// （GET /api/settings 的 academicCalendar）才是学年的唯一权威来源。
 	AcademicYear string `json:"academicYear"`
 	Grade        string `json:"grade"`
