@@ -47,6 +47,7 @@ type MemoryStore struct {
 	notices                         []learning.Notice
 	logs                            []learning.OperationLog
 	settings                        map[string]string
+	subjects                        []learning.SubjectMetadata
 	grants                          []packageGrant
 	availability                    []learning.AvailabilitySlot
 	scheduleClasses                 []learning.ScheduleClass
@@ -178,6 +179,7 @@ func (s *MemoryStore) seedBootstrapAdmin(options Options) {
 
 func (s *MemoryStore) seedBaseDictionaries() {
 	s.settings = defaultSettings()
+	s.subjects = defaultSubjectMetadata()
 	s.seedBaseLearningSpaces()
 }
 
@@ -185,20 +187,7 @@ func (s *MemoryStore) seedBaseDictionaries() {
 // defaultSettings 里缺的键，从不删除多余的键，所以旧版本写过的值会一直留在
 // 数据库里、留在系统设置列表里，即使代码早就不读它们了。这里显式清掉，
 // 每加一个新的“取代关系”就在这补一条。
-var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd", "academicYear", "academicPeriods"}
-
-// subjectColorEntry 是一门学科在课表上的视觉标识。
-// 颜色和短标签是运营会调的东西，放前端常量意味着每次改色都要发版，
-// 所以放系统设置里维护，前端启动时拉一次。
-//
-// color 只存一个主色，课程块的底色、边框、文字色由前端按固定比例推导，
-// 这样运营只需要挑一个颜色，不用理解四个色值之间的关系。
-type subjectColorEntry struct {
-	Subject    string `json:"subject"`
-	ShortLabel string `json:"shortLabel"`
-	Color      string `json:"color"`
-	SortOrder  int    `json:"sortOrder"`
-}
+var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd", "academicYear", "academicPeriods", "subjectColors"}
 
 // 客户长期用 Outlook 排课，日历分类固定是这 8 个：
 // Eng / Math / Geo / Sci / CHN / His / Chem / Phy，色值按客户提供的截图取。
@@ -206,17 +195,17 @@ type subjectColorEntry struct {
 // 「综合科学」和「科学」是两个不同的业务学科（分别面向 1-3 年级和 4-9 年级，
 // 见 subjectAppliesToGrade），但客户的 Outlook 里只有一个 Sci——两者不会在同一
 // 年级同时出现，共用一个颜色既不会撞车，也贴合客户自己的用法。
-func defaultSubjectColors() []subjectColorEntry {
-	return []subjectColorEntry{
-		{Subject: "英文", ShortLabel: "Eng", Color: "#1A6FD4", SortOrder: 1},
-		{Subject: "数学", ShortLabel: "Math", Color: "#E8C400", SortOrder: 2},
-		{Subject: "地理", ShortLabel: "Geo", Color: "#3A9BBF", SortOrder: 3},
-		{Subject: "科学", ShortLabel: "Sci", Color: "#1B3FA8", SortOrder: 4},
-		{Subject: "综合科学", ShortLabel: "Sci", Color: "#1B3FA8", SortOrder: 5},
-		{Subject: "语文", ShortLabel: "CHN", Color: "#A855D8", SortOrder: 6},
-		{Subject: "历史", ShortLabel: "His", Color: "#8B5A2B", SortOrder: 7},
-		{Subject: "化学", ShortLabel: "Chem", Color: "#E8730C", SortOrder: 8},
-		{Subject: "物理", ShortLabel: "Phy", Color: "#C2185B", SortOrder: 9},
+func defaultSubjectMetadata() []learning.SubjectMetadata {
+	return []learning.SubjectMetadata{
+		{ID: "english", Name: "英文", ShortLabel: "Eng", Color: "#1A6FD4", SortOrder: 1, Status: "启用"},
+		{ID: "math", Name: "数学", ShortLabel: "Math", Color: "#E8C400", SortOrder: 2, Status: "启用"},
+		{ID: "geography", Name: "地理", ShortLabel: "Geo", Color: "#3A9BBF", SortOrder: 3, Status: "启用"},
+		{ID: "science", Name: "科学", ShortLabel: "Sci", Color: "#1B3FA8", SortOrder: 4, Status: "启用"},
+		{ID: "integrated-science", Name: "综合科学", ShortLabel: "Sci", Color: "#1B3FA8", SortOrder: 5, Status: "启用"},
+		{ID: "chinese", Name: "语文", ShortLabel: "CHN", Color: "#A855D8", SortOrder: 6, Status: "启用"},
+		{ID: "history", Name: "历史", ShortLabel: "His", Color: "#8B5A2B", SortOrder: 7, Status: "启用"},
+		{ID: "chemistry", Name: "化学", ShortLabel: "Chem", Color: "#E8730C", SortOrder: 8, Status: "启用"},
+		{ID: "physics", Name: "物理", ShortLabel: "Phy", Color: "#C2185B", SortOrder: 9, Status: "启用"},
 	}
 }
 
@@ -241,18 +230,15 @@ func defaultSettings() map[string]string {
 		{AcademicYear: academicYear, Semester: "S1 第一学期", StartDate: fmt.Sprintf("%d-09-01", startYear), EndDate: fmt.Sprintf("%d-01-15", startYear+1)},
 		{AcademicYear: academicYear, Semester: "S2 第二学期", StartDate: fmt.Sprintf("%d-02-01", startYear+1), EndDate: fmt.Sprintf("%d-07-15", startYear+1)},
 	})
-	subjectColors, _ := json.Marshal(defaultSubjectColors())
 	return map[string]string{
 		// 校历：每学年每学期一条起止日期，管理端在系统设置里按列表维护，
 		// 可以提前把下一学年的校历也配好。套餐默认有效期跟着当前学年对应的
 		// 学期起止走，见 defaultGrantPeriod。
-		"academicCalendar": string(calendar),
-		// 学科颜色与短标签，见 defaultSubjectColors。
-		"subjectColors":                string(subjectColors),
+		"academicCalendar":             string(calendar),
 		"grades":                       "G1-G9",
 		"semesters":                    "S1 / S2",
-		"watermarkRule":                "姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀",
-		"downloadPolicy":               "套餐生效期内可下载，到期自动关闭",
+		"watermarkRule":                "学生专属：姓名/昵称、手机尾号、时间、追溯码（服务端写入）",
+		"downloadPolicy":               "仅在线预览",
 		"miniProgramDomainStatus":      "待确认",
 		"officialAccountBindingStatus": "待确认",
 		"templateMessageStatus":        "待确认",
@@ -299,6 +285,13 @@ func (s *MemoryStore) ensureDefaultSettings() {
 	}
 	for _, key := range retiredSettingKeys {
 		delete(s.settings, key)
+	}
+	s.ensureDefaultSubjectMetadata()
+}
+
+func (s *MemoryStore) ensureDefaultSubjectMetadata() {
+	if len(s.subjects) == 0 {
+		s.subjects = defaultSubjectMetadata()
 	}
 }
 

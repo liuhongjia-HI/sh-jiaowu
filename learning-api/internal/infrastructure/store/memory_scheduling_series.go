@@ -1,7 +1,6 @@
 package store
 
 import (
-	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
@@ -256,30 +255,15 @@ func gradeCode(grade string) string {
 	return "G" + itoa(index+1)
 }
 
-// subjectColorEntries 读系统设置里的学科元数据。解析失败就退回内置默认值——
-// 一个手滑写坏的设置项不该让所有课次的标题丢掉科目。
-func (s *MemoryStore) subjectColorEntries() []subjectColorEntry {
-	raw := strings.TrimSpace(s.settings["subjectColors"])
-	if raw == "" {
-		return defaultSubjectColors()
-	}
-	var entries []subjectColorEntry
-	if err := json.Unmarshal([]byte(raw), &entries); err != nil || len(entries) == 0 {
-		return defaultSubjectColors()
-	}
-	return entries
-}
-
-// subjectShortLabel 取学科的短标签（Eng / Math / Geo / …）。
-// 标签维护在系统设置的 subjectColors 里，和前端共用同一份元数据；
-// 设置里查不到就退回学科全名。
+// subjectShortLabel 从学科元数据表读取短标签（Eng / Math / Geo / …）。
+// 查不到或学科被停用时退回全名，历史课程也不会因此少掉科目标题。
 func (s *MemoryStore) subjectShortLabel(subject string) string {
 	subject = strings.TrimSpace(subject)
 	if subject == "" {
 		return ""
 	}
-	for _, entry := range s.subjectColorEntries() {
-		if entry.Subject == subject {
+	for _, entry := range s.subjects {
+		if entry.Name == subject && entry.Status == "启用" {
 			if label := strings.TrimSpace(entry.ShortLabel); label != "" {
 				return label
 			}

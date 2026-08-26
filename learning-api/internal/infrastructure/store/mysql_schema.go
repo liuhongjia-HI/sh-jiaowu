@@ -23,6 +23,15 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		return err
 	}
 	statements := []string{
+		`CREATE TABLE IF NOT EXISTS subjects (
+			id VARCHAR(64) PRIMARY KEY,
+			name VARCHAR(64) NOT NULL,
+			short_label VARCHAR(20) NOT NULL DEFAULT '',
+			color VARCHAR(16) NOT NULL DEFAULT '',
+			sort_order INT NOT NULL DEFAULT 0,
+			status VARCHAR(32) NOT NULL DEFAULT '启用',
+			UNIQUE KEY uk_subject_name (name)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS starline_file_assets (
 			id VARCHAR(64) PRIMARY KEY,
 			file_name VARCHAR(255) NOT NULL DEFAULT '',
@@ -347,6 +356,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"student_submission_results", "final_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "answers_json", "TEXT NOT NULL"},
 		{"student_score_records", "exam_type", "VARCHAR(32) NOT NULL DEFAULT '阶段测评'"},
+		{"subjects", "short_label", "VARCHAR(20) NOT NULL DEFAULT ''"},
+		{"subjects", "color", "VARCHAR(16) NOT NULL DEFAULT ''"},
+		{"subjects", "sort_order", "INT NOT NULL DEFAULT 0"},
 	}
 	for _, column := range columns {
 		if err := s.ensureColumn(column.table, column.name, column.def); err != nil {

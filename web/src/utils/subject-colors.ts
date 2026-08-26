@@ -1,8 +1,8 @@
 // 学科颜色的唯一来源。
 //
 // 在这之前排课页和资源页各写了一份调色板，同一门课在两处是不同颜色。
-// 颜色现在由后端 settings 里的 subjectColors 维护（见 defaultSubjectColors），
-// 运营改色不用发版；这里的 DEFAULT_SUBJECT_COLORS 与后端默认值保持一致，
+// 颜色现在由后端 subjects 表维护；运营改色不用发版，
+// 这里的 DEFAULT_SUBJECT_COLORS 与后端默认值保持一致，
 // 只在设置还没拉回来时兜底，所以不会出现先闪一版旧色再跳成新色。
 
 export type SubjectColorEntry = {
@@ -29,18 +29,14 @@ export const DEFAULT_SUBJECT_COLORS: SubjectColorEntry[] = [
 
 let activeColors: SubjectColorEntry[] = DEFAULT_SUBJECT_COLORS;
 
-// 把系统设置里的 subjectColors 装载进来。解析失败就保持当前这份，
-// 一个手滑写坏的设置值不该让整个课表变成灰色。
-export function loadSubjectColors(raw?: string) {
-  if (!raw || !raw.trim()) return;
-  try {
-    const parsed = JSON.parse(raw) as SubjectColorEntry[];
-    if (!Array.isArray(parsed) || parsed.length === 0) return;
-    const valid = parsed.filter((item) => item && item.subject && isHexColor(item.color));
-    if (valid.length > 0) activeColors = valid;
-  } catch {
-    // 保持默认值
-  }
+// 将接口返回的已启用学科元数据装载为全局调色板。
+// 数据缺失或不合法时保持当前兜底值，不能让课表变成灰色。
+export function loadSubjectColors(subjects?: Array<{ name: string; shortLabel: string; color: string; sortOrder: number; status: string }>) {
+  if (!Array.isArray(subjects) || subjects.length === 0) return;
+  const valid = subjects
+    .filter((item) => item && item.name && item.status === '启用' && isHexColor(item.color))
+    .map((item) => ({ subject: item.name, shortLabel: item.shortLabel, color: item.color, sortOrder: item.sortOrder }));
+  if (valid.length > 0) activeColors = valid;
 }
 
 export function subjectColorEntries() {

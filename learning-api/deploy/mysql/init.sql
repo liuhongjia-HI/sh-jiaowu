@@ -136,6 +136,9 @@ CREATE TABLE IF NOT EXISTS study_packages (
 CREATE TABLE IF NOT EXISTS subjects (
   id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(64) NOT NULL,
+  short_label VARCHAR(20) NOT NULL DEFAULT '',
+  color VARCHAR(16) NOT NULL DEFAULT '',
+  sort_order INT NOT NULL DEFAULT 0,
   status VARCHAR(32) NOT NULL DEFAULT '启用',
   UNIQUE KEY uk_subject_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -547,18 +550,21 @@ INSERT IGNORE INTO roles (code, name, description) VALUES
   ('campus_admin', '校区管理员', '校区管理'),
   ('super_admin', '超级管理员', '全部后台权限');
 
-INSERT INTO subjects (id, name, status) VALUES
-  ('math', '数学', '启用'),
-  ('english', '英文', '启用'),
-  ('chinese', '语文', '启用'),
-  ('integrated-science', '综合科学', '启用'),
-  ('science', '科学', '启用'),
-  ('geography', '地理', '启用'),
-  ('history', '历史', '启用'),
-  ('physics', '物理', '启用'),
-  ('chemistry', '化学', '启用')
+INSERT INTO subjects (id, name, short_label, color, sort_order, status) VALUES
+  ('english', '英文', 'Eng', '#1A6FD4', 1, '启用'),
+  ('math', '数学', 'Math', '#E8C400', 2, '启用'),
+  ('geography', '地理', 'Geo', '#3A9BBF', 3, '启用'),
+  ('science', '科学', 'Sci', '#1B3FA8', 4, '启用'),
+  ('integrated-science', '综合科学', 'Sci', '#1B3FA8', 5, '启用'),
+  ('chinese', '语文', 'CHN', '#A855D8', 6, '启用'),
+  ('history', '历史', 'His', '#8B5A2B', 7, '启用'),
+  ('chemistry', '化学', 'Chem', '#E8730C', 8, '启用'),
+  ('physics', '物理', 'Phy', '#C2185B', 9, '启用')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
+  short_label = IF(short_label = '', VALUES(short_label), short_label),
+  color = IF(color = '', VALUES(color), color),
+  sort_order = IF(sort_order = 0, VALUES(sort_order), sort_order),
   status = VALUES(status);
 
 DELETE FROM subjects WHERE id IN ('politics', 'biology');

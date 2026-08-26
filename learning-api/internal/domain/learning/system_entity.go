@@ -5,6 +5,24 @@ type SettingUpdateRequest struct {
 	Value string `json:"value"`
 }
 
+// SubjectMetadata 是可复用的学科展示元数据。学科名称本身已被课程、学习空间等
+// 业务数据引用，因此这里仅允许维护显示属性，不允许在系统设置中改名。
+type SubjectMetadata struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	ShortLabel string `json:"shortLabel"`
+	Color      string `json:"color"`
+	SortOrder  int    `json:"sortOrder"`
+	Status     string `json:"status"`
+}
+
+type SubjectMetadataUpdateRequest struct {
+	ShortLabel string `json:"shortLabel"`
+	Color      string `json:"color"`
+	SortOrder  int    `json:"sortOrder"`
+	Status     string `json:"status"`
+}
+
 type DashboardOverview struct {
 	OpenedStudents   int `json:"openedStudents"`
 	PackageCount     int `json:"packageCount"`

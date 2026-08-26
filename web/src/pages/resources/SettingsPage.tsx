@@ -1,10 +1,10 @@
-import { Alert, Button, Card, Empty, Form, Input, Modal, Popconfirm, Skeleton, Space, Table, Tabs, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { CalendarOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
-import type { SettingUpdateRequest } from '../../types/starline';
+import type { SettingUpdateRequest, SubjectMetadata, SubjectMetadataUpdateRequest } from '../../types/starline';
 
 const CALENDAR_KEY = 'academicCalendar';
 const FALL_LABEL = 'S1 第一学期';
@@ -251,6 +251,75 @@ function FlatSettingsCard({
   );
 }
 
+function SubjectMetadataCard() {
+  const [form] = Form.useForm<SubjectMetadataUpdateRequest>();
+  const [editing, setEditing] = useState<SubjectMetadata | null>(null);
+  const queryClient = useQueryClient();
+  const subjects = useQuery({ queryKey: ['subjects'], queryFn: () => getData<SubjectMetadata[]>('/subjects') });
+  const save = useMutation({
+    mutationFn: (values: SubjectMetadataUpdateRequest) => putData<SubjectMetadata>(`/subjects/${editing?.id}`, values),
+    onSuccess: () => {
+      message.success('学科显示配置已保存。');
+      setEditing(null);
+      form.resetFields();
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['subjects-for-schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+    onError: (error: Error) => message.error(error.message || '保存学科显示配置失败，请检查输入。')
+  });
+
+  function openEdit(subject: SubjectMetadata) {
+    setEditing(subject);
+    form.setFieldsValue({ shortLabel: subject.shortLabel, color: subject.color, sortOrder: subject.sortOrder, status: subject.status });
+  }
+
+  return (
+    <Card title="学科显示配置" extra={<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => subjects.refetch()} />}>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+        学科名称由课程和学习空间使用，此处只维护课表等页面的简称、颜色、排序和启用状态。
+      </Typography.Paragraph>
+      {subjects.isLoading ? <Skeleton active /> : subjects.error ? <Alert type="error" message="学科配置加载失败，请稍后重试。" /> : (
+        <Table
+          rowKey="id"
+          pagination={false}
+          dataSource={subjects.data ?? []}
+          columns={[
+            { title: '学科', dataIndex: 'name' },
+            { title: '简称', dataIndex: 'shortLabel' },
+            { title: '显示颜色', dataIndex: 'color', render: (color: string) => <Space size={8}><span aria-label={`颜色 ${color}`} style={{ width: 18, height: 18, borderRadius: '50%', background: color, border: '1px solid #d9d9d9', display: 'inline-block' }} /><Typography.Text>{color}</Typography.Text></Space> },
+            { title: '排序', dataIndex: 'sortOrder' },
+            { title: '状态', dataIndex: 'status', render: (status: SubjectMetadata['status']) => <Tag color={status === '启用' ? 'green' : 'default'}>{status}</Tag> },
+            { title: '操作', render: (_: unknown, row: SubjectMetadata) => <ActionButton tooltip="编辑显示配置" icon={<EditOutlined />} onClick={() => openEdit(row)} /> }
+          ]}
+        />
+      )}
+      <Modal
+        title={editing ? `编辑${editing.name}显示配置` : '编辑学科显示配置'}
+        open={Boolean(editing)}
+        onCancel={() => setEditing(null)}
+        destroyOnHidden
+        footer={<Space><Button onClick={() => setEditing(null)}>取消</Button><Button type="primary" loading={save.isPending} onClick={() => form.submit()}>保存</Button></Space>}
+      >
+        <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
+          <Form.Item name="shortLabel" label="显示简称" rules={[{ required: true, message: '请输入显示简称' }, { max: 20, message: '显示简称不能超过20个字符' }]}>
+            <Input placeholder="例如：Eng" />
+          </Form.Item>
+          <Form.Item name="color" label="显示颜色" rules={[{ required: true, message: '请选择显示颜色' }, { pattern: /^#[0-9a-fA-F]{6}$/, message: '颜色格式无效' }]}>
+            <Input type="color" />
+          </Form.Item>
+          <Form.Item name="sortOrder" label="展示排序" rules={[{ required: true, message: '请输入展示排序' }]}>
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
+            <Select options={[{ label: '启用', value: '启用' }, { label: '停用', value: '停用' }]} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const [form] = Form.useForm<SettingUpdateRequest>();
   const [editing, setEditing] = useState<Record<string, string> | null>(null);
@@ -311,7 +380,7 @@ export default function SettingsPage() {
               {
                 key: 'content',
                 label: <span><SafetyOutlined /> 内容与安全</span>,
-                children: <FlatSettingsCard rows={[...contentRows, ...otherRows]} onEdit={openEdit} />
+                children: <Space direction="vertical" size={16} style={{ width: '100%' }}><FlatSettingsCard title="资料保护" rows={[...contentRows, ...otherRows]} onEdit={openEdit} /><SubjectMetadataCard /></Space>
               },
               {
                 key: 'integration',
@@ -336,7 +405,14 @@ export default function SettingsPage() {
             <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
               <Form.Item name="key" hidden><Input /></Form.Item>
               <Form.Item name="value" label="当前值" rules={[{ required: true, message: '请输入设置值' }]}>
-                <Input.TextArea rows={4} />
+                {editing?.key === 'downloadPolicy' ? (
+                  <Select
+                    options={[
+                      { label: '仅在线预览（推荐）', value: '仅在线预览' },
+                      { label: '允许下载带水印 PDF', value: '允许下载带水印PDF' }
+                    ]}
+                  />
+                ) : <Input.TextArea rows={4} />}
               </Form.Item>
             </Form>
           </Modal>

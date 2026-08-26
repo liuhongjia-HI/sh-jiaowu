@@ -252,6 +252,9 @@ func (s *MemoryStore) updateSettingUnlocked(operator string, req learning.Settin
 }
 
 func (s *MemoryStore) validateSettingValue(key, value string) error {
+	if key == "downloadPolicy" && value != "仅在线预览" && value != "允许下载带水印PDF" {
+		return errors.New("下载规则只能选择“仅在线预览”或“允许下载带水印PDF”")
+	}
 	if key == "grantDefaultStart" || key == "grantDefaultEnd" { // 已由校历取代，保留校验以兼容历史存量值
 		if _, err := time.Parse("2006-01-02", value); err != nil {
 			return errors.New("默认时间格式应为 YYYY-MM-DD")

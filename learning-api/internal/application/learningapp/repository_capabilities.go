@@ -125,4 +125,6 @@ type SystemRepository interface {
 	SystemReadiness() learning.SystemReadiness
 	Settings() map[string]string
 	UpdateSetting(string, learning.SettingUpdateRequest) (map[string]string, error)
+	Subjects() []learning.SubjectMetadata
+	UpdateSubjectMetadata(string, string, learning.SubjectMetadataUpdateRequest) (learning.SubjectMetadata, error)
 }

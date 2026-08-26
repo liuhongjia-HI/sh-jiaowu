@@ -406,6 +406,18 @@ func (s *MemoryStore) UpdateSetting(operator string, req learning.SettingUpdateR
 	return result1, err
 }
 
+func (s *MemoryStore) Subjects() []learning.SubjectMetadata {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.subjectsUnlocked()
+}
+
+func (s *MemoryStore) UpdateSubjectMetadata(operator, id string, req learning.SubjectMetadataUpdateRequest) (learning.SubjectMetadata, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.updateSubjectMetadataUnlocked(operator, id, req)
+}
+
 func (s *MemoryStore) Availability(principal learning.Principal, ownerType, ownerID string) ([]learning.AvailabilitySlot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

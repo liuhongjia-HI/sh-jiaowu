@@ -45,6 +45,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM availability_slots",
 		"DELETE FROM operation_logs",
 		"DELETE FROM system_settings",
+		"DELETE FROM subjects",
 		"DELETE FROM notices",
 		"DELETE FROM student_learning_space_access",
 		"DELETE FROM student_package_grants",
@@ -391,8 +392,8 @@ func (s *MemoryStore) persistStaticRowsTx(tx *sql.Tx) error {
 			return err
 		}
 	}
-	for _, subject := range demoSubjects {
-		if _, err := tx.Exec(`INSERT IGNORE INTO subjects (id, name, status) VALUES (?, ?, '启用')`, subjectSlug(subject), subject); err != nil {
+	for _, subject := range s.subjects {
+		if _, err := tx.Exec(`INSERT INTO subjects (id, name, short_label, color, sort_order, status) VALUES (?, ?, ?, ?, ?, ?)`, subject.ID, subject.Name, subject.ShortLabel, subject.Color, subject.SortOrder, subject.Status); err != nil {
 			return err
 		}
 	}

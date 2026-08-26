@@ -26,7 +26,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react
 import { useQuery } from '@tanstack/react-query';
 import { loadSubjectColors } from './utils/subject-colors';
 import { changePassword, clearToken, getData, getToken, logout } from './services/http';
-import type { CurrentUser, Role } from './types/starline';
+import type { CurrentUser, Role, SubjectMetadata } from './types/starline';
 
 const { Header, Sider, Content } = Layout;
 
@@ -453,17 +453,17 @@ export default function App() {
     queryFn: () => getData<CurrentUser>('/auth/me')
   });
 
-  // 学科颜色是全局视觉规范（课表块、学科圆点都用），登录后拉一次即可。
-  // 拉不到就用内置默认值，颜色不是关键路径，不该因为一个设置项失败就挡住整个后台。
-  const settings = useQuery({
-    queryKey: ['settings-for-subject-colors', token],
+  // 学科颜色、简称和排序属于学科元数据；登录后拉一次，供课表等全局展示复用。
+  // 拉不到就用内置默认值，不能让非关键展示配置挡住整个后台。
+  const subjects = useQuery({
+    queryKey: ['subjects-for-schedule', token],
     enabled: Boolean(token),
     retry: false,
-    queryFn: () => getData<Record<string, string>>('/settings')
+    queryFn: () => getData<SubjectMetadata[]>('/subjects')
   });
   useEffect(() => {
-    if (settings.data) loadSubjectColors(settings.data.subjectColors);
-  }, [settings.data]);
+    if (subjects.data) loadSubjectColors(subjects.data);
+  }, [subjects.data]);
 
   if (!token) {
     return loginRoutes;

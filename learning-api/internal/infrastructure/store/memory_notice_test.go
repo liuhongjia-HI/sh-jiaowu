@@ -438,12 +438,12 @@ func TestUpdateSettingValidatesAndLogs(t *testing.T) {
 
 	settings, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{
 		Key:   "downloadPolicy",
-		Value: "允许下载已发布学习资料",
+		Value: "允许下载带水印PDF",
 	})
 	if err != nil {
 		t.Fatalf("expected setting update to succeed: %v", err)
 	}
-	if settings["downloadPolicy"] != "允许下载已发布学习资料" {
+	if settings["downloadPolicy"] != "允许下载带水印PDF" {
 		t.Fatalf("expected updated setting, got %#v", settings)
 	}
 	if store.logs[0].Action != "修改系统设置" || store.logs[0].Target != "下载规则" {
@@ -451,6 +451,9 @@ func TestUpdateSettingValidatesAndLogs(t *testing.T) {
 	}
 	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy"}); err == nil {
 		t.Fatal("expected empty setting value to be rejected")
+	}
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "允许下载原文件"}); err == nil {
+		t.Fatal("expected unsafe download policy to be rejected")
 	}
 	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "unknown", Value: "x"}); err == nil {
 		t.Fatal("expected unknown setting key to be rejected")

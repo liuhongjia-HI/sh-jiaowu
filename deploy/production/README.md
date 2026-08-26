@@ -42,7 +42,7 @@ sudo /opt/starline/current/deploy/production/provision-preview-runtime.sh
   ```bash
   apt-get install -y libreoffice
   ```
-- `gs`（Ghostscript）：上传后把预览 PDF 逐页转换为图片。学生专属水印由小程序覆盖显示；平台防截屏能力不可用时不阻止打开，只保留水印与安全提示。
+- `gs`（Ghostscript）：上传后把预览 PDF 逐页转换为图片，并在学生预览、下载时将专属追溯水印直接写进返回的图片/PDF。平台防截屏能力不可用时不阻止打开，只保留水印与安全提示。
   ```bash
   apt-get install -y ghostscript
   ```

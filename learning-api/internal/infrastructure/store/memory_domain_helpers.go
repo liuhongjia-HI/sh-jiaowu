@@ -1,9 +1,11 @@
 package store
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -1110,9 +1112,15 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
+		if s.studentMaterialDownloadEnabled() {
+			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
+		}
 	}
 	return material
+}
+
+func (s *MemoryStore) studentMaterialDownloadEnabled() bool {
+	return strings.TrimSpace(s.settings["downloadPolicy"]) == "允许下载带水印PDF"
 }
 
 func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, homework learning.Homework) learning.Homework {
@@ -1152,6 +1160,21 @@ func (s *MemoryStore) studentWatermarkText(principal learning.Principal) string 
 		parts = append(parts, suffix)
 	}
 	return strings.Join(parts, " · ")
+}
+
+func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, materialID string, generatedAt time.Time) (string, string) {
+	studentRef := idSuffix(strings.TrimSpace(principal.StudentID))
+	if studentRef == "" {
+		studentRef = "ANON"
+	}
+	phoneRef := strings.TrimPrefix(phoneTail(principal.Phone), "尾号")
+	if phoneRef == "" {
+		phoneRef = "NONE"
+	}
+	digest := sha256.Sum256([]byte(principal.StudentID + "|" + materialID + "|" + generatedAt.Format(time.RFC3339Nano)))
+	traceCode := fmt.Sprintf("%X", digest[:])[:10]
+	stamp := fmt.Sprintf("STARLINE | U-%s | P-%s | %s | T-%s", studentRef, phoneRef, generatedAt.Format("2006-01-02 15:04"), traceCode)
+	return stamp, traceCode
 }
 
 func studentSecurityNotice() string {
