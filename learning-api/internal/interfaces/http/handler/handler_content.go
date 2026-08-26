@@ -82,7 +82,9 @@ func (h *LearningHandler) UpdateQuestion(c *gin.Context) {
 }
 func (h *LearningHandler) Materials(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
-	OK(c, h.service.Materials(principal))
+	var query learning.MaterialQuery
+	if err := c.ShouldBindQuery(&query); err != nil { BadRequest(c, "筛选条件格式不正确"); return }
+	OK(c, h.service.Materials(principal, query))
 }
 func (h *LearningHandler) Homework(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)

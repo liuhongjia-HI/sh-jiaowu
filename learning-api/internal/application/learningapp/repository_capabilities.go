@@ -43,7 +43,7 @@ type ContentRepository interface {
 	CreateCourse(string, learning.Principal, learning.CourseUpsertRequest) (learning.Course, error)
 	UpdateCourse(string, learning.Principal, string, learning.CourseUpsertRequest) (learning.Course, error)
 	Questions(learning.Principal, learning.QuestionBankQuery) []learning.QuestionBankItem
-	Materials(learning.Principal) []learning.Material
+	Materials(learning.Principal, learning.MaterialQuery) []learning.Material
 	Homework(learning.Principal) []learning.Homework
 	Reviews(learning.Principal) []learning.Review
 	CreateQuestion(string, learning.Principal, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)

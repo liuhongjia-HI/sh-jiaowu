@@ -18,7 +18,7 @@ func (s *Service) CreateQuestion(o string, p learning.Principal, r learning.Ques
 func (s *Service) UpdateQuestion(o string, p learning.Principal, id string, r learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error) {
 	return s.content.UpdateQuestion(o, p, id, r)
 }
-func (s *Service) Materials(p learning.Principal) []learning.Material { return s.content.Materials(p) }
+func (s *Service) Materials(p learning.Principal, q learning.MaterialQuery) []learning.Material { return s.content.Materials(p, q) }
 func (s *Service) CreateMaterial(o string, p learning.Principal, r learning.MaterialUploadRequest) (learning.Material, error) {
 	return s.content.CreateMaterial(o, p, r)
 }

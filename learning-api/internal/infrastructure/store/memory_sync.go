@@ -137,10 +137,10 @@ func (s *MemoryStore) UpdateCourse(operator string, principal learning.Principal
 	return result1, err
 }
 
-func (s *MemoryStore) Materials(principal learning.Principal) []learning.Material {
+func (s *MemoryStore) Materials(principal learning.Principal, query learning.MaterialQuery) []learning.Material {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result := s.materialsUnlocked(principal)
+	result := s.materialsFilteredUnlocked(principal, query)
 	return result
 }
 
