@@ -10,13 +10,18 @@ import (
 func TestMaterialsFilterByTitleSubjectUploaderAndUploadedRange(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.PrincipalByUserID("user-super")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	course := store.courses[0]
 	store.materials = append(store.materials, learning.Material{
-		ID: "material-filter", Title: "阅读冲刺讲义", CourseID: "course-g05-english-s1-q1", Course: "五年级英语课程",
-		LearningSpaceID: "space-g05-english-s1-q1", OwnerTeacherID: "user-teacher", OwnerTeacherName: "英语老师", CreatedAt: "2026-08-20 10:00:00",
+		ID: "material-filter", Title: "阅读冲刺讲义", CourseID: course.ID, Course: course.Name,
+		LearningSpaceID: course.LearningSpaceID, OwnerTeacherID: "user-teacher", OwnerTeacherName: "英语老师", CreatedAt: "2026-08-20 10:00:00",
 	})
-	rows := store.Materials(admin, learning.MaterialQuery{Keyword: "冲刺", Subject: "英语", UploaderID: "user-teacher", UploadedFrom: "2026-08-20", UploadedTo: "2026-08-20"})
-	if len(rows) != 1 || rows[0].ID != "material-filter" || rows[0].Type != "课程讲义" { t.Fatalf("unexpected filtered materials: %#v", rows) }
+	rows := store.Materials(admin, learning.MaterialQuery{Keyword: "冲刺", Subject: course.Subject, UploaderID: "user-teacher", UploadedFrom: "2026-08-20", UploadedTo: "2026-08-20"})
+	if len(rows) != 1 || rows[0].ID != "material-filter" || rows[0].Type != "课程讲义" {
+		t.Fatalf("unexpected filtered materials: %#v", rows)
+	}
 }
 
 func TestMockExamRequiresDeadlineAndExpiredHomeworkRejectsSubmission(t *testing.T) {
@@ -24,9 +29,17 @@ func TestMockExamRequiresDeadlineAndExpiredHomeworkRejectsSubmission(t *testing.
 	teacher, _ := store.PrincipalByUserID("user-teacher")
 	student, _ := store.PrincipalByUserID("user-student-001")
 	_, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{Title: "模拟考试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", AssessmentType: "mock_exam", QuestionIDs: []string{"q1"}})
-	if err == nil || !strings.Contains(err.Error(), "截止") { t.Fatalf("mock exam should require deadline, got %v", err) }
-	store.homework[0].DeadlineAt = "2000-01-01T00:00:00+08:00"
-	if _, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{HomeworkID: store.homework[0].ID, Answers: []learning.SubmissionAnswer{{QuestionID: "q1", Choice: "A"}}}); err == nil || !strings.Contains(err.Error(), "已截止") { t.Fatalf("expired homework should reject submission, got %v", err) }
+	if err == nil || !strings.Contains(err.Error(), "截止") {
+		t.Fatalf("mock exam should require deadline, got %v", err)
+	}
+	for index := range store.homework {
+		if store.homework[index].ID == "hw-g05-english-s1-q1" {
+			store.homework[index].DeadlineAt = "2000-01-01T00:00:00+08:00"
+		}
+	}
+	if _, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{HomeworkID: "hw-g05-english-s1-q1", Answers: []learning.SubmissionAnswer{{QuestionID: "q1", Choice: "A"}}}); err == nil || !strings.Contains(err.Error(), "已截止") {
+		t.Fatalf("expired homework should reject submission, got %v", err)
+	}
 }
 
 func TestUpdateHomeworkRejectsTeacherOutsideScope(t *testing.T) {

@@ -63,7 +63,7 @@
         </view>
         <view class="status-item">
           <view class="status-value">{{materialCount}}</view>
-          <view class="status-label">学习资料</view>
+          <view class="status-label">课程讲义</view>
         </view>
         <view class="status-item">
           <view class="status-value">{{noticeCount}}</view>

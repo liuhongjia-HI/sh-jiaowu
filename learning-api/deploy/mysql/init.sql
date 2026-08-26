@@ -310,6 +310,8 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
   subject VARCHAR(32) NOT NULL DEFAULT '',
   question_ids_json TEXT NOT NULL,
   deadline DATE NULL,
+  deadline_at DATETIME NULL,
+  assessment_type VARCHAR(16) NOT NULL DEFAULT 'practice',
   owner_teacher_id VARCHAR(64) NOT NULL DEFAULT '',
   owner_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
   publish_status VARCHAR(32) NOT NULL DEFAULT '已发布',

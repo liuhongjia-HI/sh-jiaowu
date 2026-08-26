@@ -58,7 +58,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: this.data.pageTitle && this.data.pageTitle !== "资料预览" ? `Starline 学习资料：${this.data.pageTitle}` : "Starline 学习资料",
+      title: this.data.pageTitle && this.data.pageTitle !== "资料预览" ? `Starline 课程讲义：${this.data.pageTitle}` : "Starline 课程讲义",
       path: this.materialId ? `/pages/material-preview/index?id=${encodeURIComponent(this.materialId)}` : "/pages/study/index"
     };
   },

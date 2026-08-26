@@ -351,6 +351,12 @@ func (s *MemoryStore) createSubmissionUnlocked(operator string, principal learni
 	if err != nil {
 		return learning.Submission{}, err
 	}
+	if homework.DeadlineAt != "" {
+		deadline, parseErr := time.Parse(time.RFC3339, homework.DeadlineAt)
+		if parseErr == nil && !time.Now().Before(deadline) {
+			return learning.Submission{}, errors.New("本次练习已截止，无法提交")
+		}
+	}
 	if len(req.Answers) == 0 {
 		return learning.Submission{}, errors.New("请先作答再提交")
 	}

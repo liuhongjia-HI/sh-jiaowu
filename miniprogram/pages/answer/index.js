@@ -13,7 +13,8 @@ Page({
     securityNotice: "学习内容仅限本人查看，请勿外传。",
     favorited: false,
     favoriteId: "",
-    saving: false
+    saving: false,
+    isOverdue: false
   },
   onLoad(options) {
     const id = options.id || "";
@@ -42,13 +43,14 @@ Page({
       }));
       const watermarkText = homework.watermarkText || "专属水印加载中";
       this.setData({
-        taskTitle: homework.title || "课后小挑战",
-        deadlineText: homework.deadline ? `${homework.deadline} 前完成` : "",
+        taskTitle: `${homework.assessmentType === "mock_exam" ? "模拟考试 · " : "练习 · "}${homework.title || "课后小挑战"}`,
+        deadlineText: homework.isOverdue ? "已截止" : (homework.deadlineAt ? `截止 ${formatDeadline(homework.deadlineAt)}` : (homework.deadline ? `${homework.deadline} 前完成` : "")),
         rewardText: homework.course || "做完就能获得新徽章",
         questions: restoreDraftAnswers(id, questions),
         watermarkText,
         watermarkTexts: buildWatermarks(watermarkText),
-        securityNotice: homework.securityNotice || "学习内容仅限本人查看，请勿外传。"
+        securityNotice: homework.securityNotice || "学习内容仅限本人查看，请勿外传。",
+        isOverdue: Boolean(homework.isOverdue)
       });
     }).catch(() => {
       this.setData({
@@ -149,7 +151,8 @@ Page({
     wx.showToast({ title: "草稿已保存", icon: "success" });
   },
   submit() {
-    if (this.data.saving) {
+    if (this.data.saving || this.data.isOverdue) {
+      if (this.data.isOverdue) wx.showToast({ title: "本次练习已截止", icon: "none" });
       return;
     }
     const unanswered = this.data.questions.find((question) =>
@@ -222,4 +225,10 @@ function restoreDraftAnswers(homeworkId, questions) {
 
 function buildWatermarks(text) {
   return Array.from({ length: 10 }).map(() => text);
+}
+
+function formatDeadline(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }

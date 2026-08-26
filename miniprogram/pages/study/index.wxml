@@ -52,7 +52,7 @@
   </view>
 
   <view wx:if="{{materials.length}}" class="study-section study-material-hint">
-    <view class="study-section-title">学习资料</view>
+    <view class="study-section-title">课程讲义</view>
     <view class="study-section-link">已为你准备 {{materials.length}} 份</view>
   </view>
 </view>

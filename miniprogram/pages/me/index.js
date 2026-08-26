@@ -527,7 +527,7 @@ function buildOverviewMetrics(student = {}, home = {}, continueCourse = null, pe
 function buildQuickActions() {
   return [
     { title: "我的课表", action: "schedule", symbol: "▣", tone: "schedule" },
-    { title: "学习资料", action: "study", symbol: "▰", tone: "materials" },
+    { title: "课程讲义", action: "study", symbol: "▰", tone: "materials" },
     { title: "课堂反馈", action: "feedback", symbol: "▤", tone: "feedback" },
     { title: "收藏课程", action: "favorites", symbol: "★", tone: "favorites" },
     { title: "学习提醒", action: "notices", symbol: "🔔", tone: "notice" },

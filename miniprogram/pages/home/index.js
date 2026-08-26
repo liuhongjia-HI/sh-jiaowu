@@ -455,7 +455,7 @@ function navigateByPath(path) {
 function buildShortcuts() {
   return [
     { label: "题库练习", action: "tasks", icon: "/assets/icons/shortcut-question.png" },
-    { label: "学习资料", action: "materials", icon: "/assets/icons/shortcut-material.png" },
+    { label: "课程讲义", action: "materials", icon: "/assets/icons/shortcut-material.png" },
     { label: "课表", action: "schedule", icon: "/assets/icons/shortcut-schedule.png" },
     { label: "课堂反馈", action: "feedback", icon: "/assets/icons/shortcut-open.png" },
     { label: "学习中心", action: "study", icon: "/assets/icons/shortcut-study.png" },
@@ -467,7 +467,7 @@ function buildShortcuts() {
 
 function homeEmptyMessage(hasOpenedPackage) {
   if (hasOpenedPackage) {
-    return "学习套餐已开通，老师发布课程、学习资料或小挑战后会显示在这里。";
+    return "学习套餐已开通，老师发布课程、课程讲义或小挑战后会显示在这里。";
   }
   return "你的身份已绑定，暂时还没有开通学习套餐，请联系老师或教务确认开通。";
 }

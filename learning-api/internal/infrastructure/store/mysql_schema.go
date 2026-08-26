@@ -315,6 +315,8 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"homework_tasks", "preview_status", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "preview_url", "TEXT NOT NULL"},
 		{"homework_tasks", "download_url", "TEXT NOT NULL"},
+		{"homework_tasks", "deadline_at", "DATETIME NULL"},
+		{"homework_tasks", "assessment_type", "VARCHAR(16) NOT NULL DEFAULT 'practice'"},
 		{"starline_file_assets", "preview_page_dir", "TEXT NOT NULL"},
 		{"starline_file_assets", "preview_page_count", "INT NOT NULL DEFAULT 0"},
 		{"starline_file_assets", "preview_error", "TEXT NOT NULL"},
@@ -376,6 +378,8 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 	// Stable external keys are required for request-time keyed upserts. Backfill
 	// legacy rows using the same IDs the loader historically synthesized.
 	backfills := []string{
+		`UPDATE homework_tasks SET deadline_at = DATE_ADD(deadline, INTERVAL 86399 SECOND) WHERE deadline_at IS NULL AND deadline IS NOT NULL`,
+		`UPDATE homework_tasks SET assessment_type = 'practice' WHERE assessment_type = ''`,
 		`UPDATE student_package_grants SET external_id = CONCAT('grant-', id) WHERE external_id = ''`,
 		`UPDATE notices SET external_id = CONCAT('notice-', id) WHERE external_id = ''`,
 		`UPDATE operation_logs SET external_id = CONCAT('log-', id) WHERE external_id = ''`,

@@ -340,7 +340,7 @@ func (s *MemoryStore) loadCoursesFromDB() error {
 }
 
 func (s *MemoryStore) loadMaterialsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, chapter_name, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM materials ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, chapter_name, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, created_at FROM materials ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -348,12 +348,14 @@ func (s *MemoryStore) loadMaterialsFromDB() error {
 	out := []learning.Material{}
 	for rows.Next() {
 		var item learning.Material
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Chapter, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
+		var createdAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Chapter, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &createdAt); err != nil {
 			return err
 		}
 		item.Status = normalizeMaterialStatus(item.Status)
 		item.PublishStatus = publishStatus(item.Status)
 		item.Course = s.courseName(item.CourseID)
+		item.CreatedAt = dateTimeString(createdAt)
 		out = append(out, item)
 	}
 	s.materials = out
@@ -388,7 +390,7 @@ func (s *MemoryStore) loadQuestionBankFromDB() error {
 }
 
 func (s *MemoryStore) loadHomeworkFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, grade, semester, subject, question_ids_json, deadline, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM homework_tasks ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, grade, semester, subject, question_ids_json, deadline, deadline_at, assessment_type, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM homework_tasks ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -398,10 +400,16 @@ func (s *MemoryStore) loadHomeworkFromDB() error {
 		var item learning.Homework
 		var questionIDsJSON string
 		var deadline sql.NullTime
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Grade, &item.Semester, &item.Subject, &questionIDsJSON, &deadline, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
+		var deadlineAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Grade, &item.Semester, &item.Subject, &questionIDsJSON, &deadline, &deadlineAt, &item.AssessmentType, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
 			return err
 		}
 		item.Deadline = dateString(deadline)
+		item.DeadlineAt = dateTimeString(deadlineAt)
+		if item.DeadlineAt != "" {
+			item.DeadlineAt = deadlineAt.Time.Format(time.RFC3339)
+		}
+		item.AssessmentType = normalizeAssessmentType(item.AssessmentType)
 		item.Course = s.courseName(item.CourseID)
 		if item.Grade == "" || item.Semester == "" || item.Subject == "" {
 			if space, ok := s.findLearningSpace(item.LearningSpaceID); ok {

@@ -58,7 +58,7 @@ Page({
   goPreview() {
     const material = this.data.materials[0];
     if (!material) {
-      wx.showToast({ title: "暂无学习资料", icon: "none" });
+      wx.showToast({ title: "暂无课程讲义", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/material-preview/index?id=${material.id}` });

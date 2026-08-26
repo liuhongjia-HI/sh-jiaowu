@@ -49,11 +49,11 @@ type Material struct {
 }
 
 type MaterialQuery struct {
-	Keyword string `form:"keyword"`
-	Subject string `form:"subject"`
-	UploaderID string `form:"uploaderId"`
+	Keyword      string `form:"keyword"`
+	Subject      string `form:"subject"`
+	UploaderID   string `form:"uploaderId"`
 	UploadedFrom string `form:"uploadedFrom"`
-	UploadedTo string `form:"uploadedTo"`
+	UploadedTo   string `form:"uploadedTo"`
 }
 
 type MaterialUpdateRequest struct {

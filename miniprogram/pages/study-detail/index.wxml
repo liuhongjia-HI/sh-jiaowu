@@ -32,20 +32,20 @@
   </view>
 
   <view class="detail-section-head material-head">
-    <view class="detail-section-title">学习资料 <text>（{{materials.length}} 份）</text></view>
-    <view class="detail-section-link" bindtap="goPreview">全部资料 ›</view>
+    <view class="detail-section-title">课程讲义 <text>（{{materials.length}} 份）</text></view>
+    <view class="detail-section-link" bindtap="goPreview">全部讲义 ›</view>
   </view>
   <view wx:if="{{materials.length}}" class="material-list">
     <view wx:for="{{materials}}" wx:key="id" class="material-row" data-id="{{item.id}}" bindtap="previewMaterial">
       <view class="material-icon">{{item.fileType || "PDF"}}</view>
       <view class="material-copy">
         <view class="material-title">{{item.title}}</view>
-        <view class="material-meta">{{item.fileType || item.type || "学习资料"}} · {{item.fileSize || "资料"}}</view>
+        <view class="material-meta">{{item.fileType || item.type || "课程讲义"}} · {{item.fileSize || "讲义"}}</view>
       </view>
       <view class="material-arrow">↓</view>
     </view>
   </view>
-  <view wx:else class="detail-empty-line">老师发布资料后会显示在这里</view>
+  <view wx:else class="detail-empty-line">老师发布讲义后会显示在这里</view>
 
   <view class="detail-feedback">
     <view class="detail-section-head">

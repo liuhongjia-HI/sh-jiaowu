@@ -3,7 +3,7 @@ const { request } = require("../../utils/request");
 Page({
   data: {
     loading: true,
-    emptyMessage: "完成小挑战、学习资料后，这里会记录你的成长足迹。",
+    emptyMessage: "完成小挑战、学习课程讲义后，这里会记录你的成长足迹。",
     records: []
   },
   onLoad() {

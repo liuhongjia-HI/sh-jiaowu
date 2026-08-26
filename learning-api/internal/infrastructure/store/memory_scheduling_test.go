@@ -406,7 +406,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	if created.Grade != "五年级" || created.Semester != "S1" || created.Subject != "英文" {
 		t.Fatalf("expected created material to include learning dimensions, got %#v", created)
 	}
-	if created.Type != "学习资料" {
+	if created.Type != "课程讲义" {
 		t.Fatalf("expected material type to use unified naming, got %#v", created)
 	}
 	for index := range store.materials {
@@ -415,7 +415,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 			store.materials[index].PublishStatus = "已发布"
 		}
 	}
-	materials := store.Materials(teacher)
+	materials := store.Materials(teacher, learning.MaterialQuery{})
 	if !materialHasLearningDimensions(materials, created.ID) {
 		t.Fatalf("expected admin material list to include learning dimensions, got %#v", materials)
 	}
@@ -474,7 +474,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	if favoriteListContains(favoritesAfterDraft, favorite.ID) {
 		t.Fatalf("expected draft material favorite to be hidden from student: %#v", favoritesAfterDraft)
 	}
-	adminAfterDraft := store.Materials(teacher)
+	adminAfterDraft := store.Materials(teacher, learning.MaterialQuery{})
 	if !materialVisible(adminAfterDraft, created.ID) {
 		t.Fatalf("expected draft material to remain visible in admin list: %#v", adminAfterDraft)
 	}
@@ -501,7 +501,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	if favoriteListContains(favoritesAfterDisable, favorite.ID) {
 		t.Fatalf("expected disabled material favorite to be hidden from student: %#v", favoritesAfterDisable)
 	}
-	adminAfterDisable := store.Materials(teacher)
+	adminAfterDisable := store.Materials(teacher, learning.MaterialQuery{})
 	if !materialVisible(adminAfterDisable, created.ID) {
 		t.Fatalf("expected disabled material to remain visible in admin list: %#v", adminAfterDisable)
 	}
@@ -584,7 +584,7 @@ func TestDeleteMaterialRemovesItFromAdminAndStudentAndCleansFavorites(t *testing
 		t.Fatalf("expected delete to succeed: %v", err)
 	}
 
-	adminAfterDelete := store.Materials(teacher)
+	adminAfterDelete := store.Materials(teacher, learning.MaterialQuery{})
 	if materialVisible(adminAfterDelete, created.ID) {
 		t.Fatalf("expected deleted material to disappear from admin list, got %#v", adminAfterDelete)
 	}

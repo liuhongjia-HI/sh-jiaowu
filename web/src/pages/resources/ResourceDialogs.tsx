@@ -23,6 +23,8 @@ type ContentFormValues = {
   courseId: string;
   chapter?: string;
   deadline?: string;
+	deadlineAt?: string;
+	assessmentType?: 'practice' | 'mock_exam';
   status: string;
   questionIds?: string[];
 };
@@ -31,7 +33,7 @@ type QuestionFormValues = QuestionBankUpsertRequest;
 const CONTENT_TYPE_NAME: Record<string, string> = {
   course: '课程',
   question: '题',
-  handout: '学习资料'
+  handout: '课程讲义'
 };
 
 function packageContentLabel(codes?: string[]) {
@@ -584,7 +586,7 @@ export function PackageDialog({
             options={[
               { label: '课程', value: 'course' },
               { label: '题', value: 'question' },
-              { label: '学习资料', value: 'handout' }
+              { label: '课程讲义', value: 'handout' }
             ]}
           />
         </Form.Item>
@@ -919,7 +921,7 @@ export function UploadDialog({
   questions: QuestionBankItem[];
   learningSpaces: LearningSpace[];
   onCancel: () => void;
-  onSubmit: (values: { title: string; courseId: string; chapter?: string; deadline?: string; questionIds?: string[]; fileList?: UploadFile[] }) => void;
+  onSubmit: (values: { title: string; courseId: string; chapter?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
 }) {
   const [form] = Form.useForm();
   const courseId = Form.useWatch('courseId', form);
@@ -927,7 +929,7 @@ export function UploadDialog({
   const availableQuestions = questionsForCourse(selectedCourse, questions, learningSpaces);
   return (
     <Modal
-      title={kind === 'materials' ? '上传学习资料' : '组卷发布小挑战'}
+      title={kind === 'materials' ? '上传课程讲义' : '组卷发布小挑战'}
       open={open}
       okText={kind === 'materials' ? '上传' : '发布'}
       cancelText="取消"
@@ -963,9 +965,14 @@ export function UploadDialog({
               message="先选课程，再从同年级、同学期、同学科的题库中手动选题组卷。"
               style={{ marginBottom: 16 }}
             />
-            <Form.Item name="deadline" label="截止时间">
-              <Input placeholder="例如：2026-10-30" />
+            <Form.Item name="assessmentType" label="类型" initialValue="practice">
+              <Radio.Group options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} />
             </Form.Item>
+            <Form.Item shouldUpdate noStyle>{() => (
+              <Form.Item name="deadlineAt" label="截止时间" rules={form.getFieldValue('assessmentType') === 'mock_exam' ? [{ required: true, message: '模拟考试必须设置截止时间' }] : []}>
+                <Input type="datetime-local" />
+              </Form.Item>
+            )}</Form.Item>
             <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
               <QuestionCheckboxGroup selectedCourse={selectedCourse} questions={availableQuestions} />
             </Form.Item>
@@ -995,7 +1002,7 @@ export function UploadDialog({
                 <Button icon={<UploadOutlined />}>选择文件</Button>
               </Upload>
             </Form.Item>
-            <Typography.Text type="secondary">支持 PDF、PPT、Word，可一次选择多个文件，单个文件不超过 50MB。</Typography.Text>
+            <Typography.Text type="secondary">支持 PDF、PPT、Word，上传后自动生成 PDF 预览，暂不支持在线编辑；单个文件不超过 50MB。</Typography.Text>
           </>
         )}
       </Form>
@@ -1029,7 +1036,7 @@ export function ContentEditDialog({
   const availableQuestions = questionsForCourse(selectedCourse, questions, learningSpaces);
   return (
     <Modal
-      title={kind === 'materials' ? '编辑学习资料' : '编辑小挑战组卷'}
+      title={kind === 'materials' ? '编辑课程讲义' : '编辑小挑战组卷'}
       open={Boolean(item)}
       okText="保存"
       cancelText="取消"
@@ -1059,9 +1066,14 @@ export function ContentEditDialog({
           </Form.Item>
         ) : (
           <>
-            <Form.Item name="deadline" label="截止时间">
-              <Input placeholder="例如：2026-10-30" />
+            <Form.Item name="assessmentType" label="类型">
+              <Radio.Group options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} />
             </Form.Item>
+            <Form.Item shouldUpdate noStyle>{() => (
+              <Form.Item name="deadlineAt" label="截止时间" rules={form.getFieldValue('assessmentType') === 'mock_exam' ? [{ required: true, message: '模拟考试必须设置截止时间' }] : []}>
+                <Input type="datetime-local" />
+              </Form.Item>
+            )}</Form.Item>
             <Form.Item name="questionIds" label="选择题目" rules={[{ required: true, message: '请选择题目' }]}>
               <QuestionCheckboxGroup selectedCourse={selectedCourse} questions={availableQuestions} />
             </Form.Item>

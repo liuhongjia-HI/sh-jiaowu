@@ -1146,6 +1146,7 @@ func (s *MemoryStore) learningSpaceName(id string) string {
 }
 
 func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Material {
+	material.Type = "课程讲义"
 	if space, ok := s.findLearningSpace(material.LearningSpaceID); ok {
 		material.Grade = space.Grade
 		material.Semester = space.Semester
@@ -1176,6 +1177,14 @@ func (s *MemoryStore) studentMaterialDownloadEnabled() bool {
 }
 
 func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, homework learning.Homework) learning.Homework {
+	if homework.AssessmentType == "" {
+		homework.AssessmentType = "practice"
+	}
+	if homework.DeadlineAt != "" {
+		if deadline, err := time.Parse(time.RFC3339, homework.DeadlineAt); err == nil {
+			homework.IsOverdue = !time.Now().Before(deadline)
+		}
+	}
 	if asset, ok := s.fileAssets[homework.FileID]; ok {
 		homework.PreviewStatus = asset.PreviewStatus
 		homework.PreviewError = asset.PreviewError

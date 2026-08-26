@@ -103,7 +103,7 @@ function decorateCourses(courses, favorites) {
 
 function studyEmptyMessage(hasOpenedPackage) {
   if (hasOpenedPackage) {
-    return "学习套餐已开通，老师发布课程后会显示在这里。你也可以先回首页查看学习资料和小挑战。";
+    return "学习套餐已开通，老师发布课程后会显示在这里。你也可以先回首页查看课程讲义和小挑战。";
   }
   return "你的身份已绑定，暂时还没有开通学习套餐，请联系老师或教务确认。";
 }

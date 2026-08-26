@@ -72,6 +72,58 @@ func (s *MemoryStore) materialsUnlocked(principal learning.Principal) []learning
 	return s.materialsForCourses(courses)
 }
 
+func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, query learning.MaterialQuery) []learning.Material {
+	keyword := strings.ToLower(strings.TrimSpace(query.Keyword))
+	rows := s.materialsUnlocked(principal)
+	out := make([]learning.Material, 0, len(rows))
+	for _, item := range rows {
+		if keyword != "" && !strings.Contains(strings.ToLower(item.Title), keyword) {
+			continue
+		}
+		if query.Subject = strings.TrimSpace(query.Subject); query.Subject != "" && item.Subject != query.Subject {
+			continue
+		}
+		if query.UploaderID = strings.TrimSpace(query.UploaderID); query.UploaderID != "" && item.OwnerTeacherID != query.UploaderID {
+			continue
+		}
+		if query.UploadedFrom = strings.TrimSpace(query.UploadedFrom); query.UploadedFrom != "" && item.CreatedAt < query.UploadedFrom {
+			continue
+		}
+		if query.UploadedTo = strings.TrimSpace(query.UploadedTo); query.UploadedTo != "" && item.CreatedAt > query.UploadedTo+" 23:59:59" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func normalizeAssessmentType(value string) string {
+	if strings.TrimSpace(value) == "mock_exam" {
+		return "mock_exam"
+	}
+	return "practice"
+}
+
+func normalizeDeadlineAt(deadlineAt, legacyDeadline, assessmentType string, creating bool) (string, error) {
+	if deadlineAt == "" && legacyDeadline != "" {
+		return legacyDeadline + "T23:59:59+08:00", nil
+	}
+	if deadlineAt == "" {
+		if assessmentType == "mock_exam" {
+			return "", errors.New("模拟考试必须设置截止时间")
+		}
+		return "", nil
+	}
+	parsed, err := time.Parse(time.RFC3339, deadlineAt)
+	if err != nil {
+		return "", errors.New("截止时间格式不正确")
+	}
+	if creating && parsed.Before(time.Now().Add(5*time.Minute)) {
+		return "", errors.New("截止时间至少应晚于当前时间 5 分钟")
+	}
+	return parsed.Format(time.RFC3339), nil
+}
+
 func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning.Principal, req learning.MaterialUploadRequest) (learning.Material, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.Material, error) {
@@ -107,7 +159,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 		Course:           course.Name,
 		LearningSpaceID:  course.LearningSpaceID,
 		Chapter:          req.Chapter,
-		Type:             "学习资料",
+		Type:             "课程讲义",
 		OwnerTeacherID:   principal.UserID,
 		OwnerTeacherName: principal.Name,
 		PublishStatus:    "已发布",
@@ -117,6 +169,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 		FileSize:         asset.FileSize,
 		FileType:         asset.FileType,
 		PreviewStatus:    asset.PreviewStatus,
+		CreatedAt:        time.Now().Format("2006-01-02 15:04:05"),
 		PreviewURL:       "/api/files/" + asset.ID + "/preview",
 		DownloadURL:      "/api/files/" + asset.ID + "/download",
 	}
@@ -468,6 +521,8 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.Deadline = strings.TrimSpace(req.Deadline)
+	req.DeadlineAt = strings.TrimSpace(req.DeadlineAt)
+	req.AssessmentType = normalizeAssessmentType(req.AssessmentType)
 	if req.Title == "" {
 		return learning.Homework{}, errors.New("请输入题目标题")
 	}
@@ -477,6 +532,10 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	}
 	if !canUploadQuestion(principal) {
 		return learning.Homework{}, errors.New("当前账号没有上传题目权限，请联系管理员开通")
+	}
+	deadlineAt, err := normalizeDeadlineAt(req.DeadlineAt, req.Deadline, req.AssessmentType, true)
+	if err != nil {
+		return learning.Homework{}, err
 	}
 	questions, err := s.questionsForHomework(course, req.QuestionIDs)
 	if err != nil {
@@ -508,6 +567,8 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 		QuestionIDs:      questionIDs(questions),
 		Questions:        questions,
 		Deadline:         req.Deadline,
+		DeadlineAt:       deadlineAt,
+		AssessmentType:   req.AssessmentType,
 		OwnerTeacherID:   principal.UserID,
 		OwnerTeacherName: principal.Name,
 		PublishStatus:    publishStatus(status),
@@ -539,6 +600,8 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.Deadline = strings.TrimSpace(req.Deadline)
+	req.DeadlineAt = strings.TrimSpace(req.DeadlineAt)
+	req.AssessmentType = normalizeAssessmentType(req.AssessmentType)
 	status := learning.Status(strings.TrimSpace(req.Status))
 	if req.Title == "" {
 		return learning.Homework{}, errors.New("请输入题目标题")
@@ -552,6 +615,10 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 	}
 	if !canUploadQuestion(principal) {
 		return learning.Homework{}, errors.New("当前账号没有维护题目权限，请联系管理员开通")
+	}
+	deadlineAt, err := normalizeDeadlineAt(req.DeadlineAt, req.Deadline, req.AssessmentType, false)
+	if err != nil {
+		return learning.Homework{}, err
 	}
 	questions, err := s.questionsForHomework(course, req.QuestionIDs)
 	if err != nil {
@@ -577,6 +644,8 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 		s.homework[index].Questions = questions
 		s.homework[index].QuestionNum = len(questions)
 		s.homework[index].Deadline = req.Deadline
+		s.homework[index].DeadlineAt = deadlineAt
+		s.homework[index].AssessmentType = req.AssessmentType
 		s.homework[index].Status = string(status)
 		s.homework[index].PublishStatus = publishStatus(status)
 		if before.Status != string(learning.StatusEnabled) && status == learning.StatusEnabled {

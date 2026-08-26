@@ -345,6 +345,7 @@ export type Material = {
   downloadUrl?: string;
   watermarkText?: string;
   securityNotice?: string;
+  createdAt?: string;
   status: string;
 };
 
@@ -370,6 +371,9 @@ export type Homework = {
   questionIds?: string[];
   questions?: Question[];
   deadline: string;
+  deadlineAt?: string;
+  assessmentType?: 'practice' | 'mock_exam';
+  isOverdue?: boolean;
   submittedNum: number;
   totalNum: number;
   ownerTeacherId?: string;
@@ -410,6 +414,8 @@ export type HomeworkUpdateRequest = {
   courseId: string;
   learningSpaceId?: string;
   deadline: string;
+  deadlineAt?: string;
+  assessmentType?: 'practice' | 'mock_exam';
   status: string;
   questionIds?: string[];
 };
