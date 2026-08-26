@@ -1999,6 +1999,9 @@ export function RepeatFields({
           />
           {enabled && (
             <>
+              <Typography.Text type="secondary">
+                支持按日或按周自定义重复周期；固定周次例如隔周上课，设置为“每 2 周”。
+              </Typography.Text>
               <Space.Compact block>
                 <Form.Item name={['repeat', 'freq']} noStyle initialValue="weekly">
                   <Select
@@ -2030,15 +2033,18 @@ export function RepeatFields({
               </Space.Compact>
 
               {freq === 'weekly' && (
-                <Form.Item name={['repeat', 'byDay']} noStyle>
-                  <Select
-                    mode="multiple"
-                    allowClear
-                    style={{ width: '100%' }}
-                    placeholder={startWeekday ? `默认跟随首节：${weekLabel(startWeekday)}` : '默认跟随首节上课日期'}
-                    options={weekOptions}
-                  />
-                </Form.Item>
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Typography.Text strong>每周上课日</Typography.Text>
+                  <Form.Item name={['repeat', 'byDay']} noStyle>
+                    <Select
+                      mode="multiple"
+                      allowClear
+                      style={{ width: '100%' }}
+                      placeholder={startWeekday ? `默认跟随首节：${weekLabel(startWeekday)}` : '默认跟随首节上课日期'}
+                      options={weekOptions}
+                    />
+                  </Form.Item>
+                </Space>
               )}
 
               {endMode === 'count' ? (
@@ -2054,6 +2060,9 @@ export function RepeatFields({
               <Typography.Text type="secondary">
                 {repeatSummaryText(freq, interval, byDay, startWeekday, endMode)}
                 。不会自动跳过节假日和寒暑假，需要跳过的课次请排完后单独取消。单次最多生成 200 节。
+              </Typography.Text>
+              <Typography.Text type="secondary">
+                按月和特殊日期重复将在后续开放。
               </Typography.Text>
             </>
           )}
@@ -2072,11 +2081,11 @@ function repeatSummaryText(
 ) {
   const every = interval > 1 ? `每 ${interval} ` : '每';
   if (freq === 'daily') {
-    return `${every}${interval > 1 ? '天' : '天'}排一节`;
+    return `${every}天排一节`;
   }
   const days = byDay && byDay.length > 0 ? byDay : (startWeekday ? [startWeekday] : []);
   const dayText = days.length > 0 ? days.map(weekLabel).join('、') : '首节所在星期';
-  return `${every}${interval > 1 ? '周' : '周'}的 ${dayText} 各排一节，${endMode === 'count' ? '到指定节数为止' : '到指定日期为止'}`;
+  return `${every}周的 ${dayText} 各排一节，${endMode === 'count' ? '到指定节数为止' : '到指定日期为止'}`;
 }
 
 // endMode 是纯前端的开关，后端只认 until / count 二选一，不认这个字段。

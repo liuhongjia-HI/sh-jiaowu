@@ -169,7 +169,7 @@
 - 返回的每个候选含 `availableStudents`（该时段可上的学生）和 `missingStudents`（同学科同年级但该时段没空的学生），供「协调建议」面板提示教务协调时间。
 - 兼容旧入口：仅传 `courseId` + `teacherId` 时按单课程单老师查找。
 
-`POST /api/schedule-classes` / `PUT /api/schedule-classes/{id}` 确认成班或调课时同样校验「同年级同学科」，跨年级或未开通该学科的学生会被拒绝。填写 `roomName` 后，系统会按 `campusId + roomName + 星期 + 时间段` 检查教室/线上会议室等资源冲突。
+`POST /api/schedule-classes` 创建单次或重复课程，`PUT /api/schedule-classes/{id}` 调整已有课次。两者都会校验同年级同学科、老师/学生撞课和班型容量；`roomName` 仅登记，不阻塞排课。`startDate` 是单次课日期，重复排课时是首节日期，星期由日期自动推导。
 
 ```json
 {
@@ -179,14 +179,28 @@
   "roomName": "A101",
   "classType": "1V3",
   "durationMinutes": 90,
-  "dayOfWeek": 3,
   "startTime": "19:00",
   "endTime": "20:30",
-  "startDate": "2026-06-01",
-  "endDate": "2026-08-31",
-  "studentIds": ["stu-001", "stu-002", "stu-003"]
+  "startDate": "2026-06-03",
+  "studentIds": ["stu-001", "stu-002", "stu-003"],
+  "expectedStudentCount": 3,
+  "repeat": {
+    "freq": "weekly",
+    "interval": 2,
+    "byDay": [1, 3],
+    "count": 6
+  }
 }
 ```
+
+`repeat` 不传表示只排一节。本期支持：
+
+- `freq=daily`：每 `interval` 天重复，例如 `interval=3` 表示每 3 天一节。
+- `freq=weekly`：每 `interval` 周在 `byDay` 指定的星期重复，`1` 至 `7` 表示周一至周日；不传 `byDay` 时跟随首节所在星期。例如上例表示每 2 周的周一、周三各排一节。
+- 结束方式二选一：`count` 表示总课次数，`until` 表示重复到该日期（含当天）。
+- 单次最多生成 200 节；整批课次先统一校验，任意一节冲突时整批不创建。
+- 不自动跳过节假日和寒暑假；需要跳过的课次可生成后单独取消。
+- `monthly` 和特殊日期重复尚未开放，传入 `monthly` 会明确返回“按月重复暂未开放”。
 
 返回体在此基础上附带 `academicYear` / `semester`：按 `startDate` 落系统设置里的校历（`GET/PUT /api/settings` 的 `academicCalendar`）判定一次后固定写入，此后调校历、切学年都不会让已排课程的归属跟着变；只有真的改了开课日期或课程才会重新判定。开课日期落不进任何校历学期时（例如假期班），退回课程所属学习空间的学期标签 + 开课日期本身的自然年 7 月 1 日规则，不阻塞建班。
 

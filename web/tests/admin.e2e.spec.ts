@@ -287,6 +287,59 @@ test('校区管理员可以右键复制课程并只修改日期创建新课', as
   await expect(page.getByText('复制课程已创建，课表已更新')).toBeVisible();
 });
 
+test('校区管理员可以按固定周次和多个星期创建重复课程', async ({ page }) => {
+  await login(page, '13800000002');
+  let submitted: Record<string, any> | null = null;
+  await page.route('**/api/schedule-classes', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue();
+      return;
+    }
+    submitted = route.request().postDataJSON() as Record<string, any>;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: { id: 'schedule-repeat-e2e', status: '已确认', auditStatus: '已通过' }
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/scheduling', '排课管理');
+  await page.locator('.ant-segmented-item-label', { hasText: '周视图' }).click();
+  await page.locator('.schedule-day-empty-slot').first().click();
+  const drawer = page.getByRole('dialog', { name: '新建课程' });
+  await expect(drawer).toBeVisible();
+  for (const fieldName of ['课程', '老师']) {
+    const field = drawer.locator('.ant-form-item').filter({ hasText: fieldName }).first();
+    await field.locator('.ant-select-selector').click();
+    await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last().locator('.ant-select-item-option').first().click();
+  }
+
+  const repeatSection = drawer.locator('.ant-form-item').filter({ hasText: '重复' }).last();
+  await repeatSection.locator('.ant-switch').click();
+  await expect(repeatSection.getByText('支持按日或按周自定义重复周期；固定周次例如隔周上课，设置为“每 2 周”。')).toBeVisible();
+  await expect(repeatSection.getByText('按月和特殊日期重复将在后续开放。')).toBeVisible();
+  const repeatSelects = repeatSection.locator('.ant-select-selector');
+  await repeatSelects.nth(0).click();
+  const repeatModeDropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  await expect(repeatModeDropdown.getByText('按日', { exact: true })).toBeVisible();
+  await expect(repeatModeDropdown.getByText('按月', { exact: true })).toHaveCount(0);
+  await repeatModeDropdown.getByText('按周', { exact: true }).click();
+  await repeatSection.locator('.ant-input-number-input').first().fill('2');
+  await repeatSelects.nth(2).click();
+  const weekdayDropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+  await weekdayDropdown.getByText('周一', { exact: true }).click();
+  await weekdayDropdown.getByText('周三', { exact: true }).click();
+  await repeatSection.locator('.ant-input-number-input').last().fill('6');
+  await drawer.getByRole('button', { name: '创建课程' }).click();
+
+  await expect.poll(() => submitted).not.toBeNull();
+  expect(submitted?.repeat).toEqual({ freq: 'weekly', interval: 2, byDay: [1, 3], count: 6 });
+});
+
 test('退出登录会清理后台访问态', async ({ page }) => {
   await login(page, '13800000002');
   await page.getByRole('button', { name: '账号菜单' }).click();
