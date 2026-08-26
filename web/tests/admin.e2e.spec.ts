@@ -215,7 +215,7 @@ test('校区管理员可以从周历入口新建排课', async ({ page }) => {
 test('校区管理员可以右键复制课程并只修改日期创建新课', async ({ page }) => {
   await login(page, '13800000002');
 
-  const { sourceDate, copiedDate } = await page.evaluate(async () => {
+  const { sourceDate, copiedDate, startTime, endTime } = await page.evaluate(async () => {
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -227,23 +227,38 @@ test('校区管理员可以右键复制课程并只修改日期创建新课', as
     copied.setDate(copied.getDate() + 1);
     const token = localStorage.getItem('starline_admin_token');
     const user = JSON.parse(localStorage.getItem('starline_admin_user') ?? '{}') as { userId?: string; name?: string };
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-Operator-ID': user.userId ?? '',
+      'X-Operator-Name': encodeURIComponent(user.name ?? '')
+    };
+    const existingResponse = await fetch('/api/schedule-classes', { headers });
+    if (!existingResponse.ok) throw new Error(`读取现有课程失败：${await existingResponse.text()}`);
+    const existingBody = await existingResponse.json() as { data?: Array<{ teacherId: string; lessonDate: string; startTime: string; endTime: string; status: string }> };
+    const sourceDate = formatDate(source);
+    const copiedDate = formatDate(copied);
+    const overlaps = (lessonDate: string, candidateStart: string, candidateEnd: string) =>
+      (existingBody.data ?? []).some((item) => item.status !== '已取消' && item.teacherId === 'user-teacher'
+        && item.lessonDate === lessonDate && candidateStart < item.endTime && candidateEnd > item.startTime);
+    const availableSlot = Array.from({ length: 24 }, (_, index) => {
+      const hour = String(index).padStart(2, '0');
+      const nextHour = String(index + 1).padStart(2, '0');
+      return { startTime: `${hour}:00`, endTime: `${nextHour}:00` };
+    }).find((slot) => !overlaps(sourceDate, slot.startTime, slot.endTime) && !overlaps(copiedDate, slot.startTime, slot.endTime));
+    if (!availableSlot) throw new Error('今天和明天没有可用于快捷复制验收的空闲时段');
     const response = await fetch('/api/schedule-classes', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        'X-Operator-ID': user.userId ?? '',
-        'X-Operator-Name': encodeURIComponent(user.name ?? '')
-      },
+      headers,
       body: JSON.stringify({
         courseId: 'course-g05-english-s1-q1',
         teacherId: 'user-teacher',
         campusId: 'campus-main',
         classType: '1V1',
         durationMinutes: 60,
-        startTime: '06:00',
-        endTime: '07:00',
-        startDate: formatDate(source),
+        startTime: availableSlot.startTime,
+        endTime: availableSlot.endTime,
+        startDate: sourceDate,
         studentIds: [],
         expectedStudentCount: 1,
         reservationNote: '快捷复制端到端验收源课程',
@@ -251,12 +266,12 @@ test('校区管理员可以右键复制课程并只修改日期创建新课', as
       })
     });
     if (!response.ok) throw new Error(`创建验收源课程失败：${await response.text()}`);
-    return { sourceDate: formatDate(source), copiedDate: formatDate(copied) };
+    return { sourceDate, copiedDate, ...availableSlot };
   });
 
   await expectPageHeading(page, '/scheduling', '排课管理');
   await expect(page.getByText('右键课程可快速复制')).toBeVisible();
-  const sourceClass = page.locator('.schedule-timeline-block.is-class').filter({ hasText: '06:00-07:00' }).first();
+  const sourceClass = page.locator('.schedule-timeline-block.is-class').filter({ hasText: `${startTime}-${endTime}` }).first();
   await expect(sourceClass).toBeVisible();
   await sourceClass.click({ button: 'right' });
   await page.getByRole('menuitem', { name: '复制这节课' }).click();
