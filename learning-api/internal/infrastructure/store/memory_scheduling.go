@@ -412,6 +412,11 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 	if req.CampusID == "" {
 		req.CampusID = "campus-main"
 	}
+	// teacherId 是外部请求字段，不能依赖前端只展示当前教师来保证权限。
+	// 教师只能给自己排课；管理员仍可为任意可管理教师排课。
+	if hasRole(principal.Roles, learning.RoleTeacher) && req.TeacherID != principal.UserID {
+		return learning.ScheduleClass{}, errors.New("教师只能给自己排课")
+	}
 	course, err := s.courseForScheduling(principal, req.CourseID)
 	if err != nil {
 		return learning.ScheduleClass{}, err

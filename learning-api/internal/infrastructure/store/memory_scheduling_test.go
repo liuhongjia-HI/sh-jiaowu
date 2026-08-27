@@ -1052,6 +1052,32 @@ func TestTeacherCannotApproveOwnSchedule(t *testing.T) {
 	}
 }
 
+// teacherId 来自请求体，不能依赖前端下拉框只展示自己来做权限控制。
+// 否则教师可以直接构造请求，替其他教师占用课表并制造待审核记录。
+func TestTeacherCannotCreateScheduleForAnotherTeacher(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+
+	otherTeacher := store.users[0]
+	for _, user := range store.users {
+		if user.ID == teacher.UserID {
+			otherTeacher = user
+			break
+		}
+	}
+	otherTeacher.ID = "user-teacher-other"
+	otherTeacher.Name = "其他英语老师"
+	otherTeacher.Phone = "13800000014"
+	store.users = append(store.users, otherTeacher)
+
+	req := teacherLessonRequest()
+	req.TeacherID = otherTeacher.ID
+	req.IgnoreWarnings = true
+	if _, err := store.CreateScheduleClass("英语老师", teacher, req); err == nil || !strings.Contains(err.Error(), "只能给自己排课") {
+		t.Fatalf("教师替其他教师排课应被拒绝，实际 err=%v", err)
+	}
+}
+
 // 老师能改自己待审核的课，但通过之后就不能再单方面改了。
 func TestTeacherEditsOwnPendingLessonOnly(t *testing.T) {
 	store := NewMemoryStore()
