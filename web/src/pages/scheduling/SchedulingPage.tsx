@@ -239,6 +239,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     onSuccess: (record) => {
       if (copyingClass) {
         message.success(record.auditStatus === '待审核' ? '复制课程已提交审核' : '复制课程已创建，课表已更新');
+      } else if (record.auditStatus === '待审核') {
+        message.success('课程已提交审核，管理员通过后学生端可见');
       } else {
         message.success(record.status === '待确认' ? '时间段已锁定，后续可补充学生' : '课程已创建，课表已更新');
       }
@@ -256,7 +258,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       return putData<ScheduleClass>(`/schedule-classes/${editingClass.id}`, values);
     },
     onSuccess: (record) => {
-      message.success(record.status === '待确认' ? '调课已保存，当前课程待确认' : '调课已保存');
+      let successText = '调课已保存';
+      if (record.auditStatus === '待审核') successText = '修改已提交审核，管理员通过后学生端可见';
+      else if (record.status === '待确认') successText = '调课已保存，当前课程待确认';
+      message.success(successText);
       setEditingClass(null);
       queryClient.invalidateQueries({ queryKey: ['schedule-classes'] });
     },

@@ -67,6 +67,9 @@
 - `POST /api/schedule-classes`
 - `PUT /api/schedule-classes/{id}`
 - `POST /api/schedule-classes/{id}/cancel`
+- `GET /api/schedule-classes/pending`
+- `POST /api/schedule-classes/{id}/approve`
+- `POST /api/schedule-classes/{id}/reject`
 - `GET /api/logs`
 - `GET /api/settings`
 - `PUT /api/settings`
@@ -172,6 +175,12 @@
 - 兼容旧入口：仅传 `courseId` + `teacherId` 时按单课程单老师查找。
 
 `POST /api/schedule-classes` 创建单次或重复课程，`PUT /api/schedule-classes/{id}` 调整已有课次。两者都会校验同年级、同学科、同等级、老师/学生撞课和班型容量；`roomName` 仅登记，不阻塞排课。`startDate` 是单次课日期，重复排课时是首节日期，星期由日期自动推导。
+
+- 教师只能把课程排给自己；即使直接构造其他 `teacherId`，后端也会拒绝。
+- 教师创建的课程进入 `待审核`，管理员通过前不会出现在学生课表、首页待办或学生通知中。
+- `ops_staff`、`campus_admin`、`super_admin` 可查看待审核队列并通过或驳回；驳回必须填写理由。
+- 教师可修改自己的待审核课程；被驳回后修改视为重新提交，旧审核结论会清除并再次进入 `待审核`。已通过课程只能由管理员调整。
+- 可上课时间是匹配和监管的参考范围。超出范围需要二次确认，确认后允许排课并将越界说明留给管理员审核。
 
 ```json
 {
