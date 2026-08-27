@@ -584,7 +584,7 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 		item.ID = existing.ID
 		item.CreatedAt = existing.CreatedAt
 		item.SeriesID = existing.SeriesID
-		carryScheduleAuditFields(existing, &item)
+		carryScheduleAuditFieldsAfterEdit(principal, existing, &item)
 		// 单独改过的课次就此脱离系列，之后对系列的批量改动一律绕开它。
 		// 这是 split-series 的落点：不必再维护一张例外表和它的一致性。
 		item.Detached = existing.Detached || existing.SeriesID != ""
@@ -596,7 +596,7 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 			item.Semester = existing.Semester
 		}
 		s.scheduleClasses[index] = cloneScheduleClass(item)
-		if item.Status == "已确认" {
+		if item.AuditStatus == learning.AuditApproved && item.Status == "已确认" {
 			s.notifyScheduleClass(item, "课程调整提醒", "已调整")
 		}
 		s.prependLogDetail(operator, "调整排课", item.Name+" / "+item.TeacherName, auditChangeDetail(scheduleClassAuditSnapshot(existing), scheduleClassAuditSnapshot(item)))
@@ -631,7 +631,7 @@ func (s *MemoryStore) cancelScheduleClassUnlocked(operator string, principal lea
 		before := item
 		item.Status = "已取消"
 		s.scheduleClasses[index] = cloneScheduleClass(item)
-		if before.Status == "已确认" {
+		if before.AuditStatus == learning.AuditApproved && before.Status == "已确认" {
 			s.notifyScheduleClass(item, "课程取消提醒", "已取消")
 		}
 		s.prependLogDetail(operator, "取消排课", item.Name+" / "+item.TeacherName, auditChangeDetail(scheduleClassAuditSnapshot(before), scheduleClassAuditSnapshot(item)))
@@ -730,7 +730,7 @@ func (s *MemoryStore) updateScheduleSeriesUnlocked(operator string, principal le
 		item.ID = target.ID
 		item.CreatedAt = target.CreatedAt
 		item.SeriesID = target.SeriesID
-		carryScheduleAuditFields(target, &item)
+		carryScheduleAuditFieldsAfterEdit(principal, target, &item)
 		if target.LessonDate == item.LessonDate && target.CourseID == item.CourseID {
 			item.AcademicYear = target.AcademicYear
 			item.Semester = target.Semester
@@ -754,7 +754,7 @@ func (s *MemoryStore) updateScheduleSeriesUnlocked(operator string, principal le
 	if result.ID == "" {
 		result = rebuilt[targets[0].ID]
 	}
-	if result.Status == "已确认" {
+	if result.AuditStatus == learning.AuditApproved && result.Status == "已确认" {
 		s.notifyScheduleClass(result, "课程调整提醒", "已调整")
 	}
 	s.prependLogDetail(operator, scheduleScopeLogAction(scope), scheduleBatchLogTarget(result, len(targets)), auditChangeDetail(scheduleClassAuditSnapshot(anchor), scheduleClassAuditSnapshot(result)))
@@ -781,7 +781,7 @@ func scheduleEditPermission(principal learning.Principal, item learning.Schedule
 		if item.TeacherID != principal.UserID {
 			return errors.New("只能调整自己的课程")
 		}
-		if item.AuditStatus != learning.AuditPending {
+		if item.AuditStatus != learning.AuditPending && item.AuditStatus != learning.AuditRejected {
 			return errors.New("该课程已通过审核，请联系教务调整")
 		}
 		return nil
@@ -866,19 +866,25 @@ func (s *MemoryStore) pendingScheduleClassesUnlocked(principal learning.Principa
 	return out
 }
 
-// carryScheduleAuditFields 把审核轨迹从旧课次搬到重建出来的课次上。
+// carryScheduleAuditFieldsAfterEdit 把审核轨迹从旧课次搬到重建出来的课次上。
 //
 // buildScheduleClass 是从请求重新构造一节课的，不带审核信息。少了这一步，
 // 管理员改一节已通过的课会让它退回空审核状态，
 // 然后被 scheduleVisibleToStudent 判为不可见——课在学生端直接消失。
 //
-// 审核状态不因为改动而重置：管理员改自己已通过的课仍然有效；
-// 老师改自己待审核的课仍然待审核，改完还得走审核。
-func carryScheduleAuditFields(existing learning.ScheduleClass, item *learning.ScheduleClass) {
+// 管理员改课时保留原审核状态；老师改待审核课程时仍然待审核；
+// 老师修改被驳回课程则视为重新提交，清掉旧结论并回到待审核。
+func carryScheduleAuditFieldsAfterEdit(principal learning.Principal, existing learning.ScheduleClass, item *learning.ScheduleClass) {
 	item.AuditStatus = existing.AuditStatus
 	item.AuditReason = existing.AuditReason
 	item.AuditedBy = existing.AuditedBy
 	item.AuditedAt = existing.AuditedAt
 	item.CreatedBy = existing.CreatedBy
 	item.CreatedByRole = existing.CreatedByRole
+	if hasRole(principal.Roles, learning.RoleTeacher) && existing.AuditStatus == learning.AuditRejected {
+		item.AuditStatus = learning.AuditPending
+		item.AuditReason = ""
+		item.AuditedBy = ""
+		item.AuditedAt = ""
+	}
 }

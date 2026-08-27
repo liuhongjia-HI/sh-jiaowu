@@ -1105,6 +1105,71 @@ func TestTeacherEditsOwnPendingLessonOnly(t *testing.T) {
 	}
 }
 
+// 驳回不是终态：教师修改自己被驳回的课程后，应清掉旧审核结论并重新进入待审核。
+func TestTeacherEditsRejectedLessonAndResubmitsForReview(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+	rejected, err := store.ReviewScheduleClass("运营教务", ops, created.ID, false, "时间需要调整")
+	if err != nil {
+		t.Fatalf("expected rejection: %v", err)
+	}
+
+	req := lessonUpdateRequest(rejected)
+	req.StartDate = "2026-06-10"
+	resubmitted, err := store.UpdateScheduleClass("英语老师", teacher, rejected.ID, req)
+	if err != nil {
+		t.Fatalf("教师应能修改被驳回的课并重新提交: %v", err)
+	}
+	if resubmitted.AuditStatus != learning.AuditPending {
+		t.Fatalf("修改后应重新进入待审核，实际 %q", resubmitted.AuditStatus)
+	}
+	if resubmitted.AuditReason != "" || resubmitted.AuditedBy != "" || resubmitted.AuditedAt != "" {
+		t.Fatalf("重新提交后应清空旧审核轨迹，实际 %#v", resubmitted)
+	}
+	pending := store.PendingScheduleClasses(ops)
+	if len(pending) != 1 || pending[0].ID != rejected.ID {
+		t.Fatalf("重新提交的课程应回到待审核队列，实际 %#v", pending)
+	}
+	for _, notice := range store.notices {
+		if notice.RelatedType == "schedule" && notice.RelatedID == rejected.ID {
+			t.Fatalf("重新提交的待审核课程不应通知学生，实际发了 %q", notice.Title)
+		}
+	}
+}
+
+// 学生端不可见不仅包括课表接口，也包括消息通知；待审核课程的修改、取消都不能提前触达学生。
+func TestPendingLessonChangesDoNotNotifyStudent(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	created, err := store.CreateScheduleClass("英语老师", teacher, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("expected teacher schedule: %v", err)
+	}
+
+	req := lessonUpdateRequest(created)
+	req.StartDate = "2026-06-10"
+	updated, err := store.UpdateScheduleClass("英语老师", teacher, created.ID, req)
+	if err != nil {
+		t.Fatalf("expected pending update: %v", err)
+	}
+	if _, err := store.CancelScheduleClass("英语老师", teacher, updated.ID); err != nil {
+		t.Fatalf("expected pending cancellation: %v", err)
+	}
+	for _, notice := range store.notices {
+		if notice.RelatedType == "schedule" && notice.RelatedID == created.ID {
+			t.Fatalf("待审核课程的修改或取消不应通知学生，实际发了 %q", notice.Title)
+		}
+	}
+}
+
 // 同一节课不能审两次。
 func TestReviewIsIdempotentGuarded(t *testing.T) {
 	store := NewMemoryStore()
