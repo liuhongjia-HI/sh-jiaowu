@@ -15,6 +15,8 @@ func TestWatermarkEndPageScriptStampsTraceAndEscapesText(t *testing.T) {
 		"/EndPage",
 		"exch pop 2 eq",
 		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
+		"clippath pathbbox",
+		"stringwidth",
 		"rotate",
 		"show",
 	} {

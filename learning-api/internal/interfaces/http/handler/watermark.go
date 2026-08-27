@@ -107,13 +107,23 @@ func watermarkEndPageScript(watermarkText string) string {
 	escaped := escapePostScriptString(watermarkText)
 	return `/StarlineWatermark {
   gsave
-  0.86 setgray
-  /Helvetica-Bold findfont 18 scalefont setfont
+  0.72 setgray
+  /Helvetica-Bold findfont 17 scalefont setfont
+  /WatermarkText (` + escaped + `) def
+  clippath pathbbox
+  /pageTop exch def
+  /pageRight exch def
+  /pageBottom exch def
+  /pageLeft exch def
+  pageLeft pageRight add 2 div
+  pageBottom pageTop add 2 div
+  translate
   42 rotate
-  -160 120 moveto (` + escaped + `) show
-  -120 330 moveto (` + escaped + `) show
-  -80 540 moveto (` + escaped + `) show
-  20 750 moveto (` + escaped + `) show
+  /watermarkWidth WatermarkText stringwidth pop def
+  watermarkWidth -2 div -210 moveto WatermarkText show
+  watermarkWidth -2 div -70 moveto WatermarkText show
+  watermarkWidth -2 div 70 moveto WatermarkText show
+  watermarkWidth -2 div 210 moveto WatermarkText show
   grestore
 } bind def
 << /EndPage { exch pop 2 eq { StarlineWatermark } if true } >> setpagedevice`
