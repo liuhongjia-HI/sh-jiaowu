@@ -1170,6 +1170,36 @@ func TestPendingLessonChangesDoNotNotifyStudent(t *testing.T) {
 	}
 }
 
+// 系列调整不能只检查锚点课次；否则教师可选中待审核课次，借“整个系列”修改已通过课次。
+func TestTeacherCannotUpdateApprovedLessonThroughSeriesScope(t *testing.T) {
+	store := NewMemoryStore()
+	teacher := teacherPrincipal(t, store)
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	req := teacherLessonRequest()
+	req.StartDate = seriesDate(0)
+	req.IgnoreWarnings = true
+	req.Repeat = &learning.ScheduleRepeat{Freq: "weekly", Interval: 1, Count: 4}
+	first, err := store.CreateScheduleClass("英语老师", teacher, req)
+	if err != nil {
+		t.Fatalf("expected teacher series: %v", err)
+	}
+	lessons := seriesLessons(store, first.SeriesID)
+	if _, err := store.ReviewScheduleClass("运营教务", ops, lessons[0].ID, true, ""); err != nil {
+		t.Fatalf("expected first lesson approval: %v", err)
+	}
+
+	update := lessonUpdateRequest(lessons[1])
+	update.StartDate = seriesDatePlusDays(1, 1)
+	update.IgnoreWarnings = true
+	update.EditScope = learning.EditScopeAll
+	if _, err := store.UpdateScheduleClass("英语老师", teacher, lessons[1].ID, update); err == nil || !strings.Contains(err.Error(), "无权调整") {
+		t.Fatalf("系列含已通过课次时教师批量调整应被拒绝，实际 err=%v", err)
+	}
+}
+
 // 同一节课不能审两次。
 func TestReviewIsIdempotentGuarded(t *testing.T) {
 	store := NewMemoryStore()

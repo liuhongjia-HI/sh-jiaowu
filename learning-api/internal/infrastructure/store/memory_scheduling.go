@@ -414,7 +414,7 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 	}
 	// teacherId 是外部请求字段，不能依赖前端只展示当前教师来保证权限。
 	// 教师只能给自己排课；管理员仍可为任意可管理教师排课。
-	if hasRole(principal.Roles, learning.RoleTeacher) && req.TeacherID != principal.UserID {
+	if !scheduleCanApprove(principal) && hasRole(principal.Roles, learning.RoleTeacher) && req.TeacherID != principal.UserID {
 		return learning.ScheduleClass{}, errors.New("教师只能给自己排课")
 	}
 	course, err := s.courseForScheduling(principal, req.CourseID)
@@ -697,6 +697,11 @@ func (s *MemoryStore) updateScheduleSeriesUnlocked(operator string, principal le
 		if item.LessonDate < boundary {
 			continue
 		}
+		// 批量调整必须逐节校验权限，不能只信任作为入口的锚点课次。
+		// 同一系列可能部分已通过、部分仍待审核，教师不能借后者修改前者。
+		if err := scheduleEditPermission(principal, item); err != nil {
+			return learning.ScheduleClass{}, errors.New("系列中包含无权调整的课程：" + err.Error())
+		}
 		targets = append(targets, item)
 		targetIDs[item.ID] = true
 	}
@@ -881,7 +886,7 @@ func carryScheduleAuditFieldsAfterEdit(principal learning.Principal, existing le
 	item.AuditedAt = existing.AuditedAt
 	item.CreatedBy = existing.CreatedBy
 	item.CreatedByRole = existing.CreatedByRole
-	if hasRole(principal.Roles, learning.RoleTeacher) && existing.AuditStatus == learning.AuditRejected {
+	if !scheduleCanApprove(principal) && hasRole(principal.Roles, learning.RoleTeacher) && existing.AuditStatus == learning.AuditRejected {
 		item.AuditStatus = learning.AuditPending
 		item.AuditReason = ""
 		item.AuditedBy = ""
