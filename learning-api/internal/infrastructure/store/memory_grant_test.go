@@ -104,6 +104,31 @@ func TestCreateDirectGrantOpensOnlySelectedLearningContent(t *testing.T) {
 	}
 }
 
+func TestDirectGrantIsNotShownAsAnotherStudentsRecommendation(t *testing.T) {
+	store := NewMemoryStore()
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        "stu-001",
+		LearningSpaceIDs: []string{"space-g05-chinese-s1-q1"},
+		ContentTypeCodes: []string{"course"},
+	}); err != nil {
+		t.Fatalf("expected direct grant to succeed: %v", err)
+	}
+
+	student, err := store.PrincipalByUserID("user-student-003")
+	if err != nil {
+		t.Fatalf("expected second student principal: %v", err)
+	}
+	recommendations, err := store.StudentRecommendations(student)
+	if err != nil {
+		t.Fatalf("expected recommendations: %v", err)
+	}
+	for _, item := range recommendations {
+		if strings.HasPrefix(item.PackageID, "direct-") {
+			t.Fatalf("direct grant must not be exposed as a recommendation: %#v", item)
+		}
+	}
+}
+
 // 学习空间是跨学年复用的课程目录，不参与学年匹配：套餐的学年可以和它绑定的
 // 学习空间上标注的学年不一致，这是有意为之，不是缺陷。学年只属于套餐本身
 // （见 memory.go 里 packageFromRequest 和 learningSpaceMatches 的注释）。

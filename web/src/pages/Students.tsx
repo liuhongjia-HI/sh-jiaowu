@@ -799,7 +799,7 @@ function DirectGrantPanel({
       <div>
         <Typography.Text strong>学习内容</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          只开放勾选类型；未勾选的内容不会对学生可见。
+          本次勾选的类型会立即开通；已经开通的内容不会因取消勾选而关闭。
         </Typography.Paragraph>
         <Checkbox.Group
           aria-label="学习内容"

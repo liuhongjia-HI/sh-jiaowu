@@ -88,6 +88,9 @@ func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principa
 
 	out := make([]learning.StudentPackageRecommendation, 0)
 	for _, pkg := range s.packages {
+		if isDirectGrantPackage(pkg.ID) {
+			continue
+		}
 		if strings.TrimSpace(pkg.Level) == "" {
 			pkg.Level = "S"
 		}
