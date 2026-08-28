@@ -67,7 +67,7 @@ func rasterizeWatermarkedPDFPage(ctx context.Context, sourcePath, targetPath str
 		"-sDEVICE=jpeg", "-r100", "-dJPEGQ=82",
 		"-dFirstPage="+pageArg, "-dLastPage="+pageArg,
 		"-sOutputFile="+targetPath,
-		"-c", watermarkEndPageScript(watermarkText),
+		"-c", watermarkPageScript(watermarkText),
 		"-f", sourcePath,
 	)
 	if err := cmd.Run(); err != nil {
@@ -89,7 +89,7 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 	cmd := execCommandContext(ctx, "gs",
 		"-q", "-dBATCH", "-dNOPAUSE", "-dSAFER",
 		"-sDEVICE=pdfwrite", "-sOutputFile="+targetPath,
-		"-c", watermarkEndPageScript(watermarkText),
+		"-c", watermarkPageScript(watermarkText),
 		"-f", sourcePath,
 	)
 	if err := cmd.Run(); err != nil {
@@ -101,12 +101,14 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 	return nil
 }
 
-// watermarkEndPageScript 利用 Ghostscript 的 EndPage 钩子，在设备落盘前重复绘制可追溯文字。
+// watermarkPageScript 在每页 showpage 前绘制可追溯文字。
+// 不能使用 EndPage：PDF 解释器会为每页执行 setpagedevice，导致 EndPage 被重置并额外输出空白页。
 // 学生交付水印只使用 ASCII 追溯信息，避免服务器缺少中文字体时出现空白或乱码。
-func watermarkEndPageScript(watermarkText string) string {
+func watermarkPageScript(watermarkText string) string {
 	escaped := escapePostScriptString(watermarkText)
 	return `/StarlineWatermark {
   gsave
+  initgraphics
   0.72 setgray
   /Helvetica-Bold findfont 17 scalefont setfont
   /WatermarkText (` + escaped + `) def
@@ -126,7 +128,8 @@ func watermarkEndPageScript(watermarkText string) string {
   watermarkWidth -2 div 210 moveto WatermarkText show
   grestore
 } bind def
-<< /EndPage { exch pop 2 eq { StarlineWatermark } if true } >> setpagedevice`
+/OriginalShowpage /showpage load def
+/showpage { StarlineWatermark OriginalShowpage } bind def`
 }
 
 // countPDFPages 用 Ghostscript 内置的 runpdfbegin/pdfpagecount 探测页数，

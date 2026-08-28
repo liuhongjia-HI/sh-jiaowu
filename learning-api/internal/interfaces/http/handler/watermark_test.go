@@ -8,13 +8,14 @@ import (
 	"testing"
 )
 
-func TestWatermarkEndPageScriptStampsTraceAndEscapesText(t *testing.T) {
-	script := watermarkEndPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
+func TestWatermarkPageScriptStampsBeforeEveryPageOutput(t *testing.T) {
+	script := watermarkPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
 
 	for _, expected := range []string{
-		"/EndPage",
-		"exch pop 2 eq",
 		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
+		"/OriginalShowpage /showpage load def",
+		"/showpage { StarlineWatermark OriginalShowpage } bind def",
+		"initgraphics",
 		"clippath pathbbox",
 		"stringwidth",
 		"rotate",
@@ -23,6 +24,9 @@ func TestWatermarkEndPageScriptStampsTraceAndEscapesText(t *testing.T) {
 		if !strings.Contains(script, expected) {
 			t.Fatalf("watermark script should contain %q, got %s", expected, script)
 		}
+	}
+	if strings.Contains(script, "/EndPage") {
+		t.Fatalf("watermark script must not use EndPage because PDF page setup resets it: %s", script)
 	}
 }
 
