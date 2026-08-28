@@ -1,14 +1,14 @@
 <view class="hero">
   <view class="eyebrow">资料预览</view>
   <view class="hero-title">{{pageTitle}}</view>
-  <view class="badge">{{material.downloadUrl ? '开放期内可下载' : '资料仅在线查看'}}</view>
+  <view class="badge">{{material.downloadUrl ? '当前可以下载保存' : '资料仅在线查看'}}</view>
 </view>
 <view class="section">
   <view class="card">
-    <view class="bubble">小提示：先看课程讲义里的例子，再去做小挑战会更轻松。</view>
+    <view class="bubble">学习小提示：先看资料里的例子，再做小挑战会更轻松。</view>
     <view class="row preview-meta">
-      <view class="sub">学习记录已保存</view>
-      <view class="sub">带专属水印</view>
+      <view class="sub">学习进度已自动保存</view>
+      <view class="sub">已添加专属水印</view>
     </view>
     <view class="security-notice">{{securityNotice}}</view>
 
@@ -16,7 +16,7 @@
       <view class="recording-guard-icon">⚠️</view>
       <view>
         <view class="recording-guard-text">检测到系统录屏</view>
-        <view class="recording-guard-sub">课件已带专属水印，请勿录制或外传。</view>
+        <view class="recording-guard-sub">资料已添加专属水印，请停止录屏。</view>
       </view>
     </view>
 
@@ -63,7 +63,7 @@
     <view class="button-row">
       <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
       <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
-      <button wx:if="{{previewMode === 'pdf'}}" class="button light" bindtap="openSecurePreview">安全预览</button>
+      <button wx:if="{{previewMode === 'pdf'}}" class="button light" bindtap="openSecurePreview">查看课件</button>
       <button class="button" bindtap="goAnswer">去做小挑战</button>
     </view>
   </view>

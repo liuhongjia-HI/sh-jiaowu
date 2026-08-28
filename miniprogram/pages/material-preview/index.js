@@ -9,7 +9,7 @@ Page({
     readText: "",
     watermarkText: "专属水印加载中",
     watermarkTexts: ["专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中"],
-    securityNotice: "学习内容仅限本人查看，请勿外传。",
+    securityNotice: "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。",
     favorited: false,
     favoriteId: "",
     // previewMode: unknown 加载中 / image 上传后预生成分页图片 / pdf 整份安全预览
@@ -45,7 +45,7 @@ Page({
         readText: `${material.viewCount || 0} 人学过`,
         watermarkText,
         watermarkTexts: buildWatermarks(watermarkText),
-        securityNotice: material.securityNotice || "学习内容仅限本人查看，请勿外传。"
+        securityNotice: material.securityNotice || "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。"
       });
       this.loadPagedPreview(id);
     }).catch(() => {
@@ -212,10 +212,10 @@ Page({
   openSecurePreview() {
     const previewUrl = this.data.material.previewUrl;
     if (!previewUrl) {
-      wx.showToast({ title: "资料正在生成安全预览，请稍后再试", icon: "none" });
+      wx.showToast({ title: "完整课件还在准备，请稍后再试", icon: "none" });
       return;
     }
-    wx.showLoading({ title: "打开资料中" });
+    wx.showLoading({ title: "正在打开课件" });
     downloadWithAuth(stripApiPrefix(previewUrl))
       .then((tempFilePath) => {
         wx.openDocument({

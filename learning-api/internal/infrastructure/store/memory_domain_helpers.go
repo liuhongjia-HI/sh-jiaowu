@@ -1239,7 +1239,7 @@ func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, ma
 }
 
 func studentSecurityNotice() string {
-	return "内容仅限本人学习使用，页面已添加专属水印，请勿截屏、录屏或外传。"
+	return "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。"
 }
 
 func phoneTail(phone string) string {
