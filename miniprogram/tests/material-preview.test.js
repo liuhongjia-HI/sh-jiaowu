@@ -278,3 +278,63 @@ test("recording change shows a warning without hiding the page content", async (
   recordingHandler({ state: "end" });
   assert.equal(page.data.recordingWarning, false);
 });
+
+test("small challenge prioritizes a task from the material's chapter", async () => {
+  const navigatedUrls = [];
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/tasks") {
+      return Promise.resolve([
+        { id: "homework-other", courseId: "course-1", chapter: "第二章" },
+        { id: "homework-matched", courseId: "course-1", chapter: "第一章" }
+      ]);
+    }
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock({
+    navigateTo({ url }) { navigatedUrls.push(url); }
+  }));
+  page.setData({ material: { courseId: "course-1", chapter: "第一章" } });
+
+  page.goAnswer();
+  await flushPromises();
+
+  assert.deepEqual(navigatedUrls, ["/pages/answer/index?id=homework-matched"]);
+});
+
+test("small challenge falls back to the same course when chapters are not configured", async () => {
+  const navigatedUrls = [];
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/tasks") {
+      return Promise.resolve([{ id: "homework-course", courseId: "course-1" }]);
+    }
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock({
+    navigateTo({ url }) { navigatedUrls.push(url); }
+  }));
+  page.setData({ material: { courseId: "course-1", chapter: "第一章" } });
+
+  page.goAnswer();
+  await flushPromises();
+
+  assert.deepEqual(navigatedUrls, ["/pages/answer/index?id=homework-course"]);
+});
+
+test("small challenge opens the task list when the chapter has no matching task", async () => {
+  const navigatedUrls = [];
+  const toastTitles = [];
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/tasks") {
+      return Promise.resolve([{ id: "homework-other", courseId: "course-1", chapter: "第二章" }]);
+    }
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock({
+    navigateTo({ url }) { navigatedUrls.push(url); },
+    showToast({ title }) { toastTitles.push(title); }
+  }));
+  page.setData({ material: { courseId: "course-1", chapter: "第一章" } });
+
+  page.goAnswer();
+  await flushPromises();
+
+  assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
+  assert.deepEqual(toastTitles, ["本章节暂无小挑战"]);
+});

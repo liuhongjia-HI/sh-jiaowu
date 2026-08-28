@@ -29,6 +29,7 @@ type Material struct {
 	Semester         string `json:"semester,omitempty"`
 	Subject          string `json:"subject,omitempty"`
 	Chapter          string `json:"chapter"`
+	TagCode          string `json:"tagCode,omitempty"`
 	Type             string `json:"type"`
 	ViewCount        int    `json:"viewCount"`
 	OwnerTeacherID   string `json:"ownerTeacherId,omitempty"`
@@ -55,6 +56,7 @@ type MaterialQuery struct {
 	UploaderID   string `form:"uploaderId"`
 	UploadedFrom string `form:"uploadedFrom"`
 	UploadedTo   string `form:"uploadedTo"`
+	TagCode      string `form:"tagCode"`
 }
 
 type MaterialUpdateRequest struct {
@@ -62,6 +64,7 @@ type MaterialUpdateRequest struct {
 	CourseID        string `json:"courseId"`
 	LearningSpaceID string `json:"learningSpaceId"`
 	Chapter         string `json:"chapter"`
+	TagCode         string `json:"tagCode"`
 	Status          Status `json:"status"`
 }
 
@@ -73,6 +76,8 @@ type MaterialReorderRequest struct {
 type Homework struct {
 	ID               string     `json:"id"`
 	Title            string     `json:"title"`
+	Chapter          string     `json:"chapter,omitempty"`
+	TagCode          string     `json:"tagCode,omitempty"`
 	PackageName      string     `json:"packageName"`
 	CourseID         string     `json:"courseId,omitempty"`
 	Course           string     `json:"course"`
@@ -102,6 +107,7 @@ type Homework struct {
 	DownloadURL      string     `json:"downloadUrl,omitempty"`
 	WatermarkText    string     `json:"watermarkText,omitempty"`
 	SecurityNotice   string     `json:"securityNotice,omitempty"`
+	SortOrder        int        `json:"sortOrder"`
 	Status           string     `json:"status"`
 }
 
@@ -109,6 +115,8 @@ type HomeworkUpdateRequest struct {
 	Title           string   `json:"title"`
 	CourseID        string   `json:"courseId"`
 	LearningSpaceID string   `json:"learningSpaceId"`
+	Chapter         string   `json:"chapter"`
+	TagCode         string   `json:"tagCode"`
 	Deadline        string   `json:"deadline"`
 	DeadlineAt      string   `json:"deadlineAt"`
 	AssessmentType  string   `json:"assessmentType"`
@@ -183,6 +191,7 @@ type Station struct {
 	Title      string `json:"title"`
 	Desc       string `json:"desc"`
 	Status     string `json:"status"`
+	TagCode    string `json:"tagCode,omitempty"`
 	MaterialID string `json:"materialId,omitempty"`
 	HomeworkID string `json:"homeworkId,omitempty"`
 }
@@ -282,6 +291,7 @@ type MaterialUploadRequest struct {
 	LearningSpaceID string
 	CourseID        string
 	Chapter         string
+	TagCode         string
 	File            FileAsset
 }
 
@@ -289,6 +299,8 @@ type HomeworkUploadRequest struct {
 	Title           string    `json:"title"`
 	LearningSpaceID string    `json:"learningSpaceId"`
 	CourseID        string    `json:"courseId"`
+	Chapter         string    `json:"chapter"`
+	TagCode         string    `json:"tagCode"`
 	Deadline        string    `json:"deadline"`
 	DeadlineAt      string    `json:"deadlineAt"`
 	AssessmentType  string    `json:"assessmentType"`

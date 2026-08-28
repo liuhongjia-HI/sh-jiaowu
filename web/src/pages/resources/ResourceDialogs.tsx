@@ -36,6 +36,14 @@ const CONTENT_TYPE_NAME: Record<string, string> = {
   handout: '课程讲义'
 };
 
+const contentTagOptions = [
+  { label: 'HD · 课程讲义', value: 'HD' },
+  { label: 'Blank · 空白练习', value: 'Blank' },
+  { label: 'HW · 课后作业', value: 'HW' },
+  { label: 'Exam · 测试卷', value: 'Exam' },
+  { label: 'Special · 专题资料', value: 'Special' }
+];
+
 function packageContentLabel(codes?: string[]) {
   const order = ['course', 'question', 'handout'];
   return order.filter((code) => codes?.includes(code)).map((code) => CONTENT_TYPE_NAME[code]).join('+');
@@ -921,7 +929,7 @@ export function UploadDialog({
   questions: QuestionBankItem[];
   learningSpaces: LearningSpace[];
   onCancel: () => void;
-  onSubmit: (values: { title: string; courseId: string; chapter?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
+  onSubmit: (values: { title: string; courseId: string; chapter?: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
 }) {
   const [form] = Form.useForm();
   const courseId = Form.useWatch('courseId', form);
@@ -953,12 +961,18 @@ export function UploadDialog({
             }}
           />
         </Form.Item>
+        <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
+          <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
+        </Form.Item>
         {kind === 'materials' ? (
           <Form.Item name="chapter" label="章节">
             <Input placeholder="不填则归为未分章节" />
           </Form.Item>
         ) : (
           <>
+            <Form.Item name="chapter" label="章节">
+              <Input placeholder="不填则按同课程匹配小挑战" />
+            </Form.Item>
             <Alert
               type="info"
               showIcon
@@ -1060,12 +1074,18 @@ export function ContentEditDialog({
             }}
           />
         </Form.Item>
+        <Form.Item name="tagCode" label="主标签">
+          <Select allowClear placeholder="选择一个主标签" options={contentTagOptions} />
+        </Form.Item>
         {kind === 'materials' ? (
           <Form.Item name="chapter" label="章节">
             <Input placeholder="不填则归为未分章节" />
           </Form.Item>
         ) : (
           <>
+            <Form.Item name="chapter" label="章节">
+              <Input placeholder="不填则按同课程匹配小挑战" />
+            </Form.Item>
             <Form.Item name="assessmentType" label="类型">
               <Radio.Group options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} />
             </Form.Item>

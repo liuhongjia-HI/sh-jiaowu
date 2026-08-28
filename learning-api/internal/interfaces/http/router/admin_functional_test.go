@@ -164,9 +164,10 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		"title":           "接口测试练习",
 		"courseId":        course.ID,
 		"learningSpaceId": "space-g05-english-s1-q1",
+		"chapter":         "第一章",
 		"deadline":        "2026-07-31",
 	}, "file", "homework.pdf", []byte("%PDF-1.4 test homework"), http.StatusOK, &homework)
-	if homework.ID == "" || homework.FileID == "" {
+	if homework.ID == "" || homework.FileID == "" || homework.Chapter != "第一章" {
 		t.Fatalf("unexpected homework: %#v", homework)
 	}
 
@@ -175,10 +176,11 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		Title:           "接口测试练习-停用",
 		CourseID:        course.ID,
 		LearningSpaceID: "space-g05-english-s1-q1",
+		Chapter:         "第二章",
 		Deadline:        "2026-08-01",
 		Status:          string(learning.StatusDisabled),
 	}, http.StatusOK, &updatedHomework)
-	if updatedHomework.PublishStatus != "停用" || updatedHomework.Deadline != "2026-08-01" {
+	if updatedHomework.PublishStatus != "停用" || updatedHomework.Deadline != "2026-08-01" || updatedHomework.Chapter != "第二章" {
 		t.Fatalf("unexpected updated homework: %#v", updatedHomework)
 	}
 

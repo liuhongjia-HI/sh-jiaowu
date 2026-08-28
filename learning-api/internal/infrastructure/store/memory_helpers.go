@@ -263,6 +263,7 @@ func homeworkAuditSnapshot(item learning.Homework) map[string]any {
 		"title":           item.Title,
 		"courseId":        item.CourseID,
 		"learningSpaceId": item.LearningSpaceID,
+		"chapter":         item.Chapter,
 		"deadline":        item.Deadline,
 		"status":          item.Status,
 		"publishStatus":   item.PublishStatus,

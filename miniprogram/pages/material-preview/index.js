@@ -202,12 +202,32 @@ Page({
       .catch(() => {});
   },
   goAnswer() {
-    // 通过资料所属课程进入课程详情，选择对应的小挑战
-    if (this.data.material.courseId) {
-      wx.navigateTo({ url: `/pages/study-detail/index?id=${this.data.material.courseId}` });
+    const material = this.data.material || {};
+    const courseId = material.courseId || "";
+    if (!courseId) {
+      wx.navigateTo({ url: "/pages/tasks/index" });
       return;
     }
-    wx.navigateBack({ delta: 1, fail() {} });
+
+    request("/student/tasks").then((tasks) => {
+      const courseTasks = (tasks || []).filter((task) => task.courseId === courseId);
+      const chapter = normalizeChapter(material.chapter);
+      const chapterTasks = chapter
+        ? courseTasks.filter((task) => normalizeChapter(task.chapter) === chapter)
+        : [];
+      const hasConfiguredChapters = courseTasks.some((task) => normalizeChapter(task.chapter));
+      // 旧数据未配置章节时，保持同课程直达，避免学生被无意义地送回题库列表。
+      const selected = chapterTasks[0] || (!chapter || !hasConfiguredChapters ? courseTasks[0] : null);
+      if (selected) {
+        wx.navigateTo({ url: `/pages/answer/index?id=${selected.id}` });
+        return;
+      }
+      wx.showToast({ title: chapter ? "本章节暂无小挑战" : "当前课程暂无小挑战", icon: "none" });
+      wx.navigateTo({ url: "/pages/tasks/index" });
+    }).catch(() => {
+      wx.showToast({ title: "小挑战加载失败，请稍后重试", icon: "none" });
+      wx.navigateTo({ url: "/pages/tasks/index" });
+    });
   },
   openSecurePreview() {
     const previewUrl = this.data.material.previewUrl;
@@ -235,6 +255,10 @@ Page({
 
 function buildWatermarks(text) {
   return Array.from({ length: 8 }).map(() => text);
+}
+
+function normalizeChapter(value) {
+  return String(value || "").trim();
 }
 
 // downloadWithAuth 用 wx.downloadFile 带上登录态下载一份需要鉴权的文件（图片/PDF）。

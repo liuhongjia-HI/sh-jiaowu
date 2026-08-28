@@ -436,23 +436,46 @@ func (s *MemoryStore) latestSubmissionForStudent(studentID, homeworkID string) (
 }
 
 func (s *MemoryStore) buildStations(studentID string, materials []learning.Material, homework []learning.Homework) []learning.Station {
-	stations := make([]learning.Station, 0, len(materials)+len(homework))
-	for i, material := range materials {
-		status := "学习中"
-		desc := "正在学习，继续加油"
-		if i > 0 {
-			status = "待挑战"
-			desc = "完成上一站后继续阅读"
-		}
-		stations = append(stations, learning.Station{
-			Icon:       "📖",
-			Title:      "第 " + strconv.Itoa(len(stations)+1) + " 站 " + material.Title,
-			Desc:       desc,
-			Status:     status,
-			MaterialID: material.ID,
-		})
+	type stationSource struct {
+		material *learning.Material
+		homework *learning.Homework
+		order    int
 	}
-	for _, item := range homework {
+	sources := make([]stationSource, 0, len(materials)+len(homework))
+	for index := range materials {
+		sources = append(sources, stationSource{material: &materials[index], order: materials[index].SortOrder})
+	}
+	for index := range homework {
+		sources = append(sources, stationSource{homework: &homework[index], order: homework[index].SortOrder})
+	}
+	sort.SliceStable(sources, func(i, j int) bool {
+		left, right := sources[i].order, sources[j].order
+		if left == 0 || right == 0 {
+			return left != 0 && right == 0
+		}
+		return left < right
+	})
+	stations := make([]learning.Station, 0, len(sources))
+	for _, source := range sources {
+		if source.material != nil {
+			material := *source.material
+			status := "学习中"
+			desc := "正在学习，继续加油"
+			if len(stations) > 0 {
+				status = "待挑战"
+				desc = "完成上一站后继续阅读"
+			}
+			stations = append(stations, learning.Station{
+				Icon:       "📖",
+				Title:      "第 " + strconv.Itoa(len(stations)+1) + " 站 " + material.Title,
+				Desc:       desc,
+				Status:     status,
+				TagCode:    material.TagCode,
+				MaterialID: material.ID,
+			})
+			continue
+		}
+		item := *source.homework
 		status := "待挑战"
 		desc := "完成小挑战即可解锁奖励"
 		if s.hasSubmission(studentID, item.ID) {
@@ -464,6 +487,7 @@ func (s *MemoryStore) buildStations(studentID string, materials []learning.Mater
 			Title:      "第 " + strconv.Itoa(len(stations)+1) + " 站 " + item.Title,
 			Desc:       desc,
 			Status:     status,
+			TagCode:    item.TagCode,
 			HomeworkID: item.ID,
 		})
 	}

@@ -174,9 +174,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, item := range s.homework {
 		if _, err := tx.Exec(
-			`INSERT INTO homework_tasks (id, learning_space_id, course_id, title, grade, semester, subject, question_ids_json, deadline, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			item.ID, item.LearningSpaceID, item.CourseID, item.Title, item.Grade, item.Semester, item.Subject, mustJSON(item.QuestionIDs), nullableDate(item.Deadline), item.OwnerTeacherID, item.OwnerTeacherName,
+			`INSERT INTO homework_tasks (id, learning_space_id, course_id, title, chapter_name, grade, semester, subject, question_ids_json, deadline, owner_teacher_id, owner_teacher_name, publish_status, status, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.LearningSpaceID, item.CourseID, item.Title, item.Chapter, item.Grade, item.Semester, item.Subject, mustJSON(item.QuestionIDs), nullableDate(item.Deadline), item.OwnerTeacherID, item.OwnerTeacherName,
 			item.PublishStatus, item.Status, item.PackageName, item.QuestionNum, item.SubmittedNum, item.TotalNum, item.FileID, item.FileName,
 			item.FileSize, item.FileType, item.PreviewStatus, item.PreviewURL, item.DownloadURL,
 		); err != nil {

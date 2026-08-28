@@ -44,6 +44,7 @@ func (h *LearningHandler) CreateMaterial(c *gin.Context) {
 		LearningSpaceID: strings.TrimSpace(c.PostForm("learningSpaceId")),
 		CourseID:        strings.TrimSpace(c.PostForm("courseId")),
 		Chapter:         strings.TrimSpace(c.PostForm("chapter")),
+		TagCode:         strings.TrimSpace(c.PostForm("tagCode")),
 		File:            asset,
 	})
 	if err != nil {
@@ -121,6 +122,8 @@ func (h *LearningHandler) CreateHomework(c *gin.Context) {
 		Title:           strings.TrimSpace(c.PostForm("title")),
 		LearningSpaceID: strings.TrimSpace(c.PostForm("learningSpaceId")),
 		CourseID:        strings.TrimSpace(c.PostForm("courseId")),
+		Chapter:         strings.TrimSpace(c.PostForm("chapter")),
+		TagCode:         strings.TrimSpace(c.PostForm("tagCode")),
 		Deadline:        strings.TrimSpace(c.PostForm("deadline")),
 		File:            asset,
 	})

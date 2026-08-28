@@ -75,6 +75,7 @@ func (s *MemoryStore) materialsUnlocked(principal learning.Principal) []learning
 
 func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, query learning.MaterialQuery) []learning.Material {
 	keyword := strings.ToLower(strings.TrimSpace(query.Keyword))
+	query.TagCode = strings.TrimSpace(query.TagCode)
 	rows := s.materialsUnlocked(principal)
 	out := make([]learning.Material, 0, len(rows))
 	for _, item := range rows {
@@ -93,9 +94,25 @@ func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, qu
 		if query.UploadedTo = strings.TrimSpace(query.UploadedTo); query.UploadedTo != "" && item.CreatedAt > query.UploadedTo+" 23:59:59" {
 			continue
 		}
+		if query.TagCode != "" && item.TagCode != query.TagCode {
+			continue
+		}
 		out = append(out, item)
 	}
 	return out
+}
+
+var contentTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "Exam": true, "Special": true}
+
+func normalizeContentTagCode(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	if !contentTagCodes[value] {
+		return "", errors.New("请选择正确的内容标签")
+	}
+	return value, nil
 }
 
 func normalizeAssessmentType(value string) string {
@@ -135,6 +152,11 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.Chapter = strings.TrimSpace(req.Chapter)
+	tagCode, err := normalizeContentTagCode(req.TagCode)
+	if err != nil {
+		return learning.Material{}, err
+	}
+	req.Chapter = strings.TrimSpace(req.Chapter)
 	if req.Title == "" {
 		return learning.Material{}, errors.New("请输入学习资料标题")
 	}
@@ -160,6 +182,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 		Course:           course.Name,
 		LearningSpaceID:  course.LearningSpaceID,
 		Chapter:          req.Chapter,
+		TagCode:          tagCode,
 		Type:             "课程讲义",
 		OwnerTeacherID:   principal.UserID,
 		OwnerTeacherName: principal.Name,
@@ -242,6 +265,16 @@ func (s *MemoryStore) nextMaterialSortOrder(courseID string) int {
 	return maxOrder + 1
 }
 
+func (s *MemoryStore) nextHomeworkSortOrder(courseID string) int {
+	maxOrder := 0
+	for _, item := range s.homework {
+		if item.CourseID == courseID && item.SortOrder > maxOrder {
+			maxOrder = item.SortOrder
+		}
+	}
+	return maxOrder + 1
+}
+
 func orderMaterialsByCourse(rows []learning.Material) []learning.Material {
 	grouped := make(map[string][]learning.Material)
 	courseIDs := make([]string, 0)
@@ -277,6 +310,10 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.Chapter = strings.TrimSpace(req.Chapter)
+	tagCode, err := normalizeContentTagCode(req.TagCode)
+	if err != nil {
+		return learning.Material{}, err
+	}
 	if req.Title == "" {
 		return learning.Material{}, errors.New("请输入学习资料标题")
 	}
@@ -307,6 +344,7 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 		s.materials[index].Course = course.Name
 		s.materials[index].LearningSpaceID = course.LearningSpaceID
 		s.materials[index].Chapter = req.Chapter
+		s.materials[index].TagCode = tagCode
 		s.materials[index].Status = req.Status
 		s.materials[index].PublishStatus = publishStatus(req.Status)
 		s.prependLogDetail(operator, "编辑学习资料", req.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(s.materials[index])))
@@ -608,9 +646,14 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	req.Title = strings.TrimSpace(req.Title)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.CourseID = strings.TrimSpace(req.CourseID)
+	req.Chapter = strings.TrimSpace(req.Chapter)
 	req.Deadline = strings.TrimSpace(req.Deadline)
 	req.DeadlineAt = strings.TrimSpace(req.DeadlineAt)
 	req.AssessmentType = normalizeAssessmentType(req.AssessmentType)
+	tagCode, err := normalizeContentTagCode(req.TagCode)
+	if err != nil {
+		return learning.Homework{}, err
+	}
 	if req.Title == "" {
 		return learning.Homework{}, errors.New("请输入题目标题")
 	}
@@ -644,6 +687,8 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	item := learning.Homework{
 		ID:               "homework-" + time.Now().Format("20060102150405.000000000"),
 		Title:            req.Title,
+		Chapter:          req.Chapter,
+		TagCode:          tagCode,
 		PackageName:      course.Subject + "题",
 		CourseID:         course.ID,
 		Course:           course.Name,
@@ -668,6 +713,7 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 		PreviewStatus:    asset.PreviewStatus,
 		PreviewURL:       "/api/files/" + asset.ID + "/preview",
 		DownloadURL:      "/api/files/" + asset.ID + "/download",
+		SortOrder:        s.nextHomeworkSortOrder(course.ID),
 	}
 	s.homework = append([]learning.Homework{cloneHomework(item)}, s.homework...)
 	if status == learning.StatusEnabled {
@@ -686,10 +732,15 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 	id = strings.TrimSpace(id)
 	req.Title = strings.TrimSpace(req.Title)
 	req.CourseID = strings.TrimSpace(req.CourseID)
+	req.Chapter = strings.TrimSpace(req.Chapter)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.Deadline = strings.TrimSpace(req.Deadline)
 	req.DeadlineAt = strings.TrimSpace(req.DeadlineAt)
 	req.AssessmentType = normalizeAssessmentType(req.AssessmentType)
+	tagCode, err := normalizeContentTagCode(req.TagCode)
+	if err != nil {
+		return learning.Homework{}, err
+	}
 	status := learning.Status(strings.TrimSpace(req.Status))
 	if req.Title == "" {
 		return learning.Homework{}, errors.New("请输入题目标题")
@@ -721,6 +772,8 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 		}
 		before := s.homework[index]
 		s.homework[index].Title = req.Title
+		s.homework[index].Chapter = req.Chapter
+		s.homework[index].TagCode = tagCode
 		s.homework[index].PackageName = course.Subject + "题"
 		s.homework[index].CourseID = course.ID
 		s.homework[index].Course = course.Name

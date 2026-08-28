@@ -292,6 +292,7 @@ CREATE TABLE IF NOT EXISTS materials (
   course_id VARCHAR(64) NOT NULL,
   title VARCHAR(128) NOT NULL,
   chapter_name VARCHAR(128) NOT NULL,
+  tag_code VARCHAR(16) NOT NULL DEFAULT '',
   material_type VARCHAR(32) NOT NULL,
   owner_teacher_id VARCHAR(64) NOT NULL DEFAULT '',
   owner_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
@@ -306,6 +307,8 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
   learning_space_id VARCHAR(64) NOT NULL DEFAULT '',
   course_id VARCHAR(64) NOT NULL,
   title VARCHAR(128) NOT NULL,
+  chapter_name VARCHAR(128) NOT NULL DEFAULT '',
+  tag_code VARCHAR(16) NOT NULL DEFAULT '',
   grade VARCHAR(32) NOT NULL DEFAULT '',
   semester VARCHAR(32) NOT NULL DEFAULT '',
   subject VARCHAR(32) NOT NULL DEFAULT '',
@@ -317,6 +320,7 @@ CREATE TABLE IF NOT EXISTS homework_tasks (
   owner_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
   publish_status VARCHAR(32) NOT NULL DEFAULT '已发布',
   status VARCHAR(32) NOT NULL DEFAULT '草稿',
+  sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

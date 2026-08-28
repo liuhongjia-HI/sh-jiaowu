@@ -346,6 +346,7 @@ export type Material = {
   semester?: string;
   subject?: string;
   chapter: string;
+  tagCode?: string;
   type: string;
   viewCount: number;
   ownerTeacherId?: string;
@@ -371,6 +372,7 @@ export type MaterialUpdateRequest = {
   courseId: string;
   learningSpaceId?: string;
   chapter: string;
+  tagCode?: string;
   status: string;
 };
 
@@ -382,6 +384,7 @@ export type MaterialReorderRequest = {
 export type Homework = {
   id: string;
   title: string;
+  chapter?: string;
   packageName: string;
   courseId?: string;
   course: string;
@@ -389,6 +392,8 @@ export type Homework = {
   grade?: string;
   semester?: string;
   subject?: string;
+  chapter?: string;
+  tagCode?: string;
   questionNum: number;
   questionIds?: string[];
   questions?: Question[];
@@ -411,6 +416,7 @@ export type Homework = {
   downloadUrl?: string;
   watermarkText?: string;
   securityNotice?: string;
+  sortOrder?: number;
   status: string;
 };
 
@@ -435,6 +441,9 @@ export type HomeworkUpdateRequest = {
   title: string;
   courseId: string;
   learningSpaceId?: string;
+  chapter?: string;
+  tagCode?: string;
+  chapter: string;
   deadline: string;
   deadlineAt?: string;
   assessmentType?: 'practice' | 'mock_exam';
