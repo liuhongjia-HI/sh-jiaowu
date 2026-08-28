@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,7 +70,7 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 
 func (s *MemoryStore) materialsUnlocked(principal learning.Principal) []learning.Material {
 	courses := courseNames(s.coursesUnlocked(principal))
-	return s.materialsForCourses(courses)
+	return orderMaterialsByCourse(s.materialsForCourses(courses))
 }
 
 func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, query learning.MaterialQuery) []learning.Material {
@@ -170,12 +171,99 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 		FileType:         asset.FileType,
 		PreviewStatus:    asset.PreviewStatus,
 		CreatedAt:        time.Now().Format("2006-01-02 15:04:05"),
+		SortOrder:        s.nextMaterialSortOrder(course.ID),
 		PreviewURL:       "/api/files/" + asset.ID + "/preview",
 		DownloadURL:      "/api/files/" + asset.ID + "/download",
 	}
 	s.materials = append([]learning.Material{item}, s.materials...)
 	s.prependLog(operator, "上传学习资料", item.Title)
 	return s.decorateMaterial(item), nil
+}
+
+func (s *MemoryStore) reorderMaterialsUnlocked(operator string, principal learning.Principal, req learning.MaterialReorderRequest) error {
+	if s.db != nil {
+		return persistentMutationError(s, func(work *MemoryStore) error {
+			return work.reorderMaterialsUnlocked(operator, principal, req)
+		})
+	}
+	req.CourseID = strings.TrimSpace(req.CourseID)
+	if req.CourseID == "" || len(req.MaterialIDs) == 0 {
+		return errors.New("请选择需要排序的课程资料")
+	}
+	if !canUploadHandout(principal) {
+		return errors.New("当前账号没有维护学习资料权限，请联系管理员开通")
+	}
+	var course learning.Course
+	foundCourse := false
+	for _, item := range s.courses {
+		if item.ID == req.CourseID {
+			course = item
+			foundCourse = true
+			break
+		}
+	}
+	if !foundCourse || !canSeeCourse(principal, course) {
+		return errors.New("不能维护未负责的课程资料")
+	}
+	indices := make(map[string]int)
+	for index, item := range s.materials {
+		if item.CourseID == req.CourseID {
+			indices[item.ID] = index
+		}
+	}
+	if len(indices) != len(req.MaterialIDs) {
+		return errors.New("资料列表已变更，请刷新后重新排序")
+	}
+	seen := make(map[string]bool, len(req.MaterialIDs))
+	for _, id := range req.MaterialIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return errors.New("排序资料不正确，请刷新后重试")
+		}
+		if _, ok := indices[id]; !ok {
+			return errors.New("资料列表已变更，请刷新后重新排序")
+		}
+		seen[id] = true
+	}
+	for order, id := range req.MaterialIDs {
+		s.materials[indices[id]].SortOrder = order + 1
+	}
+	s.prependLog(operator, "调整学习资料顺序", course.Name)
+	return nil
+}
+
+func (s *MemoryStore) nextMaterialSortOrder(courseID string) int {
+	maxOrder := 0
+	for _, item := range s.materials {
+		if item.CourseID == courseID && item.SortOrder > maxOrder {
+			maxOrder = item.SortOrder
+		}
+	}
+	return maxOrder + 1
+}
+
+func orderMaterialsByCourse(rows []learning.Material) []learning.Material {
+	grouped := make(map[string][]learning.Material)
+	courseIDs := make([]string, 0)
+	for _, item := range rows {
+		if _, ok := grouped[item.CourseID]; !ok {
+			courseIDs = append(courseIDs, item.CourseID)
+		}
+		grouped[item.CourseID] = append(grouped[item.CourseID], item)
+	}
+	out := make([]learning.Material, 0, len(rows))
+	for _, courseID := range courseIDs {
+		items := grouped[courseID]
+		sort.SliceStable(items, func(i, j int) bool {
+			left, right := items[i].SortOrder, items[j].SortOrder
+			if left == 0 || right == 0 {
+				return left != 0 && right == 0
+			}
+			return left < right
+		})
+		out = append(out, items...)
+	}
+	return out
 }
 
 func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning.Principal, id string, req learning.MaterialUpdateRequest) (learning.Material, error) {

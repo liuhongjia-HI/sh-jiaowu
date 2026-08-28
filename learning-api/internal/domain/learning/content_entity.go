@@ -45,6 +45,7 @@ type Material struct {
 	WatermarkText    string `json:"watermarkText,omitempty"`
 	SecurityNotice   string `json:"securityNotice,omitempty"`
 	CreatedAt        string `json:"createdAt,omitempty"`
+	SortOrder        int    `json:"sortOrder"`
 	Status           Status `json:"status"`
 }
 
@@ -62,6 +63,11 @@ type MaterialUpdateRequest struct {
 	LearningSpaceID string `json:"learningSpaceId"`
 	Chapter         string `json:"chapter"`
 	Status          Status `json:"status"`
+}
+
+type MaterialReorderRequest struct {
+	CourseID    string   `json:"courseId"`
+	MaterialIDs []string `json:"materialIds"`
 }
 
 type Homework struct {

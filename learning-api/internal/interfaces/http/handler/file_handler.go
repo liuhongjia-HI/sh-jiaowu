@@ -69,6 +69,21 @@ func (h *LearningHandler) UpdateMaterial(c *gin.Context) {
 	OK(c, updated)
 }
 
+func (h *LearningHandler) ReorderMaterials(c *gin.Context) {
+	var req learning.MaterialReorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.ReorderMaterials(operator.(string), principal, req); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"reordered": true})
+}
+
 func (h *LearningHandler) DeleteMaterial(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)

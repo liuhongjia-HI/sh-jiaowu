@@ -95,6 +95,13 @@ func (s *MemoryStore) CreateGrant(operator string, req learning.GrantCreateReque
 	return result1, err
 }
 
+func (s *MemoryStore) CreateDirectGrant(operator string, req learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result, err := s.createDirectGrantUnlocked(operator, req)
+	return result, err
+}
+
 func (s *MemoryStore) StudentPermissions() []learning.StudentPermissionSummary {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -156,6 +163,12 @@ func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Princip
 	defer s.mu.Unlock()
 	result1, err := s.updateMaterialUnlocked(operator, principal, id, req)
 	return result1, err
+}
+
+func (s *MemoryStore) ReorderMaterials(operator string, principal learning.Principal, req learning.MaterialReorderRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.reorderMaterialsUnlocked(operator, principal, req)
 }
 
 func (s *MemoryStore) DeleteMaterial(operator string, principal learning.Principal, id string) error {
@@ -328,6 +341,12 @@ func (s *MemoryStore) StudentAccounts(principal learning.Principal) ([]learning.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.studentAccountsUnlocked(principal)
+}
+
+func (s *MemoryStore) RequestAdditionalStudent(principal learning.Principal, req learning.StudentAccountAddRequest) (learning.StudentAccount, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.requestAdditionalStudentUnlocked(principal, req)
 }
 
 func (s *MemoryStore) SwitchStudentAccount(principal learning.Principal, studentID string) (learning.Principal, error) {

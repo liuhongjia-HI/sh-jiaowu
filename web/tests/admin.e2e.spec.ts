@@ -128,6 +128,15 @@ test('教师账号不能进入运营和系统高权限功能', async ({ page }) 
   await expect(page.getByText('当前账号不能访问这个功能')).toBeVisible();
 });
 
+test('学生表格将操作列显示在学生列之后', async ({ page }) => {
+  await login(page, '13800000002');
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+  const studentTableHeaders = await page.locator('.student-table thead th').allTextContents();
+  expect(studentTableHeaders.slice(0, 3).map((header) => header.trim())).toEqual(['学生', '操作', '家长姓名']);
+});
+
 test('校区管理员可以在学生管理直接开通课程', async ({ page }) => {
   await login(page, '13800000002');
 
@@ -135,11 +144,16 @@ test('校区管理员可以在学生管理直接开通课程', async ({ page }) 
   await expect(page.getByRole('button', { name: '新增学生' })).toBeVisible();
   await expect(page.getByRole('button', { name: '批量导入' })).toBeVisible();
   await page.getByRole('button', { name: '开通课程' }).first().click();
-  const dialog = page.getByRole('dialog', { name: /开通课程/ });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel('课程方案')).toBeVisible();
-  await expect(dialog.getByLabel('开始日期')).toHaveCount(0);
-  await expect(dialog.getByLabel('结束日期')).toHaveCount(0);
+  const drawer = page.locator('.ant-drawer-content').last();
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('tab', { name: '开通学习内容' }).click();
+  await expect(drawer.getByText('按需开通学习内容')).toBeVisible();
+  await expect(drawer.getByText('课程范围')).toBeVisible();
+  await expect(drawer.getByText('学习内容')).toBeVisible();
+  await expect(drawer.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
+  await expect(drawer.getByRole('checkbox', { name: '习题', exact: true })).toBeVisible();
+  await expect(drawer.getByRole('checkbox', { name: '学习资料', exact: true })).toBeVisible();
+  await expect(drawer.getByText('课程方案', { exact: true })).toHaveCount(0);
 
   await page.goto('/open');
   await expect(page).toHaveURL(/\/students$/);

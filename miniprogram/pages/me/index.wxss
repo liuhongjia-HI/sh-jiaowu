@@ -752,6 +752,7 @@
   flex: none;
   margin: 0;
   min-width: 180rpx;
+  padding: 0 20rpx;
   border-radius: 999rpx;
   background: #fff;
   color: #6f5b50;
@@ -761,4 +762,42 @@
 .student-switch-button.active {
   background: #7e5b45;
   color: #fff;
+}
+
+.student-switch-button.pending {
+  background: #fff0e9;
+  color: #bd6f42;
+}
+
+.student-switch-status {
+  margin-left: 8rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+}
+
+.student-add-button {
+  flex: none;
+  min-width: 172rpx;
+  margin: 0;
+  border: 1rpx dashed #d59570;
+  border-radius: 999rpx;
+  background: #fffaf6;
+  color: #bd6f42;
+  font-size: 23rpx;
+  font-weight: 700;
+}
+
+.form-picker {
+  display: flex;
+  align-items: center;
+}
+
+.form-picker.placeholder {
+  color: #a1a3aa;
+}
+
+.student-add-hint {
+  color: #8d9099;
+  font-size: 21rpx;
+  line-height: 1.5;
 }

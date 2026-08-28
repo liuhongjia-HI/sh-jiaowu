@@ -207,6 +207,56 @@ func TestCORSPreflightForAdminLogin(t *testing.T) {
 	}
 }
 
+func TestMaterialReorderEndpointChangesStudentCourseDisplayOrder(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	teacher, err := app.store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("teacher principal: %v", err)
+	}
+	courseID := "course-g05-english-s1-q1"
+	for _, title := range []string{"排序测试资料一", "排序测试资料二"} {
+		if _, err := app.store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+			Title: title, CourseID: courseID,
+			File: learning.FileAsset{ID: "file-" + title, FileName: title + ".pdf", FileType: "PDF"},
+		}); err != nil {
+			t.Fatalf("create %s: %v", title, err)
+		}
+	}
+
+	materials := app.store.Materials(teacher, learning.MaterialQuery{})
+	orderedIDs := make([]string, 0)
+	for _, material := range materials {
+		if material.CourseID == courseID {
+			orderedIDs = append(orderedIDs, material.ID)
+		}
+	}
+	if len(orderedIDs) < 3 {
+		t.Fatalf("expected seeded and created materials, got %#v", orderedIDs)
+	}
+	orderedIDs[0], orderedIDs[1] = orderedIDs[1], orderedIDs[0]
+
+	app.doJSON(t, http.MethodPost, "/api/materials/reorder", app.loginAdmin(t, "13800000004"), learning.MaterialReorderRequest{CourseID: courseID, MaterialIDs: orderedIDs}, http.StatusOK, nil)
+
+	student, err := app.store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("student principal: %v", err)
+	}
+	detail, err := app.store.StudentCourseDetail(student, courseID)
+	if err != nil {
+		t.Fatalf("student course detail: %v", err)
+	}
+	if len(detail.Materials) != len(orderedIDs) {
+		t.Fatalf("unexpected student materials: %#v", detail.Materials)
+	}
+	for index, id := range orderedIDs {
+		if detail.Materials[index].ID != id {
+			t.Fatalf("student material order = %#v, want %#v", detail.Materials, orderedIDs)
+		}
+	}
+}
+
 func TestAdminAuthAndPermissionBoundaries(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
@@ -453,6 +503,30 @@ func TestGrantPreviewAndCreateGrantThroughAPI(t *testing.T) {
 	}
 	if logs[0].Action != "编辑学习套餐" || !strings.Contains(logs[0].Detail, `"before"`) || !strings.Contains(logs[0].Detail, `"after"`) || !strings.Contains(logs[0].Detail, "已更新") {
 		t.Fatalf("expected before/after change detail on latest log, got %#v", logs[0])
+	}
+}
+
+func TestCreateDirectGrantThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginAdmin(t, "13800000002")
+
+	var opened learning.DirectGrantResult
+	app.doJSON(t, http.MethodPost, "/api/grants/direct", token, learning.DirectGrantCreateRequest{
+		StudentID:        "stu-001",
+		LearningSpaceIDs: []string{"space-g05-math-s1-q1"},
+		ContentTypeCodes: []string{"course", "handout"},
+	}, http.StatusOK, &opened)
+	if opened.StudentID != "stu-001" || len(opened.OpenCourses) == 0 || len(opened.OpenMaterials) == 0 || len(opened.OpenHomework) != 0 {
+		t.Fatalf("unexpected direct grant response: %#v", opened)
+	}
+
+	var packages []learning.Package
+	app.doJSON(t, http.MethodGet, "/api/packages", token, nil, http.StatusOK, &packages)
+	for _, pkg := range packages {
+		if strings.HasPrefix(pkg.ID, "direct-") {
+			t.Fatalf("direct grant internals must not be exposed as course plans: %#v", pkg)
+		}
 	}
 }
 
@@ -1129,6 +1203,67 @@ func TestMultiChildLoginSwitchThroughAPI(t *testing.T) {
 	if stillFirst.Student.ID != "stu-001" {
 		t.Fatalf("expected the original token to keep reading stu-001, got %#v", stillFirst.Student)
 	}
+}
+
+func TestParentAdditionalStudentRequestNeedsApprovalBeforeSwitching(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	var parent authResponse
+	app.doJSON(t, http.MethodPost, "/api/auth/wechat-login", "", map[string]any{
+		"code": "add-child-api", "phone": "18500009069", "studentName": "小明", "schoolName": "星河小学", "grade": "五年级",
+	}, http.StatusOK, &parent)
+	var initialAccounts []learning.StudentAccount
+	app.doJSON(t, http.MethodGet, "/api/student/accounts", parent.Token, nil, http.StatusOK, &initialAccounts)
+	if len(initialAccounts) != 1 || !initialAccounts[0].Active || !initialAccounts[0].CanSwitch {
+		t.Fatalf("expected a single current student to remain visible, got %#v", initialAccounts)
+	}
+
+	var pending learning.StudentAccount
+	app.doJSON(t, http.MethodPost, "/api/student/accounts", parent.Token, map[string]any{
+		"name": "小明妹妹", "grade": "五年级", "schoolName": "星河小学",
+	}, http.StatusOK, &pending)
+	if pending.Status != "待审核" || pending.CanSwitch {
+		t.Fatalf("expected a pending account response, got %#v", pending)
+	}
+	app.doJSON(t, http.MethodPost, "/api/student/accounts/"+pending.StudentID+"/switch", parent.Token, nil, http.StatusForbidden, nil)
+
+	adminToken := app.loginAdmin(t, "13800000001")
+	app.doJSON(t, http.MethodPut, "/api/students/"+pending.StudentID, adminToken, map[string]any{
+		"name": "小明妹妹", "phone": "18500009069", "grade": "五年级", "schoolName": "星河小学", "accountStatus": "正常",
+	}, http.StatusOK, nil)
+
+	var accounts []learning.StudentAccount
+	app.doJSON(t, http.MethodGet, "/api/student/accounts", parent.Token, nil, http.StatusOK, &accounts)
+	if len(accounts) != 2 {
+		t.Fatalf("expected the current and approved students, got %#v", accounts)
+	}
+	approved := false
+	for _, account := range accounts {
+		if account.StudentID == pending.StudentID {
+			approved = account.Status == "正常" && account.CanSwitch
+		}
+	}
+	if !approved {
+		t.Fatalf("expected admin approval to unlock the requested student, got %#v", accounts)
+	}
+}
+
+func TestParentAdditionalStudentRequestLimitsPendingApplications(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	parentToken := app.login(t, "/api/auth/wechat-login", map[string]any{
+		"code": "add-child-limit", "phone": "18500009069", "studentName": "小明", "schoolName": "星河小学", "grade": "五年级",
+	})
+	for _, name := range []string{"学生甲", "学生乙", "学生丙"} {
+		app.doJSON(t, http.MethodPost, "/api/student/accounts", parentToken, map[string]any{
+			"name": name, "grade": "五年级", "schoolName": "星河小学",
+		}, http.StatusOK, nil)
+	}
+	app.doJSON(t, http.MethodPost, "/api/student/accounts", parentToken, map[string]any{
+		"name": "学生丁", "grade": "五年级", "schoolName": "星河小学",
+	}, http.StatusBadRequest, nil)
 }
 
 // 一孩多家长：爸爸已经绑过了，妈妈自己的手机号跟任何已有档案都不一样——

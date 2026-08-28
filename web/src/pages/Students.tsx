@@ -2,6 +2,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Descriptions,
   Drawer,
   Empty,
@@ -31,8 +32,9 @@ import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } fro
 import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
 import type {
   CurrentUser,
-  GrantCreateRequest,
-  GrantPreview,
+  DirectGrantCreateRequest,
+  DirectGrantResult,
+  LearningSpace,
   Student,
   StudentDetail,
   StudentImportResult,
@@ -41,8 +43,7 @@ import type {
   StudentScoreRecord,
   StudentScoreSummary,
   StudentScoreUpsertRequest,
-  StudentUpsertRequest,
-  StudyPackage
+  StudentUpsertRequest
 } from '../types/starline';
 
 type StudentFormValues = {
@@ -63,10 +64,6 @@ type StudentFilters = {
   packageState?: string;
 };
 
-type GrantFormValues = {
-  packageId: string;
-};
-
 function canWrite(user: CurrentUser) {
   return user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 }
@@ -79,11 +76,12 @@ export default function Students({ user }: { user: CurrentUser }) {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<StudentFilters>({});
   const [studentForm] = Form.useForm<StudentFormValues>();
-  const [grantForm] = Form.useForm<GrantFormValues>();
   const [editing, setEditing] = useState<Student | null>(null);
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [selected, setSelected] = useState<Student | null>(null);
-  const [grantStudent, setGrantStudent] = useState<Student | null>(null);
+  const [studentDrawerTab, setStudentDrawerTab] = useState('profile');
+  const [directLearningSpaceIds, setDirectLearningSpaceIds] = useState<string[]>([]);
+  const [directContentTypeCodes, setDirectContentTypeCodes] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const queryClient = useQueryClient();
@@ -94,17 +92,16 @@ export default function Students({ user }: { user: CurrentUser }) {
     queryKey: ['students', filters],
     queryFn: () => getData<Student[]>('/students', compactParams(filters))
   });
-  const packages = useQuery({ queryKey: ['packages'], queryFn: () => getData<StudyPackage[]>('/packages') });
+  const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const detail = useQuery({
     queryKey: ['students', selected?.id, 'detail'],
     enabled: Boolean(selected),
     queryFn: () => getData<StudentDetail>(`/students/${selected?.id}`)
   });
 
-  const packageId = Form.useWatch('packageId', grantForm);
-  const availableGrantPackages = useMemo(
-    () => (packages.data ?? []).filter((item) => item.status === '启用' && item.grade === grantStudent?.grade),
-    [packages.data, grantStudent?.grade]
+  const availableDirectLearningSpaces = useMemo(
+    () => (learningSpaces.data ?? []).filter((item) => item.status === '启用' && item.grade === selected?.grade),
+    [learningSpaces.data, selected?.grade]
   );
 
   const saveStudent = useMutation({
@@ -122,7 +119,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       return postData<Student>('/students', body);
     },
     onSuccess: () => {
-      message.success(editing ? '学生信息已保存' : '学生已新增');
+      message.success(editing?.accountStatus === '待审核' ? '审核结果已保存' : editing ? '学生信息已保存' : '学生已新增');
       setStudentModalOpen(false);
       setEditing(null);
       queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -149,17 +146,26 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: () => message.error('绑定码生成失败，请稍后重试。')
   });
 
-  const createGrant = useMutation({
-    mutationFn: (values: GrantFormValues) => postData<GrantPreview>('/grants', grantBody(grantStudent, values)),
+  const createDirectGrant = useMutation({
+    mutationFn: () => {
+      if (!selected) throw new Error('请先选择学生');
+      const body: DirectGrantCreateRequest = {
+        studentId: selected.id,
+        learningSpaceIds: directLearningSpaceIds,
+        contentTypeCodes: directContentTypeCodes
+      };
+      return postData<DirectGrantResult>('/grants/direct', body);
+    },
     onSuccess: (result) => {
-      message.success(`${result.packageName} 已开通，课程权限已同步。`);
-      setGrantStudent(null);
-      grantForm.resetFields();
+      message.success(`已为 ${result.studentName} 开通 ${result.learningSpaces.length} 个课程范围的${result.contentTypes.join('、')}。`);
+      setDirectLearningSpaceIds([]);
+      setDirectContentTypeCodes([]);
       queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err: Error) => message.error(err.message || '开通失败，请检查学生和课程方案。')
+    onError: (err: Error) => message.error(err.message || '开通失败，请检查课程范围和学习内容。')
   });
 
   const importStudents = useMutation({
@@ -179,6 +185,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
 
   const rows = students.data ?? [];
+  const reviewingStudentRequest = editing?.accountStatus === '待审核';
   const gradeOptions = useMemo(() => uniqueOptions(rows.map((item) => item.grade)), [rows]);
   const learningOptions = useMemo(() => uniqueOptions(rows.map((item) => item.learningStatus)), [rows]);
   const accountOptions = useMemo(() => uniqueOptions(rows.map((item) => item.accountStatus)), [rows]);
@@ -216,6 +223,18 @@ export default function Students({ user }: { user: CurrentUser }) {
       width: 170,
       render: (value, record) => <Space direction="vertical" size={0}><Typography.Text strong>{value}</Typography.Text><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
     },
+    {
+      title: '操作',
+      width: writable ? 176 : 64,
+      render: (_, record) => (
+        <Space size={4}>
+          <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
+          {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
+          {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
+          {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
+        </Space>
+      )
+    },
     { title: '家长姓名', dataIndex: 'guardianName', width: 110, ellipsis: true, render: (value) => value || '-' },
     { title: '年级', dataIndex: 'grade', width: 88 },
     { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
@@ -237,24 +256,21 @@ export default function Students({ user }: { user: CurrentUser }) {
     },
     { title: '账号', dataIndex: 'accountStatus', width: 88, render: (value) => <Tag color={value === '正常' ? 'green' : value === '停用' ? 'default' : 'orange'}>{value}</Tag> },
     { title: '添加时间', dataIndex: 'createdAt', width: 150, ellipsis: true, render: (value) => value || '-' },
-    { title: '最近学习', dataIndex: 'lastStudyAt', width: 150, ellipsis: true, render: (value) => value || '-' },
-    {
-      title: '操作',
-      width: writable ? 128 : 52,
-      render: (_, record) => (
-        <Space size={4}>
-          <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
-          {writable && record.accountStatus !== '停用' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
-          {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
-          {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
-        </Space>
-      )
-    }
+    { title: '最近学习', dataIndex: 'lastStudyAt', width: 150, ellipsis: true, render: (value) => value || '-' }
   ];
 
-  function openGrant(student: Student) {
-    grantForm.resetFields();
-    setGrantStudent(student);
+  function openStudentDetail(student: Student) {
+    setSelected(student);
+    setStudentDrawerTab('profile');
+    setDirectLearningSpaceIds([]);
+    setDirectContentTypeCodes([]);
+  }
+
+  function openDirectGrant(student: Student) {
+    setSelected(student);
+    setStudentDrawerTab('direct-grant');
+    setDirectLearningSpaceIds([]);
+    setDirectContentTypeCodes([]);
   }
 
   if (students.isLoading) return <Skeleton active />;
@@ -265,7 +281,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>学生管理</Typography.Title>
-          <Typography.Text type="secondary">查看学生状态，并直接开通家长购买的课程。</Typography.Text>
+          <Typography.Text type="secondary">查看学生状态，并按课程范围直接开通需要的学习内容。</Typography.Text>
         </div>
         {writable && (
           <Space>
@@ -331,8 +347,8 @@ export default function Students({ user }: { user: CurrentUser }) {
                   tags={<PackageLinks values={record.openedPackageRefs} onOpen={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)} />}
                   actions={(
                     <>
-                      <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => setSelected(record)} />
-                      {writable && record.accountStatus !== '停用' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openGrant(record)} />}
+                      <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
+                      {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
                       {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
                       {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
                     </>
@@ -347,14 +363,16 @@ export default function Students({ user }: { user: CurrentUser }) {
       </Card>
 
       <Modal
-        title={editing ? '编辑学生' : '新增学生'}
+        title={reviewingStudentRequest ? '审核学生申请' : editing ? '编辑学生' : '新增学生'}
         open={studentModalOpen}
         onCancel={() => setStudentModalOpen(false)}
         onOk={() => studentForm.submit()}
+        okText={reviewingStudentRequest ? '提交审核' : undefined}
         confirmLoading={saveStudent.isPending}
         destroyOnHidden
       >
         <Form form={studentForm} layout="vertical" onFinish={(values) => saveStudent.mutate(values)}>
+          {reviewingStudentRequest && <Alert type="info" showIcon message="该学生由家长在小程序提交，审核通过后才会出现在家长的可切换列表中。" style={{ marginBottom: 16 }} />}
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入学生姓名' }]}>
             <Input placeholder="例如：小明" />
           </Form.Item>
@@ -374,46 +392,11 @@ export default function Students({ user }: { user: CurrentUser }) {
             <Input.TextArea rows={3} placeholder="可填写家长沟通、分班或交接信息" />
           </Form.Item>
           {editing && (
-            <Form.Item name="enabled" label="启用账号" valuePropName="checked">
+            <Form.Item name="enabled" label={reviewingStudentRequest ? '审核通过并启用账号' : '启用账号'} valuePropName="checked">
               <Switch />
             </Form.Item>
           )}
         </Form>
-      </Modal>
-
-      <Modal
-        title={grantStudent ? `给 ${grantStudent.name} 开通课程` : '开通课程'}
-        open={Boolean(grantStudent)}
-        onCancel={() => {
-          setGrantStudent(null);
-          grantForm.resetFields();
-        }}
-        onOk={() => grantForm.submit()}
-        confirmLoading={createGrant.isPending}
-        okText="开通课程"
-        cancelText="取消"
-        okButtonProps={{ disabled: !packageId || createGrant.isPending }}
-        destroyOnHidden
-      >
-        <Typography.Paragraph type="secondary">
-          选择家长购买的课程方案，系统将立即开放方案内的课程、资料和练习，有效期按当前校历自动计算。
-        </Typography.Paragraph>
-        <Form form={grantForm} layout="vertical" onFinish={(values) => createGrant.mutate(values)}>
-          <Form.Item name="packageId" label="课程方案" rules={[{ required: true, message: '请选择课程方案' }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder={grantStudent ? '选择家长购买的课程方案' : '请先选择学生'}
-              options={availableGrantPackages.map((item) => ({ label: packageOptionLabel(item), value: item.id }))}
-              loading={packages.isLoading}
-              disabled={!grantStudent}
-              notFoundContent={grantStudent ? '该学生所在年级还没有可用课程方案，请先到课程方案中创建或启用。' : '请先选择学生。'}
-            />
-          </Form.Item>
-        </Form>
-        {grantStudent && availableGrantPackages.length === 0 && (
-          <Alert type="warning" showIcon message="该学生所在年级还没有可用课程方案，请先到课程方案中创建或启用。" />
-        )}
       </Modal>
 
       <Modal
@@ -449,6 +432,8 @@ export default function Students({ user }: { user: CurrentUser }) {
         {detail.error && <Alert type="error" message="学生详情加载失败，请稍后重试。" />}
         {detail.data && (
           <Tabs
+            activeKey={studentDrawerTab}
+            onChange={setStudentDrawerTab}
             items={[
               {
                 key: 'profile',
@@ -462,6 +447,24 @@ export default function Students({ user }: { user: CurrentUser }) {
                     onOpenPackage={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)}
                   />
                 )
+              },
+              {
+                key: 'direct-grant',
+                label: '开通学习内容',
+                children: selected ? (
+                  <DirectGrantPanel
+                    student={selected}
+                    learningSpaces={availableDirectLearningSpaces}
+                    loadingLearningSpaces={learningSpaces.isLoading}
+                    learningSpacesError={Boolean(learningSpaces.error)}
+                    selectedLearningSpaceIds={directLearningSpaceIds}
+                    selectedContentTypeCodes={directContentTypeCodes}
+                    submitting={createDirectGrant.isPending}
+                    onLearningSpaceIdsChange={setDirectLearningSpaceIds}
+                    onContentTypeCodesChange={setDirectContentTypeCodes}
+                    onSubmit={() => createDirectGrant.mutate()}
+                  />
+                ) : null
               },
               { key: 'records', label: '学习记录', children: <RecordTable detail={detail.data} /> },
               { key: 'scores', label: '成绩对比', children: selected ? <ScorePanel student={selected} canEdit={canManageScores(user)} /> : null },
@@ -717,7 +720,9 @@ function StudentProfile({
         emptyText="暂未开通课程"
         renderCard={(record) => (
           <InfoCard
-            title={<Typography.Link onClick={() => onOpenPackage(record.packageId)}>{record.packageName}</Typography.Link>}
+            title={record.packageId.startsWith('direct-')
+              ? <Typography.Text strong>{record.packageName}</Typography.Text>
+              : <Typography.Link onClick={() => onOpenPackage(record.packageId)}>{record.packageName}</Typography.Link>}
             subtitle={`${record.startsAt || '-'} 至 ${record.effectiveUntil || '-'}`}
             status={tagStatus(record.permissionState)}
           />
@@ -734,14 +739,101 @@ function StudentProfile({
   );
 }
 
+function DirectGrantPanel({
+  student,
+  learningSpaces,
+  loadingLearningSpaces,
+  learningSpacesError,
+  selectedLearningSpaceIds,
+  selectedContentTypeCodes,
+  submitting,
+  onLearningSpaceIdsChange,
+  onContentTypeCodesChange,
+  onSubmit
+}: {
+  student: Student;
+  learningSpaces: LearningSpace[];
+  loadingLearningSpaces: boolean;
+  learningSpacesError: boolean;
+  selectedLearningSpaceIds: string[];
+  selectedContentTypeCodes: string[];
+  submitting: boolean;
+  onLearningSpaceIdsChange: (values: string[]) => void;
+  onContentTypeCodesChange: (values: string[]) => void;
+  onSubmit: () => void;
+}) {
+  const canSubmit = selectedLearningSpaceIds.length > 0 && selectedContentTypeCodes.length > 0;
+  return (
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Alert
+        type="info"
+        showIcon
+        message="按需开通学习内容"
+        description={`先选择 ${student.name} 要学习的课程范围，再勾选需要开放的课程、习题或学习资料。确认后立即生效，有效期按当前校历计算。`}
+      />
+      <div>
+        <Typography.Text strong>课程范围</Typography.Text>
+        <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
+          只展示该学生所在年级可开通的课程范围。
+        </Typography.Paragraph>
+        {loadingLearningSpaces ? <Skeleton active paragraph={{ rows: 3 }} /> : learningSpacesError ? (
+          <Alert type="error" showIcon message="课程范围加载失败，请关闭抽屉后重试。" />
+        ) : learningSpaces.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该年级还没有可开通的课程范围。" />
+        ) : (
+          <Checkbox.Group
+            aria-label="课程范围"
+            value={selectedLearningSpaceIds}
+            onChange={(values) => onLearningSpaceIdsChange(values.filter((value): value is string => typeof value === 'string'))}
+          >
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {learningSpaces.map((space) => (
+                <Checkbox key={space.id} value={space.id}>
+                  {space.name}
+                </Checkbox>
+              ))}
+            </Space>
+          </Checkbox.Group>
+        )}
+      </div>
+      <div>
+        <Typography.Text strong>学习内容</Typography.Text>
+        <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
+          只开放勾选类型；未勾选的内容不会对学生可见。
+        </Typography.Paragraph>
+        <Checkbox.Group
+          aria-label="学习内容"
+          value={selectedContentTypeCodes}
+          onChange={(values) => onContentTypeCodesChange(values.filter((value): value is string => typeof value === 'string'))}
+        >
+          <Space wrap size={[20, 8]}>
+            <Checkbox value="course">课程</Checkbox>
+            <Checkbox value="question">习题</Checkbox>
+            <Checkbox value="handout">学习资料</Checkbox>
+          </Space>
+        </Checkbox.Group>
+      </div>
+      <Button
+        type="primary"
+        icon={<UnlockOutlined />}
+        loading={submitting}
+        disabled={!canSubmit || loadingLearningSpaces || learningSpacesError}
+        onClick={onSubmit}
+      >
+        确认开通
+      </Button>
+    </Space>
+  );
+}
+
 function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: (packageId: string) => void }) {
   if (!values?.length) return <Typography.Text type="secondary">暂未开通课程</Typography.Text>;
   return (
     <Space size={[4, 4]} wrap>
       {values.map((item) => (
-        <Typography.Link key={item.packageId} onClick={() => onOpen(item.packageId)}>
-          <Tag color="blue">{item.packageName}</Tag>
-        </Typography.Link>
+        item.packageId.startsWith('direct-')
+          ? <Tag key={item.packageId} color="blue">{item.packageName}</Tag>
+          : <Typography.Link key={item.packageId} onClick={() => onOpen(item.packageId)}><Tag color="blue">{item.packageName}</Tag></Typography.Link>
       ))}
     </Space>
   );
@@ -857,17 +949,6 @@ function compactParams(filters: StudentFilters) {
 
 function uniqueOptions(values: string[]) {
   return Array.from(new Set(values.filter(Boolean))).map((value) => ({ label: value, value }));
-}
-
-function packageOptionLabel(item: StudyPackage) {
-  return [item.name, item.subject, item.semester, item.packageType].filter(Boolean).join(' · ');
-}
-
-function grantBody(student: Student | null, values: GrantFormValues): GrantCreateRequest {
-  return {
-    studentId: student?.id,
-    packageId: values.packageId
-  };
 }
 
 function tagStatus(value: string) {

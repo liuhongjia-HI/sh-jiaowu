@@ -163,11 +163,11 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, material := range s.materials {
 		if _, err := tx.Exec(
-			`INSERT INTO materials (id, learning_space_id, course_id, title, chapter_name, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO materials (id, learning_space_id, course_id, title, chapter_name, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, sort_order)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			material.ID, material.LearningSpaceID, material.CourseID, material.Title, material.Chapter, material.Type, material.OwnerTeacherID,
 			material.OwnerTeacherName, material.PublishStatus, material.Status, material.ViewCount, material.FileID, material.FileName,
-			material.FileSize, material.FileType, material.PreviewStatus, material.PreviewURL, material.DownloadURL,
+			material.FileSize, material.FileType, material.PreviewStatus, material.PreviewURL, material.DownloadURL, material.SortOrder,
 		); err != nil {
 			return err
 		}

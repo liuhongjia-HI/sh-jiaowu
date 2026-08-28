@@ -1,6 +1,8 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -33,6 +35,10 @@ func (s *MemoryStore) createGrantUnlocked(operator string, req learning.GrantCre
 			return work.createGrantUnlocked(operator, req)
 		})
 	}
+	return s.createGrantForPackageUnlocked(operator, req, "开通套餐", "调整套餐有效期")
+}
+
+func (s *MemoryStore) createGrantForPackageUnlocked(operator string, req learning.GrantCreateRequest, openAction, updateAction string) (learning.GrantPreview, error) {
 	preview, err := s.grantPreviewUnlocked(req.StudentID, req.PackageID)
 	if err != nil {
 		return learning.GrantPreview{}, err
@@ -62,12 +68,129 @@ func (s *MemoryStore) createGrantUnlocked(operator string, req learning.GrantCre
 	preview.ExistingStartsAt = startsAt
 	preview.ExistingUntil = endsAt
 	if preview.AlreadyOpened {
-		s.prependLog(operator, "调整套餐有效期", preview.StudentName+" / "+preview.PackageName)
+		s.prependLog(operator, updateAction, preview.StudentName+" / "+preview.PackageName)
 	} else {
-		s.prependLog(operator, "开通套餐", preview.StudentName+" / "+preview.PackageName)
+		s.prependLog(operator, openAction, preview.StudentName+" / "+preview.PackageName)
 	}
 	preview.AlreadyOpened = true
 	return preview, nil
+}
+
+func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.DirectGrantResult, error) {
+			return work.createDirectGrantUnlocked(operator, req)
+		})
+	}
+	student, ok := s.findStudent(req.StudentID)
+	if !ok {
+		return learning.DirectGrantResult{}, errors.New("student not found")
+	}
+	if strings.TrimSpace(student.AccountStatus) == "停用" {
+		return learning.DirectGrantResult{}, errors.New("该学生账号已停用，请先恢复账号")
+	}
+	spaceIDs := uniqueTrimmed(req.LearningSpaceIDs)
+	if len(spaceIDs) == 0 {
+		return learning.DirectGrantResult{}, errors.New("请至少选择一个课程范围")
+	}
+	contentTypes := uniqueTrimmed(req.ContentTypeCodes)
+	if len(contentTypes) == 0 {
+		return learning.DirectGrantResult{}, errors.New("请至少选择一种学习内容")
+	}
+	for _, code := range contentTypes {
+		if !validContentType(code) {
+			return learning.DirectGrantResult{}, errors.New("内容类型不正确：" + code)
+		}
+	}
+
+	spaces := make([]learningSpace, 0, len(spaceIDs))
+	for _, id := range spaceIDs {
+		space, exists := s.findLearningSpace(id)
+		if !exists || space.Status != learning.StatusEnabled {
+			return learning.DirectGrantResult{}, errors.New("课程范围不可用：" + id)
+		}
+		if space.Grade != student.Grade {
+			return learning.DirectGrantResult{}, errors.New("不能给" + student.Grade + "学生开通" + space.Grade + "课程")
+		}
+		spaces = append(spaces, space)
+	}
+
+	result := learning.DirectGrantResult{
+		StudentID: student.ID, StudentName: student.Name, ContentTypes: contentTypeLabels(contentTypes),
+		LearningSpaces: s.learningSpaceNames(spaceIDs), OpenCourses: []string{}, OpenMaterials: []string{}, OpenHomework: []string{},
+	}
+	for _, space := range spaces {
+		packageID, err := s.ensureDirectGrantPackage(student, space, contentTypes)
+		if err != nil {
+			return learning.DirectGrantResult{}, err
+		}
+		preview, err := s.createGrantForPackageUnlocked(operator, learning.GrantCreateRequest{StudentID: student.ID, PackageID: packageID}, "开通学习内容", "调整学习内容有效期")
+		if err != nil {
+			return learning.DirectGrantResult{}, err
+		}
+		result.OpenCourses = appendUnique(result.OpenCourses, preview.OpenCourses...)
+		result.OpenMaterials = appendUnique(result.OpenMaterials, preview.OpenMaterials...)
+		result.OpenHomework = appendUnique(result.OpenHomework, preview.OpenHomework...)
+	}
+	return result, nil
+}
+
+func (s *MemoryStore) ensureDirectGrantPackage(student learning.Student, space learningSpace, contentTypes []string) (string, error) {
+	packageID := directGrantPackageID(student.ID, space.ID)
+	if existing, ok := s.findPackage(packageID); ok {
+		mergedTypes := appendUnique(s.contentTypesForPackage(packageID), contentTypes...)
+		s.replacePackageRelations(packageID, []string{space.ID}, mergedTypes)
+		s.refreshSpaceAccessForPackage(packageID)
+		return existing.ID, nil
+	}
+	pkg, err := s.packageFromRequest(packageID, learning.PackageUpsertRequest{
+		Name:             space.Name + " · 直接开通",
+		AcademicYear:     s.configuredAcademicYear(),
+		Grade:            space.Grade,
+		Semester:         space.Semester,
+		Subject:          space.Subject,
+		Level:            space.Level,
+		PhaseScope:       space.Phase,
+		PackageType:      packageTypeLabel(contentTypes),
+		Summary:          "由学生管理直接开通的学习内容。",
+		LearningSpaceIDs: []string{space.ID},
+		ContentTypeCodes: contentTypes,
+		Status:           learning.StatusEnabled,
+	})
+	if err != nil {
+		return "", err
+	}
+	s.packages = append(s.packages, pkg)
+	s.replacePackageRelations(pkg.ID, []string{space.ID}, contentTypes)
+	return pkg.ID, nil
+}
+
+func directGrantPackageID(studentID, learningSpaceID string) string {
+	sum := sha256.Sum256([]byte(studentID + "\x00" + learningSpaceID))
+	return "direct-" + hex.EncodeToString(sum[:20])
+}
+
+func isDirectGrantPackage(packageID string) bool {
+	return strings.HasPrefix(packageID, "direct-")
+}
+
+func uniqueTrimmed(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			result = appendUnique(result, value)
+		}
+	}
+	return result
+}
+
+func contentTypeLabels(values []string) []string {
+	labels := make([]string, 0, len(values))
+	for _, value := range values {
+		labels = appendUnique(labels, contentTypeLabel(value))
+	}
+	return labels
 }
 
 func (s *MemoryStore) validateGrantTarget(studentID, packageID string) (learning.Student, learning.Package, error) {

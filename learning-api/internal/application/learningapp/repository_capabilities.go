@@ -50,6 +50,7 @@ type ContentRepository interface {
 	UpdateQuestion(string, learning.Principal, string, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	CreateMaterial(string, learning.Principal, learning.MaterialUploadRequest) (learning.Material, error)
 	UpdateMaterial(string, learning.Principal, string, learning.MaterialUpdateRequest) (learning.Material, error)
+	ReorderMaterials(string, learning.Principal, learning.MaterialReorderRequest) error
 	DeleteMaterial(string, learning.Principal, string) error
 	HomeworkSubmissions(learning.Principal, string) (learning.HomeworkSubmissionSummary, error)
 	CreateHomework(string, learning.Principal, learning.HomeworkUploadRequest) (learning.Homework, error)
@@ -71,6 +72,7 @@ type GrantRepository interface {
 	StudentGrants(learning.Principal, string) ([]learning.StudentGrant, error)
 	GrantPreview(string, string) (learning.GrantPreview, error)
 	CreateGrant(string, learning.GrantCreateRequest) (learning.GrantPreview, error)
+	CreateDirectGrant(string, learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error)
 	CreatePackage(string, learning.PackageUpsertRequest) (learning.Package, error)
 	UpdatePackage(string, string, learning.PackageUpsertRequest) (learning.Package, error)
 }

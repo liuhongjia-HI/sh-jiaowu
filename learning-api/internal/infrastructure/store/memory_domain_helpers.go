@@ -1034,7 +1034,7 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 }
 
 func (s *MemoryStore) studentMaterialsForPrincipal(principal learning.Principal) []learning.Material {
-	materials := s.materialsForStudent(principal.StudentID)
+	materials := orderMaterialsByCourse(s.materialsForStudent(principal.StudentID))
 	for index := range materials {
 		materials[index] = s.decorateStudentMaterial(principal, materials[index])
 	}

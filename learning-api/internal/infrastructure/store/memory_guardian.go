@@ -40,12 +40,13 @@ func (s *MemoryStore) backfillGuardianLinksForPhoneUnlocked(phone string) error 
 		}
 	}
 	for _, user := range s.users {
-		if user.Phone == phone && hasRole(user.Roles, learning.RoleStudent) {
+		student, ok := s.findStudent(user.StudentID)
+		if user.Phone == phone && hasRole(user.Roles, learning.RoleStudent) && ok && student.AccountStatus == "正常" {
 			addStudent(user.StudentID)
 		}
 	}
 	for _, student := range s.students {
-		if phoneSame(student.Phone, phone) {
+		if student.AccountStatus == "正常" && phoneSame(student.Phone, phone) {
 			addStudent(student.ID)
 		}
 	}

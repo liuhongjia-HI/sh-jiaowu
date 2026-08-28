@@ -106,6 +106,9 @@ func (s *MemoryStore) systemReadinessUnlocked() learning.SystemReadiness {
 func (s *MemoryStore) packagesUnlocked() []learning.Package {
 	out := make([]learning.Package, 0, len(s.packages))
 	for _, pkg := range s.packages {
+		if isDirectGrantPackage(pkg.ID) {
+			continue
+		}
 		out = append(out, s.decoratePackage(pkg))
 	}
 	return out

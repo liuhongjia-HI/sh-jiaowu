@@ -340,7 +340,7 @@ func (s *MemoryStore) loadCoursesFromDB() error {
 }
 
 func (s *MemoryStore) loadMaterialsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, chapter_name, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, created_at FROM materials ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, chapter_name, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, sort_order, created_at FROM materials ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, created_at, id`)
 	if err != nil {
 		return err
 	}
@@ -349,7 +349,7 @@ func (s *MemoryStore) loadMaterialsFromDB() error {
 	for rows.Next() {
 		var item learning.Material
 		var createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Chapter, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Chapter, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &item.SortOrder, &createdAt); err != nil {
 			return err
 		}
 		item.Status = normalizeMaterialStatus(item.Status)

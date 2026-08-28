@@ -69,6 +69,24 @@ type GrantCreateRequest struct {
 	EndsAt    string `json:"endsAt"`
 }
 
+// DirectGrantCreateRequest 用于学生详情中的直接开通：管理员选择课程范围和
+// 内容类型即可，不需要先理解或挑选课程方案。
+type DirectGrantCreateRequest struct {
+	StudentID        string   `json:"studentId"`
+	LearningSpaceIDs []string `json:"learningSpaceIds"`
+	ContentTypeCodes []string `json:"contentTypeCodes"`
+}
+
+type DirectGrantResult struct {
+	StudentID      string   `json:"studentId"`
+	StudentName    string   `json:"studentName"`
+	LearningSpaces []string `json:"learningSpaces"`
+	ContentTypes   []string `json:"contentTypes"`
+	OpenCourses    []string `json:"openCourses"`
+	OpenMaterials  []string `json:"openMaterials"`
+	OpenHomework   []string `json:"openHomework"`
+}
+
 type GrantPreview struct {
 	StudentID        string   `json:"studentId"`
 	PackageID        string   `json:"packageId"`

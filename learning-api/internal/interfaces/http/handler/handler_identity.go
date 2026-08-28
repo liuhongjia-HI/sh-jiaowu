@@ -225,6 +225,21 @@ func (h *LearningHandler) StudentAccounts(c *gin.Context) {
 	OK(c, accounts)
 }
 
+func (h *LearningHandler) RequestAdditionalStudent(c *gin.Context) {
+	var req learning.StudentAccountAddRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "提交信息不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	account, err := h.service.RequestAdditionalStudent(principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, account)
+}
+
 func (h *LearningHandler) SwitchStudentAccount(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	next, err := h.service.SwitchStudentAccount(principal, c.Param("id"))

@@ -61,6 +61,18 @@ type StudentAccount struct {
 	Name      string `json:"name"`
 	Grade     string `json:"grade"`
 	Active    bool   `json:"active"`
+	// Status 为“正常”或“待审核”。待审核的学生会展示在家长名下，
+	// 但不能切换进入，直到管理员在学生管理中审核通过。
+	Status    string `json:"status"`
+	CanSwitch bool   `json:"canSwitch"`
+}
+
+// StudentAccountAddRequest 是家长从小程序申请添加孩子时填写的最小资料。
+// 家长手机号、关联关系和审核状态均由服务端从当前登录身份推导，客户端不能指定。
+type StudentAccountAddRequest struct {
+	Name       string `json:"name"`
+	Grade      string `json:"grade"`
+	SchoolName string `json:"schoolName"`
 }
 type WechatLoginRequest struct {
 	Code        string `json:"code"`

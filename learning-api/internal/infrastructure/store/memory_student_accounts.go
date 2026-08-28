@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"starline/learning-api/internal/domain/learning"
 )
@@ -20,18 +21,27 @@ func (s *MemoryStore) studentAccountsUnlocked(principal learning.Principal) ([]l
 	accounts := make([]learning.StudentAccount, 0)
 	if principal.GuardianID != "" {
 		for _, relation := range s.guardianStudents {
-			if relation.GuardianID != principal.GuardianID || relation.Status != learning.GuardianStudentActive {
+			if relation.GuardianID != principal.GuardianID || (relation.Status != learning.GuardianStudentActive && relation.Status != learning.GuardianStudentPending) {
 				continue
 			}
 			student, ok := s.findStudent(relation.StudentID)
-			if !ok || student.AccountStatus != "正常" {
+			if !ok {
+				continue
+			}
+			canSwitch := relation.Status == learning.GuardianStudentActive && student.AccountStatus == "正常"
+			if !canSwitch && student.AccountStatus != "待审核" {
 				continue
 			}
 			decorated := s.decorateStudent(student)
-			accounts = append(accounts, learning.StudentAccount{StudentID: student.ID, Name: student.Name, Grade: decorated.Grade, Active: student.ID == principal.StudentID})
+			accounts = append(accounts, learning.StudentAccount{
+				StudentID: student.ID, Name: student.Name, Grade: decorated.Grade,
+				Active: canSwitch && student.ID == principal.StudentID, Status: student.AccountStatus, CanSwitch: canSwitch,
+			})
 		}
 	}
-	if len(accounts) > 1 {
+	// 只要当前会话有家长身份，即使名下只有一个孩子也返回这一个账号。
+	// 小程序据此始终展示“当前查看”与“添加学生”入口，而不是把单孩子家庭藏起来。
+	if principal.GuardianID != "" {
 		return accounts, nil
 	}
 	// 关系表还没建起来就走手机号兜底。关系只在登录那一刻写入，而小程序只要
@@ -52,7 +62,7 @@ func (s *MemoryStore) studentAccountsUnlocked(principal learning.Principal) ([]l
 			continue
 		}
 		decorated := s.decorateStudent(sibling)
-		fallback = append(fallback, learning.StudentAccount{StudentID: sibling.ID, Name: sibling.Name, Grade: decorated.Grade, Active: sibling.ID == principal.StudentID})
+		fallback = append(fallback, learning.StudentAccount{StudentID: sibling.ID, Name: sibling.Name, Grade: decorated.Grade, Active: sibling.ID == principal.StudentID, Status: sibling.AccountStatus, CanSwitch: true})
 	}
 	// 只有真的找出了兄弟姐妹（>1）才用兜底结果。只找到自己一个的时候必须
 	// 原样返回，通常就是空列表——演示密码登录、老师/管理员账号这些没有家长
@@ -62,6 +72,84 @@ func (s *MemoryStore) studentAccountsUnlocked(principal learning.Principal) ([]l
 		return fallback, nil
 	}
 	return accounts, nil
+}
+
+// requestAdditionalStudentUnlocked 创建一份待审核学生档案，并仅以“待审核”关系
+// 挂到当前家长名下。创建时不签发可登录账号，也不授予学习权限；管理员将账号
+// 状态改为“正常”后，updateStudentUnlocked 才会把这条关系激活。
+func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Principal, req learning.StudentAccountAddRequest) (learning.StudentAccount, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.StudentAccount, error) {
+			return work.requestAdditionalStudentUnlocked(principal, req)
+		})
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.Grade = strings.TrimSpace(req.Grade)
+	req.SchoolName = strings.TrimSpace(req.SchoolName)
+	if req.Name == "" {
+		return learning.StudentAccount{}, errors.New("请输入学生姓名")
+	}
+	if req.Grade == "" {
+		return learning.StudentAccount{}, errors.New("请选择年级")
+	}
+	if req.SchoolName == "" {
+		return learning.StudentAccount{}, errors.New("请输入学校")
+	}
+	if len([]rune(req.Name)) > 32 || len([]rune(req.Grade)) > 32 || len([]rune(req.SchoolName)) > 64 {
+		return learning.StudentAccount{}, errors.New("填写内容过长，请检查后重试")
+	}
+	if principal.GuardianID == "" {
+		return learning.StudentAccount{}, errors.New("请重新登录后再添加学生")
+	}
+	guardian, ok := s.guardianByID(principal.GuardianID)
+	if !ok || guardian.AccountStatus != "正常" || strings.TrimSpace(guardian.Phone) == "" {
+		return learning.StudentAccount{}, errors.New("家长身份无效，请重新登录后再试")
+	}
+	pendingCount := 0
+	for _, relation := range s.guardianStudents {
+		if relation.GuardianID != principal.GuardianID || (relation.Status != learning.GuardianStudentActive && relation.Status != learning.GuardianStudentPending) {
+			continue
+		}
+		if relation.Status == learning.GuardianStudentPending {
+			pendingCount++
+		}
+		student, found := s.findStudent(relation.StudentID)
+		if found && student.Name == req.Name && s.decorateStudent(student).Grade == req.Grade {
+			return learning.StudentAccount{}, errors.New("名下已有同名同年级学生，请勿重复添加")
+		}
+	}
+	if pendingCount >= 3 {
+		return learning.StudentAccount{}, errors.New("已有 3 个学生申请等待审核，请审核完成后再添加")
+	}
+	guardianName := guardian.Name
+	if guardianName == "" {
+		if current, found := s.findStudent(principal.StudentID); found {
+			guardianName = current.GuardianName
+		}
+	}
+	id := "stu-" + time.Now().Format("20060102150405.000000000")
+	student := learning.Student{
+		ID: id, Name: req.Name, EnrollmentAcademicYear: s.configuredAcademicYear(), EnrollmentGrade: req.Grade,
+		Phone: guardian.Phone, SchoolName: req.SchoolName, GuardianName: guardianName,
+		OpenedPackages: []string{}, LearningStatus: "未开始", AccountStatus: "待审核", BindStatus: "待审核",
+		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+	}
+	s.students = append([]learning.Student{student}, s.students...)
+	s.syncStudentUser(student)
+	s.guardianStudents = append(s.guardianStudents, learning.GuardianStudent{
+		GuardianID: principal.GuardianID, StudentID: student.ID, Relation: learning.GuardianRelationGuardian, Status: learning.GuardianStudentPending,
+	})
+	s.prependLog("家长", "申请添加学生", student.Name)
+	return learning.StudentAccount{StudentID: student.ID, Name: student.Name, Grade: s.decorateStudent(student).Grade, Status: "待审核", CanSwitch: false}, nil
+}
+
+func (s *MemoryStore) guardianByID(id string) (learning.Guardian, bool) {
+	for _, guardian := range s.guardians {
+		if guardian.ID == id {
+			return guardian, true
+		}
+	}
+	return learning.Guardian{}, false
 }
 
 func (s *MemoryStore) switchStudentAccountUnlocked(principal learning.Principal, studentID string) (learning.Principal, error) {

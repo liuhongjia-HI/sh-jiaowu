@@ -6,6 +6,61 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.material-order-list {
+  max-height: min(50vh, 440px);
+  overflow-y: auto;
+  border: 1px solid #e3eaf0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.material-order-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #edf1f4;
+  cursor: grab;
+}
+
+.material-order-item:last-child {
+  border-bottom: 0;
+}
+
+.material-order-item:active {
+  cursor: grabbing;
+}
+
+.material-order-item:focus-within {
+  background: #f5fbf8;
+}
+
+.material-order-handle {
+  color: #98a2b3;
+  font-size: 18px;
+}
+
+.material-order-index {
+  width: 24px;
+  color: #667085;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.material-order-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #17202a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-order-actions {
+  flex: 0 0 auto;
+}
+
 .app-shell {
   min-height: 100vh;
   background:

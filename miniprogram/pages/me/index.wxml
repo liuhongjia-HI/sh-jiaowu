@@ -32,10 +32,14 @@
       <view class="profile-arrow" bindtap="toggleProfileEdit">›</view>
     </view>
 
-    <view wx:if="{{studentAccounts.length > 1}}" class="student-switcher">
+    <view wx:if="{{studentAccounts.length}}" class="student-switcher">
       <view class="student-switcher-label">当前查看：{{studentProfile.name}}</view>
       <view class="student-switcher-list">
-        <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{item.active || switchingStudentId}}">{{item.name}} · {{item.grade}}</button>
+        <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}} {{!item.canSwitch ? 'pending' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{item.active || !item.canSwitch || switchingStudentId}}">
+          <text>{{item.name}} · {{item.grade}}</text>
+          <text wx:if="{{!item.canSwitch}}" class="student-switch-status">待审核</text>
+        </button>
+        <button class="student-add-button" bindtap="openStudentAddModal">＋ 添加学生</button>
       </view>
     </view>
 
@@ -100,6 +104,27 @@
           <input class="form-input" value="{{profileForm.schoolName}}" data-field="schoolName" bindinput="onBasicInput" placeholder="学校" />
           <input class="form-input" value="{{profileForm.guardianName}}" data-field="guardianName" bindinput="onBasicInput" placeholder="家长称呼（选填）" />
           <button class="profile-save" bindtap="submitBasicProfile" loading="{{savingBasicProfile}}" disabled="{{savingBasicProfile}}">保存资料</button>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{studentAddOpen}}" class="profile-modal-mask" bindtap="closeStudentAddModal">
+      <view class="profile-modal" catchtap="stopModalTap">
+        <view class="profile-modal-head">
+          <view>
+            <view class="profile-modal-title">添加学生</view>
+            <view class="profile-modal-subtitle">填写孩子的基本信息，管理员审核通过后即可切换查看。</view>
+          </view>
+          <view class="profile-modal-close" bindtap="closeStudentAddModal">×</view>
+        </view>
+        <view class="profile-form">
+          <input class="form-input" value="{{studentAddForm.name}}" data-field="name" bindinput="onStudentAddInput" placeholder="学生姓名" maxlength="32" />
+          <picker mode="selector" range="{{gradeOptions}}" value="{{studentAddGradeIndex}}" bindchange="onStudentAddGradeChange">
+            <view class="form-input form-picker {{studentAddForm.grade ? '' : 'placeholder'}}">{{studentAddForm.grade || "请选择年级"}}</view>
+          </picker>
+          <input class="form-input" value="{{studentAddForm.schoolName}}" data-field="schoolName" bindinput="onStudentAddInput" placeholder="学校" maxlength="64" />
+          <view class="student-add-hint">提交后会显示“待审核”，审核通过前不会开放该学生的学习内容。</view>
+          <button class="profile-save" bindtap="submitStudentAdd" loading="{{addingStudent}}" disabled="{{addingStudent}}">提交审核</button>
         </view>
       </view>
     </view>

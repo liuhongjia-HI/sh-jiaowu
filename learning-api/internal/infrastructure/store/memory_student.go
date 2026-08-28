@@ -113,6 +113,7 @@ func (s *MemoryStore) updateStudentUnlocked(operator string, principal learning.
 			return learning.Student{}, errors.New("手机号已存在")
 		}
 		before := s.decorateStudent(s.students[i])
+		wasPendingApproval := s.students[i].AccountStatus == "待审核"
 		s.students[i].Name = req.Name
 		s.students[i].Phone = req.Phone
 		if req.Grade != before.Grade {
@@ -132,10 +133,23 @@ func (s *MemoryStore) updateStudentUnlocked(operator string, principal learning.
 		s.students[i].Remark = req.Remark
 		s.syncStudentUser(s.students[i])
 		after := s.decorateStudent(s.students[i])
-		s.prependLogDetail(operator, "更新学生", s.students[i].Name, auditChangeDetail(studentAuditSnapshot(before), studentAuditSnapshot(after)))
+		action := "更新学生"
+		if wasPendingApproval && s.students[i].AccountStatus == "正常" {
+			s.activatePendingGuardianRelations(s.students[i].ID)
+			action = "审核通过学生申请"
+		}
+		s.prependLogDetail(operator, action, s.students[i].Name, auditChangeDetail(studentAuditSnapshot(before), studentAuditSnapshot(after)))
 		return after, nil
 	}
 	return learning.Student{}, errors.New("student not found")
+}
+
+func (s *MemoryStore) activatePendingGuardianRelations(studentID string) {
+	for i := range s.guardianStudents {
+		if s.guardianStudents[i].StudentID == studentID && s.guardianStudents[i].Status == learning.GuardianStudentPending {
+			s.guardianStudents[i].Status = learning.GuardianStudentActive
+		}
+	}
 }
 
 func normalizeStudentProfileUpdateRequest(req learning.StudentProfileUpdateRequest) (learning.StudentProfileUpdateRequest, bool, error) {

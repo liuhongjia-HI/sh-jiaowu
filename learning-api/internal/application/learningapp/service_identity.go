@@ -13,6 +13,7 @@ type AuthRepository interface {
 	PrincipalByUserID(userID string) (learning.Principal, error)
 	GuardianStudentActive(guardianID, studentID string) bool
 	StudentAccounts(learning.Principal) ([]learning.StudentAccount, error)
+	RequestAdditionalStudent(learning.Principal, learning.StudentAccountAddRequest) (learning.StudentAccount, error)
 	SwitchStudentAccount(learning.Principal, string) (learning.Principal, error)
 }
 
@@ -52,6 +53,9 @@ func (s *Service) GuardianStudentActive(guardianID, studentID string) bool {
 }
 func (s *Service) StudentAccounts(principal learning.Principal) ([]learning.StudentAccount, error) {
 	return s.auth.StudentAccounts(principal)
+}
+func (s *Service) RequestAdditionalStudent(principal learning.Principal, req learning.StudentAccountAddRequest) (learning.StudentAccount, error) {
+	return s.auth.RequestAdditionalStudent(principal, req)
 }
 func (s *Service) SwitchStudentAccount(principal learning.Principal, studentID string) (learning.Principal, error) {
 	return s.auth.SwitchStudentAccount(principal, studentID)

@@ -24,6 +24,38 @@ func TestMaterialsFilterByTitleSubjectUploaderAndUploadedRange(t *testing.T) {
 	}
 }
 
+func TestReorderMaterialsPersistsCourseDisplayOrder(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	course := store.Courses(teacher)[0]
+	store.materials = append(store.materials,
+		learning.Material{ID: "material-sort-first", Title: "第一份资料", CourseID: course.ID, Course: course.Name, LearningSpaceID: course.LearningSpaceID, SortOrder: 1},
+		learning.Material{ID: "material-sort-second", Title: "第二份资料", CourseID: course.ID, Course: course.Name, LearningSpaceID: course.LearningSpaceID, SortOrder: 2},
+	)
+
+	err = store.ReorderMaterials("英语老师", teacher, learning.MaterialReorderRequest{
+		CourseID:    course.ID,
+		MaterialIDs: []string{"material-sort-second", "material-sort-first"},
+	})
+	if err != nil {
+		t.Fatalf("reorder materials: %v", err)
+	}
+
+	rows := store.Materials(teacher, learning.MaterialQuery{})
+	var ordered []learning.Material
+	for _, row := range rows {
+		if row.CourseID == course.ID && (row.ID == "material-sort-first" || row.ID == "material-sort-second") {
+			ordered = append(ordered, row)
+		}
+	}
+	if len(ordered) != 2 || ordered[0].ID != "material-sort-second" || ordered[0].SortOrder != 1 || ordered[1].ID != "material-sort-first" || ordered[1].SortOrder != 2 {
+		t.Fatalf("unexpected material order: %#v", ordered)
+	}
+}
+
 func TestMockExamRequiresDeadlineAndExpiredHomeworkRejectsSubmission(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, _ := store.PrincipalByUserID("user-teacher")

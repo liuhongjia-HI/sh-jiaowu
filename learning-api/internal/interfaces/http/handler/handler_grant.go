@@ -74,6 +74,24 @@ func (h *LearningHandler) CreateGrant(c *gin.Context) {
 	OK(c, preview)
 }
 
+func (h *LearningHandler) CreateDirectGrant(c *gin.Context) {
+	var req learning.DirectGrantCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	req.StudentID = strings.TrimSpace(req.StudentID)
+	req.LearningSpaceIDs = trimStringSlice(req.LearningSpaceIDs)
+	req.ContentTypeCodes = trimStringSlice(req.ContentTypeCodes)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.CreateDirectGrant(operator.(string), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
 func bindPackage(c *gin.Context) (learning.PackageUpsertRequest, bool) {
 	var req learning.PackageUpsertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

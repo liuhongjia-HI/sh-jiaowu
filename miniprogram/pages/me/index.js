@@ -7,6 +7,15 @@ Page({
     loading: true,
     studentAccounts: [],
     switchingStudentId: "",
+    addingStudent: false,
+    studentAddOpen: false,
+    gradeOptions: ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级"],
+    studentAddGradeIndex: -1,
+    studentAddForm: {
+      name: "",
+      grade: "",
+      schoolName: ""
+    },
     savingProfile: false,
     savingBasicProfile: false,
     profileEditing: false,
@@ -89,7 +98,8 @@ Page({
   },
   switchStudent(event) {
     const studentId = event.currentTarget.dataset.studentId;
-    if (!studentId || studentId === (this.data.me && this.data.me.id) || this.data.switchingStudentId) return;
+    const account = (this.data.studentAccounts || []).find((item) => item.studentId === studentId);
+    if (!studentId || !account || !account.canSwitch || account.active || this.data.switchingStudentId) return;
     this.setData({ switchingStudentId: studentId });
     request(`/student/accounts/${studentId}/switch`, { method: "POST", data: {} }).then((result) => {
       wx.setStorageSync("starline_token", result.token);
@@ -97,6 +107,49 @@ Page({
       this.setData({ switchingStudentId: "" });
       this.loadMe();
     }).catch(() => this.setData({ switchingStudentId: "" }));
+  },
+  openStudentAddModal() {
+    this.setData({
+      studentAddOpen: true,
+      studentAddGradeIndex: -1,
+      studentAddForm: { name: "", grade: "", schoolName: "" }
+    });
+  },
+  closeStudentAddModal() {
+    if (!this.data.addingStudent) {
+      this.setData({ studentAddOpen: false });
+    }
+  },
+  onStudentAddInput(event) {
+    const field = event.currentTarget.dataset.field;
+    this.setData({ [`studentAddForm.${field}`]: event.detail.value });
+  },
+  onStudentAddGradeChange(event) {
+    const index = Number(event.detail.value);
+    this.setData({
+      studentAddGradeIndex: index,
+      "studentAddForm.grade": this.data.gradeOptions[index] || ""
+    });
+  },
+  submitStudentAdd() {
+    if (this.data.addingStudent) return;
+    const form = this.data.studentAddForm || {};
+    const name = (form.name || "").trim();
+    const grade = (form.grade || "").trim();
+    const schoolName = (form.schoolName || "").trim();
+    if (!name || !grade || !schoolName) {
+      wx.showToast({ title: "请填写姓名、年级和学校", icon: "none" });
+      return;
+    }
+    this.setData({ addingStudent: true });
+    request("/student/accounts", { method: "POST", data: { name, grade, schoolName } })
+      .then(() => {
+        this.setData({ studentAddOpen: false });
+        wx.showToast({ title: "已提交，等待管理员审核", icon: "success" });
+        this.loadStudentAccounts();
+      })
+      .catch((error) => wx.showToast({ title: error.message || "提交失败，请重试", icon: "none" }))
+      .then(() => this.setData({ addingStudent: false }));
   },
   goLogin() {
     wx.navigateTo({ url: "/pages/login/index" });
@@ -428,6 +481,7 @@ function buildStudentProfile(student = {}) {
   const avatarUrl = normalizeAvatarUrl(student.avatarUrl);
   const phoneAuthorized = isAuthorizedPhone(student.phone, student.bindStatus);
   return {
+    name: student.name || "学员",
     displayName: name,
     avatarUrl,
     avatarText: shortAvatarText(name),

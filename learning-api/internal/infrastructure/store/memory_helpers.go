@@ -380,7 +380,7 @@ func normalizeStudentRequest(req learning.StudentUpsertRequest, allowStatus bool
 	if !allowStatus || req.AccountStatus == "" {
 		req.AccountStatus = "正常"
 	}
-	if req.AccountStatus != "正常" && req.AccountStatus != "停用" && req.AccountStatus != "待提醒" {
+	if req.AccountStatus != "正常" && req.AccountStatus != "停用" && req.AccountStatus != "待提醒" && req.AccountStatus != "待审核" {
 		return req, errors.New("账号状态不正确")
 	}
 	return req, nil

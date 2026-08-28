@@ -109,6 +109,9 @@ type GuardianStudentStatus string
 const (
 	GuardianStudentActive   GuardianStudentStatus = "在读"
 	GuardianStudentInactive GuardianStudentStatus = "结课"
+	// GuardianStudentPending 表示家长已提交添加申请，待管理员审核。
+	// 它不会通过 GuardianStudentActive，因此待审核学生不能被切换或访问。
+	GuardianStudentPending GuardianStudentStatus = "待审核"
 )
 
 // GuardianStudent 是家长与学生的多对多关系：一个家长可能关联多个孩子（多子女），

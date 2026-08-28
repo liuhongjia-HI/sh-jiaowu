@@ -93,6 +93,76 @@ func TestParentPhoneCanSwitchBetweenStudentAccounts(t *testing.T) {
 	}
 }
 
+func TestParentCanRequestAdditionalStudentThenSwitchAfterAdminApproval(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("load admin: %v", err)
+	}
+	firstStudent, ok := store.findStudent("stu-001")
+	if !ok {
+		t.Fatal("expected demo student")
+	}
+	principal, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "add-child-request", Phone: firstStudent.Phone, StudentName: firstStudent.Name, SchoolName: "星河小学", Grade: store.decorateStudent(firstStudent).Grade,
+	})
+	if err != nil {
+		t.Fatalf("login parent: %v", err)
+	}
+
+	pending, err := store.RequestAdditionalStudent(principal, learning.StudentAccountAddRequest{
+		Name: "小明妹妹", Grade: "五年级", SchoolName: "星河小学",
+	})
+	if err != nil {
+		t.Fatalf("request additional student: %v", err)
+	}
+	if pending.Status != "待审核" || pending.CanSwitch {
+		t.Fatalf("expected an unswitchable pending account, got %#v", pending)
+	}
+
+	accounts, err := store.StudentAccounts(principal)
+	if err != nil || len(accounts) != 2 {
+		t.Fatalf("expected current and pending students, accounts=%#v err=%v", accounts, err)
+	}
+	if _, err := store.SwitchStudentAccount(principal, pending.StudentID); err == nil {
+		t.Fatal("pending student must not be switchable")
+	}
+
+	pendingStudent, ok := store.findStudent(pending.StudentID)
+	if !ok {
+		t.Fatal("expected requested student record")
+	}
+	_, err = store.UpdateStudent("超级管理员", admin, pending.StudentID, learning.StudentUpsertRequest{
+		Name: pendingStudent.Name, Phone: pendingStudent.Phone, Grade: store.decorateStudent(pendingStudent).Grade,
+		SchoolName: pendingStudent.SchoolName, GuardianName: pendingStudent.GuardianName, AccountStatus: "正常",
+	})
+	if err != nil {
+		t.Fatalf("approve student request: %v", err)
+	}
+
+	accounts, err = store.StudentAccounts(principal)
+	if err != nil || len(accounts) != 2 {
+		t.Fatalf("expected two accounts after approval, accounts=%#v err=%v", accounts, err)
+	}
+	approved := accountByStudentID(accounts, pending.StudentID)
+	if approved.Status != "正常" || !approved.CanSwitch {
+		t.Fatalf("expected approved account to be switchable, got %#v", approved)
+	}
+	next, err := store.SwitchStudentAccount(principal, pending.StudentID)
+	if err != nil || next.StudentID != pending.StudentID {
+		t.Fatalf("expected approval to unlock switching, next=%#v err=%v", next, err)
+	}
+}
+
+func accountByStudentID(accounts []learning.StudentAccount, studentID string) learning.StudentAccount {
+	for _, account := range accounts {
+		if account.StudentID == studentID {
+			return account
+		}
+	}
+	return learning.StudentAccount{}
+}
+
 // 关系被后台解除之后，family 手上那张旧 token 不能继续读那个孩子的数据——
 // 这个校验现在挂在 GuardianStudentActive 上，中间件每个请求都会重新调用它。
 func TestSwitchedGuardianCannotAccessAfterRelationRevoked(t *testing.T) {

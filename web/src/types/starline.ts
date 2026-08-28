@@ -214,6 +214,22 @@ export type StudentGrant = {
   permissionState: string;
 };
 
+export type DirectGrantCreateRequest = {
+  studentId: string;
+  learningSpaceIds: string[];
+  contentTypeCodes: string[];
+};
+
+export type DirectGrantResult = {
+  studentId: string;
+  studentName: string;
+  learningSpaces: string[];
+  contentTypes: string[];
+  openCourses: string[];
+  openMaterials: string[];
+  openHomework: string[];
+};
+
 export type StudentLearningRecord = {
   id: string;
   type: string;
@@ -346,6 +362,7 @@ export type Material = {
   watermarkText?: string;
   securityNotice?: string;
   createdAt?: string;
+  sortOrder: number;
   status: string;
 };
 
@@ -355,6 +372,11 @@ export type MaterialUpdateRequest = {
   learningSpaceId?: string;
   chapter: string;
   status: string;
+};
+
+export type MaterialReorderRequest = {
+  courseId: string;
+  materialIds: string[];
 };
 
 export type Homework = {

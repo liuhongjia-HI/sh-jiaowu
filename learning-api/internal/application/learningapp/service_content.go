@@ -27,6 +27,9 @@ func (s *Service) CreateMaterial(o string, p learning.Principal, r learning.Mate
 func (s *Service) UpdateMaterial(o string, p learning.Principal, id string, r learning.MaterialUpdateRequest) (learning.Material, error) {
 	return s.content.UpdateMaterial(o, p, id, r)
 }
+func (s *Service) ReorderMaterials(o string, p learning.Principal, r learning.MaterialReorderRequest) error {
+	return s.content.ReorderMaterials(o, p, r)
+}
 func (s *Service) DeleteMaterial(o string, p learning.Principal, id string) error {
 	return s.content.DeleteMaterial(o, p, id)
 }

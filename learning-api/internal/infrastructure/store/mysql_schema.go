@@ -300,6 +300,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"materials", "preview_status", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"materials", "preview_url", "TEXT NOT NULL"},
 		{"materials", "download_url", "TEXT NOT NULL"},
+		{"materials", "sort_order", "INT NOT NULL DEFAULT 0"},
 		{"homework_tasks", "package_name", "VARCHAR(128) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "grade", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "semester", "VARCHAR(32) NOT NULL DEFAULT ''"},
