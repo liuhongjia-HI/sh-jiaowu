@@ -186,6 +186,7 @@ func packageAuditSnapshot(item learning.Package) map[string]any {
 		"phaseScope":       item.PhaseScope,
 		"packageType":      item.PackageType,
 		"summary":          item.Summary,
+		"trialEnabled":     item.TrialEnabled,
 		"learningSpaceIds": item.LearningSpaceIDs,
 		"contentTypeCodes": item.ContentTypeCodes,
 		"status":           item.Status,

@@ -47,6 +47,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM system_settings",
 		"DELETE FROM subjects",
 		"DELETE FROM notices",
+		"DELETE FROM student_trial_records",
 		"DELETE FROM student_learning_space_access",
 		"DELETE FROM student_package_grants",
 		"DELETE FROM package_content_types",
@@ -136,9 +137,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, pkg := range s.packages {
 		if _, err := tx.Exec(
-			`INSERT INTO study_packages (id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, status)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			pkg.ID, pkg.Name, pkg.AcademicYear, pkg.Grade, pkg.Semester, pkg.Subject, pkg.Level, pkg.PhaseScope, pkg.PackageType, pkg.Summary, pkg.Status,
+			`INSERT INTO study_packages (id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, trial_enabled, status)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			pkg.ID, pkg.Name, pkg.AcademicYear, pkg.Grade, pkg.Semester, pkg.Subject, pkg.Level, pkg.PhaseScope, pkg.PackageType, pkg.Summary, boolInt(pkg.TrialEnabled), pkg.Status,
 		); err != nil {
 			return err
 		}
@@ -201,6 +202,15 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 			`INSERT INTO student_package_grants (id, external_id, student_id, package_id, starts_at, ends_at, status, operator_id, operator_name)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, '', '')`,
 			dbID, grant.ID, grant.StudentID, grant.PackageID, nullableDate(grant.StartsAt), nullableDate(grantEndsAt(grant)), grant.Status,
+		); err != nil {
+			return err
+		}
+	}
+	for _, trial := range s.trials {
+		if _, err := tx.Exec(
+			`INSERT INTO student_trial_records (external_id, student_id, academic_year, package_id, starts_at, ends_at, status, converted_package_id, converted_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			trial.ID, trial.StudentID, trial.AcademicYear, trial.PackageID, nullableDate(trial.StartsAt), nullableDate(trial.EndsAt), trial.Status, trial.ConvertedPackageID, nullableDateTime(trial.ConvertedAt),
 		); err != nil {
 			return err
 		}

@@ -55,6 +55,27 @@
   height: 100%;
 }
 
+.trial-card,
+.trial-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  border-radius: 18rpx;
+  padding: 26rpx 28rpx;
+  background: linear-gradient(120deg, #fff4dc 0%, #fffdf7 100%);
+  border: 1rpx solid #ffe1a4;
+}
+
+.trial-copy { flex: 1; min-width: 0; }
+.trial-kicker { color: #b66814; font-size: 22rpx; font-weight: 800; }
+.trial-title, .trial-status-title { margin-top: 6rpx; color: #56360f; font-size: 32rpx; font-weight: 850; }
+.trial-sub, .trial-status-sub { margin-top: 8rpx; color: #7c5b31; font-size: 23rpx; line-height: 1.45; }
+.trial-button { flex: none; margin: 0; border-radius: 28rpx; background: #f28a24; color: #fff; font-size: 24rpx; font-weight: 800; line-height: 58rpx; }
+.trial-status-card { background: #eff9ff; border-color: #c8e9fa; }
+.trial-status-card.is-expiring { background: #fff6ea; border-color: #ffd89b; }
+.trial-status-action { flex: none; color: #217ab3; font-size: 25rpx; font-weight: 800; }
+
 .home-banner {
   position: relative;
   min-height: 270rpx;

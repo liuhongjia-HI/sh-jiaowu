@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS study_packages (
   level VARCHAR(16) NOT NULL DEFAULT 'S',
   phase_scope VARCHAR(32) NOT NULL DEFAULT '全学期',
   package_type VARCHAR(32) NOT NULL DEFAULT 'full',
+	trial_enabled TINYINT(1) NOT NULL DEFAULT 0,
   sale_starts_at DATE NULL,
   sale_ends_at DATE NULL,
   status VARCHAR(32) NOT NULL DEFAULT '草稿',
@@ -221,6 +222,21 @@ CREATE TABLE IF NOT EXISTS student_package_grants (
   operator_name VARCHAR(64) NOT NULL DEFAULT '',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_student_package (student_id, package_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS student_trial_records (
+  external_id VARCHAR(64) PRIMARY KEY,
+  student_id VARCHAR(64) NOT NULL,
+  academic_year VARCHAR(32) NOT NULL,
+  package_id VARCHAR(64) NOT NULL,
+  starts_at DATE NOT NULL,
+  ends_at DATE NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  converted_package_id VARCHAR(64) NOT NULL DEFAULT '',
+  converted_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_student_trial_year (student_id, academic_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS student_learning_space_access (

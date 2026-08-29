@@ -49,6 +49,7 @@ type MemoryStore struct {
 	settings                        map[string]string
 	subjects                        []learning.SubjectMetadata
 	grants                          []packageGrant
+	trials                          []studentTrialRecord
 	availability                    []learning.AvailabilitySlot
 	scheduleClasses                 []learning.ScheduleClass
 	commercialOrders                []learning.CommercialOrder
@@ -89,6 +90,18 @@ type packageGrant struct {
 	EndsAt         string
 	Status         string
 	EffectiveUntil string
+}
+
+type studentTrialRecord struct {
+	ID                 string
+	StudentID          string
+	AcademicYear       string
+	PackageID          string
+	StartsAt           string
+	EndsAt             string
+	Status             string
+	ConvertedPackageID string
+	ConvertedAt        string
 }
 
 type learningSpace struct {

@@ -8,8 +8,8 @@ func packageRows(s *MemoryStore) []persistenceRow {
 	rows := make([]persistenceRow, 0, len(s.packages)+len(s.packageSpaces)+len(s.contentTypes))
 	for _, pkg := range s.packages {
 		rows = append(rows, simpleRow("study_packages", "id", pkg.ID,
-			`INSERT INTO study_packages (id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), academic_year=VALUES(academic_year), grade=VALUES(grade), semester=VALUES(semester), subject=VALUES(subject), level=VALUES(level), phase_scope=VALUES(phase_scope), package_type=VALUES(package_type), summary=VALUES(summary), status=VALUES(status)`,
-			pkg.ID, pkg.Name, pkg.AcademicYear, pkg.Grade, pkg.Semester, pkg.Subject, pkg.Level, pkg.PhaseScope, pkg.PackageType, pkg.Summary, pkg.Status))
+			`INSERT INTO study_packages (id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, trial_enabled, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), academic_year=VALUES(academic_year), grade=VALUES(grade), semester=VALUES(semester), subject=VALUES(subject), level=VALUES(level), phase_scope=VALUES(phase_scope), package_type=VALUES(package_type), summary=VALUES(summary), trial_enabled=VALUES(trial_enabled), status=VALUES(status)`,
+			pkg.ID, pkg.Name, pkg.AcademicYear, pkg.Grade, pkg.Semester, pkg.Subject, pkg.Level, pkg.PhaseScope, pkg.PackageType, pkg.Summary, boolInt(pkg.TrialEnabled), pkg.Status))
 	}
 	for _, relation := range s.packageSpaces {
 		rows = append(rows, relationRow("package_spaces", []string{"package_id", "learning_space_id"}, []any{relation.PackageID, relation.LearningSpaceID},

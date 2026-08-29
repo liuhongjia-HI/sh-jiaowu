@@ -128,6 +128,20 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			created_at DATETIME NOT NULL,
 			UNIQUE KEY uk_student_favorite_target (student_id, target_type, target_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS student_trial_records (
+			external_id VARCHAR(64) PRIMARY KEY,
+			student_id VARCHAR(64) NOT NULL,
+			academic_year VARCHAR(32) NOT NULL,
+			package_id VARCHAR(64) NOT NULL,
+			starts_at DATE NOT NULL,
+			ends_at DATE NOT NULL,
+			status VARCHAR(16) NOT NULL,
+			converted_package_id VARCHAR(64) NOT NULL DEFAULT '',
+			converted_at DATETIME NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			UNIQUE KEY uk_student_trial_year (student_id, academic_year)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS student_subscriptions (
 			student_id VARCHAR(64) PRIMARY KEY,
 			enabled TINYINT(1) NOT NULL DEFAULT 0,
@@ -346,6 +360,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"schedule_classes", "created_by", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "created_by_role", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"study_packages", "trial_enabled", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "external_id", mysqlNoticeExternalIDDefinition},
 		{"notices", "channel", "VARCHAR(32) NOT NULL DEFAULT '站内通知'"},

@@ -173,6 +173,23 @@ func (h *LearningHandler) StudentHome(c *gin.Context) {
 	OK(c, home)
 }
 
+func (h *LearningHandler) StartStudentTrial(c *gin.Context) {
+	var req struct {
+		PackageID string `json:"packageId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "体验套餐参数不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	result, err := h.service.StartStudentTrial(principal, strings.TrimSpace(req.PackageID))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
 func (h *LearningHandler) StudentRecommendations(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	recommendations, err := h.service.StudentRecommendations(principal)

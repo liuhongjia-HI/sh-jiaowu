@@ -23,6 +23,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadMaterialsFromDB,
 		s.loadHomeworkFromDB,
 		s.loadGrantsFromDB,
+		s.loadTrialsFromDB,
 		s.loadFileAssetsFromDB,
 		s.loadPreviewJobsFromDB,
 		s.loadReviewsFromDB,
@@ -257,7 +258,7 @@ func (s *MemoryStore) loadTeacherScopes() (map[string]teacherDBScope, error) {
 }
 
 func (s *MemoryStore) loadPackagesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, status FROM study_packages ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, academic_year, grade, semester, subject, level, phase_scope, package_type, summary, trial_enabled, status FROM study_packages ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -265,7 +266,7 @@ func (s *MemoryStore) loadPackagesFromDB() error {
 	packages := []learning.Package{}
 	for rows.Next() {
 		var item learning.Package
-		if err := rows.Scan(&item.ID, &item.Name, &item.AcademicYear, &item.Grade, &item.Semester, &item.Subject, &item.Level, &item.PhaseScope, &item.PackageType, &item.Summary, &item.Status); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.AcademicYear, &item.Grade, &item.Semester, &item.Subject, &item.Level, &item.PhaseScope, &item.PackageType, &item.Summary, &item.TrialEnabled, &item.Status); err != nil {
 			return err
 		}
 		packages = append(packages, item)
@@ -487,6 +488,32 @@ func (s *MemoryStore) loadGrantsFromDB() error {
 	s.grants = grants
 	s.spaceAccess = access
 	return accessRows.Err()
+}
+
+func (s *MemoryStore) loadTrialsFromDB() error {
+	rows, err := s.db.Query(`SELECT external_id, student_id, academic_year, package_id, starts_at, ends_at, status, converted_package_id, converted_at FROM student_trial_records ORDER BY created_at, external_id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	trials := []studentTrialRecord{}
+	for rows.Next() {
+		var item studentTrialRecord
+		var startsAt, endsAt sql.NullTime
+		var convertedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.AcademicYear, &item.PackageID, &startsAt, &endsAt, &item.Status, &item.ConvertedPackageID, &convertedAt); err != nil {
+			return err
+		}
+		item.StartsAt = dateString(startsAt)
+		item.EndsAt = dateString(endsAt)
+		item.ConvertedAt = dateString(convertedAt)
+		trials = append(trials, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	s.trials = trials
+	return nil
 }
 
 func (s *MemoryStore) loadFileAssetsFromDB() error {

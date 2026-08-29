@@ -138,6 +138,7 @@ export type StudyPackage = {
   phaseScope: string;
   packageType: string;
   summary: string;
+  trialEnabled: boolean;
   learningSpaceIds?: string[];
   learningSpaces?: string[];
   contentTypeCodes?: string[];
@@ -156,6 +157,7 @@ export type PackageUpsertRequest = {
   phaseScope: string;
   packageType: string;
   summary: string;
+  trialEnabled: boolean;
   learningSpaceIds: string[];
   contentTypeCodes: string[];
   status: string;

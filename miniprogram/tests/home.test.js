@@ -171,6 +171,34 @@ test("home page displays unopened package recommendations", async () => {
   assert.equal(page.data.visibleRecommendations[0].recommendationReason, "同学习空间推荐");
 });
 
+test("home page lets an eligible student confirm and start a trial", async () => {
+  const calls = [];
+  const page = loadHomePage((path, options) => {
+    calls.push(["request", path, options && options.method, options && options.data]);
+    if (path === "/student/trial/start") {
+      return Promise.resolve({
+        trial: { id: "trial-1", state: "active", remainingDays: 7, packageName: "五年级英语体验" },
+        firstCourseId: "course-1"
+      });
+    }
+    return Promise.resolve({ student: {}, trial: { state: "active", remainingDays: 7 } });
+  }, {
+    getStorageSync() { return ""; },
+    showModal(args) { args.success({ confirm: true }); },
+    showToast(args) { calls.push(["toast", args.title]); },
+    navigateTo(args) { calls.push(["navigate", args.url]); }
+  });
+  page.setData({ trial: { state: "eligible", options: [{ packageId: "pkg-1", packageName: "五年级英语体验", subject: "英语" }] } });
+
+  page.startTrial();
+  await flushPromises();
+  await flushPromises();
+
+  assert.deepEqual(calls.find((item) => item[0] === "request" && item[1] === "/student/trial/start"), ["request", "/student/trial/start", "POST", { packageId: "pkg-1" }]);
+  assert.deepEqual(calls.find((item) => item[0] === "navigate"), ["navigate", "/pages/study-detail/index?id=course-1"]);
+  assert.equal(page.data.trial.state, "active");
+});
+
 test("home page guides student to contact teacher for recommendation", () => {
   const calls = [];
   const page = loadHomePage(() => Promise.resolve({}), {

@@ -95,6 +95,12 @@ func (s *MemoryStore) CreateGrant(operator string, req learning.GrantCreateReque
 	return result1, err
 }
 
+func (s *MemoryStore) StartStudentTrial(principal learning.Principal, packageID string) (learning.StudentTrialStartResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.startStudentTrialUnlocked(principal, packageID)
+}
+
 func (s *MemoryStore) CreateDirectGrant(operator string, req learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

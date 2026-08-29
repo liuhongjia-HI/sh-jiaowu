@@ -38,6 +38,7 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 	notices := s.noticesForStudent(student)
 	feedback := s.classroomFeedbackForStudent(student.ID)
 	subscriptionReminder := s.subscriptionReminder(student.ID)
+	trial := s.studentTrialUnlocked(student)
 	return learning.StudentHome{
 		Student:              student,
 		ContinueCourse:       continueCourse,
@@ -48,6 +49,7 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 		TodayTodos:           s.todayTodosForStudent(student, pendingHomework, feedback, subscriptionReminder),
 		ClassroomFeedback:    feedback,
 		SubscriptionReminder: subscriptionReminder,
+		Trial:                trial,
 	}, nil
 }
 
@@ -459,7 +461,7 @@ func (s *MemoryStore) studentStudyUnlocked(principal learning.Principal) (learni
 	if len(materials) == 0 {
 		materials = []learning.Material{}
 	}
-	return learning.StudentStudyBoard{Student: student, Courses: cards, Materials: materials}, nil
+	return learning.StudentStudyBoard{Student: student, Courses: cards, Materials: materials, Trial: s.studentTrialUnlocked(student)}, nil
 }
 
 // StudentTasks 返回任务列表，studentStatus 由提交记录派生（已完成/待完成）。

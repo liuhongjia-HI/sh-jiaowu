@@ -15,6 +15,7 @@ type Package struct {
 	LearningSpaces   []string `json:"learningSpaces,omitempty"`
 	ContentTypeCodes []string `json:"contentTypeCodes,omitempty"`
 	ContentTypes     []string `json:"contentTypes,omitempty"`
+	TrialEnabled     bool     `json:"trialEnabled"`
 	OpenStudentNum   int      `json:"openStudentNum"`
 	Status           Status   `json:"status"`
 }
@@ -31,7 +32,33 @@ type PackageUpsertRequest struct {
 	Summary          string   `json:"summary"`
 	LearningSpaceIDs []string `json:"learningSpaceIds"`
 	ContentTypeCodes []string `json:"contentTypeCodes"`
+	TrialEnabled     bool     `json:"trialEnabled"`
 	Status           Status   `json:"status"`
+}
+
+// StudentTrial 描述学生当前学年的体验资格与使用状态。体验记录负责资格和
+// 转正归因，套餐授权继续负责具体内容的访问控制。
+type StudentTrial struct {
+	ID            string               `json:"id,omitempty"`
+	State         string               `json:"state"`
+	PackageID     string               `json:"packageId,omitempty"`
+	PackageName   string               `json:"packageName,omitempty"`
+	Subject       string               `json:"subject,omitempty"`
+	StartedAt     string               `json:"startedAt,omitempty"`
+	EndsAt        string               `json:"endsAt,omitempty"`
+	RemainingDays int                  `json:"remainingDays"`
+	Options       []StudentTrialOption `json:"options,omitempty"`
+}
+
+type StudentTrialOption struct {
+	PackageID   string `json:"packageId"`
+	PackageName string `json:"packageName"`
+	Subject     string `json:"subject"`
+}
+
+type StudentTrialStartResult struct {
+	Trial         StudentTrial `json:"trial"`
+	FirstCourseID string       `json:"firstCourseId,omitempty"`
 }
 
 // StudentPackageRecommendation 是学生端可见的未开通套餐摘要。

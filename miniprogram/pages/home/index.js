@@ -9,6 +9,8 @@ Page({
     greetingName: "同学",
     keyword: "",
     home: null,
+    trial: null,
+    trialStarting: false,
     hasContent: false,
     hasOpenedPackage: false,
     pendingTask: null,
@@ -63,6 +65,7 @@ Page({
         const materials = home.materials || [];
         const notices = home.notices || [];
         const feedbackItems = home.classroomFeedback || [];
+        const trial = normalizeTrial(home.trial);
         const subscribeEnabled = wx.getStorageSync("starline_subscribe_enabled") === "1" || !!(home.subscriptionReminder && home.subscriptionReminder.enabled);
         const todoItems = decorateTodos(normalizeTodayTodos(home, {
           pendingHomework,
@@ -77,6 +80,7 @@ Page({
         const progressPercent = Number(home.continueProgress) || 0;
         this.setData({
           home,
+          trial,
           greetingName: preferredGreetingName(student),
           hasContent,
           hasOpenedPackage,
@@ -100,6 +104,7 @@ Page({
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
+        trial: null,
         emptyMessage: error.message || "请先登录绑定，或联系老师开通学习套餐。",
         hasContent: false,
         hasOpenedPackage: false,
@@ -188,6 +193,42 @@ Page({
       return;
     }
     wx.navigateTo({ url: `/pages/study-detail/index?id=${this.data.continueCourse.id}` });
+  },
+  startTrial() {
+    const trial = this.data.trial || {};
+    const options = Array.isArray(trial.options) ? trial.options : [];
+    if (trial.state !== "eligible" || options.length === 0 || this.data.trialStarting) return;
+    if (options.length === 1) {
+      this.confirmStartTrial(options[0]);
+      return;
+    }
+    wx.showActionSheet({
+      itemList: options.map((item) => `${item.subject || ""} ${item.packageName || "体验套餐"}`.trim()),
+      success: (result) => this.confirmStartTrial(options[result.tapIndex])
+    });
+  },
+  confirmStartTrial(option) {
+    if (!option || !option.packageId) {
+      wx.showToast({ title: "体验套餐信息缺失", icon: "none" });
+      return;
+    }
+    wx.showModal({
+      title: "开启 7 天免费体验",
+      content: `将为你开启“${option.packageName}”7 天体验，到期后不会自动扣费。`,
+      confirmText: "开启体验",
+      success: (result) => {
+        if (!result.confirm) return;
+        this.setData({ trialStarting: true });
+        request("/student/trial/start", { method: "POST", data: { packageId: option.packageId } })
+          .then((started) => {
+            this.setData({ trial: normalizeTrial(started.trial), trialStarting: false });
+            wx.showToast({ title: "已开启 7 天体验", icon: "success" });
+            this.loadHome();
+            if (started.firstCourseId) wx.navigateTo({ url: `/pages/study-detail/index?id=${started.firstCourseId}` });
+          })
+          .catch(() => this.setData({ trialStarting: false }));
+      }
+    });
   },
   goAnswer() {
     if (!this.data.pendingTask) {
@@ -470,4 +511,14 @@ function homeEmptyMessage(hasOpenedPackage) {
     return "学习套餐已开通，老师发布课程、课程讲义或小挑战后会显示在这里。";
   }
   return "你的身份已绑定，暂时还没有开通学习套餐，请联系老师或教务确认开通。";
+}
+
+function normalizeTrial(trial) {
+  const value = trial || {};
+  return {
+    ...value,
+    state: value.state || "unavailable",
+    options: Array.isArray(value.options) ? value.options : [],
+    remainingDays: Number(value.remainingDays) || 0
+  };
 }

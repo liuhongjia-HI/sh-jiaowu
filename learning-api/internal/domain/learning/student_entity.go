@@ -210,6 +210,7 @@ type StudentStudyBoard struct {
 	Student   Student             `json:"student"`
 	Courses   []StudentCourseCard `json:"courses"`
 	Materials []Material          `json:"materials"`
+	Trial     StudentTrial        `json:"trial"`
 }
 
 // StudentTask 是任务列表中的一项，studentStatus 由提交记录派生。
@@ -301,4 +302,5 @@ type StudentHome struct {
 	TodayTodos           []StudentTodo        `json:"todayTodos"`
 	ClassroomFeedback    []ClassroomFeedback  `json:"classroomFeedback"`
 	SubscriptionReminder SubscriptionReminder `json:"subscriptionReminder"`
+	Trial                StudentTrial         `json:"trial"`
 }

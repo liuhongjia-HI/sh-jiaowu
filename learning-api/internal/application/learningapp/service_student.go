@@ -41,6 +41,9 @@ func (s *Service) UpdateStudentScore(operator string, principal learning.Princip
 func (s *Service) StudentHome(principal learning.Principal) (learning.StudentHome, error) {
 	return s.student.StudentHome(principal)
 }
+func (s *Service) StartStudentTrial(principal learning.Principal, packageID string) (learning.StudentTrialStartResult, error) {
+	return s.student.StartStudentTrial(principal, packageID)
+}
 func (s *Service) StudentRecommendations(principal learning.Principal) ([]learning.StudentPackageRecommendation, error) {
 	return s.student.StudentRecommendations(principal)
 }

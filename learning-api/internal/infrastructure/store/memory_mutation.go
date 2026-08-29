@@ -76,6 +76,7 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	work.settings = cloneMap(s.settings)
 	work.subjects = append([]learning.SubjectMetadata(nil), s.subjects...)
 	work.grants = append([]packageGrant(nil), s.grants...)
+	work.trials = append([]studentTrialRecord(nil), s.trials...)
 	work.availability = append([]learning.AvailabilitySlot(nil), s.availability...)
 	work.scheduleClasses = make([]learning.ScheduleClass, len(s.scheduleClasses))
 	for index, item := range s.scheduleClasses {
@@ -169,6 +170,7 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.settings = work.settings
 	s.subjects = work.subjects
 	s.grants = work.grants
+	s.trials = work.trials
 	s.availability = work.availability
 	s.scheduleClasses = work.scheduleClasses
 	s.commercialOrders = work.commercialOrders

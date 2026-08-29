@@ -669,6 +669,7 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		PhaseScope:   req.PhaseScope,
 		PackageType:  req.PackageType,
 		Summary:      req.Summary,
+		TrialEnabled: req.TrialEnabled,
 		Status:       req.Status,
 	}, nil
 }

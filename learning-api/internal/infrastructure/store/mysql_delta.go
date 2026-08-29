@@ -23,6 +23,7 @@ func persistStateDeltaTx(tx *sql.Tx, before, after *MemoryStore) error {
 		schedulingRows,
 		commercialRows,
 		engagementRows,
+		trialRows,
 	}
 	for _, build := range builders {
 		if err := syncPersistenceRows(tx, build(before), build(after)); err != nil {
