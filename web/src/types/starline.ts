@@ -308,6 +308,7 @@ export type Course = {
   grade: string;
   learningSpaceId?: string;
   chapterCount: number;
+  chapters?: string[];
   materialNum: number;
   homeworkNum: number;
   status: string;
@@ -317,6 +318,7 @@ export type CourseUpsertRequest = {
   name: string;
   learningSpaceId: string;
   chapterCount: number;
+  chapters?: string[];
   status: string;
 };
 
@@ -384,7 +386,6 @@ export type MaterialReorderRequest = {
 export type Homework = {
   id: string;
   title: string;
-  chapter?: string;
   packageName: string;
   courseId?: string;
   course: string;
@@ -441,7 +442,6 @@ export type HomeworkUpdateRequest = {
   title: string;
   courseId: string;
   learningSpaceId?: string;
-  chapter?: string;
   tagCode?: string;
   chapter: string;
   deadline: string;

@@ -1,22 +1,24 @@
 package learning
 
 type Course struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Subject         string `json:"subject"`
-	Grade           string `json:"grade"`
-	LearningSpaceID string `json:"learningSpaceId,omitempty"`
-	ChapterCount    int    `json:"chapterCount"`
-	MaterialNum     int    `json:"materialNum"`
-	HomeworkNum     int    `json:"homeworkNum"`
-	Status          Status `json:"status"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Subject         string   `json:"subject"`
+	Grade           string   `json:"grade"`
+	LearningSpaceID string   `json:"learningSpaceId,omitempty"`
+	ChapterCount    int      `json:"chapterCount"`
+	Chapters        []string `json:"chapters,omitempty"`
+	MaterialNum     int      `json:"materialNum"`
+	HomeworkNum     int      `json:"homeworkNum"`
+	Status          Status   `json:"status"`
 }
 
 type CourseUpsertRequest struct {
-	Name            string `json:"name"`
-	LearningSpaceID string `json:"learningSpaceId"`
-	ChapterCount    int    `json:"chapterCount"`
-	Status          Status `json:"status"`
+	Name            string   `json:"name"`
+	LearningSpaceID string   `json:"learningSpaceId"`
+	ChapterCount    int      `json:"chapterCount"`
+	Chapters        []string `json:"chapters"`
+	Status          Status   `json:"status"`
 }
 
 type Material struct {

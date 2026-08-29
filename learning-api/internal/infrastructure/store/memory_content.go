@@ -234,9 +234,6 @@ func (s *MemoryStore) reorderMaterialsUnlocked(operator string, principal learni
 			indices[item.ID] = index
 		}
 	}
-	if len(indices) != len(req.MaterialIDs) {
-		return errors.New("资料列表已变更，请刷新后重新排序")
-	}
 	seen := make(map[string]bool, len(req.MaterialIDs))
 	for _, id := range req.MaterialIDs {
 		id = strings.TrimSpace(id)

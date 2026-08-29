@@ -34,6 +34,10 @@ function loadStudyDetailPage(requestImpl, wxMock = {}) {
   return page;
 }
 
+function flushPromises() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 test("study detail shares the current course id and title", () => {
   const page = loadStudyDetailPage(() => Promise.resolve({}), {
     showToast() {}
@@ -51,4 +55,26 @@ test("study detail top-right affordance is a native share button", () => {
   const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
 
   assert.match(wxml, /<button class="detail-share" open-type="share"/);
+});
+
+test("study detail filters its ordered directory by the selected content tag", async () => {
+  const page = loadStudyDetailPage(() => Promise.resolve({
+    course: { name: "五年级英语S1Q1课程" },
+    materials: [{ id: "mat-hd", tagCode: "HD" }],
+    homework: [{ id: "hw-exam", tagCode: "Exam" }],
+    stations: [
+      { title: "第 1 站 讲义", materialId: "mat-hd", tagCode: "HD" },
+      { title: "第 2 站 测试", homeworkId: "hw-exam", tagCode: "Exam" }
+    ]
+  }), { showToast() {} });
+  page.courseId = "course-1";
+
+  page.loadDetail();
+  await flushPromises();
+  assert.deepEqual(page.data.tags.map((tag) => tag.code), ["HD", "Exam"]);
+  assert.equal(page.data.visibleStations.length, 2);
+
+  page.selectTag({ currentTarget: { dataset: { code: "Exam" } } });
+  assert.equal(page.data.activeTag, "Exam");
+  assert.deepEqual(page.data.visibleStations.map((station) => station.homeworkId), ["hw-exam"]);
 });

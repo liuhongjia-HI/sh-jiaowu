@@ -292,6 +292,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"learning_spaces", "level", "VARCHAR(16) NOT NULL DEFAULT 'S'"},
 		{"study_packages", "level", "VARCHAR(16) NOT NULL DEFAULT 'S'"},
 		{"courses", "chapter_count", "INT NOT NULL DEFAULT 0"},
+		{"courses", "chapters_json", "TEXT NULL"},
 		{"materials", "view_count", "INT NOT NULL DEFAULT 0"},
 		{"materials", "file_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"materials", "file_name", "VARCHAR(255) NOT NULL DEFAULT ''"},

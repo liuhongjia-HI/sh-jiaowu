@@ -322,7 +322,7 @@ func (s *MemoryStore) loadPackageContentTypes() ([]packageContentType, error) {
 }
 
 func (s *MemoryStore) loadCoursesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, name, subject, grade, status, chapter_count FROM courses ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json FROM courses ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -330,9 +330,11 @@ func (s *MemoryStore) loadCoursesFromDB() error {
 	out := []learning.Course{}
 	for rows.Next() {
 		var item learning.Course
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.Name, &item.Subject, &item.Grade, &item.Status, &item.ChapterCount); err != nil {
+		var chaptersJSON sql.NullString
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.Name, &item.Subject, &item.Grade, &item.Status, &item.ChapterCount, &chaptersJSON); err != nil {
 			return err
 		}
+		item.Chapters = parseStringSliceJSON(chaptersJSON.String)
 		out = append(out, item)
 	}
 	s.courses = out

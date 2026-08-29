@@ -703,6 +703,10 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 	if req.ChapterCount < 0 {
 		return learning.Course{}, errors.New("章节数不能小于 0")
 	}
+	req.Chapters = cleanPhrases(req.Chapters)
+	if len(req.Chapters) > 0 {
+		req.ChapterCount = len(req.Chapters)
+	}
 	if req.Status == "" {
 		req.Status = learning.StatusEnabled
 	}
@@ -720,6 +724,7 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 		Grade:           space.Grade,
 		LearningSpaceID: space.ID,
 		ChapterCount:    req.ChapterCount,
+		Chapters:        req.Chapters,
 		Status:          req.Status,
 	}
 	if !canSeeCourse(principal, course) {

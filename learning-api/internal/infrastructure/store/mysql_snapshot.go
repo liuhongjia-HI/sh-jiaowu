@@ -155,8 +155,8 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, course := range s.courses {
 		if _, err := tx.Exec(
-			`INSERT INTO courses (id, learning_space_id, name, subject, grade, status, chapter_count) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			course.ID, course.LearningSpaceID, course.Name, course.Subject, course.Grade, course.Status, course.ChapterCount,
+			`INSERT INTO courses (id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			course.ID, course.LearningSpaceID, course.Name, course.Subject, course.Grade, course.Status, course.ChapterCount, mustJSON(course.Chapters),
 		); err != nil {
 			return err
 		}

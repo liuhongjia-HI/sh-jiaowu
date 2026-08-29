@@ -19,8 +19,14 @@
   <view class="detail-section-head">
     <view class="detail-section-title">课程目录 <text>（共 {{stations.length}} 节）</text></view>
   </view>
+  <scroll-view class="tag-filter" scroll-x="true" enable-flex="true" wx:if="{{tags.length}}">
+    <view class="tag-filter-inner">
+      <view class="tag-chip {{activeTag === 'all' ? 'is-active' : ''}}" data-code="all" bindtap="selectTag">全部</view>
+      <view wx:for="{{tags}}" wx:key="code" class="tag-chip {{activeTag === item.code ? 'is-active' : ''}}" data-code="{{item.code}}" bindtap="selectTag">{{item.code}} · {{item.label}} {{item.count}}</view>
+    </view>
+  </scroll-view>
   <view class="lesson-list">
-    <view wx:for="{{stations}}" wx:key="title" class="lesson-row {{item.statusClass}}" data-status="{{item.status}}" data-material-id="{{item.materialId}}" data-homework-id="{{item.homeworkId}}" bindtap="tapStation">
+    <view wx:for="{{visibleStations}}" wx:key="title" class="lesson-row {{item.statusClass}}" data-status="{{item.status}}" data-material-id="{{item.materialId}}" data-homework-id="{{item.homeworkId}}" bindtap="tapStation">
       <view class="lesson-line"></view>
       <view class="lesson-state">{{item.icon}}</view>
       <view class="lesson-copy">
@@ -30,6 +36,7 @@
       <view class="lesson-status">{{item.status}}</view>
     </view>
   </view>
+	<view wx:if="{{!visibleStations.length}}" class="detail-empty-line">这个标签下暂时没有内容</view>
 
   <view class="detail-section-head material-head">
     <view class="detail-section-title">课程讲义 <text>（{{materials.length}} 份）</text></view>

@@ -168,6 +168,11 @@
   padding: 4rpx 0;
 }
 
+.tag-filter { margin: 0 -4rpx 8rpx; white-space: nowrap; }
+.tag-filter-inner { display: inline-flex; gap: 12rpx; padding: 2rpx 4rpx; }
+.tag-chip { padding: 10rpx 16rpx; border-radius: 999rpx; background: #eceef2; color: #646873; font-size: 21rpx; }
+.tag-chip.is-active { background: #ff5a1f; color: #fff; font-weight: 700; }
+
 .lesson-row {
   position: relative;
   display: flex;

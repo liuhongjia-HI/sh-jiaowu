@@ -24,6 +24,52 @@ func TestMaterialsFilterByTitleSubjectUploaderAndUploadedRange(t *testing.T) {
 	}
 }
 
+func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, _ := store.PrincipalByUserID("user-teacher")
+	student, _ := store.PrincipalByUserID("user-student-001")
+	material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "HD 阅读讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", Chapter: "第一章", TagCode: "HD",
+	})
+	if err != nil {
+		t.Fatalf("create tagged material: %v", err)
+	}
+	if material.TagCode != "HD" {
+		t.Fatalf("material tag not returned: %#v", material)
+	}
+	question, err := store.CreateQuestion("英语老师", teacher, learning.QuestionBankUpsertRequest{
+		Title: "第一章题目", Grade: "五年级", Semester: "S1", Subject: "英语", Type: "single", Stem: "选择 A", Options: []string{"A", "B"}, Answer: "A", Score: 10, Status: string(learning.StatusEnabled),
+	})
+	if err != nil {
+		t.Fatalf("create question: %v", err)
+	}
+	homework, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
+		Title: "HW 第一章练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", Chapter: "第一章", TagCode: "HW", QuestionIDs: []string{question.ID}, Status: string(learning.StatusEnabled),
+	})
+	if err != nil {
+		t.Fatalf("create tagged homework: %v", err)
+	}
+	if homework.TagCode != "HW" || homework.Chapter != "第一章" {
+		t.Fatalf("homework dimensions not returned: %#v", homework)
+	}
+	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
+	if err != nil {
+		t.Fatalf("student detail: %v", err)
+	}
+	if !stationHasTag(detail.Stations, material.ID, "HD") || !stationHasTag(detail.Stations, homework.ID, "HW") {
+		t.Fatalf("student stations missing tag: %#v", detail.Stations)
+	}
+}
+
+func stationHasTag(stations []learning.Station, id, tag string) bool {
+	for _, station := range stations {
+		if (station.MaterialID == id || station.HomeworkID == id) && station.TagCode == tag {
+			return true
+		}
+	}
+	return false
+}
+
 func TestReorderMaterialsPersistsCourseDisplayOrder(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")

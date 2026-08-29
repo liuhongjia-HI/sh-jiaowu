@@ -376,9 +376,10 @@ export function CourseDialog({
             options={spaceOptions}
           />
         </Form.Item>
-        <Form.Item name="chapterCount" label="章节数" rules={[{ required: true, message: '请输入章节数' }]}>
-          <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+        <Form.Item name="chapters" label="章节目录" extra="按输入顺序展示；输入名称后按回车新增。">
+          <Select mode="tags" tokenSeparators={[',', '，']} placeholder="例如：第一章、第二章" onChange={(chapters) => form.setFieldValue('chapterCount', chapters.length)} />
         </Form.Item>
+        <Form.Item name="chapterCount" hidden><InputNumber /></Form.Item>
         <Form.Item name="status" label="状态">
           <Select
             options={[
@@ -966,12 +967,12 @@ export function UploadDialog({
         </Form.Item>
         {kind === 'materials' ? (
           <Form.Item name="chapter" label="章节">
-            <Input placeholder="不填则归为未分章节" />
+            <Select allowClear placeholder="不填则归为未分章节" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
           </Form.Item>
         ) : (
           <>
             <Form.Item name="chapter" label="章节">
-              <Input placeholder="不填则按同课程匹配小挑战" />
+              <Select allowClear placeholder="不填则按同课程匹配小挑战" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
             </Form.Item>
             <Alert
               type="info"
@@ -1079,12 +1080,12 @@ export function ContentEditDialog({
         </Form.Item>
         {kind === 'materials' ? (
           <Form.Item name="chapter" label="章节">
-            <Input placeholder="不填则归为未分章节" />
+            <Select allowClear placeholder="不填则归为未分章节" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
           </Form.Item>
         ) : (
           <>
             <Form.Item name="chapter" label="章节">
-              <Input placeholder="不填则按同课程匹配小挑战" />
+              <Select allowClear placeholder="不填则按同课程匹配小挑战" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
             </Form.Item>
             <Form.Item name="assessmentType" label="类型">
               <Radio.Group options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} />
