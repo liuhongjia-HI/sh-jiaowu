@@ -8,13 +8,15 @@ import (
 	"testing"
 )
 
-func TestWatermarkPageScriptStampsBeforeEveryPageOutput(t *testing.T) {
+func TestWatermarkEndPageScriptStampsOnlyContentPages(t *testing.T) {
 	script := watermarkPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
 
 	for _, expected := range []string{
 		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
-		"/OriginalShowpage /showpage load def",
-		"/showpage { StarlineWatermark OriginalShowpage } bind def",
+		"<< /EndPage {",
+		"dup 0 eq",
+		"pop pop true",
+		"pop pop false",
 		"initgraphics",
 		"clippath pathbbox",
 		"stringwidth",
@@ -25,8 +27,40 @@ func TestWatermarkPageScriptStampsBeforeEveryPageOutput(t *testing.T) {
 			t.Fatalf("watermark script should contain %q, got %s", expected, script)
 		}
 	}
-	if strings.Contains(script, "/EndPage") {
-		t.Fatalf("watermark script must not use EndPage because PDF page setup resets it: %s", script)
+	if strings.Contains(script, "/showpage") {
+		t.Fatalf("watermark script must not override showpage because PDF rendering does not call it: %s", script)
+	}
+}
+
+func TestCountPDFPagesPermitsGhostscriptToReadSourcePDF(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	previewPath := filepath.Join(root, "preview.pdf")
+	if err := os.WriteFile(previewPath, []byte("%PDF-1.4 fixture"), 0644); err != nil {
+		t.Fatalf("write preview: %v", err)
+	}
+	gsScript := "#!/bin/sh\n" +
+		"for arg in \"$@\"; do\n" +
+		"  if [ \"$arg\" = \"--permit-file-read=" + previewPath + "\" ]; then\n" +
+		"    echo 4\n" +
+		"    exit 0\n" +
+		"  fi\n" +
+		"done\n" +
+		"exit 1\n"
+	if err := os.WriteFile(filepath.Join(binDir, "gs"), []byte(gsScript), 0755); err != nil {
+		t.Fatalf("write fake gs: %v", err)
+	}
+	t.Setenv("PATH", binDir)
+
+	pageCount, err := countPDFPages(context.Background(), previewPath)
+	if err != nil {
+		t.Fatalf("count PDF pages: %v", err)
+	}
+	if pageCount != 4 {
+		t.Fatalf("page count = %d, want 4", pageCount)
 	}
 }
 

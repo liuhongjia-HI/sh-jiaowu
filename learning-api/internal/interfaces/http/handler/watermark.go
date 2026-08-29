@@ -101,8 +101,9 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 	return nil
 }
 
-// watermarkPageScript 在每页 showpage 前绘制可追溯文字。
-// 不能使用 EndPage：PDF 解释器会为每页执行 setpagedevice，导致 EndPage 被重置并额外输出空白页。
+// watermarkPageScript 通过 EndPage 钩子在内容页落盘前绘制可追溯文字。
+// PDF 解释器会产生 reason=2 的设备切换事件；该事件不能输出页面，
+// 否则会生成只有水印的空白页。只有 reason=0 才是实际内容页。
 // 学生交付水印只使用 ASCII 追溯信息，避免服务器缺少中文字体时出现空白或乱码。
 func watermarkPageScript(watermarkText string) string {
 	escaped := escapePostScriptString(watermarkText)
@@ -128,8 +129,14 @@ func watermarkPageScript(watermarkText string) string {
   watermarkWidth -2 div 210 moveto WatermarkText show
   grestore
 } bind def
-/OriginalShowpage /showpage load def
-/showpage { StarlineWatermark OriginalShowpage } bind def`
+<< /EndPage {
+  dup 0 eq {
+    StarlineWatermark
+    pop pop true
+  } {
+    pop pop false
+  } ifelse
+} bind >> setpagedevice`
 }
 
 // countPDFPages 用 Ghostscript 内置的 runpdfbegin/pdfpagecount 探测页数，
@@ -150,7 +157,7 @@ pdfpagecount = quit
 		return 0, err
 	}
 	defer os.Remove(scriptPath)
-	countCmd := execCommandContext(ctx, "gs", "-q", "-dBATCH", "-dNOPAUSE", "-dSAFER", "-dNODISPLAY", scriptPath)
+	countCmd := execCommandContext(ctx, "gs", "-q", "-dBATCH", "-dNOPAUSE", "-dSAFER", "--permit-file-read="+sourcePath, "-dNODISPLAY", scriptPath)
 	out, err := countCmd.Output()
 	if err != nil {
 		return 0, fmt.Errorf("页数探测失败: %w", err)
