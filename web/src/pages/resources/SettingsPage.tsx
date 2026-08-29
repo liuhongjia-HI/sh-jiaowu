@@ -1,8 +1,9 @@
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { CalendarOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, putData } from '../../services/http';
+import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton } from '../../components/ListViews';
 import type { SettingUpdateRequest, SubjectMetadata, SubjectMetadataUpdateRequest } from '../../types/starline';
 
@@ -187,12 +188,12 @@ function AcademicCalendarCard({
         />
       )}
 
-      <Modal
+      <FormDrawer
         title={originalYear ? `编辑${originalYear}` : '新增学年'}
         open={modalOpen}
         onCancel={close}
-        footer={<Space><Button onClick={close}>取消</Button><Button type="primary" loading={saving} onClick={() => form.submit()}>保存</Button></Space>}
-        destroyOnHidden
+        onSubmit={() => form.submit()}
+        submitting={saving}
       >
         <Form form={form} layout="vertical" onFinish={submit}>
           <Form.Item name="academicYear" label="学年" rules={[{ required: true, message: '请输入学年，例如 2026.2027学年' }]}>
@@ -215,7 +216,7 @@ function AcademicCalendarCard({
             </Form.Item>
           </Space.Compact>
         </Form>
-      </Modal>
+      </FormDrawer>
     </Card>
   );
 }
@@ -294,12 +295,12 @@ function SubjectMetadataCard() {
           ]}
         />
       )}
-      <Modal
+      <FormDrawer
         title={editing ? `编辑${editing.name}显示配置` : '编辑学科显示配置'}
         open={Boolean(editing)}
         onCancel={() => setEditing(null)}
-        destroyOnHidden
-        footer={<Space><Button onClick={() => setEditing(null)}>取消</Button><Button type="primary" loading={save.isPending} onClick={() => form.submit()}>保存</Button></Space>}
+        onSubmit={() => form.submit()}
+        submitting={save.isPending}
       >
         <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
           <Form.Item name="shortLabel" label="显示简称" rules={[{ required: true, message: '请输入显示简称' }, { max: 20, message: '显示简称不能超过20个字符' }]}>
@@ -315,7 +316,7 @@ function SubjectMetadataCard() {
             <Select options={[{ label: '启用', value: '启用' }, { label: '停用', value: '停用' }]} />
           </Form.Item>
         </Form>
-      </Modal>
+      </FormDrawer>
     </Card>
   );
 }
@@ -396,11 +397,12 @@ export default function SettingsPage() {
             ]}
           />
 
-          <Modal
+          <FormDrawer
             title={`编辑${editing ? labels[editing.key] ?? editing.key : '设置'}`}
             open={Boolean(editing)}
             onCancel={() => setEditing(null)}
-            footer={<Space><Button onClick={() => setEditing(null)}>取消</Button><Button type="primary" loading={save.isPending} onClick={() => form.submit()}>保存</Button></Space>}
+            onSubmit={() => form.submit()}
+            submitting={save.isPending}
           >
             <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
               <Form.Item name="key" hidden><Input /></Form.Item>
@@ -415,7 +417,7 @@ export default function SettingsPage() {
                 ) : <Input.TextArea rows={4} />}
               </Form.Item>
             </Form>
-          </Modal>
+          </FormDrawer>
         </>
       )}
     </div>

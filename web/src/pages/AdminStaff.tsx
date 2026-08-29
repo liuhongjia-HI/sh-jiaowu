@@ -3,6 +3,7 @@ import { Alert, Button, Card, Empty, Form, Input, Modal, Select, Skeleton, Space
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, postData, putData, resetAdminStaffPassword } from '../services/http';
+import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
 import type { AdminStaff, AdminStaffUpsertRequest, PasswordResetResult, Role } from '../types/starline';
 
@@ -164,13 +165,12 @@ export default function AdminStaff() {
         )}
       </Card>
 
-      <Modal
+      <FormDrawer
         title={editing ? '编辑管理人员' : '新增管理人员'}
         open={open}
         onCancel={() => setOpen(false)}
-        onOk={() => form.submit()}
-        confirmLoading={saveStaff.isPending}
-        destroyOnHidden
+        onSubmit={() => form.submit()}
+        submitting={saveStaff.isPending}
       >
         <Form form={form} layout="vertical" onFinish={(values) => saveStaff.mutate(values)}>
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
@@ -196,7 +196,7 @@ export default function AdminStaff() {
             </Form.Item>
           )}
         </Form>
-      </Modal>
+      </FormDrawer>
       <Modal
         title="临时密码"
         open={Boolean(resetResult)}

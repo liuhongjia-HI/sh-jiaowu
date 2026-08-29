@@ -1,9 +1,10 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Popconfirm, Radio, Skeleton, Space, Switch, Table, Tag, Typography, Upload, message } from 'antd';
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Radio, Skeleton, Space, Switch, Table, Tag, Typography, Upload, message } from 'antd';
 import type { UploadFile } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, postData, postForm, putData, resolveAssetUrl } from '../services/http';
+import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
 import type { Banner, BannerLinkType, BannerUpsertRequest } from '../types/starline';
 
@@ -184,13 +185,12 @@ export default function Banners() {
         )}
       </Card>
 
-      <Modal
+      <FormDrawer
         title={editing ? '编辑轮播图' : '新增轮播图'}
         open={open}
         onCancel={() => setOpen(false)}
-        onOk={() => form.submit()}
-        confirmLoading={saveBanner.isPending || uploadImage.isPending}
-        destroyOnHidden
+        onSubmit={() => form.submit()}
+        submitting={saveBanner.isPending || uploadImage.isPending}
       >
         <Form form={form} layout="vertical" onFinish={(values) => saveBanner.mutate(values)}>
           <Form.Item
@@ -256,7 +256,7 @@ export default function Banners() {
             <Switch />
           </Form.Item>
         </Form>
-      </Modal>
+      </FormDrawer>
     </div>
   );
 }

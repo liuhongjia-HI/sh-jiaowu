@@ -31,6 +31,7 @@ import {
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, postData } from '../services/http';
+import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton } from '../components/ListViews';
 import type {
   CommercialOrder,
@@ -231,13 +232,12 @@ export default function Commercial() {
         />
       </Card>
 
-      <Modal
+      <FormDrawer
         title="新建订单"
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
-        onOk={() => orderForm.submit()}
-        confirmLoading={createOrder.isPending}
-        destroyOnClose
+        onSubmit={() => orderForm.submit()}
+        submitting={createOrder.isPending}
       >
         <Form form={orderForm} layout="vertical" onFinish={(values) => createOrder.mutate(normalizeOrder(values))}>
           <Form.Item name="studentId" label="学生" rules={[{ required: true, message: '请选择学生' }]}>
@@ -256,7 +256,7 @@ export default function Commercial() {
             <Input.TextArea rows={3} maxLength={120} showCount placeholder="可填写报名渠道、优惠说明或家长诉求" />
           </Form.Item>
         </Form>
-      </Modal>
+      </FormDrawer>
 
       <Modal
         title={activeAction ? `${actionTitle[activeAction.kind]} · ${activeAction.order.studentName}` : '订单操作'}

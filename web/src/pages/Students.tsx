@@ -28,6 +28,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getData, postData, postForm, putData } from '../services/http';
+import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
 import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
 import type {
@@ -77,7 +78,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   const [filters, setFilters] = useState<StudentFilters>({});
   const [studentForm] = Form.useForm<StudentFormValues>();
   const [editing, setEditing] = useState<Student | null>(null);
-  const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [studentDrawerOpen, setStudentDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Student | null>(null);
   const [studentDrawerTab, setStudentDrawerTab] = useState('profile');
   const [directLearningSpaceIds, setDirectLearningSpaceIds] = useState<string[]>([]);
@@ -120,7 +121,7 @@ export default function Students({ user }: { user: CurrentUser }) {
     },
     onSuccess: () => {
       message.success(editing?.accountStatus === '待审核' ? '审核结果已保存' : editing ? '学生信息已保存' : '学生已新增');
-      setStudentModalOpen(false);
+      setStudentDrawerOpen(false);
       setEditing(null);
       queryClient.invalidateQueries({ queryKey: ['students'] });
     },
@@ -199,7 +200,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   function openCreate() {
     setEditing(null);
     studentForm.setFieldsValue({ name: '', phone: '', grade: '', schoolName: '', guardianName: '', remark: '', enabled: true });
-    setStudentModalOpen(true);
+    setStudentDrawerOpen(true);
   }
 
   function openEdit(student: Student) {
@@ -213,7 +214,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       remark: student.remark ?? '',
       enabled: student.accountStatus !== '停用'
     });
-    setStudentModalOpen(true);
+    setStudentDrawerOpen(true);
   }
 
   const columns: TableColumnsType<Student> = [
@@ -362,14 +363,13 @@ export default function Students({ user }: { user: CurrentUser }) {
         </div>
       </Card>
 
-      <Modal
+      <FormDrawer
         title={reviewingStudentRequest ? '审核学生申请' : editing ? '编辑学生' : '新增学生'}
-        open={studentModalOpen}
-        onCancel={() => setStudentModalOpen(false)}
-        onOk={() => studentForm.submit()}
-        okText={reviewingStudentRequest ? '提交审核' : undefined}
-        confirmLoading={saveStudent.isPending}
-        destroyOnHidden
+        open={studentDrawerOpen}
+        onCancel={() => setStudentDrawerOpen(false)}
+        onSubmit={() => studentForm.submit()}
+        submitText={reviewingStudentRequest ? '提交审核' : editing ? '保存' : '确定'}
+        submitting={saveStudent.isPending}
       >
         <Form form={studentForm} layout="vertical" onFinish={(values) => saveStudent.mutate(values)}>
           {reviewingStudentRequest && <Alert type="info" showIcon message="该学生由家长在小程序提交，审核通过后才会出现在家长的可切换列表中。" style={{ marginBottom: 16 }} />}
@@ -397,7 +397,7 @@ export default function Students({ user }: { user: CurrentUser }) {
             </Form.Item>
           )}
         </Form>
-      </Modal>
+      </FormDrawer>
 
       <Modal
         title="批量导入学生"
@@ -610,13 +610,12 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
           ]}
         />
       )}
-      <Modal
+      <FormDrawer
         title={editing ? '修正成绩' : '录入成绩'}
         open={open}
         onCancel={() => setOpen(false)}
-        onOk={() => form.submit()}
-        confirmLoading={saveScore.isPending}
-        destroyOnHidden
+        onSubmit={() => form.submit()}
+        submitting={saveScore.isPending}
       >
         <Form form={form} layout="vertical" onFinish={(values) => saveScore.mutate(values)}>
           <Form.Item name="examName" label="考试/测评名称" rules={[{ required: true, message: '请输入考试或测评名称' }]}>
@@ -648,7 +647,7 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
             <RichTextInput placeholder="用家长能看懂的话说明下一步怎么补。" />
           </Form.Item>
         </Form>
-      </Modal>
+      </FormDrawer>
     </Space>
   );
 }

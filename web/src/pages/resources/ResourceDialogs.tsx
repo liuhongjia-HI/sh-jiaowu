@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
+import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
 import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, levelOptions, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
@@ -225,16 +226,12 @@ export function SettingDialog({
   onSubmit: (values: SettingFormValues) => void;
 }) {
   return (
-    <Modal
+    <FormDrawer
       title="编辑系统设置"
       open={Boolean(setting)}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={loading}
       onCancel={onCancel}
-      onOk={() => form.submit()}
-      destroyOnHidden
-      styles={{ body: { maxHeight: 'calc(100vh - 240px)', overflowY: 'auto', paddingRight: 4 } }}
+      onSubmit={() => form.submit()}
+      submitting={loading}
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="key" label="设置项">
@@ -247,7 +244,7 @@ export function SettingDialog({
           <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} placeholder="请输入设置值" />
         </Form.Item>
       </Form>
-    </Modal>
+    </FormDrawer>
   );
 }
 
@@ -317,16 +314,13 @@ export function CourseDialog({
   }, [availableSpaces, form, open, selectedSpaceId]);
 
   return (
-    <Modal
+    <FormDrawer
       title={editing ? '编辑课程' : '新增课程'}
       open={open}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={loading}
-      okButtonProps={{ disabled: !hasSpaceOptions }}
       onCancel={onCancel}
-      onOk={() => form.submit()}
-      destroyOnHidden
+      onSubmit={() => form.submit()}
+      submitDisabled={!hasSpaceOptions}
+      submitting={loading}
     >
       {!availableSpaces.length && (
         <Alert
@@ -390,7 +384,7 @@ export function CourseDialog({
           />
         </Form.Item>
       </Form>
-    </Modal>
+    </FormDrawer>
   );
 }
 
@@ -520,14 +514,12 @@ export function PackageDialog({
   }, [academicYear, autoNameEnabled, contentTypeCodes, editing, form, grade, learningSpaceIds, learningSpaces, level, open, semester, subject]);
 
   return (
-    <Modal
+    <FormDrawer
       title={editing ? '编辑课程方案' : '新增课程方案'}
       open={open}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={loading}
       onCancel={onCancel}
-      onOk={() => form.submit()}
+      onSubmit={() => form.submit()}
+      submitting={loading}
       afterOpenChange={(visible) => {
         if (visible) {
           form.setFieldsValue(initialValues);
@@ -535,8 +527,7 @@ export function PackageDialog({
           setAutoNameEnabled(!editing);
         }
       }}
-      destroyOnHidden
-      width={720}
+      width="min(720px, 100vw)"
     >
         <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="name" label="方案名称" rules={[{ required: true, message: '请输入方案名称' }]}>
@@ -625,7 +616,7 @@ export function PackageDialog({
           <Input.TextArea rows={3} placeholder="说明这个方案适合什么学生、包含哪些课程内容。" />
         </Form.Item>
       </Form>
-    </Modal>
+    </FormDrawer>
   );
 }
 
@@ -740,17 +731,15 @@ export function QuestionDialog({
     }
   }, [editing, form, hasScope, open, scopeError, scopeLoading, scopedGradeOptions, scopedSemesterOptions, scopedSubjectOptions]);
   return (
-    <Modal
+    <FormDrawer
       title={editing ? '编辑题库题目' : '新增题库题目'}
       open={open}
-      okText="保存"
-      cancelText="取消"
       className="question-dialog"
-      confirmLoading={loading}
-      okButtonProps={{ disabled: saveDisabled }}
       onCancel={onCancel}
-      onOk={() => form.submit()}
-      destroyOnHidden
+      onSubmit={() => form.submit()}
+      submitDisabled={saveDisabled}
+      submitting={loading}
+      width="min(640px, 100vw)"
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         {scopeLoading && (
@@ -913,7 +902,7 @@ export function QuestionDialog({
           </Form.Item>
         </Space.Compact>
       </Form>
-    </Modal>
+    </FormDrawer>
   );
 }
 
@@ -941,15 +930,14 @@ export function UploadDialog({
   const selectedCourse = courses.find((course) => course.id === courseId);
   const availableQuestions = questionsForCourse(selectedCourse, questions, learningSpaces);
   return (
-    <Modal
+    <FormDrawer
       title={kind === 'materials' ? '上传课程讲义' : '组卷发布小挑战'}
       open={open}
-      okText={kind === 'materials' ? '上传' : '发布'}
-      cancelText="取消"
-      confirmLoading={loading}
       onCancel={onCancel}
-      onOk={() => form.submit()}
-      destroyOnHidden
+      onSubmit={() => form.submit()}
+      submitText={kind === 'materials' ? '上传' : '发布'}
+      submitting={loading}
+      width={kind === 'homework' ? 'min(720px, 100vw)' : undefined}
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="title" label={kind === 'materials' ? '资料标题' : '练习标题'} rules={kind === 'homework' ? [{ required: true, message: '请输入标题' }] : []}>
@@ -970,12 +958,12 @@ export function UploadDialog({
           <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
         </Form.Item>
         {kind === 'materials' ? (
-          <Form.Item name="chapter" label="章节">
+          <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
             <Select allowClear placeholder="不填则归为未分章节" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
           </Form.Item>
         ) : (
           <>
-            <Form.Item name="chapter" label="章节">
+            <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
               <Select allowClear placeholder="不填则按同课程匹配小挑战" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
             </Form.Item>
             <Alert
@@ -1025,7 +1013,7 @@ export function UploadDialog({
           </>
         )}
       </Form>
-    </Modal>
+    </FormDrawer>
   );
 }
 
@@ -1054,15 +1042,13 @@ export function ContentEditDialog({
   const selectedCourse = courses.find((course) => course.id === courseId);
   const availableQuestions = questionsForCourse(selectedCourse, questions, learningSpaces);
   return (
-    <Modal
+    <FormDrawer
       title={kind === 'materials' ? '编辑课程讲义' : '编辑小挑战组卷'}
       open={Boolean(item)}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={loading}
       onCancel={onCancel}
-      onOk={() => form.submit()}
-      destroyOnHidden
+      onSubmit={() => form.submit()}
+      submitting={loading}
+      width={kind === 'homework' ? 'min(720px, 100vw)' : undefined}
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
         <Form.Item name="title" label={kind === 'materials' ? '资料标题' : '题目标题'} rules={[{ required: true, message: '请输入标题' }]}>
@@ -1083,12 +1069,12 @@ export function ContentEditDialog({
           <Select allowClear placeholder="选择一个主标签" options={contentTagOptions} />
         </Form.Item>
         {kind === 'materials' ? (
-          <Form.Item name="chapter" label="章节">
+          <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
             <Select allowClear placeholder="不填则归为未分章节" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
           </Form.Item>
         ) : (
           <>
-            <Form.Item name="chapter" label="章节">
+            <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
               <Select allowClear placeholder="不填则按同课程匹配小挑战" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
             </Form.Item>
             <Form.Item name="assessmentType" label="类型">
@@ -1122,6 +1108,6 @@ export function ContentEditDialog({
           />
         </Form.Item>
       </Form>
-    </Modal>
+    </FormDrawer>
   );
 }

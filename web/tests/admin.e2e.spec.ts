@@ -48,7 +48,7 @@ async function createQuestion(page: Page, title: string, typeText: string, stem:
     await dialog.locator('label.ant-radio-wrapper').filter({ hasText: answer }).click();
   }
   await dialog.getByLabel('分值').fill(score);
-  await dialog.locator('.ant-modal-footer .ant-btn-primary').click();
+  await dialog.getByRole('button', { name: '保存' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(title)).toBeVisible();
 }
@@ -94,9 +94,10 @@ test('新增课程方案默认带出当前学年', async ({ page }) => {
   await expectPageHeading(page, '/packages', '课程方案');
 
   await page.getByRole('button', { name: '新增方案' }).click();
-  const dialog = page.getByRole('dialog', { name: '新增课程方案' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('2026.2027学年', { exact: true })).toBeVisible();
+  const drawer = page.getByRole('dialog', { name: '新增课程方案' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toHaveClass(/ant-drawer-content/);
+  await expect(drawer.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
 
 test('点击课程方案名称可查看该方案的课程讲义', async ({ page }) => {
@@ -169,7 +170,8 @@ test('教师可以进入题库并打开手动组卷入口', async ({ page }) => 
   await page.getByRole('button', { name: '新增题目' }).click();
   const questionDialog = page.getByRole('dialog', { name: '新增题库题目' });
   await expect(questionDialog).toBeVisible();
-  await page.locator('.question-dialog .ant-modal-footer button').filter({ hasText: /取\s*消/ }).click();
+  await expect(questionDialog).toHaveClass(/ant-drawer-content/);
+  await questionDialog.getByRole('button', { name: '取消' }).click();
 
   await expectPageHeading(page, '/homework', '课后练习');
   await page.getByRole('button', { name: '手动组卷' }).click();
@@ -198,7 +200,7 @@ test('教师可以新增题目并手动组卷发布小挑战', async ({ page }) 
   await dialog.getByLabel('截止时间').fill('2026-12-31T18:00');
   await dialog.getByRole('checkbox', { name: singleTitle, exact: false }).check();
   await dialog.getByRole('checkbox', { name: textTitle, exact: false }).check();
-  await dialog.locator('.ant-modal-footer .ant-btn-primary').click();
+  await dialog.getByRole('button', { name: '发布' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(homeworkTitle)).toBeVisible();
 });

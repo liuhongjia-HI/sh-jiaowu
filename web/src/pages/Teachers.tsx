@@ -3,6 +3,7 @@ import { Alert, Button, Card, Empty, Form, Input, Modal, Select, Skeleton, Space
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, postData, putData, resetTeacherPassword } from '../services/http';
+import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
 import type { LearningSpace, PasswordResetResult, Teacher, TeacherUpsertRequest } from '../types/starline';
 
@@ -196,13 +197,12 @@ export default function Teachers() {
         )}
       </Card>
 
-      <Modal
+      <FormDrawer
         title={editing ? '编辑教师' : '新增教师'}
         open={open}
         onCancel={() => setOpen(false)}
-        onOk={() => form.submit()}
-        confirmLoading={saveTeacher.isPending}
-        destroyOnHidden
+        onSubmit={() => form.submit()}
+        submitting={saveTeacher.isPending}
       >
         <Form form={form} layout="vertical" onFinish={submitTeacher}>
           {!editing && (
@@ -259,7 +259,7 @@ export default function Teachers() {
             </>
           )}
         </Form>
-      </Modal>
+      </FormDrawer>
       <Modal
         title="临时密码"
         open={Boolean(resetResult)}
