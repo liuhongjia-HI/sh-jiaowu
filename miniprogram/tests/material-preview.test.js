@@ -233,27 +233,31 @@ test("openSecurePreview ignores repeated taps while the document is opening", as
   assert.equal(page.data.openingPreview, false);
 });
 
-test("openSecurePreview uses the loaded cover in devtools where openDocument has no visible UI", async () => {
-  const previewCalls = [];
+test("openSecurePreview opens the in-app reader when paged preview is ready", async () => {
+  const navigationCalls = [];
   let downloadCount = 0;
   const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock({
     getDeviceInfo() { return { platform: "devtools" }; },
     downloadFile() { downloadCount += 1; },
-    previewImage(opts) {
-      previewCalls.push({ current: opts.current, urls: opts.urls });
-      opts.success && opts.success();
+    navigateTo(opts) {
+      navigationCalls.push(opts.url);
     }
   }));
+  page.materialId = "mat-1";
   page.setData({
-    material: { previewUrl: "/api/student/materials/mat-1/preview" },
-    previewImagePath: "page-1#local"
+    material: { previewUrl: "/api/student/materials/mat-1/preview", title: "第一课" },
+    previewMode: "image",
+    previewImagePath: "page-1#local",
+    pageCount: 3
   });
 
   page.openSecurePreview();
   await flushPromises();
 
   assert.equal(downloadCount, 0);
-  assert.deepEqual(previewCalls, [{ current: "page-1#local", urls: ["page-1#local"] }]);
+  assert.deepEqual(navigationCalls, [
+    "/pages/material-reader/index?id=mat-1&title=%E7%AC%AC%E4%B8%80%E8%AF%BE"
+  ]);
 });
 
 test("material preview consumes structured processing status without treating it as an error", async () => {

@@ -197,7 +197,6 @@
 }
 
 .notice-title,
-.notice-summary,
 .notice-target {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -220,6 +219,9 @@
   margin-top: 8rpx;
   color: #777a83;
   font-size: 22rpx;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .notice-target {

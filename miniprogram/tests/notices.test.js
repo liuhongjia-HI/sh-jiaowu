@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 function loadNoticesPage(requestImpl) {
@@ -70,4 +72,12 @@ test("notice tab keeps an empty filtered result when that category has no messag
 
   assert.equal(page.data.notices.length, 1);
   assert.deepEqual(page.data.visibleNotices, []);
+});
+
+test("notice summary wraps so the complete message remains visible", () => {
+  const styles = fs.readFileSync(path.join(__dirname, "../pages/notices/index.wxss"), "utf8");
+  const summaryRules = [...styles.matchAll(/\.notice-summary\s*\{([^}]*)\}/g)].map((match) => match[1]).join("\n");
+
+  assert.match(summaryRules, /white-space:\s*normal/);
+  assert.match(summaryRules, /overflow-wrap:\s*anywhere/);
 });

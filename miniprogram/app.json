@@ -5,6 +5,7 @@
     "pages/study/index",
     "pages/study-detail/index",
     "pages/material-preview/index",
+    "pages/material-reader/index",
     "pages/tasks/index",
     "pages/answer/index",
     "pages/result/index",

@@ -238,11 +238,12 @@ Page({
       wx.showToast({ title: "完整课件还在准备，请稍后再试", icon: "none" });
       return;
     }
-    if (isDevtools() && this.data.previewImagePath) {
-      this.setData({ openingPreview: true });
-      previewImage(this.data.previewImagePath)
-        .catch((error) => showFileError("课件预览失败", error))
-        .finally(() => this.setData({ openingPreview: false }));
+    if (this.materialId && this.data.previewMode === "image" && this.data.pageCount > 0) {
+      const title = encodeURIComponent(this.data.material.title || this.data.pageTitle || "课件阅读");
+      wx.navigateTo({
+        url: `/pages/material-reader/index?id=${encodeURIComponent(this.materialId)}&title=${title}`,
+        fail: (error) => showFileError("课件阅读页打开失败", error)
+      });
       return;
     }
     this.setData({ openingPreview: true });
@@ -336,28 +337,6 @@ function openDocument(filePath) {
       }
     });
   });
-}
-
-function previewImage(filePath) {
-  return new Promise((resolve, reject) => {
-    wx.previewImage({
-      current: filePath,
-      urls: [filePath],
-      success: resolve,
-      fail(error) {
-        reject(new Error((error && error.errMsg) || "课件图片预览失败"));
-      }
-    });
-  });
-}
-
-function isDevtools() {
-  if (!wx.getDeviceInfo) return false;
-  try {
-    return wx.getDeviceInfo().platform === "devtools";
-  } catch (_) {
-    return false;
-  }
 }
 
 // stripApiPrefix 去掉后端接口返回字段里多余的 "/api" 前缀。

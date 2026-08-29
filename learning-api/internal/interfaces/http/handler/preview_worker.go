@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"starline/learning-api/internal/application/learningapp"
@@ -68,12 +69,6 @@ func (w *PreviewWorker) processNext(ctx context.Context) bool {
 }
 
 func (w *PreviewWorker) generate(ctx context.Context, asset learning.FileAsset) (learning.PreviewResult, error) {
-	if _, err := os.Stat(asset.OriginalPath); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return learning.PreviewResult{}, errors.New("原文件不存在，请重新上传")
-		}
-		return learning.PreviewResult{}, fmt.Errorf("读取原文件失败: %w", err)
-	}
 	root, err := filepath.Abs(w.storageRoot)
 	if err != nil {
 		return learning.PreviewResult{}, errors.New("文件存储目录不可用")
@@ -86,9 +81,23 @@ func (w *PreviewWorker) generate(ctx context.Context, asset learning.FileAsset) 
 	if err := os.MkdirAll(pageDir, 0750); err != nil {
 		return learning.PreviewResult{}, fmt.Errorf("创建分页目录失败: %w", err)
 	}
-	previewPath, err := buildPreview(ctx, asset.OriginalPath, previewDir, filepath.Ext(asset.OriginalPath))
-	if err != nil {
-		return learning.PreviewResult{}, err
+	previewPath := strings.TrimSpace(asset.PreviewPath)
+	if previewPath == "" || asset.PreviewStatus != "可预览" {
+		if _, err := os.Stat(asset.OriginalPath); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return learning.PreviewResult{}, errors.New("原文件不存在，请重新上传")
+			}
+			return learning.PreviewResult{}, fmt.Errorf("读取原文件失败: %w", err)
+		}
+		previewPath, err = buildPreview(ctx, asset.OriginalPath, previewDir, filepath.Ext(asset.OriginalPath))
+		if err != nil {
+			return learning.PreviewResult{}, err
+		}
+	} else if _, err := os.Stat(previewPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return learning.PreviewResult{}, errors.New("现有预览文件不存在，请重新上传")
+		}
+		return learning.PreviewResult{}, fmt.Errorf("读取现有预览文件失败: %w", err)
 	}
 	pageCount, err := countPDFPages(ctx, previewPath)
 	if err != nil {
