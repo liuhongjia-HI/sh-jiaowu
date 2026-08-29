@@ -5,7 +5,32 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"starline/learning-api/internal/domain/learning"
 )
+
+func TestStudentPreviewPagesMetadataUsesStructuredStatuses(t *testing.T) {
+	tests := []struct {
+		name      string
+		asset     learning.FileAsset
+		wantState string
+		wantImage bool
+	}{
+		{name: "processing", asset: learning.FileAsset{PreviewStatus: "待转换"}, wantState: "processing"},
+		{name: "failed", asset: learning.FileAsset{PreviewStatus: "转换失败"}, wantState: "failed"},
+		{name: "pdf fallback", asset: learning.FileAsset{PreviewStatus: "可预览", PreviewPath: "preview.pdf"}, wantState: "ready"},
+		{name: "paged image", asset: learning.FileAsset{PreviewStatus: "可预览", PreviewPath: "preview.pdf", PreviewPageDir: "pages", PreviewPageCount: 3}, wantState: "ready", wantImage: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := studentPreviewPagesMetadata(tt.asset)
+			if got.PreviewStatus != tt.wantState || got.ImageMode != tt.wantImage {
+				t.Fatalf("metadata = %#v, want state=%q imageMode=%v", got, tt.wantState, tt.wantImage)
+			}
+		})
+	}
+}
 
 func TestBuildPreviewNeverReusesOriginalPathForPDF(t *testing.T) {
 	dir := t.TempDir()

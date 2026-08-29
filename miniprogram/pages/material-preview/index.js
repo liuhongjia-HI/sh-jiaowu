@@ -12,13 +12,13 @@ Page({
     securityNotice: "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。",
     favorited: false,
     favoriteId: "",
-    // previewMode: unknown 加载中 / image 上传后预生成分页图片 / pdf 整份安全预览
+    // previewMode: unknown 加载中 / processing 生成中 / image 首图预览 / pdf 无缩略图降级 / cover-error 首图失败 / unavailable 不可用
     previewMode: "unknown",
     pageCount: 0,
-    pageImages: [],
-    loadedPageCount: 0,
+    previewImagePath: "",
     pagesLoading: false,
     previewMessage: "",
+    openingPreview: false,
     recordingWarning: false
   },
   onLoad(options) {
@@ -51,7 +51,9 @@ Page({
     }).catch(() => {
       this.setData({
         pageTitle: "资料加载失败",
-        securityNotice: "资料加载失败，请重新进入。"
+        securityNotice: "资料加载失败，请重新进入。",
+        previewMode: "unavailable",
+        previewMessage: "资料加载失败，请重新进入"
       });
     });
     this.refreshFavorite(id);
@@ -88,87 +90,87 @@ Page({
       showFileError("课件下载失败", error);
     }).finally(() => wx.hideLoading());
   },
-  // 分页图片在上传后由服务端预生成，学生专属水印由当前页面覆盖显示。
-  // 图片模式不可用时保留整份 PDF 按钮，单页失败则留在原位重试，不清空已加载页面。
+  // 分页图片在上传后由服务端预生成；详情页只下载第一页作为预览，完整内容交给文档查看器。
+  // 缩略图不可用时保留整份 PDF 入口，避免模拟内容冒充真实预览。
   loadPagedPreview(id) {
     request(`/student/materials/${id}/preview/pages`).then((info) => {
+      const previewStatus = info && info.previewStatus;
+      if (previewStatus === "processing") {
+        this.setData({
+          previewMode: "processing",
+          previewMessage: info.message || "课件正在生成，请稍后再试",
+          pagesLoading: false
+        });
+        this.schedulePreviewRetry(id);
+        return;
+      }
+      if (previewStatus === "failed" || previewStatus === "unavailable") {
+        this.setData({
+          previewMode: "unavailable",
+          previewMessage: info.message || "课件暂时无法打开",
+          pagesLoading: false
+        });
+        return;
+      }
       if (!info || !info.imageMode || !info.pageCount) {
-        this.setData({ previewMode: "pdf" });
+        this.setData({
+          previewMode: "pdf",
+          previewMessage: (info && info.message) || "暂未生成缩略图，点击打开完整课件",
+          pageCount: (info && info.pageCount) || 0,
+          pagesLoading: false
+        });
         return;
       }
       const token = ++this.pageLoadToken;
-      const pageImages = Array.from({ length: info.pageCount }).map((_, index) => ({
-        index: index + 1,
-        path: "",
-        status: "pending",
-        error: ""
-      }));
       this.setData({
         previewMode: "image",
         previewMessage: "",
         pageCount: info.pageCount,
-        pageImages,
-        loadedPageCount: 0,
+        previewImagePath: "",
         pagesLoading: true
       });
-      this.loadNextPage(id, token, 1, info.pageCount);
+      this.loadPreviewCover(id, token);
     }).catch((error) => {
       const message = error.message || "课件暂时无法打开";
       this.setData({ previewMode: "unavailable", previewMessage: message, pagesLoading: false });
       if (message.includes("正在生成") && this.previewRetryCount < 3) {
-        this.previewRetryCount += 1;
-        this.previewRetryTimer = setTimeout(() => this.loadPagedPreview(id), 3000);
+        this.schedulePreviewRetry(id);
       }
     });
   },
+  schedulePreviewRetry(id) {
+    if (this.previewRetryCount >= 3 || this.previewRetryTimer) return;
+    this.previewRetryCount += 1;
+    this.previewRetryTimer = setTimeout(() => {
+      this.previewRetryTimer = null;
+      this.loadPagedPreview(id);
+    }, 3000);
+  },
   retryPreview() {
     if (!this.materialId) return;
+    if (this.previewRetryTimer) {
+      clearTimeout(this.previewRetryTimer);
+      this.previewRetryTimer = null;
+    }
+    this.pageLoadToken += 1;
     this.previewRetryCount = 0;
-    this.setData({ previewMode: "unknown", previewMessage: "" });
+    this.setData({ previewMode: "unknown", previewMessage: "", previewImagePath: "", pagesLoading: false });
     this.loadPagedPreview(this.materialId);
   },
-  loadNextPage(id, token, page, total) {
-    if (token !== this.pageLoadToken) {
-      return;
-    }
-    if (page > total) {
-      this.setData({ pagesLoading: false });
-      return;
-    }
-    this.updatePage(page, { status: "loading", error: "" });
-    downloadWithAuth(`/student/materials/${id}/preview/pages/${page}`)
+  loadPreviewCover(id, token) {
+    downloadWithAuth(`/student/materials/${id}/preview/pages/1`)
       .then((tempFilePath) => {
-        if (token !== this.pageLoadToken) {
-          return;
-        }
-        this.updatePage(page, { path: tempFilePath, status: "ready", error: "" });
-        this.setData({ loadedPageCount: this.data.loadedPageCount + 1 });
-        this.loadNextPage(id, token, page + 1, total);
+        if (token !== this.pageLoadToken) return;
+        this.setData({ previewImagePath: tempFilePath, pagesLoading: false });
       })
       .catch((error) => {
-        if (token !== this.pageLoadToken) {
-          return;
-        }
-        this.updatePage(page, { status: "error", error: error.message || "本页加载失败" });
-        this.loadNextPage(id, token, page + 1, total);
+        if (token !== this.pageLoadToken) return;
+        this.setData({
+          previewMode: "cover-error",
+          previewMessage: error.message || "课件缩略图加载失败",
+          pagesLoading: false
+        });
       });
-  },
-  updatePage(page, patch) {
-    const pageImages = this.data.pageImages.map((item) => item.index === page ? { ...item, ...patch } : item);
-    this.setData({ pageImages });
-  },
-  retryPage(event) {
-    const page = Number(event.currentTarget.dataset.page);
-    if (!page || !this.materialId) {
-      return;
-    }
-    this.updatePage(page, { status: "loading", error: "" });
-    downloadWithAuth(`/student/materials/${this.materialId}/preview/pages/${page}`)
-      .then((tempFilePath) => {
-        this.updatePage(page, { path: tempFilePath, status: "ready", error: "" });
-        this.setData({ loadedPageCount: this.data.loadedPageCount + 1 });
-      })
-      .catch((error) => this.updatePage(page, { status: "error", error: error.message || "本页加载失败" }));
   },
   refreshFavorite(materialId) {
     request("/student/favorites").then((favorites) => {
@@ -230,26 +232,23 @@ Page({
     });
   },
   openSecurePreview() {
+    if (this.data.openingPreview) return;
     const previewUrl = this.data.material.previewUrl;
     if (!previewUrl) {
       wx.showToast({ title: "完整课件还在准备，请稍后再试", icon: "none" });
       return;
     }
+    this.setData({ openingPreview: true });
     wx.showLoading({ title: "正在打开课件" });
     downloadWithAuth(stripApiPrefix(previewUrl))
-      .then((tempFilePath) => {
-        wx.openDocument({
-          filePath: tempFilePath,
-          fileType: "pdf",
-          fail() {
-            wx.showToast({ title: "资料打开失败，请稍后再试", icon: "none" });
-          }
-        });
-      })
+      .then((tempFilePath) => openDocument(tempFilePath))
       .catch((error) => {
         showFileError("课件无法打开", error);
       })
-      .then(() => wx.hideLoading());
+      .finally(() => {
+        this.setData({ openingPreview: false });
+        wx.hideLoading();
+      });
   }
 });
 
@@ -317,6 +316,19 @@ function showFileError(title, error) {
     return;
   }
   wx.showToast({ title: content, icon: "none" });
+}
+
+function openDocument(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.openDocument({
+      filePath,
+      fileType: "pdf",
+      success: resolve,
+      fail(error) {
+        reject(new Error((error && error.errMsg) || "资料打开失败，请稍后再试"));
+      }
+    });
+  });
 }
 
 // stripApiPrefix 去掉后端接口返回字段里多余的 "/api" 前缀。

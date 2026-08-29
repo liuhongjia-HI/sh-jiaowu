@@ -55,7 +55,7 @@ function baseWxMock(overrides = {}) {
   };
 }
 
-test("material preview switches to paged image mode and downloads pages in order", async () => {
+test("material preview downloads only the first page as the clickable cover", async () => {
   const downloadedUrls = [];
   const wxMock = baseWxMock({
     downloadFile(opts) {
@@ -85,11 +85,10 @@ test("material preview switches to paged image mode and downloads pages in order
 
   assert.equal(page.data.previewMode, "image");
   assert.equal(page.data.pageCount, 2);
-  assert.deepEqual(page.data.pageImages.map((item) => item.index), [1, 2]);
+  assert.equal(page.data.previewImagePath, "https://gate.example.com/api/student/materials/mat-1/preview/pages/1#local");
   assert.equal(page.data.pagesLoading, false);
   assert.deepEqual(downloadedUrls, [
-    "https://gate.example.com/api/student/materials/mat-1/preview/pages/1",
-    "https://gate.example.com/api/student/materials/mat-1/preview/pages/2"
+    "https://gate.example.com/api/student/materials/mat-1/preview/pages/1"
   ]);
 });
 
@@ -114,19 +113,19 @@ test("material preview falls back to pdf mode when the server has no image mode"
   await flushPromises();
 
   assert.equal(page.data.previewMode, "pdf");
-  assert.equal(page.data.pageImages.length, 0);
+  assert.equal(page.data.previewImagePath, "");
 });
 
-test("material preview keeps loaded pages and marks failed pages for retry", async () => {
+test("material preview lets the student retry when the first-page cover fails", async () => {
   let call = 0;
   const wxMock = baseWxMock({
     downloadFile(opts) {
       call += 1;
       if (call === 1) {
-        opts.success({ statusCode: 200, tempFilePath: "page-1#local" });
+        opts.fail(new Error("network drop"));
         return;
       }
-      opts.fail(new Error("network drop"));
+      opts.success({ statusCode: 200, tempFilePath: "page-1#local" });
     }
   });
   const requestImpl = (path) => {
@@ -149,10 +148,16 @@ test("material preview keeps loaded pages and marks failed pages for retry", asy
   await flushPromises();
   await flushPromises();
 
-  assert.equal(page.data.previewMode, "image");
+  assert.equal(page.data.previewMode, "cover-error");
   assert.equal(page.data.pagesLoading, false);
-  assert.deepEqual(page.data.pageImages.map((item) => item.status), ["ready", "error", "error"]);
-  assert.equal(page.data.pageImages[0].path, "page-1#local");
+  assert.equal(page.data.previewImagePath, "");
+
+  page.retryPreview();
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(page.data.previewMode, "image");
+  assert.equal(page.data.previewImagePath, "page-1#local");
 });
 
 test("openSecurePreview strips the redundant /api prefix from previewUrl before downloading", async () => {
@@ -165,6 +170,7 @@ test("openSecurePreview strips the redundant /api prefix from previewUrl before 
     },
     openDocument(opts) {
       openedPath = opts.filePath;
+      opts.success && opts.success();
     }
   });
   const requestImpl = (path) => {
@@ -189,6 +195,69 @@ test("openSecurePreview strips the redundant /api prefix from previewUrl before 
 
   assert.deepEqual(downloadedUrls, ["https://gate.example.com/api/student/materials/mat-1/preview"]);
   assert.equal(openedPath, "secure-preview.pdf#local");
+});
+
+test("openSecurePreview ignores repeated taps while the document is opening", async () => {
+  const downloadedUrls = [];
+  let finishDownload;
+  const wxMock = baseWxMock({
+    downloadFile(opts) {
+      downloadedUrls.push(opts.url);
+      finishDownload = () => opts.success({ statusCode: 200, tempFilePath: "secure-preview.pdf#local" });
+    },
+    openDocument(opts) {
+      opts.success && opts.success();
+    }
+  });
+  const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), wxMock);
+  page.setData({ material: { previewUrl: "/api/student/materials/mat-1/preview" } });
+
+  page.openSecurePreview();
+  page.openSecurePreview();
+  assert.equal(page.data.openingPreview, true);
+  assert.deepEqual(downloadedUrls, ["https://gate.example.com/api/student/materials/mat-1/preview"]);
+
+  finishDownload();
+  await flushPromises();
+  await flushPromises();
+  assert.equal(page.data.openingPreview, false);
+});
+
+test("material preview consumes structured processing status without treating it as an error", async () => {
+  const requestImpl = (path) => {
+    if (path === "/student/materials/mat-1") {
+      return Promise.resolve({ id: "mat-1", title: "第一课", previewUrl: "/api/student/materials/mat-1/preview" });
+    }
+    if (path === "/student/materials/mat-1/preview/pages") {
+      return Promise.resolve({ previewStatus: "processing", imageMode: false, pageCount: 0, message: "课件正在生成，请稍后再试" });
+    }
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.reject(new Error("unexpected path " + path));
+  };
+  const page = loadMaterialPreviewPage(requestImpl, baseWxMock());
+
+  page.onLoad({ id: "mat-1" });
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(page.data.previewMode, "processing");
+  assert.equal(page.data.previewMessage, "课件正在生成，请稍后再试");
+  page.onUnload();
+});
+
+test("material detail failure leaves the loading state with an actionable message", async () => {
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/materials/mat-1") return Promise.reject(new Error("network unavailable"));
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock());
+
+  page.onLoad({ id: "mat-1" });
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(page.data.previewMode, "unavailable");
+  assert.equal(page.data.previewMessage, "资料加载失败，请重新进入");
 });
 
 test("openSecurePreview shows the backend reason when a historical preview file is missing", async () => {

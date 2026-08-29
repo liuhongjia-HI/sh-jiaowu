@@ -73,7 +73,7 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
     ['/packages', '课程方案'],
     ['/content', '课程内容'],
     ['/scheduling', '排课管理'],
-    ['/materials', '学习资料'],
+    ['/materials', '课程讲义'],
     ['/homework', '课后练习'],
     ['/review', '批改反馈'],
     ['/commercial', '商业运营'],
@@ -99,7 +99,7 @@ test('新增课程方案默认带出当前学年', async ({ page }) => {
   await expect(dialog.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
 
-test('点击课程方案名称可查看该方案的学习资料', async ({ page }) => {
+test('点击课程方案名称可查看该方案的课程讲义', async ({ page }) => {
   await login(page, '13800000001');
   await expectPageHeading(page, '/packages', '课程方案');
 
@@ -109,9 +109,9 @@ test('点击课程方案名称可查看该方案的学习资料', async ({ page 
   await packageLink.click();
 
   await expect(page).toHaveURL(/\/content\?tab=materials&packageId=/);
-  await expect(page.getByRole('heading', { name: '学习资料' })).toBeVisible();
-  await expect(page.getByText(`正在查看“${packageName}”套餐包含的全部学习资料。`)).toBeVisible();
-  await expect(page.getByRole('button', { name: '查看全部资料' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '课程讲义' })).toBeVisible();
+  await expect(page.getByText(`正在查看“${packageName}”套餐包含的全部课程讲义。`)).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看全部讲义' })).toBeVisible();
 });
 
 test('教师账号不能进入运营和系统高权限功能', async ({ page }) => {
@@ -148,8 +148,8 @@ test('校区管理员可以在学生管理直接开通课程', async ({ page }) 
   await expect(drawer).toBeVisible();
   await drawer.getByRole('tab', { name: '开通学习内容' }).click();
   await expect(drawer.getByText('按需开通学习内容')).toBeVisible();
-  await expect(drawer.getByText('课程范围')).toBeVisible();
-  await expect(drawer.getByText('学习内容')).toBeVisible();
+  await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('学习内容', { exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '习题', exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '学习资料', exact: true })).toBeVisible();
@@ -195,9 +195,9 @@ test('教师可以新增题目并手动组卷发布小挑战', async ({ page }) 
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('练习标题').fill(homeworkTitle);
   await selectOption(page, dialog, '课程范围', '五年级英文S1Q1课程');
-  await dialog.getByLabel('截止时间').fill('2026-12-31');
-  await selectOption(page, dialog, '选择题目', singleTitle);
-  await selectOption(page, dialog, '选择题目', textTitle);
+  await dialog.getByLabel('截止时间').fill('2026-12-31T18:00');
+  await dialog.getByRole('checkbox', { name: singleTitle, exact: false }).check();
+  await dialog.getByRole('checkbox', { name: textTitle, exact: false }).check();
   await dialog.locator('.ant-modal-footer .ant-btn-primary').click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(homeworkTitle)).toBeVisible();
@@ -288,7 +288,7 @@ test('校区管理员可以右键复制课程并只修改日期创建新课', as
   const sourceClass = page.locator('.schedule-timeline-block.is-class').filter({ hasText: `${startTime}-${endTime}` }).first();
   await expect(sourceClass).toBeVisible();
   await sourceClass.click({ button: 'right' });
-  await page.getByRole('menuitem', { name: '复制这节课' }).click();
+  await page.getByRole('menuitem', { name: '复制这节课' }).dispatchEvent('click');
 
   const drawer = page.getByRole('dialog', { name: '复制课程' });
   await expect(drawer).toBeVisible();

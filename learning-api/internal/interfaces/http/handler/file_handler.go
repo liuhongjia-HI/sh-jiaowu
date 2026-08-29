@@ -206,19 +206,48 @@ func (h *LearningHandler) StudentMaterialPreviewPages(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
-	if asset.PreviewStatus != "可预览" {
-		BadRequest(c, previewUnavailableMessage(asset))
-		return
-	}
-	if asset.PreviewPageCount <= 0 || strings.TrimSpace(asset.PreviewPageDir) == "" {
-		OK(c, gin.H{"imageMode": false, "pageCount": 0})
+	metadata := studentPreviewPagesMetadata(asset)
+	if !metadata.ImageMode {
+		OK(c, metadata)
 		return
 	}
 	if _, err := os.Stat(filepath.Join(asset.PreviewPageDir, "page-0001.jpg")); err != nil {
-		BadRequest(c, "历史课件分页文件不可用，请联系老师重新上传")
+		metadata.PreviewStatus = "ready"
+		metadata.ImageMode = false
+		metadata.PageCount = 0
+		metadata.Message = "缩略图暂时不可用，点击打开完整课件"
+		OK(c, metadata)
 		return
 	}
-	OK(c, gin.H{"imageMode": true, "pageCount": asset.PreviewPageCount})
+	OK(c, metadata)
+}
+
+type studentPreviewPagesResponse struct {
+	PreviewStatus string `json:"previewStatus"`
+	ImageMode     bool   `json:"imageMode"`
+	PageCount     int    `json:"pageCount"`
+	Message       string `json:"message,omitempty"`
+}
+
+func studentPreviewPagesMetadata(asset learning.FileAsset) studentPreviewPagesResponse {
+	switch asset.PreviewStatus {
+	case "待转换", "处理中":
+		return studentPreviewPagesResponse{PreviewStatus: "processing", Message: "课件正在生成，请稍后再试"}
+	case "转换失败":
+		return studentPreviewPagesResponse{PreviewStatus: "failed", Message: "课件生成失败，请联系老师处理"}
+	case "可预览":
+		if strings.TrimSpace(asset.PreviewPath) == "" {
+			return studentPreviewPagesResponse{PreviewStatus: "unavailable", Message: "历史课件文件不可用，请联系老师重新上传"}
+		}
+		imageMode := asset.PreviewPageCount > 0 && strings.TrimSpace(asset.PreviewPageDir) != ""
+		message := ""
+		if !imageMode {
+			message = "暂未生成缩略图，点击打开完整课件"
+		}
+		return studentPreviewPagesResponse{PreviewStatus: "ready", ImageMode: imageMode, PageCount: asset.PreviewPageCount, Message: message}
+	default:
+		return studentPreviewPagesResponse{PreviewStatus: "unavailable", Message: "历史课件文件不可用，请联系老师重新上传"}
+	}
 }
 
 // StudentMaterialPreviewPage 返回单页栅格化图片，学生水印由小程序覆盖显示。
@@ -307,6 +336,10 @@ func (h *LearningHandler) StudentMaterialDownload(c *gin.Context) {
 	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
 	if err != nil {
 		Forbidden(c, err.Error())
+		return
+	}
+	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
+		BadRequest(c, previewUnavailableMessage(asset))
 		return
 	}
 	if _, err := os.Stat(asset.PreviewPath); err != nil {

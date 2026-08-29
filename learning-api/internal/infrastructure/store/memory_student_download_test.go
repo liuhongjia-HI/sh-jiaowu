@@ -68,6 +68,31 @@ func TestStudentPreviewFileIncludesServerRenderableWatermarkTrace(t *testing.T) 
 	}
 }
 
+func TestStudentPreviewFileReturnsAuthorizedAssetWhilePreviewIsProcessing(t *testing.T) {
+	store := NewMemoryStore()
+	principal, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	for index := range store.materials {
+		if store.materials[index].ID == "mat-g05-english-s1-q1" {
+			store.materials[index].FileID = "file-preview-processing"
+			break
+		}
+	}
+	store.fileAssets["file-preview-processing"] = learning.FileAsset{
+		ID: "file-preview-processing", PreviewStatus: "待转换",
+	}
+
+	asset, err := store.StudentMaterialPreviewFile(principal, "mat-g05-english-s1-q1")
+	if err != nil {
+		t.Fatalf("authorized processing asset should be returned for status reporting: %v", err)
+	}
+	if asset.PreviewStatus != "待转换" {
+		t.Fatalf("preview status = %q, want 待转换", asset.PreviewStatus)
+	}
+}
+
 func TestStudentMaterialHidesDownloadWhenPolicyIsOnlinePreviewOnly(t *testing.T) {
 	store := NewMemoryStore()
 	principal, err := store.PrincipalByUserID("user-student-001")

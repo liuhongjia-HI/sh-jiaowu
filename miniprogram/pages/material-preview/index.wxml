@@ -20,33 +20,36 @@
       </view>
     </view>
 
-    <view wx:if="{{previewMode === 'image'}}" class="paged-preview">
-      <view wx:for="{{pageImages}}" wx:key="index" class="page-wrap">
-        <image wx:if="{{item.status === 'ready'}}" class="page-image" src="{{item.path}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
-        <view wx:if="{{item.status === 'ready'}}" class="watermark-layer">
-          <view wx:for="{{watermarkTexts}}" wx:for-item="mark" wx:key="mark" class="watermark">{{mark}}</view>
-        </view>
-        <view wx:elif="{{item.status === 'error'}}" class="page-error">
-          <view>第 {{item.index}} 页加载失败</view>
-          <view class="page-error-message">{{item.error}}</view>
-          <button class="button light page-retry" data-page="{{item.index}}" bindtap="retryPage">重新加载</button>
-        </view>
-        <view wx:else class="page-placeholder">正在加载第 {{item.index}} 页…</view>
-        <view class="page-index">第 {{item.index}}/{{pageCount}} 页</view>
+    <view wx:if="{{previewMode === 'image'}}" class="material-preview-card" bindtap="openSecurePreview">
+      <view wx:if="{{pagesLoading || !previewImagePath}}" class="preview-loading">正在加载课件预览…</view>
+      <image wx:else class="preview-cover" src="{{previewImagePath}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
+      <view wx:if="{{previewImagePath}}" class="watermark-layer">
+        <view wx:for="{{watermarkTexts}}" wx:for-item="mark" wx:key="mark" class="watermark">{{mark}}</view>
       </view>
-      <view wx:if="{{pagesLoading}}" class="page-loading">正在加载第 {{loadedPageCount}}/{{pageCount}} 页…</view>
+      <view wx:if="{{previewImagePath}}" class="preview-action">共 {{pageCount}} 页 · 点击查看完整课件</view>
     </view>
 
-    <view wx:elif="{{previewMode === 'pdf'}}" class="paper">
+    <view wx:elif="{{previewMode === 'pdf'}}" class="material-preview-card preview-fallback" bindtap="openSecurePreview">
       <view class="watermark-layer">
         <view wx:for="{{watermarkTexts}}" wx:key="index" class="watermark">{{item}}</view>
       </view>
-      <view class="paper-title">{{paperTitle}}</view>
-      <view class="paper-line"></view>
-      <view class="paper-line short"></view>
-      <view class="paper-block">📘</view>
-      <view class="paper-line"></view>
-      <view class="paper-line tiny"></view>
+      <view class="preview-file-icon">📄</view>
+      <view class="preview-fallback-title">{{paperTitle}}</view>
+      <view class="preview-fallback-message">{{previewMessage}}</view>
+      <view class="preview-action">点击查看完整课件</view>
+    </view>
+
+    <view wx:elif="{{previewMode === 'unknown' || previewMode === 'processing'}}" class="preview-unavailable preview-processing">
+      <view class="preview-unavailable-icon">⏳</view>
+      <view class="preview-unavailable-title">{{previewMode === 'processing' ? '课件预览正在生成' : '正在加载课件预览'}}</view>
+      <view wx:if="{{previewMessage}}" class="preview-unavailable-message">{{previewMessage}}</view>
+    </view>
+
+    <view wx:elif="{{previewMode === 'cover-error'}}" class="preview-unavailable">
+      <view class="preview-unavailable-icon">🖼️</view>
+      <view class="preview-unavailable-title">缩略图加载失败</view>
+      <view class="preview-unavailable-message">{{previewMessage}}</view>
+      <button class="button light preview-retry" bindtap="retryPreview">重新加载</button>
     </view>
 
     <view wx:elif="{{previewMode === 'unavailable'}}" class="preview-unavailable">
@@ -63,7 +66,7 @@
     <view class="button-row">
       <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
       <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
-      <button wx:if="{{previewMode === 'pdf'}}" class="button light" bindtap="openSecurePreview">查看课件</button>
+      <button wx:if="{{material.previewUrl && (previewMode === 'image' || previewMode === 'pdf' || previewMode === 'cover-error')}}" loading="{{openingPreview}}" disabled="{{openingPreview}}" class="button light" bindtap="openSecurePreview">打开完整课件</button>
       <button class="button" bindtap="goAnswer">去做小挑战</button>
     </view>
   </view>

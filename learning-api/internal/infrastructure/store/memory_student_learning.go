@@ -274,10 +274,10 @@ func (s *MemoryStore) studentMaterialPreviewFileUnlocked(principal learning.Prin
 	if !ok {
 		return learning.FileAsset{}, errors.New("资料预览文件不存在")
 	}
-	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
-		return learning.FileAsset{}, errors.New("资料正在生成安全预览，请稍后再试")
-	}
 	asset.WatermarkText = s.studentWatermarkText(principal)
+	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
+		return asset, nil
+	}
 	generatedAt := time.Now().Truncate(5 * time.Minute)
 	stampText, traceCode := s.studentWatermarkStampText(principal, material.ID, generatedAt)
 	asset.WatermarkStampText = stampText
