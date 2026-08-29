@@ -77,6 +77,31 @@ func TestRecoverPreviewJobsReturnsInterruptedWorkToQueue(t *testing.T) {
 	}
 }
 
+func TestRecoverPreviewJobsRequeuesCompletedPDFWithoutPageImages(t *testing.T) {
+	store := NewMemoryStore()
+	store.fileAssets["file-pdf-only"] = learning.FileAsset{
+		ID: "file-pdf-only", PreviewStatus: "可预览", PreviewPath: "/data/preview/file-pdf-only.pdf",
+	}
+	store.previewJobs = append(store.previewJobs, learning.PreviewJob{
+		ID: "job-pdf-only", FileID: "file-pdf-only", Status: "已完成", AttemptCount: 1,
+	})
+
+	if err := store.RecoverPreviewJobs(); err != nil {
+		t.Fatalf("recover preview jobs: %v", err)
+	}
+
+	var recovered learning.PreviewJob
+	for _, job := range store.previewJobs {
+		if job.ID == "job-pdf-only" {
+			recovered = job
+			break
+		}
+	}
+	if recovered.Status != "待处理" || recovered.AttemptCount != 0 {
+		t.Fatalf("completed PDF-only job was not requeued: %#v", recovered)
+	}
+}
+
 func TestMarkPreviewFileMissingReopensRetryForLostPreview(t *testing.T) {
 	store := NewMemoryStore()
 	store.fileAssets["file-lost"] = learning.FileAsset{ID: "file-lost", FileName: "lost.pdf", PreviewStatus: "可预览", PreviewPath: "/opt/starline/releases/old/uploads/preview/lost.pdf", PreviewPageDir: "/opt/starline/releases/old/uploads/pages/file-lost", PreviewPageCount: 3}

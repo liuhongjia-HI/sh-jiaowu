@@ -20,23 +20,22 @@
       </view>
     </view>
 
-    <view wx:if="{{previewMode === 'image'}}" class="material-preview-card" bindtap="openSecurePreview">
+    <view wx:if="{{previewMode === 'image'}}" class="material-preview-card" hover-class="material-preview-card-active" bindtap="openSecurePreview">
       <view wx:if="{{pagesLoading || !previewImagePath}}" class="preview-loading">正在加载课件预览…</view>
       <image wx:else class="preview-cover" src="{{previewImagePath}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
       <view wx:if="{{previewImagePath}}" class="watermark-layer">
         <view wx:for="{{watermarkTexts}}" wx:for-item="mark" wx:key="mark" class="watermark">{{mark}}</view>
       </view>
-      <view wx:if="{{previewImagePath}}" class="preview-action">共 {{pageCount}} 页 · 点击查看完整课件</view>
+      <view wx:if="{{previewImagePath}}" class="preview-page-count">共 {{pageCount}} 页</view>
     </view>
 
-    <view wx:elif="{{previewMode === 'pdf'}}" class="material-preview-card preview-fallback" bindtap="openSecurePreview">
+    <view wx:elif="{{previewMode === 'pdf'}}" class="material-preview-card preview-fallback" hover-class="material-preview-card-active" bindtap="openSecurePreview">
       <view class="watermark-layer">
         <view wx:for="{{watermarkTexts}}" wx:key="index" class="watermark">{{item}}</view>
       </view>
       <view class="preview-file-icon">📄</view>
       <view class="preview-fallback-title">{{paperTitle}}</view>
       <view class="preview-fallback-message">{{previewMessage}}</view>
-      <view class="preview-action">点击查看完整课件</view>
     </view>
 
     <view wx:elif="{{previewMode === 'unknown' || previewMode === 'processing'}}" class="preview-unavailable preview-processing">
@@ -64,10 +63,9 @@
       <view class="badge">距离小徽章还差一步</view>
     </view>
     <view class="button-row">
-      <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
+      <button class="button light {{material.downloadUrl ? '' : 'solo-secondary'}}" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
       <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
-      <button wx:if="{{material.previewUrl && (previewMode === 'image' || previewMode === 'pdf' || previewMode === 'cover-error')}}" loading="{{openingPreview}}" disabled="{{openingPreview}}" class="button light" bindtap="openSecurePreview">打开完整课件</button>
-      <button class="button" bindtap="goAnswer">去做小挑战</button>
+      <button class="button challenge-button" bindtap="goAnswer">去做小挑战</button>
     </view>
   </view>
 </view>

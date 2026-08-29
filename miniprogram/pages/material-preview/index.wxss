@@ -29,19 +29,21 @@
   font-size: 26rpx;
 }
 
-.preview-action {
+.preview-page-count {
   position: absolute;
-  left: 20rpx;
   right: 20rpx;
   bottom: 20rpx;
   z-index: 3;
-  padding: 18rpx 22rpx;
-  border-radius: 18rpx;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
   background: rgba(42, 35, 32, .82);
   color: #fff;
-  text-align: center;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 700;
+}
+
+.material-preview-card-active {
+  opacity: .9;
 }
 
 .preview-fallback {
@@ -49,13 +51,18 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-bottom: 100rpx;
+  padding-bottom: 34rpx;
 }
 
 .preview-file-icon { position: relative; z-index: 2; font-size: 76rpx; }
 .preview-fallback-title { position: relative; z-index: 2; margin-top: 24rpx; font-size: 32rpx; font-weight: 800; }
 .preview-fallback-message { position: relative; z-index: 2; margin-top: 14rpx; color: #8a6554; font-size: 24rpx; text-align: center; }
 .preview-processing { border-style: dashed; }
+
+.challenge-button,
+.solo-secondary {
+  grid-column: 1 / -1;
+}
 
 .security-notice {
   margin-top: 18rpx;

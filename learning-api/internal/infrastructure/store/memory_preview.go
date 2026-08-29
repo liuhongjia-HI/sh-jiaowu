@@ -30,14 +30,39 @@ func (s *MemoryStore) RecoverPreviewJobs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return persistentMutationError(s, func(work *MemoryStore) error {
+		filesWithJobs := make(map[string]bool, len(work.previewJobs))
 		for index := range work.previewJobs {
-			if work.previewJobs[index].Status == "处理中" {
-				work.previewJobs[index].Status = "待处理"
-				work.previewJobs[index].StartedAt = ""
+			job := &work.previewJobs[index]
+			filesWithJobs[job.FileID] = true
+			if job.Status == "处理中" {
+				job.Status = "待处理"
+				job.StartedAt = ""
 			}
+			asset, ok := work.fileAssets[job.FileID]
+			if job.Status == "已完成" && ok && needsPreviewPageBackfill(asset) {
+				job.Status = "待处理"
+				job.AttemptCount = 0
+				job.ErrorMessage = ""
+				job.StartedAt = ""
+				job.FinishedAt = ""
+			}
+		}
+		for fileID, asset := range work.fileAssets {
+			if filesWithJobs[fileID] || !needsPreviewPageBackfill(asset) {
+				continue
+			}
+			work.previewJobs = append(work.previewJobs, learning.PreviewJob{
+				ID: "preview-job-backfill-" + fileID, FileID: fileID, Status: "待处理", CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+			})
 		}
 		return nil
 	})
+}
+
+func needsPreviewPageBackfill(asset learning.FileAsset) bool {
+	return asset.PreviewStatus == "可预览" &&
+		strings.TrimSpace(asset.PreviewPath) != "" &&
+		(asset.PreviewPageCount <= 0 || strings.TrimSpace(asset.PreviewPageDir) == "")
 }
 
 func (s *MemoryStore) ClaimPreviewJob() (learning.PreviewJob, bool, error) {

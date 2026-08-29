@@ -1,5 +1,15 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
+
+test("material preview keeps only the preview card as the full-courseware entry", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.wxml"), "utf8");
+
+  assert.doesNotMatch(template, />打开完整课件<\/button>/);
+  assert.doesNotMatch(template, /class="preview-action"/);
+  assert.match(template, /class="button challenge-button" bindtap="goAnswer"/);
+});
 
 function loadMaterialPreviewPage(requestImpl, wxMock) {
   const pages = [];
@@ -221,6 +231,29 @@ test("openSecurePreview ignores repeated taps while the document is opening", as
   await flushPromises();
   await flushPromises();
   assert.equal(page.data.openingPreview, false);
+});
+
+test("openSecurePreview uses the loaded cover in devtools where openDocument has no visible UI", async () => {
+  const previewCalls = [];
+  let downloadCount = 0;
+  const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock({
+    getDeviceInfo() { return { platform: "devtools" }; },
+    downloadFile() { downloadCount += 1; },
+    previewImage(opts) {
+      previewCalls.push({ current: opts.current, urls: opts.urls });
+      opts.success && opts.success();
+    }
+  }));
+  page.setData({
+    material: { previewUrl: "/api/student/materials/mat-1/preview" },
+    previewImagePath: "page-1#local"
+  });
+
+  page.openSecurePreview();
+  await flushPromises();
+
+  assert.equal(downloadCount, 0);
+  assert.deepEqual(previewCalls, [{ current: "page-1#local", urls: ["page-1#local"] }]);
 });
 
 test("material preview consumes structured processing status without treating it as an error", async () => {
