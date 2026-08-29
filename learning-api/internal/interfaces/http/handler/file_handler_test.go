@@ -32,6 +32,32 @@ func TestStudentPreviewPagesMetadataUsesStructuredStatuses(t *testing.T) {
 	}
 }
 
+func TestStudentPreviewPagesMetadataUsesExistingPDFWhileBackfillIsPending(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	gsPath := filepath.Join(binDir, "gs")
+	if err := os.WriteFile(gsPath, []byte("#!/bin/sh\necho 4\n"), 0755); err != nil {
+		t.Fatalf("write fake gs: %v", err)
+	}
+	t.Setenv("PATH", binDir)
+	previewPath := filepath.Join(root, "preview.pdf")
+	if err := os.WriteFile(previewPath, []byte("%PDF-1.4 existing preview"), 0644); err != nil {
+		t.Fatalf("write preview: %v", err)
+	}
+
+	got := studentPreviewPagesMetadataWithPDFFallback(context.Background(), learning.FileAsset{
+		PreviewStatus: "可预览",
+		PreviewPath:   previewPath,
+	})
+
+	if got.PreviewStatus != "ready" || !got.ImageMode || got.PageCount != 4 {
+		t.Fatalf("metadata = %#v, want ready image mode with 4 pages", got)
+	}
+}
+
 func TestBuildPreviewNeverReusesOriginalPathForPDF(t *testing.T) {
 	dir := t.TempDir()
 	originalDir := filepath.Join(dir, "original")

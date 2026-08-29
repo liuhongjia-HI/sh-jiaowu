@@ -206,12 +206,16 @@ func (h *LearningHandler) StudentMaterialPreviewPages(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
-	metadata := studentPreviewPagesMetadata(asset)
+	metadata := studentPreviewPagesMetadataWithPDFFallback(c.Request.Context(), asset)
 	if !metadata.ImageMode {
 		OK(c, metadata)
 		return
 	}
-	if _, err := os.Stat(filepath.Join(asset.PreviewPageDir, "page-0001.jpg")); err != nil {
+	if strings.TrimSpace(asset.PreviewPageDir) != "" {
+		if _, err := os.Stat(filepath.Join(asset.PreviewPageDir, "page-0001.jpg")); err == nil {
+			OK(c, metadata)
+			return
+		}
 		metadata.PreviewStatus = "ready"
 		metadata.ImageMode = false
 		metadata.PageCount = 0
@@ -250,6 +254,38 @@ func studentPreviewPagesMetadata(asset learning.FileAsset) studentPreviewPagesRe
 	}
 }
 
+// studentPreviewPagesMetadataWithPDFFallback 让历史 PDF 在后台分页回填完成前也能立即阅读。
+// 单页接口本来就会从 PreviewPath 动态生成带水印图片，因此这里只需现场读取页数，
+// 不必让用户等待 PreviewPageDir 先写完。
+func studentPreviewPagesMetadataWithPDFFallback(ctx context.Context, asset learning.FileAsset) studentPreviewPagesResponse {
+	metadata := studentPreviewPagesMetadata(asset)
+	if metadata.PreviewStatus != "ready" || metadata.ImageMode || strings.TrimSpace(asset.PreviewPath) == "" {
+		return metadata
+	}
+	pageCount, err := studentPreviewPageCount(ctx, asset)
+	if err != nil {
+		return metadata
+	}
+	metadata.ImageMode = true
+	metadata.PageCount = pageCount
+	metadata.Message = ""
+	return metadata
+}
+
+func studentPreviewPageCount(ctx context.Context, asset learning.FileAsset) (int, error) {
+	if asset.PreviewPageCount > 0 {
+		return asset.PreviewPageCount, nil
+	}
+	previewPath := strings.TrimSpace(asset.PreviewPath)
+	if previewPath == "" {
+		return 0, errors.New("预览文件还没有生成")
+	}
+	if _, err := os.Stat(previewPath); err != nil {
+		return 0, err
+	}
+	return countPDFPages(ctx, previewPath)
+}
+
 // StudentMaterialPreviewPage 返回单页栅格化图片，学生水印由小程序覆盖显示。
 func (h *LearningHandler) StudentMaterialPreviewPage(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
@@ -267,14 +303,21 @@ func (h *LearningHandler) StudentMaterialPreviewPage(c *gin.Context) {
 		BadRequest(c, previewUnavailableMessage(asset))
 		return
 	}
-	if page > asset.PreviewPageCount || strings.TrimSpace(asset.PreviewPageDir) == "" {
+	pageCount, err := studentPreviewPageCount(c.Request.Context(), asset)
+	if err != nil {
+		BadRequest(c, "课件页面正在生成，请稍后重试")
+		return
+	}
+	if page > pageCount {
 		BadRequest(c, "页码超出课件范围")
 		return
 	}
-	sourceImagePath := filepath.Join(asset.PreviewPageDir, fmt.Sprintf("page-%04d.jpg", page))
-	if _, err := os.Stat(sourceImagePath); err != nil {
-		BadRequest(c, "本页课件文件不可用，请联系老师重新生成")
-		return
+	if strings.TrimSpace(asset.PreviewPageDir) != "" {
+		sourceImagePath := filepath.Join(asset.PreviewPageDir, fmt.Sprintf("page-%04d.jpg", page))
+		if _, err := os.Stat(sourceImagePath); err != nil {
+			BadRequest(c, "本页课件文件不可用，请联系老师重新生成")
+			return
+		}
 	}
 	imageFile, err := os.CreateTemp("", "starline-material-watermark-*.jpg")
 	if err != nil {

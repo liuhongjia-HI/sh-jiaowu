@@ -1,6 +1,8 @@
 const { request } = require("../../utils/request");
 const { activateContentSecurity } = require("../../utils/content-security");
 
+const READER_BATCH_SIZE = 3;
+
 Page({
   data: {
     material: {},
@@ -19,6 +21,12 @@ Page({
     pagesLoading: false,
     previewMessage: "",
     openingPreview: false,
+    readerOpen: false,
+    readerPages: [],
+    readerNextPage: 1,
+    readerHasMore: false,
+    readerLoading: false,
+    readerMessage: "",
     recordingWarning: false
   },
   onLoad(options) {
@@ -66,6 +74,7 @@ Page({
   },
   onUnload() {
     this.pageLoadToken += 1;
+    this.readerLoadToken = (this.readerLoadToken || 0) + 1;
     if (this.previewRetryTimer) {
       clearTimeout(this.previewRetryTimer);
       this.previewRetryTimer = null;
@@ -239,11 +248,7 @@ Page({
       return;
     }
     if (this.materialId && this.data.previewMode === "image" && this.data.pageCount > 0) {
-      const title = encodeURIComponent(this.data.material.title || this.data.pageTitle || "课件阅读");
-      wx.navigateTo({
-        url: `/pages/material-reader/index?id=${encodeURIComponent(this.materialId)}&title=${title}`,
-        fail: (error) => showFileError("课件阅读页打开失败", error)
-      });
+      this.openImageReader();
       return;
     }
     this.setData({ openingPreview: true });
@@ -257,6 +262,76 @@ Page({
         this.setData({ openingPreview: false });
         wx.hideLoading();
       });
+  },
+  openImageReader() {
+    const firstPage = this.data.previewImagePath
+      ? [{ page: 1, path: this.data.previewImagePath }]
+      : [];
+    const nextPage = firstPage.length ? 2 : 1;
+    this.readerLoadToken = (this.readerLoadToken || 0) + 1;
+    this.setData({
+      readerOpen: true,
+      readerPages: firstPage,
+      readerNextPage: nextPage,
+      readerHasMore: nextPage <= this.data.pageCount,
+      readerLoading: false,
+      readerMessage: ""
+    });
+    if (wx.setNavigationBarTitle) wx.setNavigationBarTitle({ title: this.data.pageTitle || "课件阅读" });
+    this.loadReaderBatch();
+  },
+  loadReaderBatch() {
+    if (this.data.readerLoading || !this.data.readerHasMore || !this.materialId) return Promise.resolve();
+    const token = this.readerLoadToken;
+    const start = this.data.readerNextPage;
+    const end = Math.min(this.data.pageCount, start + READER_BATCH_SIZE - 1);
+    const pageNumbers = [];
+    for (let page = start; page <= end; page += 1) pageNumbers.push(page);
+    this.setData({ readerLoading: true, readerMessage: "" });
+    return Promise.all(pageNumbers.map((page) => (
+      downloadWithAuth(`/student/materials/${this.materialId}/preview/pages/${page}`)
+        .then((path) => ({ page, path }))
+    ))).then((loadedPages) => {
+      if (token !== this.readerLoadToken) return;
+      const readerNextPage = end + 1;
+      this.setData({
+        readerPages: this.data.readerPages.concat(loadedPages),
+        readerNextPage,
+        readerHasMore: readerNextPage <= this.data.pageCount,
+        readerLoading: false
+      });
+    }).catch((error) => {
+      if (token !== this.readerLoadToken) return;
+      this.setData({
+        readerLoading: false,
+        readerMessage: (error && error.message) || "部分课件页面加载失败，请重试"
+      });
+    });
+  },
+  onReachBottom() {
+    if (this.data.readerOpen) this.loadReaderBatch();
+  },
+  retryReader() {
+    this.loadReaderBatch();
+  },
+  closeReader() {
+    this.readerLoadToken = (this.readerLoadToken || 0) + 1;
+    this.setData({
+      readerOpen: false,
+      readerPages: [],
+      readerNextPage: 1,
+      readerHasMore: false,
+      readerLoading: false,
+      readerMessage: ""
+    });
+    if (wx.setNavigationBarTitle) wx.setNavigationBarTitle({ title: "资料预览" });
+  },
+  previewReaderPage(event) {
+    if (!wx.previewImage) return;
+    const index = Number(event.currentTarget.dataset.index || 0);
+    const urls = this.data.readerPages.map((item) => item.path);
+    if (!urls.length) return;
+    wx.previewImage({ current: urls[index] || urls[0], urls });
   }
 });
 

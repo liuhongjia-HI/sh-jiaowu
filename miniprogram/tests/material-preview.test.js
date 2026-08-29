@@ -233,14 +233,13 @@ test("openSecurePreview ignores repeated taps while the document is opening", as
   assert.equal(page.data.openingPreview, false);
 });
 
-test("openSecurePreview opens the in-app reader when paged preview is ready", async () => {
-  const navigationCalls = [];
-  let downloadCount = 0;
+test("openSecurePreview expands the paged reader inside the current page", async () => {
+  const downloadedUrls = [];
   const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock({
-    getDeviceInfo() { return { platform: "devtools" }; },
-    downloadFile() { downloadCount += 1; },
-    navigateTo(opts) {
-      navigationCalls.push(opts.url);
+    setNavigationBarTitle() {},
+    downloadFile(opts) {
+      downloadedUrls.push(opts.url);
+      opts.success({ statusCode: 200, tempFilePath: `${opts.url}#local` });
     }
   }));
   page.materialId = "mat-1";
@@ -253,10 +252,13 @@ test("openSecurePreview opens the in-app reader when paged preview is ready", as
 
   page.openSecurePreview();
   await flushPromises();
+  await flushPromises();
 
-  assert.equal(downloadCount, 0);
-  assert.deepEqual(navigationCalls, [
-    "/pages/material-reader/index?id=mat-1&title=%E7%AC%AC%E4%B8%80%E8%AF%BE"
+  assert.equal(page.data.readerOpen, true);
+  assert.deepEqual(page.data.readerPages.map((item) => item.page), [1, 2, 3]);
+  assert.deepEqual(downloadedUrls, [
+    "https://gate.example.com/api/student/materials/mat-1/preview/pages/2",
+    "https://gate.example.com/api/student/materials/mat-1/preview/pages/3"
   ]);
 });
 
