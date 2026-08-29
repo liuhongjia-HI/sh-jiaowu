@@ -40,6 +40,10 @@ type authResponse struct {
 }
 
 func newTestApp(t *testing.T) *testApp {
+	return newTestAppWithStorageRoot(t, "")
+}
+
+func newTestAppWithStorageRoot(t *testing.T, storageRoot string) *testApp {
 	t.Helper()
 	repo := store.NewMemoryStore()
 	cfg := config.MustLoad()
@@ -47,6 +51,9 @@ func newTestApp(t *testing.T) *testApp {
 	cfg.Auth.TokenSecret = "router-test-secret"
 	cfg.Demo.AdminPasswordLogin = true
 	cfg.Demo.StudentPasswordLogin = true
+	if storageRoot != "" {
+		cfg.FileStorage.Root = storageRoot
+	}
 	service := learningapp.NewService(repo)
 	engine := router.New(router.Dependencies{
 		Config:  cfg,
@@ -186,6 +193,32 @@ func TestStudentAvatarUploadAndPublicReadThroughAPI(t *testing.T) {
 	if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "image/png" {
 		raw, _ := io.ReadAll(response.Body)
 		t.Fatalf("unexpected avatar response status=%d content-type=%q body=%q", response.StatusCode, response.Header.Get("Content-Type"), raw)
+	}
+}
+
+func TestStudentAvatarUsesConfiguredPersistentStorageRoot(t *testing.T) {
+	storageRoot := filepath.Join(t.TempDir(), "persistent-uploads")
+	app := newTestAppWithStorageRoot(t, storageRoot)
+	defer app.close()
+
+	pngData, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatalf("decode png fixture: %v", err)
+	}
+	var updated learning.Student
+	doMultipart(t, app, http.MethodPost, "/api/student/profile/avatar", app.loginStudent(t), nil, "file", "avatar.png", pngData, http.StatusOK, &updated)
+
+	if _, err := os.Stat(filepath.Join(storageRoot, "avatars", filepath.Base(updated.AvatarURL))); err != nil {
+		t.Fatalf("expected avatar to be stored in configured persistent root: %v", err)
+	}
+	response, err := http.Get(app.server.URL + updated.AvatarURL)
+	if err != nil {
+		t.Fatalf("read public avatar: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(response.Body)
+		t.Fatalf("expected public avatar from configured root, status=%d body=%q", response.StatusCode, raw)
 	}
 }
 

@@ -50,7 +50,7 @@ func (h *LearningHandler) UploadStudentAvatar(c *gin.Context) {
 		BadRequest(c, "请选择头像")
 		return
 	}
-	avatar, err := saveStudentAvatar(file)
+	avatar, err := saveStudentAvatar(file, h.fileStorageRoot)
 	if err != nil {
 		BadRequest(c, err.Error())
 		return
@@ -80,7 +80,7 @@ func (h *LearningHandler) StudentAvatar(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
-	root, err := filepath.Abs(filepath.Join("uploads", "avatars"))
+	root, err := filepath.Abs(filepath.Join(h.fileStorageRoot, "avatars"))
 	if err != nil {
 		c.Status(http.StatusNotFound)
 		return
@@ -100,7 +100,7 @@ func (h *LearningHandler) StudentAvatar(c *gin.Context) {
 	c.File(path)
 }
 
-func saveStudentAvatar(file *multipart.FileHeader) (studentAvatarFile, error) {
+func saveStudentAvatar(file *multipart.FileHeader, storageRoot string) (studentAvatarFile, error) {
 	if file == nil || file.Size <= 0 {
 		return studentAvatarFile{}, errors.New("头像内容为空，请重新选择")
 	}
@@ -137,7 +137,7 @@ func saveStudentAvatar(file *multipart.FileHeader) (studentAvatarFile, error) {
 		return studentAvatarFile{}, errors.New("头像尺寸过大，请重新选择")
 	}
 
-	root, err := filepath.Abs(filepath.Join("uploads", "avatars"))
+	root, err := filepath.Abs(filepath.Join(storageRoot, "avatars"))
 	if err != nil {
 		return studentAvatarFile{}, errors.New("头像目录初始化失败")
 	}
