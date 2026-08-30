@@ -89,9 +89,8 @@ func (s *MemoryStore) startDefaultStudentTrialUnlocked(principal learning.Princi
 }
 
 func (s *MemoryStore) hasActiveFormalGrant(studentID string) bool {
-	today := trialToday()
 	for _, grant := range s.grants {
-		if grant.StudentID == studentID && grant.Status != "revoked" && grant.StartsAt <= today && grantEndsAt(grant) >= today {
+		if grant.StudentID == studentID && grant.Status != "revoked" && grantActive(grant) {
 			return true
 		}
 	}

@@ -761,6 +761,16 @@ function DirectGrantPanel({
   onContentTypeCodesChange: (values: string[]) => void;
   onSubmit: () => void;
 }) {
+  const [selectedSubject, setSelectedSubject] = useState<string>();
+  const subjectFilters = useMemo(() => {
+    const counts = new Map<string, number>();
+    learningSpaces.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
+    return Array.from(counts, ([subject, count]) => ({ subject, count }));
+  }, [learningSpaces]);
+  const visibleLearningSpaces = useMemo(
+    () => selectedSubject ? learningSpaces.filter((space) => space.subject === selectedSubject) : learningSpaces,
+    [learningSpaces, selectedSubject]
+  );
   const canSubmit = selectedLearningSpaceIds.length > 0 && selectedContentTypeCodes.length > 0;
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -775,10 +785,36 @@ function DirectGrantPanel({
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
           只展示该学生所在年级可开通的课程范围。
         </Typography.Paragraph>
+        <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
+          <Space wrap size={[8, 8]}>
+            <Tag color="blue">当前年级：{student.grade}</Tag>
+            <Typography.Text type="secondary">已选 {selectedLearningSpaceIds.length} 个课程范围</Typography.Text>
+          </Space>
+          <div role="group" aria-label="科目筛选">
+            <Space wrap size={[8, 8]}>
+              <Typography.Text>科目</Typography.Text>
+              <Button size="small" type={!selectedSubject ? 'primary' : 'default'} onClick={() => setSelectedSubject(undefined)}>
+                全部（{learningSpaces.length}）
+              </Button>
+              {subjectFilters.map(({ subject, count }) => (
+                <Button
+                  key={subject}
+                  size="small"
+                  type={selectedSubject === subject ? 'primary' : 'default'}
+                  onClick={() => setSelectedSubject(subject)}
+                >
+                  {subject}（{count}）
+                </Button>
+              ))}
+            </Space>
+          </div>
+        </Space>
         {loadingLearningSpaces ? <Skeleton active paragraph={{ rows: 3 }} /> : learningSpacesError ? (
           <Alert type="error" showIcon message="课程范围加载失败，请关闭抽屉后重试。" />
         ) : learningSpaces.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该年级还没有可开通的课程范围。" />
+        ) : visibleLearningSpaces.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该科目暂无可开通课程范围。" />
         ) : (
           <Checkbox.Group
             aria-label="课程范围"
@@ -786,7 +822,7 @@ function DirectGrantPanel({
             onChange={(values) => onLearningSpaceIdsChange(values.filter((value): value is string => typeof value === 'string'))}
           >
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              {learningSpaces.map((space) => (
+              {visibleLearningSpaces.map((space) => (
                 <Checkbox key={space.id} value={space.id}>
                   {space.name}
                 </Checkbox>

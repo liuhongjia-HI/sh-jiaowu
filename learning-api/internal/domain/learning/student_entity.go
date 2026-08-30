@@ -202,7 +202,11 @@ type StudentRemindResult struct {
 
 type StudentCourseCard struct {
 	Course
-	Progress int `json:"progress"`
+	Progress       int    `json:"progress"`
+	OpenedAt       string `json:"openedAt,omitempty"`
+	AvailableAt    string `json:"availableAt,omitempty"`
+	HighlightUntil string `json:"highlightUntil,omitempty"`
+	IsNew          bool   `json:"isNew"`
 }
 
 // StudentStudyBoard 是学习页的聚合数据：课程卡（带进度）+ 资料。

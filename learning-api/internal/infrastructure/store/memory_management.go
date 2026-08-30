@@ -56,7 +56,7 @@ func (s *MemoryStore) expiringStudentCount(days int) int {
 		if !grantActive(grant) {
 			continue
 		}
-		endsAt, err := time.Parse("2006-01-02", grantEndsAt(grant))
+		endsAt, _, err := normalizeGrantTimestamp(grantEndsAt(grant), true)
 		if err != nil {
 			continue
 		}

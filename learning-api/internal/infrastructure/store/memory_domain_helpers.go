@@ -418,9 +418,8 @@ func (s *MemoryStore) permissionForStudent(student learning.Student) learning.St
 	effectiveUntil := ""
 	hasActive := false
 	hasUpcoming := false
-	today := time.Now().Format("2006-01-02")
 	for _, grant := range s.grants {
-		if grant.StudentID != student.ID || grant.Status == "revoked" || grantEndsAt(grant) < today {
+		if grant.StudentID != student.ID || grant.Status == "revoked" || grantPeriodExpired(grantEndsAt(grant)) {
 			continue
 		}
 		pkg, ok := s.findPackage(grant.PackageID)
@@ -979,7 +978,59 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 			}
 		}
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		left := s.courseAccessForStudent(studentID, out[i])
+		right := s.courseAccessForStudent(studentID, out[j])
+		if left.AvailableAt != right.AvailableAt {
+			return left.AvailableAt > right.AvailableAt
+		}
+		return out[i].Name < out[j].Name
+	})
 	return out
+}
+
+type courseAccess struct {
+	OpenedAt       string
+	AvailableAt    string
+	HighlightUntil string
+	IsNew          bool
+}
+
+func (s *MemoryStore) courseAccessForStudent(studentID string, course learning.Course) courseAccess {
+	selected := packageGrant{}
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") || !containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
+			continue
+		}
+		if selected.ID == "" || grant.StartsAt > selected.StartsAt || (grant.StartsAt == selected.StartsAt && grant.OpenedAt > selected.OpenedAt) {
+			selected = grant
+		}
+	}
+	if selected.ID == "" {
+		return courseAccess{}
+	}
+	availableAt := selected.StartsAt
+	if availableAt == "" {
+		availableAt = selected.OpenedAt
+	}
+	visibleAt, _, err := normalizeGrantTimestamp(availableAt, false)
+	if err != nil {
+		return courseAccess{OpenedAt: selected.OpenedAt, AvailableAt: availableAt}
+	}
+	if selected.OpenedAt != "" {
+		openedAt, _, openedErr := normalizeGrantTimestamp(selected.OpenedAt, false)
+		if openedErr == nil && openedAt.After(visibleAt) {
+			visibleAt = openedAt
+			availableAt = selected.OpenedAt
+		}
+	}
+	highlightUntil := visibleAt.Add(time.Hour)
+	return courseAccess{
+		OpenedAt:       selected.OpenedAt,
+		AvailableAt:    availableAt,
+		HighlightUntil: highlightUntil.Format("2006-01-02 15:04:05"),
+		IsNew:          !time.Now().Before(visibleAt) && time.Now().Before(highlightUntil),
+	}
 }
 
 // studentAccessibleSpaceIDs 返回学生通过有效套餐开通的全部学习空间 ID，不区分内容类型。
@@ -1089,9 +1140,8 @@ func (s *MemoryStore) learningSpaceIDsForPackage(packageID string) []string {
 
 func (s *MemoryStore) learningSpaceIDsForGrant(grantID string) []string {
 	out := make([]string, 0)
-	today := time.Now().Format("2006-01-02")
 	for _, access := range s.spaceAccess {
-		if access.PackageGrantID == grantID && access.Status == "active" && (access.StartsAt == "" || access.StartsAt <= today) && access.EndsAt >= today && s.learningSpaceEnabled(access.LearningSpaceID) {
+		if access.PackageGrantID == grantID && access.Status == "active" && grantPeriodActive(access.StartsAt, access.EndsAt) && s.learningSpaceEnabled(access.LearningSpaceID) {
 			out = appendUnique(out, access.LearningSpaceID)
 		}
 	}

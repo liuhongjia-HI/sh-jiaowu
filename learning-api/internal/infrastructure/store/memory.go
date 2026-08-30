@@ -88,6 +88,7 @@ type packageGrant struct {
 	PackageID      string
 	StartsAt       string
 	EndsAt         string
+	OpenedAt       string
 	Status         string
 	EffectiveUntil string
 }

@@ -259,23 +259,52 @@ func grantEndsAt(grant packageGrant) string {
 }
 
 func grantActive(grant packageGrant) bool {
-	today := time.Now().Format("2006-01-02")
 	status := grant.Status
 	if status == "" {
 		status = "active"
 	}
-	return status == "active" && (grant.StartsAt == "" || grant.StartsAt <= today) && grantEndsAt(grant) >= today
+	return status == "active" && grantPeriodActive(grant.StartsAt, grantEndsAt(grant))
 }
 
 func grantPermissionState(grant packageGrant) string {
-	today := time.Now().Format("2006-01-02")
-	if grant.Status == "revoked" || grantEndsAt(grant) < today {
+	if grant.Status == "revoked" || grantPeriodExpired(grantEndsAt(grant)) {
 		return "已到期"
 	}
-	if grant.StartsAt != "" && grant.StartsAt > today {
+	if grantPeriodNotStarted(grant.StartsAt) {
 		return "未开始"
 	}
 	return "生效中"
+}
+
+func grantPeriodActive(startsAt, endsAt string) bool {
+	now := time.Now()
+	if startsAt != "" {
+		start, _, err := normalizeGrantTimestamp(startsAt, false)
+		if err != nil || now.Before(start) {
+			return false
+		}
+	}
+	if endsAt == "" {
+		return false
+	}
+	end, _, err := normalizeGrantTimestamp(endsAt, true)
+	return err == nil && !now.After(end)
+}
+
+func grantPeriodExpired(endsAt string) bool {
+	if endsAt == "" {
+		return true
+	}
+	end, _, err := normalizeGrantTimestamp(endsAt, true)
+	return err != nil || time.Now().After(end)
+}
+
+func grantPeriodNotStarted(startsAt string) bool {
+	if startsAt == "" {
+		return false
+	}
+	start, _, err := normalizeGrantTimestamp(startsAt, false)
+	return err != nil || time.Now().Before(start)
 }
 
 func contentTypeLabel(value string) string {

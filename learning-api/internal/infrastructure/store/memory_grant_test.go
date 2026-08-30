@@ -104,6 +104,67 @@ func TestCreateDirectGrantOpensOnlySelectedLearningContent(t *testing.T) {
 	}
 }
 
+func TestDirectGrantSupportsTimedPeriodAndHighlightsNewCourse(t *testing.T) {
+	store := NewMemoryStore()
+	startsAt := time.Now().Add(-5 * time.Minute).Format("2006-01-02T15:04")
+	endsAt := time.Now().Add(time.Hour).Format("2006-01-02T15:04")
+
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        "stu-001",
+		LearningSpaceIDs: []string{"space-g05-math-s1-q1"},
+		ContentTypeCodes: []string{"course"},
+		StartsAt:         startsAt,
+		EndsAt:           endsAt,
+	}); err != nil {
+		t.Fatalf("expected timed direct grant to succeed: %v", err)
+	}
+
+	principal, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	study, err := store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("expected study board: %v", err)
+	}
+	if len(study.Courses) == 0 || study.Courses[0].Subject != "数学" {
+		t.Fatalf("newly opened course should be first, got %#v", study.Courses)
+	}
+	if !study.Courses[0].IsNew || study.Courses[0].OpenedAt == "" || study.Courses[0].HighlightUntil == "" {
+		t.Fatalf("newly opened course should expose its one-hour highlight, got %#v", study.Courses[0])
+	}
+}
+
+func TestDirectGrantKeepsFutureCourseHiddenUntilItsStartTime(t *testing.T) {
+	store := NewMemoryStore()
+	startsAt := time.Now().Add(10 * time.Minute).Format("2006-01-02T15:04")
+	endsAt := time.Now().Add(2 * time.Hour).Format("2006-01-02T15:04")
+
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        "stu-001",
+		LearningSpaceIDs: []string{"space-g05-math-s1-q1"},
+		ContentTypeCodes: []string{"course"},
+		StartsAt:         startsAt,
+		EndsAt:           endsAt,
+	}); err != nil {
+		t.Fatalf("expected future direct grant to be accepted: %v", err)
+	}
+
+	principal, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	study, err := store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("expected study board: %v", err)
+	}
+	for _, course := range study.Courses {
+		if course.Subject == "数学" {
+			t.Fatalf("future course must stay hidden before start time, got %#v", study.Courses)
+		}
+	}
+}
+
 func TestDirectGrantIsNotShownAsAnotherStudentsRecommendation(t *testing.T) {
 	store := NewMemoryStore()
 	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{

@@ -1,0 +1,1 @@
+{"code":0,"data":{"userId":"user-teacher","name":"英语老师","phone":"13800000004","authMethod":"password","campusId":"campus-main","roles":["teacher"],"learningSpaceIds":["space-g05-english-s1-q1","space-g05-english-s1-q2"],"canUploadHandout":true,"canUploadQuestion":true,"canReview":true},"message":"ok"}
