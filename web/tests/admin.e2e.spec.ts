@@ -154,6 +154,34 @@ test('学生表格将操作列显示在学生列之后', async ({ page }) => {
   expect(studentTableHeaders.slice(0, 3).map((header) => header.trim())).toEqual(['学生', '操作', '家长姓名']);
 });
 
+test('未开通课程学生在表格中高亮提示运营跟进', async ({ page }) => {
+  await login(page, '13800000002');
+  await page.route('**/api/students*', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [{
+          id: 'follow-up-highlight', name: '运营待跟进高亮学生', phone: '13900000157', grade: '五年级', schoolName: '星河小学',
+          openedPackages: [], openedPackageRefs: [], learningStatus: '未开始', accountStatus: '正常', followUpStatus: '待跟进',
+          streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-30 20:00:00'
+        }]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+  const followUpRow = page.locator('.student-table tbody tr', { hasText: '运营待跟进高亮学生' });
+  await expect(followUpRow).toBeVisible();
+  await expect(followUpRow).toHaveClass(/student-follow-up-row/);
+});
+
 test('iPad 横屏时学生姓名完整显示且表格可横向查看', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await login(page, '13800000002');

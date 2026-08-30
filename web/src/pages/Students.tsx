@@ -355,6 +355,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               emptyText="还没有学生，先新增学生或批量导入。"
               renderCard={(record) => (
                 <InfoCard
+                  className={record.followUpStatus === '待跟进' ? 'student-follow-up-card' : undefined}
                   title={<Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f">{record.name}</Badge>}
                   subtitle={`${record.grade} · ${record.phone}`}
                   status={<Space size={4}><Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>{packageStatusTag(record)}</Space>}
@@ -389,7 +390,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} tableLayout="fixed" scroll={{ x: 1536 }} pagination={{ pageSize: 8 }} /></div>
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1536 }} pagination={{ pageSize: 8 }} /></div>
           )}
         </div>
       </Card>

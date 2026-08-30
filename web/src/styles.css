@@ -2288,6 +2288,34 @@ button.schedule-block:hover {
   white-space: nowrap;
 }
 
+.student-table .student-follow-up-row > td {
+  background: #fff7e6 !important;
+  border-bottom-color: #ffd591;
+}
+
+.student-table .student-follow-up-row > td:first-child {
+  box-shadow: inset 4px 0 #fa8c16;
+}
+
+.student-table .student-follow-up-row:hover > td {
+  background: #fff1d6 !important;
+}
+
+.student-follow-up-card {
+  border-color: #ffbb75;
+  background: linear-gradient(135deg, #fffaf0 0%, #fff7e6 100%);
+  box-shadow: 0 14px 34px rgba(217, 119, 6, .1);
+}
+
+.student-follow-up-card:hover {
+  border-color: #fa8c16;
+  box-shadow: 0 20px 44px rgba(217, 119, 6, .16);
+}
+
+.student-follow-up-card .info-card-actions {
+  border-top-color: #ffd8a8;
+}
+
 .ant-input,
 .ant-input-affix-wrapper,
 .ant-select-selector,
