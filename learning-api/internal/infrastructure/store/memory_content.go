@@ -880,8 +880,16 @@ func (s *MemoryStore) reviewsUnlocked(principal learning.Principal) []learning.R
 	}
 	if hasRole(principal.Roles, learning.RoleTeacher) {
 		out := make([]learning.Review, 0, len(s.reviews))
+		subjects := subjectsForCourses(s.coursesUnlocked(principal))
 		for _, review := range s.reviews {
 			if review.ReviewerTeacherID == principal.UserID {
+				out = append(out, review)
+				continue
+			}
+			// 存量任务还没有责任快照时，暂按原课程范围展示，避免迁移
+			// 当天出现无人可批的历史作业。所有新任务一旦有分派信息，
+			// 都只按 reviewerTeacherID 路由。
+			if review.ReviewerTeacherID == "" && (canSeeSubject(principal, subjects, review.PackageName) || canSeeSubject(principal, subjects, review.Homework)) {
 				out = append(out, review)
 			}
 		}
