@@ -81,3 +81,43 @@ func TestUpdateStudentRebasesEnrollmentWhenAdminCorrectsGrade(t *testing.T) {
 		t.Fatalf("expected enrollment basis rebased to now, got %#v", raw)
 	}
 }
+
+func TestFollowUpOnlyIncludesUnpurchasedMiniProgramStudents(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("expected admin principal: %v", err)
+	}
+
+	miniProgramStudent, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "follow-up-mini-program", Phone: "13600008888", StudentName: "待跟进学生", SchoolName: "星河小学", Grade: "五年级",
+	})
+	if err != nil {
+		t.Fatalf("create mini-program student: %v", err)
+	}
+	if miniProgramStudent.StudentID == "" {
+		t.Fatal("expected a student account after mini-program registration")
+	}
+
+	manual, err := store.CreateStudent("超级管理员", admin, learning.StudentUpsertRequest{
+		Name: "后台新增学生", Phone: "13600009999", Grade: "五年级", SchoolName: "星河小学", AccountStatus: "正常",
+	})
+	if err != nil {
+		t.Fatalf("create manual student: %v", err)
+	}
+
+	followUps := store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"})
+	if len(followUps) != 1 || followUps[0].ID != miniProgramStudent.StudentID || followUps[0].FollowUpStatus != "待跟进" {
+		t.Fatalf("expected only the unpurchased mini-program student to need follow-up, got %#v", followUps)
+	}
+	if manual.FollowUpStatus != "" {
+		t.Fatalf("manual student must not enter follow-up automatically, got %#v", manual)
+	}
+
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: miniProgramStudent.StudentID, PackageID: "pkg-g05-english-s1-full"}); err != nil {
+		t.Fatalf("open formal package: %v", err)
+	}
+	if followUps = store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"}); len(followUps) != 0 {
+		t.Fatalf("student with a formal package must leave follow-up, got %#v", followUps)
+	}
+}
