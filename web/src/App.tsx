@@ -410,7 +410,7 @@ function Shell({ user }: { user: CurrentUser }) {
         <Content className="app-content">
           <Suspense fallback={<PageLoading />}>
             <Routes>
-              <Route path="/dashboard" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Dashboard /></GuardedRoute>} />
+			  <Route path="/dashboard" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Dashboard user={user} /></GuardedRoute>} />
               <Route path="/packages" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><PackagesPage user={user} /></GuardedRoute>} />
               <Route path="/open" element={<Navigate to="/students" replace />} />
               <Route path="/permissions" element={<Navigate to="/students" replace />} />

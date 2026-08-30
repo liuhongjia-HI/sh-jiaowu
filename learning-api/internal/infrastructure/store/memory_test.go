@@ -556,7 +556,7 @@ func TestDashboardUsesRealProductionCounts(t *testing.T) {
 	store.homework = []learning.Homework{{ID: "hw-prod", Title: "验收练习", PublishStatus: "已发布", Status: string(learning.StatusEnabled)}}
 	store.reviews = []learning.Review{{ID: "rev-prod", Status: "待批改"}}
 
-	overview := store.Dashboard()
+	overview := store.Dashboard(learning.Principal{UserID: "user-super", Roles: []learning.Role{learning.RoleSuperAdmin}})
 	if overview.OpenedStudents != 1 || overview.PackageCount != 1 || overview.PendingReviews != 1 || overview.MaterialViews != 7 || overview.UnpublishedFiles != 0 {
 		t.Fatalf("dashboard should use real counts, got %#v", overview)
 	}

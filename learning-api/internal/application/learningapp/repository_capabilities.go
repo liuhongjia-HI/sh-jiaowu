@@ -129,7 +129,7 @@ type BannerRepository interface {
 }
 
 type SystemRepository interface {
-	Dashboard() learning.DashboardOverview
+	Dashboard(learning.Principal) learning.DashboardOverview
 	SystemReadiness() learning.SystemReadiness
 	Settings() map[string]string
 	UpdateSetting(string, learning.SettingUpdateRequest) (map[string]string, error)

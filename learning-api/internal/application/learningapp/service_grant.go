@@ -2,7 +2,9 @@ package learningapp
 
 import "starline/learning-api/internal/domain/learning"
 
-func (s *Service) Dashboard() learning.DashboardOverview     { return s.system.Dashboard() }
+func (s *Service) Dashboard(p learning.Principal) learning.DashboardOverview {
+	return s.system.Dashboard(p)
+}
 func (s *Service) SystemReadiness() learning.SystemReadiness { return s.system.SystemReadiness() }
 func (s *Service) Packages() []learning.Package              { return s.grant.Packages() }
 func (s *Service) CreatePackage(o string, r learning.PackageUpsertRequest) (learning.Package, error) {
