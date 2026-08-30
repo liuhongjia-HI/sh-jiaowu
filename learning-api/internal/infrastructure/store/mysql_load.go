@@ -439,7 +439,7 @@ func (s *MemoryStore) loadHomeworkFromDB() error {
 }
 
 func (s *MemoryStore) loadGrantsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, external_id, student_id, package_id, starts_at, ends_at, status FROM student_package_grants ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, external_id, student_id, package_id, starts_at, ends_at, opened_at, status FROM student_package_grants ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -449,15 +449,16 @@ func (s *MemoryStore) loadGrantsFromDB() error {
 	for rows.Next() {
 		var dbID int
 		var grant packageGrant
-		var startsAt, endsAt sql.NullTime
-		if err := rows.Scan(&dbID, &grant.ID, &grant.StudentID, &grant.PackageID, &startsAt, &endsAt, &grant.Status); err != nil {
+		var startsAt, endsAt, openedAt sql.NullTime
+		if err := rows.Scan(&dbID, &grant.ID, &grant.StudentID, &grant.PackageID, &startsAt, &endsAt, &openedAt, &grant.Status); err != nil {
 			return err
 		}
 		if grant.ID == "" {
 			grant.ID = "grant-" + strconv.Itoa(dbID)
 		}
-		grant.StartsAt = dateString(startsAt)
-		grant.EndsAt = dateString(endsAt)
+		grant.StartsAt = dateTimeString(startsAt)
+		grant.EndsAt = dateTimeString(endsAt)
+		grant.OpenedAt = dateTimeString(openedAt)
 		grant.EffectiveUntil = grant.EndsAt
 		grantIDs[dbID] = grant.ID
 		grants = append(grants, grant)
@@ -481,8 +482,8 @@ func (s *MemoryStore) loadGrantsFromDB() error {
 		if item.PackageGrantID == "" {
 			item.PackageGrantID = grantIDs[dbGrantID]
 		}
-		item.StartsAt = dateString(startsAt)
-		item.EndsAt = dateString(endsAt)
+		item.StartsAt = dateTimeString(startsAt)
+		item.EndsAt = dateTimeString(endsAt)
 		access = append(access, item)
 	}
 	s.grants = grants

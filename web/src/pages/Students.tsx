@@ -83,6 +83,8 @@ export default function Students({ user }: { user: CurrentUser }) {
   const [studentDrawerTab, setStudentDrawerTab] = useState('profile');
   const [directLearningSpaceIds, setDirectLearningSpaceIds] = useState<string[]>([]);
   const [directContentTypeCodes, setDirectContentTypeCodes] = useState<string[]>([]);
+  const [directStartsAt, setDirectStartsAt] = useState('');
+  const [directEndsAt, setDirectEndsAt] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const queryClient = useQueryClient();
@@ -153,7 +155,9 @@ export default function Students({ user }: { user: CurrentUser }) {
       const body: DirectGrantCreateRequest = {
         studentId: selected.id,
         learningSpaceIds: directLearningSpaceIds,
-        contentTypeCodes: directContentTypeCodes
+        contentTypeCodes: directContentTypeCodes,
+        startsAt: directStartsAt || undefined,
+        endsAt: directEndsAt || undefined
       };
       return postData<DirectGrantResult>('/grants/direct', body);
     },
@@ -161,6 +165,8 @@ export default function Students({ user }: { user: CurrentUser }) {
       message.success(`已为 ${result.studentName} 开通 ${result.learningSpaces.length} 个课程范围的${result.contentTypes.join('、')}。`);
       setDirectLearningSpaceIds([]);
       setDirectContentTypeCodes([]);
+      setDirectStartsAt(toDateTimeInput(new Date()));
+      setDirectEndsAt('');
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
@@ -265,6 +271,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerTab('profile');
     setDirectLearningSpaceIds([]);
     setDirectContentTypeCodes([]);
+    setDirectStartsAt('');
+    setDirectEndsAt('');
   }
 
   function openDirectGrant(student: Student) {
@@ -272,6 +280,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerTab('direct-grant');
     setDirectLearningSpaceIds([]);
     setDirectContentTypeCodes([]);
+    setDirectStartsAt(toDateTimeInput(new Date()));
+    setDirectEndsAt('');
   }
 
   if (students.isLoading) return <Skeleton active />;
@@ -459,9 +469,13 @@ export default function Students({ user }: { user: CurrentUser }) {
                     learningSpacesError={Boolean(learningSpaces.error)}
                     selectedLearningSpaceIds={directLearningSpaceIds}
                     selectedContentTypeCodes={directContentTypeCodes}
+                    startsAt={directStartsAt}
+                    endsAt={directEndsAt}
                     submitting={createDirectGrant.isPending}
                     onLearningSpaceIdsChange={setDirectLearningSpaceIds}
                     onContentTypeCodesChange={setDirectContentTypeCodes}
+                    onStartsAtChange={setDirectStartsAt}
+                    onEndsAtChange={setDirectEndsAt}
                     onSubmit={() => createDirectGrant.mutate()}
                   />
                 ) : null
@@ -745,9 +759,13 @@ function DirectGrantPanel({
   learningSpacesError,
   selectedLearningSpaceIds,
   selectedContentTypeCodes,
+  startsAt,
+  endsAt,
   submitting,
   onLearningSpaceIdsChange,
   onContentTypeCodesChange,
+  onStartsAtChange,
+  onEndsAtChange,
   onSubmit
 }: {
   student: Student;
@@ -756,9 +774,13 @@ function DirectGrantPanel({
   learningSpacesError: boolean;
   selectedLearningSpaceIds: string[];
   selectedContentTypeCodes: string[];
+  startsAt: string;
+  endsAt: string;
   submitting: boolean;
   onLearningSpaceIdsChange: (values: string[]) => void;
   onContentTypeCodesChange: (values: string[]) => void;
+  onStartsAtChange: (value: string) => void;
+  onEndsAtChange: (value: string) => void;
   onSubmit: () => void;
 }) {
   const [selectedSubject, setSelectedSubject] = useState<string>();
@@ -778,7 +800,7 @@ function DirectGrantPanel({
         type="info"
         showIcon
         message="按需开通学习内容"
-        description={`先选择 ${student.name} 要学习的课程范围，再勾选需要开放的课程、习题或学习资料。确认后立即生效，有效期按当前校历计算。`}
+        description={`先选择 ${student.name} 要学习的课程范围，再勾选需要开放的课程、习题或学习资料。可设置何时对家长可见；结束时间不填时按当前校历自动计算。`}
       />
       <div>
         <Typography.Text strong>课程范围</Typography.Text>
@@ -848,6 +870,22 @@ function DirectGrantPanel({
           </Space>
         </Checkbox.Group>
       </div>
+      <div>
+        <Typography.Text strong>生效时间</Typography.Text>
+        <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
+          开通时间默认现在。未到开通时间的课程不会在学生端显示；结束时间留空时按当前校历到期。
+        </Typography.Paragraph>
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <label>
+            <Typography.Text>开通时间</Typography.Text>
+            <input aria-label="开通时间" className="ant-input" type="datetime-local" value={startsAt} onChange={(event) => onStartsAtChange(event.target.value)} style={{ marginTop: 4 }} />
+          </label>
+          <label>
+            <Typography.Text>结束时间（选填）</Typography.Text>
+            <input aria-label="结束时间" className="ant-input" type="datetime-local" min={startsAt} value={endsAt} onChange={(event) => onEndsAtChange(event.target.value)} style={{ marginTop: 4 }} />
+          </label>
+        </Space>
+      </div>
       <Button
         type="primary"
         icon={<UnlockOutlined />}
@@ -859,6 +897,11 @@ function DirectGrantPanel({
       </Button>
     </Space>
   );
+}
+
+function toDateTimeInput(value: Date) {
+  const offset = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: (packageId: string) => void }) {

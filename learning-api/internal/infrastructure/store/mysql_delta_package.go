@@ -50,8 +50,8 @@ func syncGrantPersistence(tx *sql.Tx, before, after *MemoryStore) error {
 		old, existed := beforeGrants[grant.ID]
 		if !existed || old != grant {
 			if _, err := tx.Exec(
-				`INSERT INTO student_package_grants (external_id, student_id, package_id, starts_at, ends_at, status, operator_id, operator_name) VALUES (?, ?, ?, ?, ?, ?, '', '') ON DUPLICATE KEY UPDATE external_id=VALUES(external_id), starts_at=VALUES(starts_at), ends_at=VALUES(ends_at), status=VALUES(status)`,
-				grant.ID, grant.StudentID, grant.PackageID, nullableDate(grant.StartsAt), nullableDate(grantEndsAt(grant)), grant.Status,
+				`INSERT INTO student_package_grants (external_id, student_id, package_id, starts_at, ends_at, opened_at, status, operator_id, operator_name) VALUES (?, ?, ?, ?, ?, ?, ?, '', '') ON DUPLICATE KEY UPDATE external_id=VALUES(external_id), starts_at=VALUES(starts_at), ends_at=VALUES(ends_at), opened_at=VALUES(opened_at), status=VALUES(status)`,
+				grant.ID, grant.StudentID, grant.PackageID, nullableDate(grant.StartsAt), nullableDate(grantEndsAt(grant)), nullableDateTime(grantOpenedAt(grant)), grant.Status,
 			); err != nil {
 				return err
 			}

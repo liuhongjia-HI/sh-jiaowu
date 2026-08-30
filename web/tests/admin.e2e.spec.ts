@@ -184,6 +184,8 @@ test('校区管理员可以在学生管理直接开通课程', async ({ page }) 
   await expect(drawer.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '习题', exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '学习资料', exact: true })).toBeVisible();
+  await expect(drawer.getByLabel('开通时间')).toBeVisible();
+  await expect(drawer.getByLabel('结束时间')).toBeVisible();
   await expect(drawer.getByText('课程方案', { exact: true })).toHaveCount(0);
 
   await page.goto('/open');

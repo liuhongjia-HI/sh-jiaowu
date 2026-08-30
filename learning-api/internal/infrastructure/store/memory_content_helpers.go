@@ -258,6 +258,19 @@ func grantEndsAt(grant packageGrant) string {
 	return grant.EffectiveUntil
 }
 
+func grantOpenedAt(grant packageGrant) string {
+	if grant.OpenedAt != "" {
+		return grant.OpenedAt
+	}
+	if grant.StartsAt != "" {
+		_, normalized, err := normalizeGrantTimestamp(grant.StartsAt, false)
+		if err == nil {
+			return normalized
+		}
+	}
+	return time.Now().Format("2006-01-02 15:04:05")
+}
+
 func grantActive(grant packageGrant) bool {
 	status := grant.Status
 	if status == "" {

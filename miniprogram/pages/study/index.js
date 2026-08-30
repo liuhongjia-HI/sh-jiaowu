@@ -88,17 +88,30 @@ Page({
 // decorateCourses 使用接口返回的真实进度，仅补充图标等展示字段。
 function decorateCourses(courses, favorites) {
   const favoriteCourseNames = (favorites || []).map((item) => item.course).filter(Boolean);
-  return courses.map((course, index) => {
+  return [...courses].sort((left, right) => courseAvailableAt(right) - courseAvailableAt(left)).map((course, index) => {
     const progress = Number(course.progress) || 0;
+    const isNew = Boolean(course.isNew);
     return {
       ...course,
       progress,
       favorited: favoriteCourseNames.includes(course.name),
       badgeText: progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新课程",
-      cardClass: progress >= 100 ? "reward" : "",
+      cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : "",
+      newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: index % 2 === 0 ? "📖" : "💡"
     };
   });
+}
+
+function courseAvailableAt(course) {
+  const value = String(course.availableAt || course.openedAt || "").replace(" ", "T");
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatCourseTime(value) {
+  const text = String(value || "");
+  return text.length >= 16 ? text.slice(5, 16).replace(" ", " ") : text;
 }
 
 function studyEmptyMessage(hasOpenedPackage) {

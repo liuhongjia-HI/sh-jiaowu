@@ -125,6 +125,8 @@ func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.Di
 		LearningSpaces: s.learningSpaceNames(spaceIDs), OpenCourses: []string{}, OpenMaterials: []string{}, OpenHomework: []string{},
 	}
 	for _, space := range spaces {
+		directPackageID := directGrantPackageID(student.ID, space.ID)
+		courseAlreadyOpened := containsString(s.contentTypesForPackage(directPackageID), "course")
 		packageID, err := s.ensureDirectGrantPackage(student, space, contentTypes)
 		if err != nil {
 			return learning.DirectGrantResult{}, err
@@ -138,11 +140,23 @@ func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.Di
 		if err != nil {
 			return learning.DirectGrantResult{}, err
 		}
+		if containsString(contentTypes, "course") && !courseAlreadyOpened {
+			s.markGrantNewlyOpened(student.ID, packageID)
+		}
 		result.OpenCourses = appendUnique(result.OpenCourses, preview.OpenCourses...)
 		result.OpenMaterials = appendUnique(result.OpenMaterials, preview.OpenMaterials...)
 		result.OpenHomework = appendUnique(result.OpenHomework, preview.OpenHomework...)
 	}
 	return result, nil
+}
+
+func (s *MemoryStore) markGrantNewlyOpened(studentID, packageID string) {
+	for index := range s.grants {
+		if s.grants[index].StudentID == studentID && s.grants[index].PackageID == packageID {
+			s.grants[index].OpenedAt = time.Now().Format("2006-01-02 15:04:05")
+			return
+		}
+	}
 }
 
 func (s *MemoryStore) ensureDirectGrantPackage(student learning.Student, space learningSpace, contentTypes []string) (string, error) {

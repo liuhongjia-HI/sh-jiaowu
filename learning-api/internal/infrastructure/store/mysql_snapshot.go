@@ -199,9 +199,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		dbID := index + 1
 		grantIDs[grant.ID] = dbID
 		if _, err := tx.Exec(
-			`INSERT INTO student_package_grants (id, external_id, student_id, package_id, starts_at, ends_at, status, operator_id, operator_name)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, '', '')`,
-			dbID, grant.ID, grant.StudentID, grant.PackageID, nullableDate(grant.StartsAt), nullableDate(grantEndsAt(grant)), grant.Status,
+			`INSERT INTO student_package_grants (id, external_id, student_id, package_id, starts_at, ends_at, opened_at, status, operator_id, operator_name)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', '')`,
+			dbID, grant.ID, grant.StudentID, grant.PackageID, nullableDate(grant.StartsAt), nullableDate(grantEndsAt(grant)), nullableDateTime(grantOpenedAt(grant)), grant.Status,
 		); err != nil {
 			return err
 		}

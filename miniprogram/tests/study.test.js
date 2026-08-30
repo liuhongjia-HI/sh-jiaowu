@@ -61,3 +61,24 @@ test("study page refreshes opened courses when tab is shown again", async () => 
   assert.equal(page.data.visibleCourses.length, 1);
   assert.equal(page.data.visibleCourses[0].name, "四年级地理S1Q1课程");
 });
+
+test("study page puts a newly opened course first and keeps its new marker", async () => {
+  const page = loadStudyPage((path) => {
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.resolve({
+      student: { id: "stu-001", openedPackages: ["五年级课程"] },
+      courses: [
+        { id: "course-old", name: "已开通课程", subject: "英语", grade: "五年级", availableAt: "2026-08-30 09:00:00" },
+        { id: "course-new", name: "刚开通课程", subject: "数学", grade: "五年级", availableAt: "2026-08-30 10:00:00", isNew: true }
+      ],
+      materials: []
+    });
+  });
+
+  page.loadStudy();
+  await flushPromises();
+
+  assert.equal(page.data.visibleCourses[0].id, "course-new");
+  assert.equal(page.data.visibleCourses[0].isNew, true);
+  assert.equal(page.data.visibleCourses[0].cardClass, "new-course");
+});

@@ -1002,7 +1002,7 @@ func (s *MemoryStore) courseAccessForStudent(studentID string, course learning.C
 		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") || !containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
 			continue
 		}
-		if selected.ID == "" || grant.StartsAt > selected.StartsAt || (grant.StartsAt == selected.StartsAt && grant.OpenedAt > selected.OpenedAt) {
+		if selected.ID == "" || grant.StartsAt > selected.StartsAt || (grant.StartsAt == selected.StartsAt && grantOpenedAt(grant) > grantOpenedAt(selected)) {
 			selected = grant
 		}
 	}
@@ -1015,18 +1015,19 @@ func (s *MemoryStore) courseAccessForStudent(studentID string, course learning.C
 	}
 	visibleAt, _, err := normalizeGrantTimestamp(availableAt, false)
 	if err != nil {
-		return courseAccess{OpenedAt: selected.OpenedAt, AvailableAt: availableAt}
+		return courseAccess{OpenedAt: grantOpenedAt(selected), AvailableAt: availableAt}
 	}
-	if selected.OpenedAt != "" {
-		openedAt, _, openedErr := normalizeGrantTimestamp(selected.OpenedAt, false)
+	openedAtValue := grantOpenedAt(selected)
+	if openedAtValue != "" {
+		openedAt, _, openedErr := normalizeGrantTimestamp(openedAtValue, false)
 		if openedErr == nil && openedAt.After(visibleAt) {
 			visibleAt = openedAt
-			availableAt = selected.OpenedAt
+			availableAt = openedAtValue
 		}
 	}
 	highlightUntil := visibleAt.Add(time.Hour)
 	return courseAccess{
-		OpenedAt:       selected.OpenedAt,
+		OpenedAt:       openedAtValue,
 		AvailableAt:    availableAt,
 		HighlightUntil: highlightUntil.Format("2006-01-02 15:04:05"),
 		IsNew:          !time.Now().Before(visibleAt) && time.Now().Before(highlightUntil),

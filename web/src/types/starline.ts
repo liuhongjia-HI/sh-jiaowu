@@ -220,6 +220,8 @@ export type DirectGrantCreateRequest = {
   studentId: string;
   learningSpaceIds: string[];
   contentTypeCodes: string[];
+  startsAt?: string;
+  endsAt?: string;
 };
 
 export type DirectGrantResult = {

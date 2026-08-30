@@ -360,6 +360,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"schedule_classes", "created_by", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "created_by_role", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"student_package_grants", "opened_at", "DATETIME NULL"},
 		{"study_packages", "trial_enabled", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "external_id", mysqlNoticeExternalIDDefinition},
@@ -396,12 +397,25 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 	if err := s.ensureColumnDefinition("notices", "external_id", mysqlNoticeExternalIDDefinition); err != nil {
 		return err
 	}
+	if err := s.ensureColumnDefinition("student_package_grants", "starts_at", "DATETIME NOT NULL"); err != nil {
+		return err
+	}
+	if err := s.ensureColumnDefinition("student_package_grants", "ends_at", "DATETIME NOT NULL"); err != nil {
+		return err
+	}
+	if err := s.ensureColumnDefinition("student_learning_space_access", "starts_at", "DATETIME NOT NULL"); err != nil {
+		return err
+	}
+	if err := s.ensureColumnDefinition("student_learning_space_access", "ends_at", "DATETIME NOT NULL"); err != nil {
+		return err
+	}
 	// Stable external keys are required for request-time keyed upserts. Backfill
 	// legacy rows using the same IDs the loader historically synthesized.
 	backfills := []string{
 		`UPDATE homework_tasks SET deadline_at = DATE_ADD(deadline, INTERVAL 86399 SECOND) WHERE deadline_at IS NULL AND deadline IS NOT NULL`,
 		`UPDATE homework_tasks SET assessment_type = 'practice' WHERE assessment_type = ''`,
 		`UPDATE student_package_grants SET external_id = CONCAT('grant-', id) WHERE external_id = ''`,
+		`UPDATE student_package_grants SET opened_at = created_at WHERE opened_at IS NULL`,
 		`UPDATE notices SET external_id = CONCAT('notice-', id) WHERE external_id = ''`,
 		`UPDATE operation_logs SET external_id = CONCAT('log-', id) WHERE external_id = ''`,
 		`UPDATE operation_logs log_row
