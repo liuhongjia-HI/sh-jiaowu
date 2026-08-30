@@ -89,6 +89,22 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
   }
 });
 
+test('题库和课程内容可以切换卡片与表格视图', async ({ page }) => {
+  await login(page, '13800000001');
+
+  for (const [path, heading, storageKey] of [
+    ['/questions', '题库', 'starline:list-view:questions'],
+    ['/content', '课程内容', 'starline:list-view:courses']
+  ] as const) {
+    await expectPageHeading(page, path, heading);
+    const toggle = page.getByLabel(`列表视图：${storageKey}`);
+    await toggle.getByText('卡片').click();
+    await expect(page.locator('.card-list-grid .info-card').first()).toBeVisible();
+    await toggle.getByText('表格').click();
+    await expect(page.locator('.ant-table-thead').first()).toBeVisible();
+  }
+});
+
 test('新增课程方案默认带出当前学年', async ({ page }) => {
   await login(page, '13800000001');
   await expectPageHeading(page, '/packages', '课程方案');
