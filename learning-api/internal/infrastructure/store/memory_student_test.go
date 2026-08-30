@@ -82,7 +82,7 @@ func TestUpdateStudentRebasesEnrollmentWhenAdminCorrectsGrade(t *testing.T) {
 	}
 }
 
-func TestFollowUpOnlyIncludesUnpurchasedMiniProgramStudents(t *testing.T) {
+func TestFollowUpIncludesEveryStudentWithoutAnOpenedPackage(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.PrincipalByUserID("user-super")
 	if err != nil {
@@ -98,6 +98,10 @@ func TestFollowUpOnlyIncludesUnpurchasedMiniProgramStudents(t *testing.T) {
 	if miniProgramStudent.StudentID == "" {
 		t.Fatal("expected a student account after mini-program registration")
 	}
+	miniProgramProfile, ok := store.findStudent(miniProgramStudent.StudentID)
+	if !ok {
+		t.Fatal("expected mini-program student profile")
+	}
 
 	manual, err := store.CreateStudent("超级管理员", admin, learning.StudentUpsertRequest{
 		Name: "后台新增学生", Phone: "13600009999", Grade: "五年级", SchoolName: "星河小学", AccountStatus: "正常",
@@ -107,25 +111,25 @@ func TestFollowUpOnlyIncludesUnpurchasedMiniProgramStudents(t *testing.T) {
 	}
 
 	followUps := store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"})
-	if len(followUps) != 1 || followUps[0].ID != miniProgramStudent.StudentID || followUps[0].FollowUpStatus != "待跟进" {
-		t.Fatalf("expected only the unpurchased mini-program student to need follow-up, got %#v", followUps)
+	if len(followUps) != 2 {
+		t.Fatalf("expected every student without a package to need follow-up, got %#v", followUps)
 	}
-	if manual.FollowUpStatus != "" {
-		t.Fatalf("manual student must not enter follow-up automatically, got %#v", manual)
+	if miniProgramProfile.FollowUpStatus != "待跟进" || manual.FollowUpStatus != "待跟进" {
+		t.Fatalf("students without a package must be marked for follow-up, got mini-program=%#v manual=%#v", miniProgramProfile, manual)
 	}
 	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
 		StudentID: miniProgramStudent.StudentID, LearningSpaceIDs: []string{"space-g05-english-s1-q1"}, ContentTypeCodes: []string{"course"},
 	}); err != nil {
 		t.Fatalf("open direct learning content: %v", err)
 	}
-	if followUps = store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"}); len(followUps) != 1 || followUps[0].ID != miniProgramStudent.StudentID {
-		t.Fatalf("direct learning access is not a package purchase, got %#v", followUps)
+	if followUps = store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"}); len(followUps) != 1 || followUps[0].ID != manual.ID {
+		t.Fatalf("students with direct learning access must leave follow-up, got %#v", followUps)
 	}
 
 	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: miniProgramStudent.StudentID, PackageID: "pkg-g05-english-s1-full"}); err != nil {
 		t.Fatalf("open formal package: %v", err)
 	}
-	if followUps = store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"}); len(followUps) != 0 {
-		t.Fatalf("student with a formal package must leave follow-up, got %#v", followUps)
+	if followUps = store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"}); len(followUps) != 1 || followUps[0].ID != manual.ID {
+		t.Fatalf("only the still-unopened student must remain for follow-up, got %#v", followUps)
 	}
 }
