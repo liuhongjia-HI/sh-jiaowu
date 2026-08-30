@@ -312,7 +312,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>{writable ? '学生管理' : '我的学生'}</Typography.Title>
-          <Typography.Text type="secondary">{writable ? '先确定辅导老师，再排课、批改和跟进；小程序自助注册且未开通正式套餐的学生会自动归入待跟进。' : '这里只显示已分配给我的学生，避免跨班或跨老师查看。'}</Typography.Text>
+          <Typography.Text type="secondary">{writable ? '先确定辅导老师，再排课、批改和跟进；所有未开通课程的学生会自动归入待跟进。' : '这里只显示已分配给我的学生，避免跨班或跨老师查看。'}</Typography.Text>
         </div>
         {writable && (
           <Space>
