@@ -99,7 +99,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodPost, "/api/courses", token, learning.CourseUpsertRequest{
 		Name:            "接口测试英语课程",
 		LearningSpaceID: "space-g05-english-s1-q1",
-		ChapterCount:    6,
+		Curriculum:      apiTestCurriculum("api-course"),
 		Status:          learning.StatusEnabled,
 	}, http.StatusOK, &course)
 	if course.ID == "" || course.Grade != "五年级" || course.Subject != "英文" {
@@ -110,10 +110,10 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodPut, "/api/courses/"+course.ID, token, learning.CourseUpsertRequest{
 		Name:            "接口测试英语课程-已编辑",
 		LearningSpaceID: "space-g05-english-s1-q1",
-		ChapterCount:    8,
+		Curriculum:      apiTestCurriculum("api-course"),
 		Status:          learning.StatusEnabled,
 	}, http.StatusOK, &updatedCourse)
-	if updatedCourse.Name != "接口测试英语课程-已编辑" || updatedCourse.ChapterCount != 8 {
+	if updatedCourse.Name != "接口测试英语课程-已编辑" || updatedCourse.LessonCount != 1 {
 		t.Fatalf("unexpected updated course: %#v", updatedCourse)
 	}
 
@@ -122,7 +122,7 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		"title":           "接口测试学习资料",
 		"courseId":        course.ID,
 		"learningSpaceId": "space-g05-english-s1-q1",
-		"chapter":         "第一章",
+		"lessonId":        "api-course-lesson-1",
 	}, "file", "material.pdf", []byte("%PDF-1.4 test material"), http.StatusOK, &material)
 	if material.ID == "" || material.FileID == "" || material.PreviewStatus != "待转换" {
 		t.Fatalf("unexpected material: %#v", material)
@@ -165,10 +165,10 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		Title:           "接口测试学习资料-草稿",
 		CourseID:        course.ID,
 		LearningSpaceID: "space-g05-english-s1-q1",
-		Chapter:         "第二章",
+		LessonID:        "api-course-lesson-1",
 		Status:          learning.StatusDraft,
 	}, http.StatusOK, &updatedMaterial)
-	if updatedMaterial.PublishStatus != "草稿" || updatedMaterial.Chapter != "第二章" {
+	if updatedMaterial.PublishStatus != "草稿" || updatedMaterial.LessonID != "api-course-lesson-1" {
 		t.Fatalf("unexpected updated material: %#v", updatedMaterial)
 	}
 
@@ -177,10 +177,10 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		"title":           "接口测试练习",
 		"courseId":        course.ID,
 		"learningSpaceId": "space-g05-english-s1-q1",
-		"chapter":         "第一章",
+		"lessonId":        "api-course-lesson-1",
 		"deadline":        "2026-07-31",
 	}, "file", "homework.pdf", []byte("%PDF-1.4 test homework"), http.StatusOK, &homework)
-	if homework.ID == "" || homework.FileID == "" || homework.Chapter != "第一章" {
+	if homework.ID == "" || homework.FileID == "" || homework.LessonID != "api-course-lesson-1" {
 		t.Fatalf("unexpected homework: %#v", homework)
 	}
 
@@ -189,11 +189,11 @@ func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {
 		Title:           "接口测试练习-停用",
 		CourseID:        course.ID,
 		LearningSpaceID: "space-g05-english-s1-q1",
-		Chapter:         "第二章",
+		LessonID:        "api-course-lesson-1",
 		Deadline:        "2026-08-01",
 		Status:          string(learning.StatusDisabled),
 	}, http.StatusOK, &updatedHomework)
-	if updatedHomework.PublishStatus != "停用" || updatedHomework.Deadline != "2026-08-01" || updatedHomework.Chapter != "第二章" {
+	if updatedHomework.PublishStatus != "停用" || updatedHomework.Deadline != "2026-08-01" || updatedHomework.LessonID != "api-course-lesson-1" {
 		t.Fatalf("unexpected updated homework: %#v", updatedHomework)
 	}
 

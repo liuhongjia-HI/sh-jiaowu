@@ -43,6 +43,14 @@ func newTestApp(t *testing.T) *testApp {
 	return newTestAppWithStorageRoot(t, "")
 }
 
+func apiTestCurriculum(prefix string) []learning.CurriculumNode {
+	return []learning.CurriculumNode{
+		{ID: prefix + "-unit-1", Type: learning.CurriculumUnit, Name: "Unit 1", SortOrder: 1},
+		{ID: prefix + "-chapter-1", ParentID: prefix + "-unit-1", Type: learning.CurriculumChapter, Name: "Chapter 1", SortOrder: 1},
+		{ID: prefix + "-lesson-1", ParentID: prefix + "-chapter-1", Type: learning.CurriculumLesson, Name: "Lesson 1", SortOrder: 1},
+	}
+}
+
 func newTestAppWithStorageRoot(t *testing.T, storageRoot string) *testApp {
 	t.Helper()
 	repo := store.NewMemoryStore()
@@ -251,7 +259,7 @@ func TestMaterialReorderEndpointChangesStudentCourseDisplayOrder(t *testing.T) {
 	courseID := "course-g05-english-s1-q1"
 	for _, title := range []string{"排序测试资料一", "排序测试资料二"} {
 		if _, err := app.store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
-			Title: title, CourseID: courseID,
+			Title: title, CourseID: courseID, LessonID: courseID + "-lesson-1",
 			File: learning.FileAsset{ID: "file-" + title, FileName: title + ".pdf", FileType: "PDF"},
 		}); err != nil {
 			t.Fatalf("create %s: %v", title, err)
@@ -636,6 +644,7 @@ func TestStudentLearningReviewClosedLoopThroughAPI(t *testing.T) {
 		Title:           "闭环课后小挑战",
 		CourseID:        "course-g05-english-s1-q1",
 		LearningSpaceID: "space-g05-english-s1-q1",
+		LessonID:        "course-g05-english-s1-q1-lesson-1",
 		Deadline:        "2026-12-31",
 		Status:          string(learning.StatusEnabled),
 		QuestionIDs:     []string{singleQuestion.ID, textQuestion.ID},
@@ -944,6 +953,7 @@ func TestFileDownloadRequiresVisibleContent(t *testing.T) {
 	material, err := app.store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
 		Title:    "接口测试学习资料",
 		CourseID: "course-g05-english-s1-q1",
+		LessonID: "course-g05-english-s1-q1-lesson-1",
 		File: learning.FileAsset{
 			ID:            "file-router-download",
 			FileName:      "material.pdf",
@@ -1020,7 +1030,7 @@ func TestStudentMaterialDownloadNeverFallsBackToOriginalFile(t *testing.T) {
 		t.Fatalf("teacher principal: %v", err)
 	}
 	material, err := app.store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
-		Title: "学生下载水印测试", CourseID: "course-g05-english-s1-q1",
+		Title: "学生下载水印测试", CourseID: "course-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1",
 		File: learning.FileAsset{
 			ID: "file-student-watermark-download", FileName: "lesson.pdf", FileSize: int64(len(original)), FileType: "PDF",
 			ContentType: "application/pdf", OriginalPath: source, PreviewPath: source, PreviewStatus: "可预览",
