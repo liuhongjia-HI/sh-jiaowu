@@ -249,6 +249,52 @@ func TestDisabledHomeworkIsHiddenFromStudent(t *testing.T) {
 	}
 }
 
+func TestDeleteHomeworkRemovesUnsubmittedTaskAndProtectsSubmittedWork(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
+		Title:       "待删除课后练习",
+		CourseID:    "course-g05-english-s1-q1",
+		QuestionIDs: []string{"q1"},
+		Status:      string(learning.StatusEnabled),
+	})
+	if err != nil {
+		t.Fatalf("expected homework creation to succeed: %v", err)
+	}
+
+	if err := store.DeleteHomework("英语老师", teacher, created.ID); err != nil {
+		t.Fatalf("expected unsubmitted homework deletion to succeed: %v", err)
+	}
+	for _, item := range store.Homework(teacher) {
+		if item.ID == created.ID {
+			t.Fatalf("expected deleted homework to disappear from admin list: %#v", item)
+		}
+	}
+	tasks, err := store.StudentTasks(student)
+	if err != nil {
+		t.Fatalf("expected student tasks after homework deletion: %v", err)
+	}
+	for _, task := range tasks {
+		if task.ID == created.ID {
+			t.Fatalf("expected deleted homework to disappear from student tasks: %#v", task)
+		}
+	}
+
+	if err := store.DeleteHomework("英语老师", teacher, "homework-does-not-exist"); err == nil {
+		t.Fatal("expected deleting a nonexistent homework item to fail")
+	}
+	if err := store.DeleteHomework("英语老师", teacher, "hw-g05-english-s1-q1"); err == nil {
+		t.Fatal("expected homework with submissions to be protected from deletion")
+	}
+}
+
 func TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")
