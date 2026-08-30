@@ -119,7 +119,7 @@ function buildTags(materials, homework) {
 	[...(materials || []), ...(homework || [])].forEach((item) => {
 		if (item.tagCode && tagLabels[item.tagCode]) counts[item.tagCode] = (counts[item.tagCode] || 0) + 1;
 	});
-	return Object.keys(tagLabels).filter((code) => counts[code]).map((code) => ({ code, label: tagLabels[code], count: counts[code] }));
+	return Object.keys(tagLabels).map((code) => ({ code, label: tagLabels[code], count: counts[code] || 0 }));
 }
 
 function filterStations(stations, tagCode) {

@@ -123,7 +123,9 @@ func (s *MemoryStore) homeworkForCourses(courses []string) []learning.Homework {
 	out := make([]learning.Homework, 0)
 	for _, item := range s.homework {
 		if homeworkVisible(item.Status) && containsString(courses, item.Course) {
-			out = append(out, cloneHomework(item))
+			item = cloneHomework(item)
+			item.TagCode = contentTagCodeOrInferred(item.TagCode, item.Title, item.FileName)
+			out = append(out, item)
 		}
 	}
 	return out

@@ -1153,6 +1153,7 @@ func (s *MemoryStore) learningSpaceName(id string) string {
 
 func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Material {
 	material.Type = "课程讲义"
+	material.TagCode = contentTagCodeOrInferred(material.TagCode, material.Title, material.FileName)
 	if space, ok := s.findLearningSpace(material.LearningSpaceID); ok {
 		material.Grade = space.Grade
 		material.Semester = space.Semester

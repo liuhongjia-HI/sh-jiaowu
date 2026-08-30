@@ -104,6 +104,17 @@ func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, qu
 
 var contentTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "Exam": true, "Special": true}
 
+var contentTagPrefixes = []struct {
+	prefix string
+	code   string
+}{
+	{prefix: "hd", code: "HD"},
+	{prefix: "blank", code: "Blank"},
+	{prefix: "hw", code: "HW"},
+	{prefix: "exam", code: "Exam"},
+	{prefix: "special", code: "Special"},
+}
+
 func normalizeContentTagCode(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -113,6 +124,21 @@ func normalizeContentTagCode(value string) (string, error) {
 		return "", errors.New("请选择正确的内容标签")
 	}
 	return value, nil
+}
+
+func contentTagCodeOrInferred(tagCode string, values ...string) string {
+	if strings.TrimSpace(tagCode) != "" {
+		return tagCode
+	}
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		for _, tag := range contentTagPrefixes {
+			if value == tag.prefix || strings.HasPrefix(value, tag.prefix+"_") || strings.HasPrefix(value, tag.prefix+"-") || strings.HasPrefix(value, tag.prefix+" ") {
+				return tag.code
+			}
+		}
+	}
+	return ""
 }
 
 func normalizeAssessmentType(value string) string {
@@ -156,6 +182,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	if err != nil {
 		return learning.Material{}, err
 	}
+	tagCode = contentTagCodeOrInferred(tagCode, req.Title, req.File.FileName)
 	req.Chapter = strings.TrimSpace(req.Chapter)
 	if req.Title == "" {
 		return learning.Material{}, errors.New("请输入学习资料标题")
@@ -311,6 +338,7 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 	if err != nil {
 		return learning.Material{}, err
 	}
+	tagCode = contentTagCodeOrInferred(tagCode, req.Title)
 	if req.Title == "" {
 		return learning.Material{}, errors.New("请输入学习资料标题")
 	}
@@ -651,6 +679,7 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	if err != nil {
 		return learning.Homework{}, err
 	}
+	tagCode = contentTagCodeOrInferred(tagCode, req.Title, req.File.FileName)
 	if req.Title == "" {
 		return learning.Homework{}, errors.New("请输入题目标题")
 	}
@@ -738,6 +767,7 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 	if err != nil {
 		return learning.Homework{}, err
 	}
+	tagCode = contentTagCodeOrInferred(tagCode, req.Title)
 	status := learning.Status(strings.TrimSpace(req.Status))
 	if req.Title == "" {
 		return learning.Homework{}, errors.New("请输入题目标题")

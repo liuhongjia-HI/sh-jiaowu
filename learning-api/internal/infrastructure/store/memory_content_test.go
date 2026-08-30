@@ -61,6 +61,49 @@ func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) 
 	}
 }
 
+func TestContentTagIsInferredFromTitleWhenUploadOmitsIt(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "Blank_G5S1Q1_1.1.2 Elements of a Map", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1",
+	})
+	if err != nil {
+		t.Fatalf("create material: %v", err)
+	}
+	if material.TagCode != "Blank" {
+		t.Fatalf("expected inferred Blank tag, got %#v", material)
+	}
+}
+
+func TestHistoricalContentWithBlankTagIsVisibleInStudentTagFilter(t *testing.T) {
+	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.materials = append(store.materials, learning.Material{
+		ID: "material-legacy-blank", Title: "Blank_G5S1Q1_1.1.2 Elements of a Map", CourseID: "course-g05-english-s1-q1", Course: "五年级英文S1Q1课程", LearningSpaceID: "space-g05-english-s1-q1", Status: learning.StatusEnabled,
+	})
+
+	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
+	if err != nil {
+		t.Fatalf("student detail: %v", err)
+	}
+	if !stationHasTag(detail.Stations, "material-legacy-blank", "Blank") {
+		t.Fatalf("legacy material should be filtered as Blank: %#v", detail.Stations)
+	}
+}
+
+func TestExplicitContentTagWinsOverTitlePrefix(t *testing.T) {
+	if tag := contentTagCodeOrInferred("HD", "Blank_G5S1Q1_1.1.2 Elements of a Map"); tag != "HD" {
+		t.Fatalf("expected explicit tag to win, got %q", tag)
+	}
+}
+
 func stationHasTag(stations []learning.Station, id, tag string) bool {
 	for _, station := range stations {
 		if (station.MaterialID == id || station.HomeworkID == id) && station.TagCode == tag {

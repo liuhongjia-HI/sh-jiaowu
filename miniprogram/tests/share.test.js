@@ -71,7 +71,8 @@ test("study detail filters its ordered directory by the selected content tag", a
 
   page.loadDetail();
   await flushPromises();
-  assert.deepEqual(page.data.tags.map((tag) => tag.code), ["HD", "Exam"]);
+  assert.deepEqual(page.data.tags.map((tag) => tag.code), ["HD", "Blank", "HW", "Exam", "Special"]);
+  assert.deepEqual(page.data.tags.map((tag) => tag.count), [1, 0, 0, 1, 0]);
   assert.equal(page.data.visibleStations.length, 2);
 
   page.selectTag({ currentTarget: { dataset: { code: "Exam" } } });
