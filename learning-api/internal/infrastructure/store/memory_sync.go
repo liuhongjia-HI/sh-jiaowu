@@ -257,6 +257,12 @@ func (s *MemoryStore) CompleteReview(operator string, principal learning.Princip
 	}, nil)
 }
 
+func (s *MemoryStore) AssignReview(operator string, principal learning.Principal, id string, req learning.ReviewAssignRequest) (learning.Review, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.assignReviewUnlocked(operator, principal, id, req)
+}
+
 func (s *MemoryStore) ConnectSchedulingDB(dsn string) error {
 	return s.connectPrepared(dsn, true)
 }
@@ -515,10 +521,39 @@ func (s *MemoryStore) PendingScheduleClasses(principal learning.Principal) []lea
 	return s.pendingScheduleClassesUnlocked(principal)
 }
 
-func (s *MemoryStore) Dashboard() learning.DashboardOverview {
+func (s *MemoryStore) LessonFeedbacks(principal learning.Principal, classID string) ([]learning.LessonFeedback, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lessonFeedbacksUnlocked(principal, classID)
+}
+
+func (s *MemoryStore) UpsertLessonFeedback(operator string, principal learning.Principal, classID string, req learning.LessonFeedbackUpsertRequest) (learning.LessonFeedback, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.upsertLessonFeedbackUnlocked(operator, principal, classID, req)
+}
+
+func (s *MemoryStore) Dashboard(principal learning.Principal) learning.DashboardOverview {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := s.dashboardUnlocked()
+	if hasRole(principal.Roles, learning.RoleTeacher) && !hasRole(principal.Roles, learning.RoleOpsStaff) && !hasRole(principal.Roles, learning.RoleCampusAdmin) && !hasRole(principal.Roles, learning.RoleSuperAdmin) {
+		studentIDs := map[string]bool{}
+		for _, assignment := range s.tutoringAssignments {
+			if assignment.TeacherID == principal.UserID && assignment.Status == learning.TutoringAssignmentActive {
+				studentIDs[assignment.StudentID] = true
+			}
+		}
+		result.OpenedStudents = len(studentIDs)
+		result.PendingReviews = len(s.reviewsUnlocked(principal))
+		result.PackageCount = len(s.coursesUnlocked(principal))
+		result.ExpiringStudents = 0
+		result.UnpublishedFiles = 0
+		result.MaterialViews = 0
+		for _, material := range s.materialsUnlocked(principal) {
+			result.MaterialViews += material.ViewCount
+		}
+	}
 	return result
 }
 

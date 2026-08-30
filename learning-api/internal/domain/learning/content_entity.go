@@ -323,6 +323,11 @@ type Review struct {
 	TeacherComment string `json:"teacherComment,omitempty"`
 	Reward         string `json:"reward,omitempty"`
 	Status         string `json:"status"`
+	// 分派信息是任务创建时的责任快照；后续换老师不会改变已进入队列的责任人。
+	ReviewerTeacherID    string `json:"reviewerTeacherId,omitempty"`
+	ReviewerTeacherName  string `json:"reviewerTeacherName,omitempty"`
+	TutoringAssignmentID string `json:"tutoringAssignmentId,omitempty"`
+	AssignedAt           string `json:"assignedAt,omitempty"`
 }
 
 type ReviewCompleteRequest struct {
@@ -330,4 +335,9 @@ type ReviewCompleteRequest struct {
 	TeacherComment string `json:"teacherComment"`
 	Reward         string `json:"reward"`
 	FinalStatus    string `json:"finalStatus"`
+}
+
+type ReviewAssignRequest struct {
+	TeacherID string `json:"teacherId"`
+	Reason    string `json:"reason"`
 }

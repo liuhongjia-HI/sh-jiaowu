@@ -138,7 +138,6 @@ export type StudyPackage = {
   phaseScope: string;
   packageType: string;
   summary: string;
-  trialEnabled: boolean;
   learningSpaceIds?: string[];
   learningSpaces?: string[];
   contentTypeCodes?: string[];
@@ -157,7 +156,6 @@ export type PackageUpsertRequest = {
   phaseScope: string;
   packageType: string;
   summary: string;
-  trialEnabled: boolean;
   learningSpaceIds: string[];
   contentTypeCodes: string[];
   status: string;
@@ -177,6 +175,8 @@ export type Student = {
   openedPackageRefs: StudentPackageRef[];
   learningStatus: string;
   accountStatus: string;
+  registrationSource?: string;
+  followUpStatus?: string;
   streakDays: number;
   averageScore: number;
   badgeCount: number;
@@ -216,10 +216,43 @@ export type StudentGrant = {
   permissionState: string;
 };
 
+export type TutoringAssignment = {
+  id: string;
+  studentId: string;
+  teacherId: string;
+  teacherName: string;
+  campusId: string;
+  academicYear: string;
+  gradeSnapshot: string;
+  subjectId: string;
+  subjectName: string;
+  levelCode: string;
+  role: 'primary' | 'assistant';
+  status: 'pending' | 'active' | 'ended';
+  startsAt: string;
+  endsAt?: string;
+  endedReason?: string;
+  assignedBy?: string;
+  endedBy?: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TutoringAssignmentCreateRequest = {
+  teacherId: string;
+  subjectId: string;
+  levelCode: string;
+  role?: 'primary' | 'assistant';
+  startsAt?: string;
+};
+
 export type DirectGrantCreateRequest = {
   studentId: string;
   learningSpaceIds: string[];
   contentTypeCodes: string[];
+  startsAt?: string;
+  endsAt?: string;
 };
 
 export type DirectGrantResult = {
@@ -500,6 +533,10 @@ export type Review = {
   teacherComment?: string;
   reward?: string;
   status: string;
+  reviewerTeacherId?: string;
+  reviewerTeacherName?: string;
+  tutoringAssignmentId?: string;
+  assignedAt?: string;
 };
 
 export type ReviewCompleteRequest = {
@@ -507,6 +544,11 @@ export type ReviewCompleteRequest = {
   teacherComment: string;
   reward?: string;
   finalStatus?: string;
+};
+
+export type ReviewAssignRequest = {
+  teacherId: string;
+  reason: string;
 };
 
 export type Notice = {
@@ -804,4 +846,20 @@ export type ScheduleClass = {
   reservationNote?: string;
   status: string;
   createdAt: string;
+};
+
+export type LessonFeedback = {
+  id: string;
+  scheduleClassId: string;
+  studentId: string;
+  studentName: string;
+  teacherId: string;
+  teacherName: string;
+  courseName: string;
+  lessonDate: string;
+  summary: string;
+  homework?: string;
+  nextStep?: string;
+  createdAt: string;
+  updatedAt: string;
 };

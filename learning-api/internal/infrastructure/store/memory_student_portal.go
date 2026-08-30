@@ -452,9 +452,14 @@ func (s *MemoryStore) studentStudyUnlocked(principal learning.Principal) (learni
 	courses := s.coursesForStudent(student.ID)
 	cards := make([]learning.StudentCourseCard, 0, len(courses))
 	for _, course := range courses {
+		access := s.courseAccessForStudent(student.ID, course)
 		cards = append(cards, learning.StudentCourseCard{
-			Course:   course,
-			Progress: s.courseProgress(student.ID, course.ID),
+			Course:         course,
+			Progress:       s.courseProgress(student.ID, course.ID),
+			OpenedAt:       access.OpenedAt,
+			AvailableAt:    access.AvailableAt,
+			HighlightUntil: access.HighlightUntil,
+			IsNew:          access.IsNew,
 		})
 	}
 	materials := s.studentMaterialsForPrincipal(principal)

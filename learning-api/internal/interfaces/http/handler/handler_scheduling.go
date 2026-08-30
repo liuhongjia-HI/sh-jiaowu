@@ -58,6 +58,32 @@ func (h *LearningHandler) ScheduleClasses(c *gin.Context) {
 	OK(c, h.service.ScheduleClasses(principal))
 }
 
+func (h *LearningHandler) LessonFeedbacks(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	items, err := h.service.LessonFeedbacks(principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, items)
+}
+
+func (h *LearningHandler) UpsertLessonFeedback(c *gin.Context) {
+	var req learning.LessonFeedbackUpsertRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.UpsertLessonFeedback(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
+
 func (h *LearningHandler) CreateScheduleClass(c *gin.Context) {
 	var req learning.ScheduleClassCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

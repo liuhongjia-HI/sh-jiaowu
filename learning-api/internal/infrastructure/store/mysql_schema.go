@@ -23,6 +23,34 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		return err
 	}
 	statements := []string{
+		`CREATE TABLE IF NOT EXISTS student_tutoring_assignments (
+			id VARCHAR(64) PRIMARY KEY,
+			student_id VARCHAR(64) NOT NULL,
+			teacher_id VARCHAR(64) NOT NULL,
+			teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			campus_id VARCHAR(64) NOT NULL DEFAULT '',
+			academic_year VARCHAR(32) NOT NULL,
+			grade_snapshot VARCHAR(32) NOT NULL DEFAULT '',
+			subject_id VARCHAR(64) NOT NULL,
+			subject_name VARCHAR(64) NOT NULL DEFAULT '',
+			level_code VARCHAR(16) NOT NULL DEFAULT 'S',
+			assignment_role VARCHAR(16) NOT NULL DEFAULT 'primary',
+			status VARCHAR(16) NOT NULL DEFAULT 'active',
+			source_type VARCHAR(32) NOT NULL DEFAULT 'manual',
+			source_id VARCHAR(64) NOT NULL DEFAULT '',
+			starts_at DATE NOT NULL,
+			ends_at DATE NULL,
+			ended_reason VARCHAR(255) NOT NULL DEFAULT '',
+			assigned_by VARCHAR(64) NOT NULL DEFAULT '',
+			ended_by VARCHAR(64) NOT NULL DEFAULT '',
+			version INT NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			active_marker TINYINT GENERATED ALWAYS AS (CASE WHEN status = 'active' AND assignment_role = 'primary' THEN 1 ELSE NULL END) STORED,
+			UNIQUE KEY uk_student_active_primary_assignment (student_id, academic_year, subject_id, level_code, active_marker),
+			KEY idx_tutoring_assignment_teacher (teacher_id, status, starts_at),
+			KEY idx_tutoring_assignment_student (student_id, status, starts_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS subjects (
 			id VARCHAR(64) PRIMARY KEY,
 			name VARCHAR(64) NOT NULL,
@@ -68,7 +96,12 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			system_score INT NOT NULL DEFAULT 0,
 			teacher_comment TEXT NOT NULL,
 			reward VARCHAR(128) NOT NULL DEFAULT '',
-			status VARCHAR(32) NOT NULL DEFAULT ''
+			status VARCHAR(32) NOT NULL DEFAULT '',
+			reviewer_teacher_id VARCHAR(64) NOT NULL DEFAULT '',
+			reviewer_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			tutoring_assignment_id VARCHAR(64) NOT NULL DEFAULT '',
+			assigned_at DATETIME NULL,
+			KEY idx_pending_reviews_reviewer (reviewer_teacher_id, status)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS question_bank_items (
 			id VARCHAR(64) PRIMARY KEY,
@@ -229,6 +262,23 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			channel VARCHAR(32) NOT NULL DEFAULT '',
 			failure_reason TEXT NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS lesson_feedbacks (
+			id VARCHAR(160) PRIMARY KEY,
+			schedule_class_id VARCHAR(64) NOT NULL,
+			student_id VARCHAR(64) NOT NULL,
+			student_name VARCHAR(64) NOT NULL DEFAULT '',
+			teacher_id VARCHAR(64) NOT NULL DEFAULT '',
+			teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			course_name VARCHAR(128) NOT NULL DEFAULT '',
+			lesson_date DATE NULL,
+			summary TEXT NOT NULL,
+			homework TEXT NOT NULL,
+			next_step TEXT NOT NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			UNIQUE KEY uk_lesson_feedback_student (schedule_class_id, student_id),
+			KEY idx_lesson_feedback_student (student_id, lesson_date)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		// banners 是学生端小程序首页的运营轮播图，纯新表，不像其它表那样有历史数据要迁移，
 		// 直接建表即可，不需要额外的 ensureColumnDefinition 补列步骤。
 		`CREATE TABLE IF NOT EXISTS banners (
@@ -296,6 +346,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"students", "average_score", "INT NOT NULL DEFAULT 0"},
 		{"students", "badge_count", "INT NOT NULL DEFAULT 0"},
 		{"students", "bind_status", "VARCHAR(32) NOT NULL DEFAULT '待绑定'"},
+		{"students", "registration_source", "VARCHAR(16) NOT NULL DEFAULT ''"},
 		{"students", "last_study_at", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "effective_until", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "enrollment_academic_year", "VARCHAR(32) NOT NULL DEFAULT ''"},
@@ -360,6 +411,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"schedule_classes", "created_by", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "created_by_role", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"student_package_grants", "external_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"student_package_grants", "opened_at", "DATETIME NULL"},
 		{"study_packages", "trial_enabled", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"student_learning_space_access", "external_grant_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "external_id", mysqlNoticeExternalIDDefinition},
@@ -377,6 +429,10 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"operation_logs", "user_agent", "TEXT NOT NULL"},
 		{"operation_logs", "detail", "TEXT NOT NULL"},
 		{"question_bank_items", "title", "VARCHAR(128) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "reviewer_teacher_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "reviewer_teacher_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "tutoring_assignment_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "assigned_at", "DATETIME NULL"},
 		{"student_submission_results", "objective_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "final_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "answers_json", "TEXT NOT NULL"},
@@ -390,10 +446,25 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			return err
 		}
 	}
+	if _, err := s.db.Exec("UPDATE students SET registration_source = '小程序' WHERE registration_source = '' AND remark = '小程序自助建档'"); err != nil {
+		return err
+	}
 	// ensureColumn only adds missing columns. Existing deployments created the
 	// notices key as VARCHAR(64), so explicitly normalize it before upserts
 	// write generated station-notice IDs and before validating its unique index.
 	if err := s.ensureColumnDefinition("notices", "external_id", mysqlNoticeExternalIDDefinition); err != nil {
+		return err
+	}
+	if err := s.ensureColumnDefinition("student_package_grants", "starts_at", "DATETIME NOT NULL"); err != nil {
+		return err
+	}
+	if err := s.ensureColumnDefinition("student_package_grants", "ends_at", "DATETIME NOT NULL"); err != nil {
+		return err
+	}
+	if err := s.ensureColumnDefinition("student_learning_space_access", "starts_at", "DATETIME NOT NULL"); err != nil {
+		return err
+	}
+	if err := s.ensureColumnDefinition("student_learning_space_access", "ends_at", "DATETIME NOT NULL"); err != nil {
 		return err
 	}
 	// Stable external keys are required for request-time keyed upserts. Backfill
@@ -402,6 +473,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		`UPDATE homework_tasks SET deadline_at = DATE_ADD(deadline, INTERVAL 86399 SECOND) WHERE deadline_at IS NULL AND deadline IS NOT NULL`,
 		`UPDATE homework_tasks SET assessment_type = 'practice' WHERE assessment_type = ''`,
 		`UPDATE student_package_grants SET external_id = CONCAT('grant-', id) WHERE external_id = ''`,
+		`UPDATE student_package_grants SET opened_at = created_at WHERE opened_at IS NULL`,
 		`UPDATE notices SET external_id = CONCAT('notice-', id) WHERE external_id = ''`,
 		`UPDATE operation_logs SET external_id = CONCAT('log-', id) WHERE external_id = ''`,
 		`UPDATE operation_logs log_row
@@ -437,6 +509,9 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 		return err
 	}
 	if err := s.ensureIndex("schedule_classes", "idx_schedule_term", "academic_year, semester, status"); err != nil {
+		return err
+	}
+	if err := s.ensureIndex("pending_reviews", "idx_pending_reviews_reviewer", "reviewer_teacher_id, status"); err != nil {
 		return err
 	}
 	if err := s.backfillScheduleClassTerms(); err != nil {

@@ -57,6 +57,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/students/:id", h.StudentDetail)
 	g.GET("/students/:id/grants", h.StudentGrants)
 	g.GET("/students/:id/learning-records", h.StudentLearningRecords)
+	g.GET("/students/:id/tutoring-assignments", h.StudentTutoringAssignments)
 	g.GET("/students/:id/scores", h.StudentScores)
 	g.GET("/courses", h.Courses)
 	g.POST("/courses", h.CreateCourse)
@@ -78,6 +79,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/files/:id/download", h.DownloadFile)
 	g.POST("/files/:id/preview/retry", h.RetryFilePreview)
 	g.GET("/reviews/pending", h.Reviews)
+	g.POST("/reviews/:id/assign", h.AssignReview)
 	g.POST("/reviews/:id/complete", h.CompleteReview)
 	g.POST("/students/:id/scores", h.CreateStudentScore)
 	g.PUT("/students/:id/scores/:scoreId", h.UpdateStudentScore)
@@ -88,6 +90,8 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/availability", h.Availability)
 	g.PUT("/availability", h.SaveAvailability)
 	g.GET("/schedule-classes", h.ScheduleClasses)
+	g.GET("/schedule-classes/:id/feedbacks", h.LessonFeedbacks)
+	g.PUT("/schedule-classes/:id/feedbacks", h.UpsertLessonFeedback)
 	// 排课权限下放：老师可以直接建课，落「待审核」，通过后才对学生可见。
 	// 能不能改某一节由 scheduleEditPermission 判定，不靠路由分组区分。
 	g.POST("/schedule-classes", h.CreateScheduleClass)
@@ -110,6 +114,9 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.PUT("/students/:id", h.UpdateStudent)
 	g.POST("/students/:id/remind", h.RemindStudent)
 	g.POST("/students/:id/bind-code", h.GenerateStudentBindCode)
+	g.POST("/students/:id/tutoring-assignments", h.CreateTutoringAssignment)
+	g.POST("/teacher-assignments/:id/end", h.EndTutoringAssignment)
+	g.POST("/teacher-assignments/:id/transfer", h.TransferTutoringAssignment)
 	g.POST("/students/import", h.ImportStudents)
 	g.GET("/commercial/summary", h.CommercialSummary)
 	g.GET("/commercial/orders", h.CommercialOrders)
@@ -154,7 +161,6 @@ func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
 	g := api.Group("/student", middleware.AuthRequired(tokens, service, learning.RoleStudent))
 	g.GET("/home", h.StudentHome)
-	g.POST("/trial/start", h.StartStudentTrial)
 	g.GET("/banners", h.StudentBanners)
 	g.GET("/recommendations", h.StudentRecommendations)
 	g.POST("/subscription", h.ConfirmStudentSubscription)

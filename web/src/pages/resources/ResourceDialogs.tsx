@@ -168,7 +168,7 @@ export function HomeworkSubmissionDialog({
   );
 }
 
-export function ReviewBoard({ rows, onOpen }: { rows: Review[]; onOpen: (record: Record<string, unknown>) => void }) {
+export function ReviewBoard({ rows, onOpen, onAssign }: { rows: Review[]; onOpen: (record: Record<string, unknown>) => void; onAssign?: (review: Review) => void }) {
   const columns = ['待批改', '待复核', '已批改'];
   const statusOf = (review: Review) => {
     if (review.status === '待复核') return '待复核';
@@ -197,10 +197,14 @@ export function ReviewBoard({ rows, onOpen }: { rows: Review[]; onOpen: (record:
                     <Space wrap>
                       <Tag color="blue">{review.packageName}</Tag>
                       <Tag color="green">系统评分 {review.systemScore}</Tag>
+					  <Tag color={review.reviewerTeacherName ? 'purple' : 'orange'}>{review.reviewerTeacherName ? `负责老师：${review.reviewerTeacherName}` : '待教务分派'}</Tag>
                     </Space>
-                    <Button size="small" type="primary" onClick={() => onOpen(review as unknown as Record<string, unknown>)}>
-                      填写反馈
-                    </Button>
+					<Space>
+					  <Button size="small" type="primary" onClick={() => onOpen(review as unknown as Record<string, unknown>)}>
+						填写反馈
+					  </Button>
+					  {onAssign && <Button size="small" onClick={() => onAssign(review)}>{review.reviewerTeacherName ? '转派' : '分派'}</Button>}
+					</Space>
                   </Space>
                 </Card>
               ))}
@@ -590,10 +594,6 @@ export function PackageDialog({
             ]}
           />
         </Form.Item>
-        <Form.Item name="trialEnabled" valuePropName="checked">
-          <Checkbox>允许首次登录且未开通套餐的学生免费体验 7 天</Checkbox>
-        </Form.Item>
-        <Typography.Text type="secondary">开启体验的方案必须处于启用状态，并同时包含课程和题目；体验到期不会自动扣费。</Typography.Text>
         <Space size={12} align="start" wrap style={{ width: '100%' }}>
           <Form.Item name="phaseScope" label="适用阶段">
             <Input style={{ width: 180 }} placeholder="全学期" />

@@ -269,6 +269,13 @@ func (s *MemoryStore) ensureSchedulingTables() error {
 			UNIQUE KEY uk_schedule_student (schedule_class_id, student_id),
 			KEY idx_schedule_student_time (student_id, schedule_class_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS lesson_feedbacks (
+			id VARCHAR(160) PRIMARY KEY, schedule_class_id VARCHAR(64) NOT NULL, student_id VARCHAR(64) NOT NULL,
+			student_name VARCHAR(64) NOT NULL DEFAULT '', teacher_id VARCHAR(64) NOT NULL DEFAULT '', teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			course_name VARCHAR(128) NOT NULL DEFAULT '', lesson_date DATE NULL, summary TEXT NOT NULL, homework TEXT NOT NULL, next_step TEXT NOT NULL,
+			created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
+			UNIQUE KEY uk_lesson_feedback_student (schedule_class_id, student_id), KEY idx_lesson_feedback_student (student_id, lesson_date)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {

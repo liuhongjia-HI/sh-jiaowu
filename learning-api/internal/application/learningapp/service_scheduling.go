@@ -32,6 +32,12 @@ func (s *Service) ReviewScheduleClass(o string, p learning.Principal, id string,
 func (s *Service) PendingScheduleClasses(p learning.Principal) []learning.ScheduleClass {
 	return s.scheduling.PendingScheduleClasses(p)
 }
+func (s *Service) LessonFeedbacks(p learning.Principal, id string) ([]learning.LessonFeedback, error) {
+	return s.scheduling.LessonFeedbacks(p, id)
+}
+func (s *Service) UpsertLessonFeedback(o string, p learning.Principal, id string, r learning.LessonFeedbackUpsertRequest) (learning.LessonFeedback, error) {
+	return s.scheduling.UpsertLessonFeedback(o, p, id, r)
+}
 func (s *Service) StudentSchedule(p learning.Principal) ([]learning.ScheduleClass, error) {
 	return s.scheduling.StudentSchedule(p)
 }

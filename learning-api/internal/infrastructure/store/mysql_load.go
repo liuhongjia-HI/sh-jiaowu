@@ -14,6 +14,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadSubjectsFromDB,
 		s.loadLearningSpacesFromDB,
 		s.loadStudentsFromDB,
+		s.loadTutoringAssignmentsFromDB,
 		s.loadUsersFromDB,
 		s.loadGuardiansFromDB,
 		s.loadGuardianStudentsFromDB,
@@ -52,7 +53,48 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		return err
 	}
 	s.scheduleClasses = classes
+	if err := s.loadLessonFeedbacksFromDB(); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *MemoryStore) loadLessonFeedbacksFromDB() error {
+	rows, err := s.db.Query(`SELECT id, schedule_class_id, student_id, student_name, teacher_id, teacher_name, course_name, lesson_date, summary, homework, next_step, created_at, updated_at FROM lesson_feedbacks ORDER BY lesson_date DESC, updated_at DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.LessonFeedback{}
+	for rows.Next() {
+		var item learning.LessonFeedback
+		var lessonDate, createdAt, updatedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.ScheduleClassID, &item.StudentID, &item.StudentName, &item.TeacherID, &item.TeacherName, &item.CourseName, &lessonDate, &item.Summary, &item.Homework, &item.NextStep, &createdAt, &updatedAt); err != nil {
+			return err
+		}
+		item.LessonDate, item.CreatedAt, item.UpdatedAt = dateString(lessonDate), dateTimeString(createdAt), dateTimeString(updatedAt)
+		out = append(out, item)
+	}
+	s.lessonFeedbacks = out
+	return rows.Err()
+}
+
+func (s *MemoryStore) loadTutoringAssignmentsFromDB() error {
+	rows, err := s.db.Query(`SELECT id, student_id, teacher_id, teacher_name, campus_id, academic_year, grade_snapshot, subject_id, subject_name, level_code, assignment_role, status, source_type, source_id, DATE_FORMAT(starts_at, '%Y-%m-%d'), COALESCE(DATE_FORMAT(ends_at, '%Y-%m-%d'), ''), ended_reason, assigned_by, ended_by, version, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') FROM student_tutoring_assignments ORDER BY student_id, starts_at DESC, created_at DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.TutoringAssignment{}
+	for rows.Next() {
+		var item learning.TutoringAssignment
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.TeacherID, &item.TeacherName, &item.CampusID, &item.AcademicYear, &item.GradeSnapshot, &item.SubjectID, &item.SubjectName, &item.LevelCode, &item.Role, &item.Status, &item.SourceType, &item.SourceID, &item.StartsAt, &item.EndsAt, &item.EndedReason, &item.AssignedBy, &item.EndedBy, &item.Version, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return err
+		}
+		out = append(out, item)
+	}
+	s.tutoringAssignments = out
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadSubjectsFromDB() error {
@@ -92,7 +134,7 @@ func (s *MemoryStore) loadLearningSpacesFromDB() error {
 }
 
 func (s *MemoryStore) loadStudentsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), last_study_at, effective_until, enrollment_academic_year, enrollment_grade, bind_code, bind_code_expires_at FROM students ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, registration_source, remark, learning_status, streak_days, average_score, badge_count, bind_status, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), last_study_at, effective_until, enrollment_academic_year, enrollment_grade, bind_code, bind_code_expires_at FROM students ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -100,7 +142,7 @@ func (s *MemoryStore) loadStudentsFromDB() error {
 	out := []learning.Student{}
 	for rows.Next() {
 		var item learning.Student
-		if err := rows.Scan(&item.ID, &item.Name, &item.Nickname, &item.AvatarURL, &item.Grade, &item.Phone, &item.SchoolName, &item.GuardianName, &item.OfficialAccountOpenID, &item.AccountStatus, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.CreatedAt, &item.LastStudyAt, &item.EffectiveUntil, &item.EnrollmentAcademicYear, &item.EnrollmentGrade, &item.BindCode, &item.BindCodeExpiresAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Nickname, &item.AvatarURL, &item.Grade, &item.Phone, &item.SchoolName, &item.GuardianName, &item.OfficialAccountOpenID, &item.AccountStatus, &item.RegistrationSource, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.CreatedAt, &item.LastStudyAt, &item.EffectiveUntil, &item.EnrollmentAcademicYear, &item.EnrollmentGrade, &item.BindCode, &item.BindCodeExpiresAt); err != nil {
 			return err
 		}
 		out = append(out, item)
@@ -439,7 +481,7 @@ func (s *MemoryStore) loadHomeworkFromDB() error {
 }
 
 func (s *MemoryStore) loadGrantsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, external_id, student_id, package_id, starts_at, ends_at, status FROM student_package_grants ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, external_id, student_id, package_id, starts_at, ends_at, opened_at, status FROM student_package_grants ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -449,15 +491,16 @@ func (s *MemoryStore) loadGrantsFromDB() error {
 	for rows.Next() {
 		var dbID int
 		var grant packageGrant
-		var startsAt, endsAt sql.NullTime
-		if err := rows.Scan(&dbID, &grant.ID, &grant.StudentID, &grant.PackageID, &startsAt, &endsAt, &grant.Status); err != nil {
+		var startsAt, endsAt, openedAt sql.NullTime
+		if err := rows.Scan(&dbID, &grant.ID, &grant.StudentID, &grant.PackageID, &startsAt, &endsAt, &openedAt, &grant.Status); err != nil {
 			return err
 		}
 		if grant.ID == "" {
 			grant.ID = "grant-" + strconv.Itoa(dbID)
 		}
-		grant.StartsAt = dateString(startsAt)
-		grant.EndsAt = dateString(endsAt)
+		grant.StartsAt = dateTimeString(startsAt)
+		grant.EndsAt = dateTimeString(endsAt)
+		grant.OpenedAt = dateTimeString(openedAt)
 		grant.EffectiveUntil = grant.EndsAt
 		grantIDs[dbID] = grant.ID
 		grants = append(grants, grant)
@@ -481,8 +524,8 @@ func (s *MemoryStore) loadGrantsFromDB() error {
 		if item.PackageGrantID == "" {
 			item.PackageGrantID = grantIDs[dbGrantID]
 		}
-		item.StartsAt = dateString(startsAt)
-		item.EndsAt = dateString(endsAt)
+		item.StartsAt = dateTimeString(startsAt)
+		item.EndsAt = dateTimeString(endsAt)
 		access = append(access, item)
 	}
 	s.grants = grants
@@ -558,7 +601,7 @@ func (s *MemoryStore) loadPreviewJobsFromDB() error {
 }
 
 func (s *MemoryStore) loadReviewsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status FROM pending_reviews ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at FROM pending_reviews ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -566,9 +609,11 @@ func (s *MemoryStore) loadReviewsFromDB() error {
 	out := []learning.Review{}
 	for rows.Next() {
 		var item learning.Review
-		if err := rows.Scan(&item.ID, &item.StudentID, &item.HomeworkID, &item.SubmissionID, &item.StudentName, &item.PackageName, &item.Homework, &item.SystemScore, &item.TeacherComment, &item.Reward, &item.Status); err != nil {
+		var assignedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.HomeworkID, &item.SubmissionID, &item.StudentName, &item.PackageName, &item.Homework, &item.SystemScore, &item.TeacherComment, &item.Reward, &item.Status, &item.ReviewerTeacherID, &item.ReviewerTeacherName, &item.TutoringAssignmentID, &assignedAt); err != nil {
 			return err
 		}
+		item.AssignedAt = dateTimeString(assignedAt)
 		out = append(out, item)
 	}
 	s.reviews = out

@@ -53,11 +53,16 @@ func (s *MemoryStore) createGrantForPackageUnlocked(operator string, req learnin
 		PackageID:      req.PackageID,
 		StartsAt:       startsAt,
 		EndsAt:         endsAt,
+		OpenedAt:       time.Now().Format("2006-01-02 15:04:05"),
 		Status:         "active",
 		EffectiveUntil: endsAt,
 	}
 	if index, ok := s.findGrantIndex(req.StudentID, req.PackageID); ok {
 		grant.ID = s.grants[index].ID
+		grant.OpenedAt = s.grants[index].OpenedAt
+		if grant.OpenedAt == "" {
+			grant.OpenedAt = time.Now().Format("2006-01-02 15:04:05")
+		}
 		s.grants[index] = grant
 		s.replaceSpaceAccessForGrant(grant)
 	} else {
@@ -120,19 +125,38 @@ func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.Di
 		LearningSpaces: s.learningSpaceNames(spaceIDs), OpenCourses: []string{}, OpenMaterials: []string{}, OpenHomework: []string{},
 	}
 	for _, space := range spaces {
+		directPackageID := directGrantPackageID(student.ID, space.ID)
+		courseAlreadyOpened := containsString(s.contentTypesForPackage(directPackageID), "course")
 		packageID, err := s.ensureDirectGrantPackage(student, space, contentTypes)
 		if err != nil {
 			return learning.DirectGrantResult{}, err
 		}
-		preview, err := s.createGrantForPackageUnlocked(operator, learning.GrantCreateRequest{StudentID: student.ID, PackageID: packageID}, "开通学习内容", "调整学习内容有效期")
+		preview, err := s.createGrantForPackageUnlocked(operator, learning.GrantCreateRequest{
+			StudentID: student.ID,
+			PackageID: packageID,
+			StartsAt:  req.StartsAt,
+			EndsAt:    req.EndsAt,
+		}, "开通学习内容", "调整学习内容有效期")
 		if err != nil {
 			return learning.DirectGrantResult{}, err
+		}
+		if containsString(contentTypes, "course") && !courseAlreadyOpened {
+			s.markGrantNewlyOpened(student.ID, packageID)
 		}
 		result.OpenCourses = appendUnique(result.OpenCourses, preview.OpenCourses...)
 		result.OpenMaterials = appendUnique(result.OpenMaterials, preview.OpenMaterials...)
 		result.OpenHomework = appendUnique(result.OpenHomework, preview.OpenHomework...)
 	}
 	return result, nil
+}
+
+func (s *MemoryStore) markGrantNewlyOpened(studentID, packageID string) {
+	for index := range s.grants {
+		if s.grants[index].StudentID == studentID && s.grants[index].PackageID == packageID {
+			s.grants[index].OpenedAt = time.Now().Format("2006-01-02 15:04:05")
+			return
+		}
+	}
 }
 
 func (s *MemoryStore) ensureDirectGrantPackage(student learning.Student, space learningSpace, contentTypes []string) (string, error) {
@@ -367,18 +391,36 @@ func (s *MemoryStore) normalizeGrantPeriod(startsAt, endsAt string) (string, str
 	if endsAt == "" {
 		endsAt = defaultEndsAt
 	}
-	start, err := time.Parse("2006-01-02", startsAt)
+	start, normalizedStart, err := normalizeGrantTimestamp(startsAt, false)
 	if err != nil {
-		return "", "", errors.New("请选择正确的开通开始日期")
+		return "", "", errors.New("请选择正确的开通开始时间")
 	}
-	end, err := time.Parse("2006-01-02", endsAt)
+	end, normalizedEnd, err := normalizeGrantTimestamp(endsAt, true)
 	if err != nil {
-		return "", "", errors.New("请选择正确的开通结束日期")
+		return "", "", errors.New("请选择正确的开通结束时间")
 	}
 	if end.Before(start) {
-		return "", "", errors.New("开通结束日期不能早于开始日期")
+		return "", "", errors.New("开通结束时间不能早于开始时间")
 	}
-	return startsAt, endsAt, nil
+	return normalizedStart, normalizedEnd, nil
+}
+
+func normalizeGrantTimestamp(value string, endOfDay bool) (time.Time, string, error) {
+	value = strings.TrimSpace(value)
+	if parsed, err := time.ParseInLocation("2006-01-02T15:04", value, time.Local); err == nil {
+		return parsed, parsed.Format("2006-01-02 15:04:05"), nil
+	}
+	if parsed, err := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local); err == nil {
+		return parsed, parsed.Format("2006-01-02 15:04:05"), nil
+	}
+	parsed, err := time.ParseInLocation("2006-01-02", value, time.Local)
+	if err != nil {
+		return time.Time{}, "", err
+	}
+	if endOfDay {
+		parsed = parsed.Add(24*time.Hour - time.Second)
+	}
+	return parsed, value, nil
 }
 
 func (s *MemoryStore) contentPermissionsUnlocked() []learning.ContentPermissionSummary {

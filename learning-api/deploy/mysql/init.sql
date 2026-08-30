@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS students (
   guardian_name VARCHAR(32) NOT NULL DEFAULT '',
   official_account_open_id VARCHAR(128) NOT NULL DEFAULT '',
   account_status VARCHAR(32) NOT NULL DEFAULT '正常',
+	registration_source VARCHAR(16) NOT NULL DEFAULT '',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -108,6 +109,35 @@ CREATE TABLE IF NOT EXISTS teacher_learning_space_access (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_teacher_learning_space (teacher_id, learning_space_id),
   KEY idx_teacher_learning_space (learning_space_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS student_tutoring_assignments (
+  id VARCHAR(64) PRIMARY KEY,
+  student_id VARCHAR(64) NOT NULL,
+  teacher_id VARCHAR(64) NOT NULL,
+  teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+  campus_id VARCHAR(64) NOT NULL DEFAULT '',
+  academic_year VARCHAR(32) NOT NULL,
+  grade_snapshot VARCHAR(32) NOT NULL DEFAULT '',
+  subject_id VARCHAR(64) NOT NULL,
+  subject_name VARCHAR(64) NOT NULL DEFAULT '',
+  level_code VARCHAR(16) NOT NULL DEFAULT 'S',
+  assignment_role VARCHAR(16) NOT NULL DEFAULT 'primary',
+  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  source_type VARCHAR(32) NOT NULL DEFAULT 'manual',
+  source_id VARCHAR(64) NOT NULL DEFAULT '',
+  starts_at DATE NOT NULL,
+  ends_at DATE NULL,
+  ended_reason VARCHAR(255) NOT NULL DEFAULT '',
+  assigned_by VARCHAR(64) NOT NULL DEFAULT '',
+  ended_by VARCHAR(64) NOT NULL DEFAULT '',
+  version INT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  active_marker TINYINT GENERATED ALWAYS AS (CASE WHEN status = 'active' AND assignment_role = 'primary' THEN 1 ELSE NULL END) STORED,
+  UNIQUE KEY uk_student_active_primary_assignment (student_id, academic_year, subject_id, level_code, active_marker),
+  KEY idx_tutoring_assignment_teacher (teacher_id, status, starts_at),
+  KEY idx_tutoring_assignment_student (student_id, status, starts_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS admin_campus_scopes (
@@ -215,8 +245,9 @@ CREATE TABLE IF NOT EXISTS student_package_grants (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   student_id VARCHAR(64) NOT NULL,
   package_id VARCHAR(64) NOT NULL,
-  starts_at DATE NOT NULL,
-  ends_at DATE NOT NULL,
+  starts_at DATETIME NOT NULL,
+  ends_at DATETIME NOT NULL,
+  opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   status VARCHAR(32) NOT NULL DEFAULT 'active',
   operator_id VARCHAR(64) NOT NULL DEFAULT '',
   operator_name VARCHAR(64) NOT NULL DEFAULT '',
@@ -229,8 +260,8 @@ CREATE TABLE IF NOT EXISTS student_trial_records (
   student_id VARCHAR(64) NOT NULL,
   academic_year VARCHAR(32) NOT NULL,
   package_id VARCHAR(64) NOT NULL,
-  starts_at DATE NOT NULL,
-  ends_at DATE NOT NULL,
+  starts_at DATETIME NOT NULL,
+  ends_at DATETIME NOT NULL,
   status VARCHAR(16) NOT NULL,
   converted_package_id VARCHAR(64) NOT NULL DEFAULT '',
   converted_at DATETIME NULL,
@@ -942,12 +973,12 @@ VALUES
   ('user-teacher', 'space-g05-english-s1-q1', 1, 1, 1, 1, 1, 'active'),
   ('user-teacher', 'space-g05-english-s1-q2', 1, 1, 1, 1, 1, 'active');
 
-INSERT IGNORE INTO student_package_grants (student_id, package_id, starts_at, ends_at, status, operator_id, operator_name) VALUES
-  ('stu-001', 'pkg-g05-english-s1-full', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
-  ('stu-002', 'pkg-g05-math-s1-question_handout', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
-  ('stu-003', 'pkg-g05-chinese-s1-question', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
-  ('stu-002', 'pkg-g05-english-s1-full', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化'),
-  ('stu-003', 'pkg-g05-english-s1-question_handout', '2026-05-22', '2027-05-22', 'active', 'seed', '初始化');
+INSERT IGNORE INTO student_package_grants (student_id, package_id, starts_at, ends_at, opened_at, status, operator_id, operator_name) VALUES
+  ('stu-001', 'pkg-g05-english-s1-full', '2026-05-22', '2027-05-22', '2026-05-22 00:00:00', 'active', 'seed', '初始化'),
+  ('stu-002', 'pkg-g05-math-s1-question_handout', '2026-05-22', '2027-05-22', '2026-05-22 00:00:00', 'active', 'seed', '初始化'),
+  ('stu-003', 'pkg-g05-chinese-s1-question', '2026-05-22', '2027-05-22', '2026-05-22 00:00:00', 'active', 'seed', '初始化'),
+  ('stu-002', 'pkg-g05-english-s1-full', '2026-05-22', '2027-05-22', '2026-05-22 00:00:00', 'active', 'seed', '初始化'),
+  ('stu-003', 'pkg-g05-english-s1-question_handout', '2026-05-22', '2027-05-22', '2026-05-22 00:00:00', 'active', 'seed', '初始化');
 
 INSERT IGNORE INTO student_learning_space_access (student_id, learning_space_id, package_grant_id, starts_at, ends_at, status)
 SELECT

@@ -938,6 +938,34 @@ func TestAdminScheduleIsApprovedImmediately(t *testing.T) {
 	}
 }
 
+func TestTeacherCanUpsertLessonFeedbackOnlyForOwnApprovedClass(t *testing.T) {
+	store := NewMemoryStore()
+	ops, err := store.PrincipalByUserID("user-ops")
+	if err != nil {
+		t.Fatalf("expected ops principal: %v", err)
+	}
+	created, err := store.CreateScheduleClass("运营教务", ops, teacherLessonRequest())
+	if err != nil {
+		t.Fatalf("create class: %v", err)
+	}
+	teacher := teacherPrincipal(t, store)
+	feedback, err := store.UpsertLessonFeedback("英语老师", teacher, created.ID, learning.LessonFeedbackUpsertRequest{StudentID: "stu-001", Summary: "课堂参与积极，能主动说明阅读依据。", Homework: "完成阅读练习第 2 题", NextStep: "下节课继续训练定位关键词。"})
+	if err != nil {
+		t.Fatalf("write feedback: %v", err)
+	}
+	if feedback.StudentID != "stu-001" || feedback.ScheduleClassID != created.ID {
+		t.Fatalf("unexpected feedback: %#v", feedback)
+	}
+	updated, err := store.UpsertLessonFeedback("英语老师", teacher, created.ID, learning.LessonFeedbackUpsertRequest{StudentID: "stu-001", Summary: "已补充课堂表现说明。"})
+	if err != nil || updated.ID != feedback.ID {
+		t.Fatalf("feedback upsert must keep one record, got %#v, %v", updated, err)
+	}
+	items, err := store.LessonFeedbacks(teacher, created.ID)
+	if err != nil || len(items) != 1 || items[0].Summary != "已补充课堂表现说明。" {
+		t.Fatalf("expected one updated feedback, got %#v, %v", items, err)
+	}
+}
+
 // 老师排课要经管理员确认，在通过之前学生端一律看不到。
 func TestTeacherScheduleIsPendingAndHiddenFromStudent(t *testing.T) {
 	store := NewMemoryStore()

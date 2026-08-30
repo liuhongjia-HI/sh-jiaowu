@@ -29,7 +29,7 @@
     </view>
   </view>
   <view wx:else class="study-section course-list">
-    <view wx:for="{{visibleCourses}}" wx:key="id" class="course-card" bindtap="goDetail" data-id="{{item.id}}">
+    <view wx:for="{{visibleCourses}}" wx:key="id" class="course-card {{item.cardClass}}" bindtap="goDetail" data-id="{{item.id}}">
       <view class="course-cover course-cover-{{index}}">
         <view class="course-cover-glow"></view>
         <view class="course-cover-emoji">{{item.coverIcon}}</view>
@@ -37,9 +37,10 @@
       <view class="course-content">
         <view class="course-title-row">
           <view class="course-title">{{item.name}}</view>
-          <view class="course-status">{{item.status}}</view>
+          <view class="course-status {{item.isNew ? 'course-status-new' : ''}}">{{item.isNew ? '新开通' : item.status}}</view>
         </view>
         <view class="course-meta">{{item.grade || "学习课程"}} · {{item.subject || "综合学习"}}</view>
+        <view wx:if="{{item.newCourseText}}" class="course-new-time">{{item.newCourseText}}</view>
         <view class="course-code">{{item.chapterCount}} 节课程 · {{item.materialNum}} 份资料</view>
         <view class="course-progress-row">
           <text>已学 {{item.progress}}%</text>

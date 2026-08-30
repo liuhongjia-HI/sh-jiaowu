@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Checkbox,
@@ -25,7 +26,7 @@ import {
 import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getData, postData, postForm, putData } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
@@ -44,7 +45,13 @@ import type {
   StudentScoreRecord,
   StudentScoreSummary,
   StudentScoreUpsertRequest,
-  StudentUpsertRequest
+	StudentUpsertRequest,
+	SubjectMetadata,
+	Teacher,
+	TutoringAssignment,
+	TutoringAssignmentCreateRequest,
+	ScheduleClass,
+	LessonFeedback
 } from '../types/starline';
 
 type StudentFormValues = {
@@ -63,6 +70,7 @@ type StudentFilters = {
   accountStatus?: string;
   learningStatus?: string;
   packageState?: string;
+  followUpState?: string;
 };
 
 function canWrite(user: CurrentUser) {
@@ -71,6 +79,16 @@ function canWrite(user: CurrentUser) {
 
 function canManageScores(user: CurrentUser) {
   return user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));
+}
+
+function bindStatusText(status: string) {
+  return status === '已绑定' ? '已关联微信' : '待关联微信';
+}
+
+function packageStatusTag(student: Student) {
+  if (student.followUpStatus === '待跟进') return <Tag color="red">待跟进</Tag>;
+  if ((student.openedPackages?.length ?? 0) > 0) return <Tag color="green">已开通</Tag>;
+  return <Tag>未开通</Tag>;
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
@@ -83,6 +101,8 @@ export default function Students({ user }: { user: CurrentUser }) {
   const [studentDrawerTab, setStudentDrawerTab] = useState('profile');
   const [directLearningSpaceIds, setDirectLearningSpaceIds] = useState<string[]>([]);
   const [directContentTypeCodes, setDirectContentTypeCodes] = useState<string[]>([]);
+  const [directStartsAt, setDirectStartsAt] = useState('');
+  const [directEndsAt, setDirectEndsAt] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const queryClient = useQueryClient();
@@ -93,7 +113,10 @@ export default function Students({ user }: { user: CurrentUser }) {
     queryKey: ['students', filters],
     queryFn: () => getData<Student[]>('/students', compactParams(filters))
   });
+  const allStudents = useQuery({ queryKey: ['students', 'summary'], queryFn: () => getData<Student[]>('/students') });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
+	const teachers = useQuery({ queryKey: ['teachers', 'tutoring-assignment'], enabled: writable, queryFn: () => getData<Teacher[]>('/teachers') });
+	const subjects = useQuery({ queryKey: ['subjects', 'tutoring-assignment'], enabled: writable, queryFn: () => getData<SubjectMetadata[]>('/subjects') });
   const detail = useQuery({
     queryKey: ['students', selected?.id, 'detail'],
     enabled: Boolean(selected),
@@ -120,7 +143,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       return postData<Student>('/students', body);
     },
     onSuccess: () => {
-      message.success(editing?.accountStatus === '待审核' ? '审核结果已保存' : editing ? '学生信息已保存' : '学生已新增');
+      message.success(editing ? '学生信息已保存' : '学生已新增');
       setStudentDrawerOpen(false);
       setEditing(null);
       queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -153,7 +176,9 @@ export default function Students({ user }: { user: CurrentUser }) {
       const body: DirectGrantCreateRequest = {
         studentId: selected.id,
         learningSpaceIds: directLearningSpaceIds,
-        contentTypeCodes: directContentTypeCodes
+        contentTypeCodes: directContentTypeCodes,
+        startsAt: directStartsAt || undefined,
+        endsAt: directEndsAt || undefined
       };
       return postData<DirectGrantResult>('/grants/direct', body);
     },
@@ -161,6 +186,8 @@ export default function Students({ user }: { user: CurrentUser }) {
       message.success(`已为 ${result.studentName} 开通 ${result.learningSpaces.length} 个课程范围的${result.contentTypes.join('、')}。`);
       setDirectLearningSpaceIds([]);
       setDirectContentTypeCodes([]);
+      setDirectStartsAt(toDateTimeInput(new Date()));
+      setDirectEndsAt('');
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
@@ -186,16 +213,16 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
 
   const rows = students.data ?? [];
-  const reviewingStudentRequest = editing?.accountStatus === '待审核';
+  const allRows = allStudents.data ?? [];
   const gradeOptions = useMemo(() => uniqueOptions(rows.map((item) => item.grade)), [rows]);
   const learningOptions = useMemo(() => uniqueOptions(rows.map((item) => item.learningStatus)), [rows]);
   const accountOptions = useMemo(() => uniqueOptions(rows.map((item) => item.accountStatus)), [rows]);
   const stats = useMemo(() => ({
-    total: rows.length,
-    opened: rows.filter((item) => (item.openedPackages?.length ?? 0) > 0).length,
-    waiting: rows.filter((item) => item.accountStatus.includes('待') || item.learningStatus.includes('未')).length,
-    disabled: rows.filter((item) => item.accountStatus === '停用').length
-  }), [rows]);
+    total: allRows.length,
+    opened: allRows.filter((item) => (item.openedPackages?.length ?? 0) > 0).length,
+    waiting: allRows.filter((item) => item.followUpStatus === '待跟进').length,
+    disabled: allRows.filter((item) => item.accountStatus === '停用').length
+  }), [allRows]);
 
   function openCreate() {
     setEditing(null);
@@ -222,7 +249,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       title: '学生',
       dataIndex: 'name',
       width: 170,
-      render: (value, record) => <Space direction="vertical" size={0}><Typography.Text strong>{value}</Typography.Text><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
+      render: (value, record) => <Space direction="vertical" size={0}><Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f"><Typography.Text strong className="student-name">{value}</Typography.Text></Badge><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
     },
     {
       title: '操作',
@@ -240,10 +267,11 @@ export default function Students({ user }: { user: CurrentUser }) {
     { title: '年级', dataIndex: 'grade', width: 88 },
     { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
     {
-      title: '关联状态',
+      title: '微信关联',
       width: 108,
-      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag></Space>
+      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag></Space>
     },
+    { title: '套餐状态', width: 96, render: (_, record) => packageStatusTag(record) },
     {
       title: '课程',
       dataIndex: 'openedPackageRefs',
@@ -265,6 +293,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerTab('profile');
     setDirectLearningSpaceIds([]);
     setDirectContentTypeCodes([]);
+    setDirectStartsAt('');
+    setDirectEndsAt('');
   }
 
   function openDirectGrant(student: Student) {
@@ -272,6 +302,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerTab('direct-grant');
     setDirectLearningSpaceIds([]);
     setDirectContentTypeCodes([]);
+    setDirectStartsAt(toDateTimeInput(new Date()));
+    setDirectEndsAt('');
   }
 
   if (students.isLoading) return <Skeleton active />;
@@ -281,8 +313,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <Typography.Title level={3}>学生管理</Typography.Title>
-          <Typography.Text type="secondary">查看学生状态，并按课程范围直接开通需要的学习内容。</Typography.Text>
+          <Typography.Title level={3}>{writable ? '学生管理' : '我的学生'}</Typography.Title>
+          <Typography.Text type="secondary">{writable ? '先确定辅导老师，再排课、批改和跟进；小程序自助注册且未开通正式套餐的学生会自动归入待跟进。' : '这里只显示已分配给我的学生，避免跨班或跨老师查看。'}</Typography.Text>
         </div>
         {writable && (
           <Space>
@@ -295,7 +327,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       <div className="student-stat-grid">
         <Card><Statistic title="学生总数" value={stats.total} /></Card>
         <Card><Statistic title="已开通课程" value={stats.opened} /></Card>
-        <Card><Statistic title="待跟进" value={stats.waiting} /></Card>
+        <Card hoverable onClick={() => setFilters((prev) => prev.followUpState === '待跟进' ? {} : { followUpState: '待跟进' })}><Statistic title="待跟进（点击筛选）" value={stats.waiting} valueStyle={{ color: stats.waiting ? '#cf1322' : undefined }} /></Card>
         <Card><Statistic title="已停用" value={stats.disabled} /></Card>
       </div>
 
@@ -309,11 +341,12 @@ export default function Students({ user }: { user: CurrentUser }) {
               <Select allowClear placeholder="学习状态" options={learningOptions} style={{ width: 150 }} onChange={(learningStatus) => setFilters((prev) => ({ ...prev, learningStatus }))} />
               <Select
                 allowClear
-                placeholder="开通状态"
+                placeholder="套餐开通状态"
                 options={[{ label: '已开通', value: '已开通' }, { label: '未开通', value: '未开通' }]}
                 style={{ width: 140 }}
                 onChange={(packageState) => setFilters((prev) => ({ ...prev, packageState }))}
               />
+              <Select allowClear value={filters.followUpState} placeholder="跟进状态" options={[{ label: '待跟进', value: '待跟进' }]} style={{ width: 140 }} onChange={(followUpState) => setFilters((prev) => ({ ...prev, followUpState }))} />
             </Space>
             <ListViewToggle storageKey="starline:list-view:students" value={viewMode} onChange={setViewMode} />
           </div>
@@ -324,11 +357,11 @@ export default function Students({ user }: { user: CurrentUser }) {
               emptyText="还没有学生，先新增学生或批量导入。"
               renderCard={(record) => (
                 <InfoCard
-                  title={record.name}
+                  title={<Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f">{record.name}</Badge>}
                   subtitle={`${record.grade} · ${record.phone}`}
-                  status={<Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>}
+                  status={<Space size={4}><Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>{packageStatusTag(record)}</Space>}
                   fields={[
-                    { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
+                    { label: '微信关联', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag> },
                     { label: '家长姓名', value: record.guardianName || '-' },
                     { label: '学校', value: record.schoolName || '-' },
                     { label: '公众号', value: <Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '已关联' : '未关联'}</Tag> },
@@ -358,21 +391,20 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <Table className="student-table" rowKey="id" columns={columns} dataSource={rows} tableLayout="fixed" pagination={{ pageSize: 8 }} />
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} tableLayout="fixed" scroll={{ x: 1536 }} pagination={{ pageSize: 8 }} /></div>
           )}
         </div>
       </Card>
 
       <FormDrawer
-        title={reviewingStudentRequest ? '审核学生申请' : editing ? '编辑学生' : '新增学生'}
+        title={editing ? '编辑学生' : '新增学生'}
         open={studentDrawerOpen}
         onCancel={() => setStudentDrawerOpen(false)}
         onSubmit={() => studentForm.submit()}
-        submitText={reviewingStudentRequest ? '提交审核' : editing ? '保存' : '确定'}
+        submitText={editing ? '保存' : '确定'}
         submitting={saveStudent.isPending}
       >
         <Form form={studentForm} layout="vertical" onFinish={(values) => saveStudent.mutate(values)}>
-          {reviewingStudentRequest && <Alert type="info" showIcon message="该学生由家长在小程序提交，审核通过后才会出现在家长的可切换列表中。" style={{ marginBottom: 16 }} />}
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入学生姓名' }]}>
             <Input placeholder="例如：小明" />
           </Form.Item>
@@ -392,7 +424,7 @@ export default function Students({ user }: { user: CurrentUser }) {
             <Input.TextArea rows={3} placeholder="可填写家长沟通、分班或交接信息" />
           </Form.Item>
           {editing && (
-            <Form.Item name="enabled" label={reviewingStudentRequest ? '审核通过并启用账号' : '启用账号'} valuePropName="checked">
+            <Form.Item name="enabled" label="启用账号" valuePropName="checked">
               <Switch />
             </Form.Item>
           )}
@@ -448,7 +480,13 @@ export default function Students({ user }: { user: CurrentUser }) {
                   />
                 )
               },
-              {
+			  {
+				key: 'tutoring',
+				label: writable ? '辅导老师' : '我的辅导关系',
+				children: selected ? <TutoringAssignmentPanel student={selected} writable={writable} teachers={teachers.data ?? []} subjects={subjects.data ?? []} learningSpaces={learningSpaces.data ?? []} /> : null
+			  },
+			  { key: 'lesson-feedback', label: '课后反馈', children: selected ? <LessonFeedbackPanel student={selected} user={user} /> : null },
+			  ...(writable ? [{
                 key: 'direct-grant',
                 label: '开通学习内容',
                 children: selected ? (
@@ -459,13 +497,17 @@ export default function Students({ user }: { user: CurrentUser }) {
                     learningSpacesError={Boolean(learningSpaces.error)}
                     selectedLearningSpaceIds={directLearningSpaceIds}
                     selectedContentTypeCodes={directContentTypeCodes}
+                    startsAt={directStartsAt}
+                    endsAt={directEndsAt}
                     submitting={createDirectGrant.isPending}
                     onLearningSpaceIdsChange={setDirectLearningSpaceIds}
                     onContentTypeCodesChange={setDirectContentTypeCodes}
+                    onStartsAtChange={setDirectStartsAt}
+                    onEndsAtChange={setDirectEndsAt}
                     onSubmit={() => createDirectGrant.mutate()}
                   />
                 ) : null
-              },
+              }] : []),
               { key: 'records', label: '学习记录', children: <RecordTable detail={detail.data} /> },
               { key: 'scores', label: '成绩对比', children: selected ? <ScorePanel student={selected} canEdit={canManageScores(user)} /> : null },
               { key: 'logs', label: '操作记录', children: <LogTable detail={detail.data} /> }
@@ -652,6 +694,151 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
   );
 }
 
+type TutoringAction = { kind: 'end' | 'transfer'; assignment: TutoringAssignment };
+
+function LessonFeedbackPanel({ student, user }: { student: Student; user: CurrentUser }) {
+	const [form] = Form.useForm<Pick<LessonFeedback, 'summary' | 'homework' | 'nextStep'>>();
+	const [selectedClass, setSelectedClass] = useState<ScheduleClass | null>(null);
+	const client = useQueryClient();
+	const canWrite = user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));
+	const classes = useQuery({ queryKey: ['schedule-classes', 'feedback'], enabled: canWrite, queryFn: () => getData<ScheduleClass[]>('/schedule-classes') });
+	const eligible = (classes.data ?? []).filter((item) => item.students.some((row) => row.id === student.id) && item.auditStatus === '已通过' && item.status !== '已取消');
+	const feedbacks = useQuery({ queryKey: ['lesson-feedbacks', selectedClass?.id], enabled: Boolean(selectedClass), queryFn: () => getData<LessonFeedback[]>(`/schedule-classes/${selectedClass?.id}/feedbacks`) });
+	const save = useMutation({
+		mutationFn: (values: Pick<LessonFeedback, 'summary' | 'homework' | 'nextStep'>) => {
+			if (!selectedClass) throw new Error('请选择课次');
+			return putData<LessonFeedback>(`/schedule-classes/${selectedClass.id}/feedbacks`, { studentId: student.id, ...values });
+		},
+		onSuccess: () => {
+			message.success('课后反馈已保存，并同步到家长可见的成长记录。');
+			client.invalidateQueries({ queryKey: ['lesson-feedbacks', selectedClass?.id] });
+			client.invalidateQueries({ queryKey: ['students', student.id, 'detail'] });
+		},
+		onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请稍后重试。')
+	});
+	useEffect(() => {
+		if (!selectedClass || feedbacks.isLoading) return;
+		const existing = (feedbacks.data ?? []).find((row) => row.studentId === student.id);
+		form.setFieldsValue(existing ? { summary: existing.summary, homework: existing.homework, nextStep: existing.nextStep } : { summary: '', homework: '', nextStep: '' });
+	}, [feedbacks.data, feedbacks.isLoading, form, selectedClass, student.id]);
+
+	function chooseClass(id: string) {
+		const item = eligible.find((row) => row.id === id) ?? null;
+		setSelectedClass(item);
+	}
+
+	if (!canWrite) return <Empty description="课后反馈由授课老师填写。" />;
+	return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+		<Typography.Text type="secondary">选择已通过审核的课次，为这名学生记录课堂表现、课后任务和下一步建议。</Typography.Text>
+		<Select placeholder="选择课次" value={selectedClass?.id} loading={classes.isLoading} onChange={chooseClass} options={eligible.map((item) => ({ value: item.id, label: `${item.lessonDate} · ${item.courseName} · ${item.teacherName}` }))} />
+		{eligible.length === 0 && !classes.isLoading && <Empty description="暂无可填写反馈的已生效课次。" />}
+		{selectedClass && <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
+			<Form.Item name="summary" label="课堂表现" rules={[{ required: true, message: '请填写本节课表现' }]}><Input.TextArea rows={3} placeholder="用家长能理解的话说明收获和需关注的地方" /></Form.Item>
+			<Form.Item name="homework" label="课后任务"><Input.TextArea rows={2} /></Form.Item>
+			<Form.Item name="nextStep" label="下一步建议"><Input.TextArea rows={2} /></Form.Item>
+			<Button type="primary" loading={save.isPending} onClick={() => form.submit()}>保存并同步成长记录</Button>
+		</Form>}
+		{feedbacks.data?.find((row) => row.studentId === student.id) && <Alert type="success" message={`已保存，最近更新于 ${feedbacks.data.find((row) => row.studentId === student.id)?.updatedAt}`} />}
+	</Space>;
+}
+
+function TutoringAssignmentPanel({
+  student,
+  writable,
+  teachers,
+  subjects,
+  learningSpaces
+}: {
+  student: Student;
+  writable: boolean;
+  teachers: Teacher[];
+  subjects: SubjectMetadata[];
+  learningSpaces: LearningSpace[];
+}) {
+  const [createForm] = Form.useForm<TutoringAssignmentCreateRequest>();
+  const [actionForm] = Form.useForm<{ teacherId?: string; startsAt: string; reason: string }>();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [action, setAction] = useState<TutoringAction | null>(null);
+  const client = useQueryClient();
+  const queryKey = ['students', student.id, 'tutoring-assignments'];
+  const assignments = useQuery({ queryKey, queryFn: () => getData<TutoringAssignment[]>(`/students/${student.id}/tutoring-assignments`) });
+  const selectedSubjectId = Form.useWatch('subjectId', createForm);
+  const selectedLevelCode = Form.useWatch('levelCode', createForm);
+  const studentSpaces = useMemo(() => learningSpaces.filter((space) => space.status === '启用' && space.grade === student.grade), [learningSpaces, student.grade]);
+  const selectableSubjects = useMemo(() => subjects.filter((subject) => studentSpaces.some((space) => space.subject === subject.name)), [subjects, studentSpaces]);
+  const selectedSubject = selectableSubjects.find((subject) => subject.id === selectedSubjectId);
+  const levelOptions = useMemo(() => uniqueOptions(studentSpaces.filter((space) => !selectedSubject || space.subject === selectedSubject.name).map((space) => space.level || 'S')), [studentSpaces, selectedSubject]);
+  const selectableTeachers = useMemo(() => teachers.filter((teacher) => teacher.accountStatus === '正常' && studentSpaces.some((space) => (!selectedSubject || space.subject === selectedSubject.name) && (!selectedLevelCode || (space.level || 'S') === selectedLevelCode) && teacher.learningSpaceIds.includes(space.id))), [teachers, studentSpaces, selectedSubject, selectedLevelCode]);
+  const create = useMutation({
+    mutationFn: (values: TutoringAssignmentCreateRequest) => postData<TutoringAssignment>(`/students/${student.id}/tutoring-assignments`, { ...values, role: values.role || 'primary' }),
+    onSuccess: () => {
+      message.success('辅导关系已生效，老师现在可以查看这名学生。');
+      setCreateOpen(false);
+      createForm.resetFields();
+      client.invalidateQueries({ queryKey });
+      client.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请检查老师的教学范围。')
+  });
+  const update = useMutation({
+    mutationFn: (values: { teacherId?: string; startsAt: string; reason: string }) => {
+      if (!action) throw new Error('请选择要处理的辅导关系');
+      const path = action.kind === 'transfer' ? `/teacher-assignments/${action.assignment.id}/transfer` : `/teacher-assignments/${action.assignment.id}/end`;
+      return postData<TutoringAssignment>(path, action.kind === 'transfer'
+        ? { teacherId: values.teacherId, startsAt: values.startsAt, reason: values.reason, version: action.assignment.version }
+        : { endsAt: values.startsAt, reason: values.reason, version: action.assignment.version });
+    },
+    onSuccess: () => {
+      message.success(action?.kind === 'transfer' ? '已转交给新的辅导老师。' : '辅导关系已结束。');
+      setAction(null);
+      actionForm.resetFields();
+      client.invalidateQueries({ queryKey });
+      client.invalidateQueries({ queryKey: ['students'] });
+      client.invalidateQueries({ queryKey: ['review'] });
+    },
+    onError: (error) => message.error(error instanceof Error ? error.message : '操作失败，请刷新后重试。')
+  });
+
+  function openCreate() {
+    createForm.setFieldsValue({ teacherId: undefined as unknown as string, subjectId: undefined as unknown as string, levelCode: undefined as unknown as string, role: 'primary', startsAt: new Date().toISOString().slice(0, 10) });
+    setCreateOpen(true);
+  }
+
+  function openAction(next: TutoringAction) {
+    setAction(next);
+    actionForm.setFieldsValue({ teacherId: undefined, startsAt: new Date().toISOString().slice(0, 10), reason: '' });
+  }
+
+  if (assignments.isLoading) return <Skeleton active />;
+  if (assignments.error) return <Alert type="error" message="辅导关系加载失败，请稍后重试。" />;
+  const rows = assignments.data ?? [];
+  return (
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <Typography.Text type="secondary">{writable ? '主辅导老师决定学生归属、默认排课范围和新产生的批改任务；协作老师仅用于辅助记录。' : '只有有效辅导关系内的学生才会出现在我的工作范围。'}</Typography.Text>
+        {writable && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>分配老师</Button>}
+      </div>
+      {rows.length === 0 ? <Empty description={writable ? '还没有辅导老师，分配后才能进入老师的工作范围。' : '暂未找到有效辅导关系。'} /> : <CardList rows={rows} rowKey={(item) => item.id} emptyText="还没有辅导关系" renderCard={(item) => <InfoCard title={`${item.subjectName} · ${item.levelCode} · ${item.teacherName}`} subtitle={`${item.startsAt} 起${item.endsAt ? `，${item.endsAt} 结束` : ''}`} status={<Tag color={item.status === 'active' ? 'green' : 'default'}>{item.status === 'active' ? (item.role === 'primary' ? '主辅导老师' : '协作老师') : '已结束'}</Tag>} fields={[{ label: '分配人', value: item.assignedBy || '-' }, { label: '结束原因', value: item.endedReason || '-' }]} actions={writable && item.status === 'active' ? <Space size={4}><Button size="small" onClick={() => openAction({ kind: 'transfer', assignment: item })}>转交</Button><Button size="small" danger onClick={() => openAction({ kind: 'end', assignment: item })}>结束</Button></Space> : undefined} />} />}
+      <FormDrawer title="分配辅导老师" open={createOpen} onCancel={() => setCreateOpen(false)} onSubmit={() => createForm.submit()} submitting={create.isPending} submitText="确认分配">
+        <Form form={createForm} layout="vertical" onFinish={(values) => create.mutate(values)}>
+          <Form.Item name="subjectId" label="辅导学科" rules={[{ required: true, message: '请选择学科' }]}><Select placeholder="先选择学科" options={selectableSubjects.map((subject) => ({ value: subject.id, label: subject.name }))} onChange={() => createForm.setFieldsValue({ levelCode: undefined as unknown as string, teacherId: undefined as unknown as string })} /></Form.Item>
+          <Form.Item name="levelCode" label="课程等级" rules={[{ required: true, message: '请选择等级' }]}><Select placeholder="请选择等级" options={levelOptions} onChange={() => createForm.setFieldsValue({ teacherId: undefined as unknown as string })} /></Form.Item>
+          <Form.Item name="teacherId" label="辅导老师" rules={[{ required: true, message: '请选择老师' }]}><Select placeholder="只显示覆盖该年级、学科和等级的老师" options={selectableTeachers.map((teacher) => ({ value: teacher.id, label: teacher.name }))} /></Form.Item>
+          <Form.Item name="role" label="辅导角色" rules={[{ required: true }]}><Select options={[{ value: 'primary', label: '主辅导老师' }, { value: 'assistant', label: '协作老师' }]} /></Form.Item>
+          <Form.Item name="startsAt" label="生效日期" rules={[{ required: true, message: '请选择生效日期' }]}><Input type="date" /></Form.Item>
+        </Form>
+      </FormDrawer>
+      <FormDrawer title={action?.kind === 'transfer' ? '转交辅导关系' : '结束辅导关系'} open={Boolean(action)} onCancel={() => setAction(null)} onSubmit={() => actionForm.submit()} submitting={update.isPending} submitText={action?.kind === 'transfer' ? '确认转交' : '确认结束'}>
+        <Form form={actionForm} layout="vertical" onFinish={(values) => update.mutate(values)}>
+          {action?.kind === 'transfer' && <Form.Item name="teacherId" label="新的辅导老师" rules={[{ required: true, message: '请选择新的辅导老师' }]}><Select placeholder="请选择老师" options={teachers.filter((teacher) => teacher.accountStatus === '正常' && teacher.id !== action.assignment.teacherId).map((teacher) => ({ value: teacher.id, label: teacher.name }))} /></Form.Item>}
+          <Form.Item name="startsAt" label={action?.kind === 'transfer' ? '转交生效日期' : '结束日期'} rules={[{ required: true, message: '请选择日期' }]}><Input type="date" /></Form.Item>
+          <Form.Item name="reason" label={action?.kind === 'transfer' ? '转交原因' : '结束原因'} rules={[{ required: true, message: '请填写原因，方便后续交接追溯' }]}><Input.TextArea rows={3} placeholder="例如：老师请假、学科调整或学生结课" /></Form.Item>
+        </Form>
+      </FormDrawer>
+    </Space>
+  );
+}
+
 function StudentProfile({
   detail,
   writable,
@@ -745,9 +932,13 @@ function DirectGrantPanel({
   learningSpacesError,
   selectedLearningSpaceIds,
   selectedContentTypeCodes,
+  startsAt,
+  endsAt,
   submitting,
   onLearningSpaceIdsChange,
   onContentTypeCodesChange,
+  onStartsAtChange,
+  onEndsAtChange,
   onSubmit
 }: {
   student: Student;
@@ -756,11 +947,25 @@ function DirectGrantPanel({
   learningSpacesError: boolean;
   selectedLearningSpaceIds: string[];
   selectedContentTypeCodes: string[];
+  startsAt: string;
+  endsAt: string;
   submitting: boolean;
   onLearningSpaceIdsChange: (values: string[]) => void;
   onContentTypeCodesChange: (values: string[]) => void;
+  onStartsAtChange: (value: string) => void;
+  onEndsAtChange: (value: string) => void;
   onSubmit: () => void;
 }) {
+  const [selectedSubject, setSelectedSubject] = useState<string>();
+  const subjectFilters = useMemo(() => {
+    const counts = new Map<string, number>();
+    learningSpaces.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
+    return Array.from(counts, ([subject, count]) => ({ subject, count }));
+  }, [learningSpaces]);
+  const visibleLearningSpaces = useMemo(
+    () => selectedSubject ? learningSpaces.filter((space) => space.subject === selectedSubject) : learningSpaces,
+    [learningSpaces, selectedSubject]
+  );
   const canSubmit = selectedLearningSpaceIds.length > 0 && selectedContentTypeCodes.length > 0;
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -768,17 +973,43 @@ function DirectGrantPanel({
         type="info"
         showIcon
         message="按需开通学习内容"
-        description={`先选择 ${student.name} 要学习的课程范围，再勾选需要开放的课程、习题或学习资料。确认后立即生效，有效期按当前校历计算。`}
+        description={`先选择 ${student.name} 要学习的课程范围，再勾选需要开放的课程、习题或学习资料。可设置何时对家长可见；结束时间不填时按当前校历自动计算。`}
       />
       <div>
         <Typography.Text strong>课程范围</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
           只展示该学生所在年级可开通的课程范围。
         </Typography.Paragraph>
+        <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
+          <Space wrap size={[8, 8]}>
+            <Tag color="blue">当前年级：{student.grade}</Tag>
+            <Typography.Text type="secondary">已选 {selectedLearningSpaceIds.length} 个课程范围</Typography.Text>
+          </Space>
+          <div role="group" aria-label="科目筛选">
+            <Space wrap size={[8, 8]}>
+              <Typography.Text>科目</Typography.Text>
+              <Button size="small" type={!selectedSubject ? 'primary' : 'default'} onClick={() => setSelectedSubject(undefined)}>
+                全部（{learningSpaces.length}）
+              </Button>
+              {subjectFilters.map(({ subject, count }) => (
+                <Button
+                  key={subject}
+                  size="small"
+                  type={selectedSubject === subject ? 'primary' : 'default'}
+                  onClick={() => setSelectedSubject(subject)}
+                >
+                  {subject}（{count}）
+                </Button>
+              ))}
+            </Space>
+          </div>
+        </Space>
         {loadingLearningSpaces ? <Skeleton active paragraph={{ rows: 3 }} /> : learningSpacesError ? (
           <Alert type="error" showIcon message="课程范围加载失败，请关闭抽屉后重试。" />
         ) : learningSpaces.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该年级还没有可开通的课程范围。" />
+        ) : visibleLearningSpaces.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该科目暂无可开通课程范围。" />
         ) : (
           <Checkbox.Group
             aria-label="课程范围"
@@ -786,7 +1017,7 @@ function DirectGrantPanel({
             onChange={(values) => onLearningSpaceIdsChange(values.filter((value): value is string => typeof value === 'string'))}
           >
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              {learningSpaces.map((space) => (
+              {visibleLearningSpaces.map((space) => (
                 <Checkbox key={space.id} value={space.id}>
                   {space.name}
                 </Checkbox>
@@ -812,6 +1043,22 @@ function DirectGrantPanel({
           </Space>
         </Checkbox.Group>
       </div>
+      <div>
+        <Typography.Text strong>生效时间</Typography.Text>
+        <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
+          开通时间默认现在。未到开通时间的课程不会在学生端显示；结束时间留空时按当前校历到期。
+        </Typography.Paragraph>
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <label>
+            <Typography.Text>开通时间</Typography.Text>
+            <input aria-label="开通时间" className="ant-input" type="datetime-local" value={startsAt} onChange={(event) => onStartsAtChange(event.target.value)} style={{ marginTop: 4 }} />
+          </label>
+          <label>
+            <Typography.Text>结束时间（选填）</Typography.Text>
+            <input aria-label="结束时间" className="ant-input" type="datetime-local" min={startsAt} value={endsAt} onChange={(event) => onEndsAtChange(event.target.value)} style={{ marginTop: 4 }} />
+          </label>
+        </Space>
+      </div>
       <Button
         type="primary"
         icon={<UnlockOutlined />}
@@ -823,6 +1070,11 @@ function DirectGrantPanel({
       </Button>
     </Space>
   );
+}
+
+function toDateTimeInput(value: Date) {
+  const offset = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: (packageId: string) => void }) {

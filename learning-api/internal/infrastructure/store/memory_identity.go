@@ -243,7 +243,7 @@ func (s *MemoryStore) createWechatStudentAccount(openID string, req learning.Wec
 	id := "stu-" + time.Now().Format("20060102150405.000000000")
 	student := learning.Student{
 		ID: id, Name: req.StudentName, EnrollmentAcademicYear: s.configuredAcademicYear(), EnrollmentGrade: req.Grade,
-		Phone: req.Phone, SchoolName: req.SchoolName, AccountStatus: "正常", BindStatus: "已绑定",
+		Phone: req.Phone, SchoolName: req.SchoolName, AccountStatus: "正常", RegistrationSource: "小程序", BindStatus: "已绑定",
 		Remark: "小程序自助建档", LearningStatus: "未开始", CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
 	user := learning.User{
@@ -254,9 +254,6 @@ func (s *MemoryStore) createWechatStudentAccount(openID string, req learning.Wec
 	s.users = append(s.users, user)
 	principal := principalFromUser(user)
 	principal.GuardianID = s.ensureGuardianLink(student.Phone, openID, student.ID)
-	if err := s.startDefaultStudentTrialUnlocked(principal); err != nil {
-		return learning.Principal{}, err
-	}
 	s.prependLog(student.Name, "小程序自助建档", student.Name)
 	return principal, nil
 }

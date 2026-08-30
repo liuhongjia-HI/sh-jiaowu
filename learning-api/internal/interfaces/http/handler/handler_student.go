@@ -19,6 +19,7 @@ func (h *LearningHandler) Students(c *gin.Context) {
 		AccountStatus:  strings.TrimSpace(c.Query("accountStatus")),
 		LearningStatus: strings.TrimSpace(c.Query("learningStatus")),
 		PackageState:   strings.TrimSpace(c.Query("packageState")),
+		FollowUpState:  strings.TrimSpace(c.Query("followUpState")),
 	}))
 }
 func (h *LearningHandler) StudentDetail(c *gin.Context) {
@@ -123,6 +124,60 @@ func (h *LearningHandler) StudentLearningRecords(c *gin.Context) {
 	}
 	OK(c, records)
 }
+func (h *LearningHandler) StudentTutoringAssignments(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	items, err := h.service.StudentTutoringAssignments(principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, items)
+}
+func (h *LearningHandler) CreateTutoringAssignment(c *gin.Context) {
+	var req learning.TutoringAssignmentCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求数据格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.CreateTutoringAssignment(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
+func (h *LearningHandler) EndTutoringAssignment(c *gin.Context) {
+	var req learning.TutoringAssignmentEndRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求数据格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.EndTutoringAssignment(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
+func (h *LearningHandler) TransferTutoringAssignment(c *gin.Context) {
+	var req learning.TutoringAssignmentTransferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求数据格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.TransferTutoringAssignment(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
 func (h *LearningHandler) StudentScores(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	scores, err := h.service.StudentScores(principal, c.Param("id"))
@@ -171,23 +226,6 @@ func (h *LearningHandler) StudentHome(c *gin.Context) {
 		return
 	}
 	OK(c, home)
-}
-
-func (h *LearningHandler) StartStudentTrial(c *gin.Context) {
-	var req struct {
-		PackageID string `json:"packageId"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		BadRequest(c, "体验套餐参数不正确")
-		return
-	}
-	principal, _ := middleware.CurrentPrincipal(c)
-	result, err := h.service.StartStudentTrial(principal, strings.TrimSpace(req.PackageID))
-	if err != nil {
-		BadRequest(c, err.Error())
-		return
-	}
-	OK(c, result)
 }
 
 func (h *LearningHandler) StudentRecommendations(c *gin.Context) {

@@ -136,6 +136,31 @@ type ScheduleClass struct {
 	CreatedAt    string `json:"createdAt"`
 }
 
+// LessonFeedback 是一节已完成课程对一名学生的反馈；课次和学生共同决定唯一记录，
+// 重写时保留同一 ID，避免家长端因重复提交看到多条相同反馈。
+type LessonFeedback struct {
+	ID              string `json:"id"`
+	ScheduleClassID string `json:"scheduleClassId"`
+	StudentID       string `json:"studentId"`
+	StudentName     string `json:"studentName"`
+	TeacherID       string `json:"teacherId"`
+	TeacherName     string `json:"teacherName"`
+	CourseName      string `json:"courseName"`
+	LessonDate      string `json:"lessonDate"`
+	Summary         string `json:"summary"`
+	Homework        string `json:"homework,omitempty"`
+	NextStep        string `json:"nextStep,omitempty"`
+	CreatedAt       string `json:"createdAt"`
+	UpdatedAt       string `json:"updatedAt"`
+}
+
+type LessonFeedbackUpsertRequest struct {
+	StudentID string `json:"studentId"`
+	Summary   string `json:"summary"`
+	Homework  string `json:"homework"`
+	NextStep  string `json:"nextStep"`
+}
+
 // ScheduleRepeat 是重复规则，对应 RRULE 的一个子集。
 // 一期只实现 daily / weekly，monthly 与特殊日期按客户要求后续迭代，
 // 但字段先切出来，届时不用改表结构：Interval 不写死成 1 就是为了这个。

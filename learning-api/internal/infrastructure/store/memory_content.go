@@ -875,6 +875,26 @@ func (s *MemoryStore) contentFileUnlocked(principal learning.Principal, fileID s
 	return learning.FileAsset{}, errors.New("没有权限查看该文件")
 }
 func (s *MemoryStore) reviewsUnlocked(principal learning.Principal) []learning.Review {
+	if hasRole(principal.Roles, learning.RoleOpsStaff) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleSuperAdmin) {
+		return append([]learning.Review(nil), s.reviews...)
+	}
+	if hasRole(principal.Roles, learning.RoleTeacher) {
+		out := make([]learning.Review, 0, len(s.reviews))
+		subjects := subjectsForCourses(s.coursesUnlocked(principal))
+		for _, review := range s.reviews {
+			if review.ReviewerTeacherID == principal.UserID {
+				out = append(out, review)
+				continue
+			}
+			// 存量任务还没有责任快照时，暂按原课程范围展示，避免迁移
+			// 当天出现无人可批的历史作业。所有新任务一旦有分派信息，
+			// 都只按 reviewerTeacherID 路由。
+			if review.ReviewerTeacherID == "" && (canSeeSubject(principal, subjects, review.PackageName) || canSeeSubject(principal, subjects, review.Homework)) {
+				out = append(out, review)
+			}
+		}
+		return out
+	}
 	subjects := subjectsForCourses(s.coursesUnlocked(principal))
 	out := make([]learning.Review, 0, len(s.reviews))
 	for _, review := range s.reviews {
@@ -883,6 +903,45 @@ func (s *MemoryStore) reviewsUnlocked(principal learning.Principal) []learning.R
 		}
 	}
 	return out
+}
+
+func (s *MemoryStore) assignReviewUnlocked(operator string, principal learning.Principal, id string, req learning.ReviewAssignRequest) (learning.Review, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.Review, error) {
+			return work.assignReviewUnlocked(operator, principal, id, req)
+		})
+	}
+	if !canManageTutoringAssignments(principal) {
+		return learning.Review{}, errors.New("没有权限分派批改任务")
+	}
+	req.TeacherID = strings.TrimSpace(req.TeacherID)
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.TeacherID == "" || req.Reason == "" {
+		return learning.Review{}, errors.New("请选择老师并填写分派原因")
+	}
+	teacher, ok := s.findUser(req.TeacherID)
+	if !ok || !isActiveTeacher(teacher) || !teacher.CanReview {
+		return learning.Review{}, errors.New("该老师不可承担批改任务")
+	}
+	if !canManageTeacher(principal, teacher) && !hasRole(principal.Roles, learning.RoleOpsStaff) {
+		return learning.Review{}, errors.New("不能分派给其他校区老师")
+	}
+	for index := range s.reviews {
+		review := &s.reviews[index]
+		if review.ID != strings.TrimSpace(id) {
+			continue
+		}
+		if review.Status != "待批改" && review.Status != "待复核" {
+			return learning.Review{}, errors.New("该任务当前不可重新分派")
+		}
+		review.ReviewerTeacherID = teacher.ID
+		review.ReviewerTeacherName = teacher.Name
+		review.TutoringAssignmentID = ""
+		review.AssignedAt = time.Now().Format("2006-01-02 15:04:05")
+		s.prependLogDetail(operator, "分派批改任务", review.StudentName, "老师 "+teacher.Name+" / 原因 "+req.Reason)
+		return *review, nil
+	}
+	return learning.Review{}, errors.New("待批改记录不存在")
 }
 
 func (s *MemoryStore) completeReviewUnlocked(operator string, principal learning.Principal, id string, req learning.ReviewCompleteRequest) (learning.Submission, error) {

@@ -19,16 +19,20 @@ type Student struct {
 	OpenedPackageRefs      []StudentPackageRef `json:"openedPackageRefs"`
 	LearningStatus         string              `json:"learningStatus"`
 	AccountStatus          string              `json:"accountStatus"`
-	StreakDays             int                 `json:"streakDays"`
-	AverageScore           int                 `json:"averageScore"`
-	BadgeCount             int                 `json:"badgeCount"`
-	Remark                 string              `json:"remark,omitempty"`
-	BindStatus             string              `json:"bindStatus"`
-	CreatedAt              string              `json:"createdAt"`
-	LastStudyAt            string              `json:"lastStudyAt,omitempty"`
-	LastSubmittedAt        string              `json:"lastSubmittedAt,omitempty"`
-	LastSubmissionStatus   string              `json:"lastSubmissionStatus,omitempty"`
-	EffectiveUntil         string              `json:"effectiveUntil,omitempty"`
+	// RegistrationSource 由服务端写入，用于区分小程序自助建档与后台/导入建档。
+	RegistrationSource string `json:"registrationSource,omitempty"`
+	// FollowUpStatus 是运营视图的派生状态，不影响学生登录或学习权限。
+	FollowUpStatus       string `json:"followUpStatus,omitempty"`
+	StreakDays           int    `json:"streakDays"`
+	AverageScore         int    `json:"averageScore"`
+	BadgeCount           int    `json:"badgeCount"`
+	Remark               string `json:"remark,omitempty"`
+	BindStatus           string `json:"bindStatus"`
+	CreatedAt            string `json:"createdAt"`
+	LastStudyAt          string `json:"lastStudyAt,omitempty"`
+	LastSubmittedAt      string `json:"lastSubmittedAt,omitempty"`
+	LastSubmissionStatus string `json:"lastSubmissionStatus,omitempty"`
+	EffectiveUntil       string `json:"effectiveUntil,omitempty"`
 	// BindCode/BindCodeExpiresAt 是"关联第二个家长"用的邀请码：机构后台生成，
 	// 分享给爸爸/妈妈/其他家长后，对方在小程序里输入即可关联到这个学生，
 	// 不需要走"手机号命中已有档案"那条路。到期后需要在后台重新生成。
@@ -70,6 +74,7 @@ type StudentQuery struct {
 	AccountStatus  string
 	LearningStatus string
 	PackageState   string
+	FollowUpState  string
 }
 
 // Guardian 是登录主体：家长用手机号/微信登录，登录之后可能同时看得到多个孩子。
@@ -202,7 +207,11 @@ type StudentRemindResult struct {
 
 type StudentCourseCard struct {
 	Course
-	Progress int `json:"progress"`
+	Progress       int    `json:"progress"`
+	OpenedAt       string `json:"openedAt,omitempty"`
+	AvailableAt    string `json:"availableAt,omitempty"`
+	HighlightUntil string `json:"highlightUntil,omitempty"`
+	IsNew          bool   `json:"isNew"`
 }
 
 // StudentStudyBoard 是学习页的聚合数据：课程卡（带进度）+ 资料。

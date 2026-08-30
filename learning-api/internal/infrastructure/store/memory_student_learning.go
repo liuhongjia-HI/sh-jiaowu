@@ -106,6 +106,12 @@ func (s *MemoryStore) studentGrowthUnlocked(principal learning.Principal) ([]lea
 			Status: "已学习", OccurredAt: firstNonEmpty(student.LastStudyAt, "2026-05-22 18:20:00"), Description: "查看课件资料",
 		})
 	}
+	for _, feedback := range s.lessonFeedbacks {
+		if feedback.StudentID != principal.StudentID {
+			continue
+		}
+		records = append(records, learning.StudentLearningRecord{ID: "growth-lesson-" + feedback.ID, Type: "课后反馈", Title: feedback.CourseName, Course: feedback.TeacherName, Status: "已反馈", OccurredAt: firstNonEmpty(feedback.LessonDate, feedback.UpdatedAt), Description: feedback.Summary})
+	}
 	for _, summary := range s.scoreSummariesForStudent(principal.StudentID) {
 		if summary.LatestRecord == nil {
 			continue
@@ -386,11 +392,18 @@ func (s *MemoryStore) createSubmissionUnlocked(operator string, principal learni
 	s.submissions[submission.ID] = cloneSubmission(submission)
 	if hasText {
 		student, _ := s.findStudent(principal.StudentID)
-		s.reviews = append([]learning.Review{{
+		review := learning.Review{
 			ID: "rev-" + submission.ID, StudentID: principal.StudentID, HomeworkID: homework.ID, SubmissionID: submission.ID,
 			StudentName: student.Name, PackageName: homework.PackageName, Homework: homework.Title, SystemScore: score,
 			TeacherComment: "", Status: "待批改",
-		}}, s.reviews...)
+		}
+		if assignment, found := s.primaryTutoringAssignmentForHomework(principal.StudentID, homework); found {
+			review.ReviewerTeacherID = assignment.TeacherID
+			review.ReviewerTeacherName = assignment.TeacherName
+			review.TutoringAssignmentID = assignment.ID
+			review.AssignedAt = time.Now().Format("2006-01-02 15:04:05")
+		}
+		s.reviews = append([]learning.Review{review}, s.reviews...)
 	}
 	s.prependLog(operator, "提交小挑战", homework.Title)
 	return cloneSubmission(submission), nil

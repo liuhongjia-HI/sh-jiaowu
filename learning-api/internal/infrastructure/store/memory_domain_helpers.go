@@ -30,7 +30,7 @@ func (s *MemoryStore) visibleStudent(principal learning.Principal, id string) (l
 	if !ok {
 		return learning.Student{}, errors.New("student not found")
 	}
-	if !canSeeStudent(principal, student, s.coursesForStudent(student.ID)) {
+	if !s.canSeeStudent(principal, student, s.coursesForStudent(student.ID)) {
 		return learning.Student{}, errors.New("没有权限访问该学生")
 	}
 	return student, nil
@@ -68,6 +68,10 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	}
 	student.OpenedPackages = packages
 	student.OpenedPackageRefs = packageRefs
+	student.FollowUpStatus = ""
+	if student.RegistrationSource == "小程序" && student.AccountStatus != "停用" && !s.hasFormalPackageGrant(student.ID) {
+		student.FollowUpStatus = "待跟进"
+	}
 	if hasActiveGrant && student.LearningStatus == "待开通" {
 		student.LearningStatus = "已开通"
 	}
@@ -76,6 +80,27 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 		student.LastSubmissionStatus = submission.Status
 	}
 	return student
+}
+
+// hasFormalPackageGrant 只认正式套餐授权。直接开通的单项内容和历史体验授权
+// 都不代表已购买套餐，因此仍保留在待跟进列表中。
+func (s *MemoryStore) hasFormalPackageGrant(studentID string) bool {
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || grant.Status == "revoked" || strings.HasPrefix(grant.PackageID, "direct-") {
+			continue
+		}
+		isHistoricalTrial := false
+		for _, trial := range s.trials {
+			if trial.StudentID == studentID && trial.Status == "active" && trial.PackageID == grant.PackageID && trial.StartsAt == grant.StartsAt && trial.EndsAt == grantEndsAt(grant) {
+				isHistoricalTrial = true
+				break
+			}
+		}
+		if !isHistoricalTrial {
+			return true
+		}
+	}
+	return false
 }
 
 // studentAverageScore 用学生已批改小挑战的真实得分算平均分，不是一个可以手工填写、
@@ -418,9 +443,8 @@ func (s *MemoryStore) permissionForStudent(student learning.Student) learning.St
 	effectiveUntil := ""
 	hasActive := false
 	hasUpcoming := false
-	today := time.Now().Format("2006-01-02")
 	for _, grant := range s.grants {
-		if grant.StudentID != student.ID || grant.Status == "revoked" || grantEndsAt(grant) < today {
+		if grant.StudentID != student.ID || grant.Status == "revoked" || grantPeriodExpired(grantEndsAt(grant)) {
 			continue
 		}
 		pkg, ok := s.findPackage(grant.PackageID)
@@ -979,7 +1003,196 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 			}
 		}
 	}
+	for _, course := range s.previewCoursesForStudent(studentID) {
+		out = appendCourseUnique(out, s.decorateCourse(course))
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		left := s.courseAccessForStudent(studentID, out[i])
+		right := s.courseAccessForStudent(studentID, out[j])
+		if left.AvailableAt != right.AvailableAt {
+			return left.AvailableAt > right.AvailableAt
+		}
+		return out[i].Name < out[j].Name
+	})
 	return out
+}
+
+// previewCoursesForStudent 为未购课学生提供本年级每门学科的首章节入口。
+// 预览是由课程内容实时派生的永久权限，不写入套餐授权：内容发布完整后即可
+// 自动出现，也不会与正式套餐的有效期或学习状态混在一起。
+func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Course {
+	student, ok := s.findStudent(studentID)
+	if !ok || student.AccountStatus != "正常" {
+		return nil
+	}
+	selected := make(map[string]learning.Course)
+	for _, course := range s.courses {
+		if course.Status != learning.StatusEnabled || course.Grade != student.Grade {
+			continue
+		}
+		space, exists := s.findLearningSpace(course.LearningSpaceID)
+		if !exists || space.Status != learning.StatusEnabled || space.Grade != student.Grade {
+			continue
+		}
+		if _, ready := s.previewChapterForCourse(course); !ready {
+			continue
+		}
+		key := subjectSlug(course.Subject)
+		current, exists := selected[key]
+		if !exists || s.previewCourseOrder(course) < s.previewCourseOrder(current) {
+			selected[key] = course
+		}
+	}
+	out := make([]learning.Course, 0, len(selected))
+	for _, course := range selected {
+		out = append(out, course)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Subject != out[j].Subject {
+			return out[i].Subject < out[j].Subject
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
+}
+
+func (s *MemoryStore) previewCourseOrder(course learning.Course) string {
+	space, ok := s.findLearningSpace(course.LearningSpaceID)
+	if !ok {
+		return course.ID
+	}
+	semester := "9"
+	if semesterNumber(space.Semester) == "1" {
+		semester = "1"
+	} else if semesterNumber(space.Semester) == "2" {
+		semester = "2"
+	}
+	phase := "9"
+	if strings.Contains(space.Phase, "Q1") || strings.Contains(space.Phase, "期中") {
+		phase = "1"
+	} else if strings.Contains(space.Phase, "Q2") || strings.Contains(space.Phase, "期末") {
+		phase = "2"
+	}
+	level := "1"
+	if strings.TrimSpace(space.Level) == "S" || strings.TrimSpace(space.Level) == "" {
+		level = "0"
+	}
+	return semester + phase + level + course.ID
+}
+
+// previewChapterForCourse 只在首章同时具备已发布讲义和习题时返回。课程编排
+// 优先以课程章节顺序为准；老数据没有章节目录时，再从已发布内容的排序中推断。
+func (s *MemoryStore) previewChapterForCourse(course learning.Course) (string, bool) {
+	chapters := make([]string, 0, len(course.Chapters))
+	for _, chapter := range course.Chapters {
+		if chapter = strings.TrimSpace(chapter); chapter != "" {
+			chapters = append(chapters, chapter)
+		}
+	}
+	if len(chapters) > 0 {
+		return chapters[0], s.previewChapterHasContent(course.ID, chapters[0])
+	}
+	chapters = s.publishedChaptersForCourse(course.ID)
+	if len(chapters) == 0 {
+		return "", false
+	}
+	return chapters[0], s.previewChapterHasContent(course.ID, chapters[0])
+}
+
+func (s *MemoryStore) publishedChaptersForCourse(courseID string) []string {
+	positions := map[string]int{}
+	add := func(chapter string, position int) {
+		chapter = strings.TrimSpace(chapter)
+		if chapter == "" {
+			return
+		}
+		if current, exists := positions[chapter]; !exists || position < current {
+			positions[chapter] = position
+		}
+	}
+	for _, material := range s.materials {
+		if material.CourseID == courseID && materialPublished(material.Status) {
+			add(material.Chapter, material.SortOrder)
+		}
+	}
+	for _, homework := range s.homework {
+		if homework.CourseID == courseID && homeworkVisible(homework.Status) {
+			add(homework.Chapter, homework.SortOrder)
+		}
+	}
+	chapters := make([]string, 0, len(positions))
+	for chapter := range positions {
+		chapters = append(chapters, chapter)
+	}
+	sort.Slice(chapters, func(i, j int) bool {
+		if positions[chapters[i]] != positions[chapters[j]] {
+			return positions[chapters[i]] < positions[chapters[j]]
+		}
+		return chapters[i] < chapters[j]
+	})
+	return chapters
+}
+
+func (s *MemoryStore) previewChapterHasContent(courseID, chapter string) bool {
+	hasMaterial, hasHomework := false, false
+	for _, material := range s.materials {
+		if material.CourseID == courseID && material.Chapter == chapter && materialPublished(material.Status) {
+			hasMaterial = true
+			break
+		}
+	}
+	for _, homework := range s.homework {
+		if homework.CourseID == courseID && homework.Chapter == chapter && homeworkVisible(homework.Status) {
+			hasHomework = true
+			break
+		}
+	}
+	return hasMaterial && hasHomework
+}
+
+type courseAccess struct {
+	OpenedAt       string
+	AvailableAt    string
+	HighlightUntil string
+	IsNew          bool
+}
+
+func (s *MemoryStore) courseAccessForStudent(studentID string, course learning.Course) courseAccess {
+	selected := packageGrant{}
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") || !containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
+			continue
+		}
+		if selected.ID == "" || grant.StartsAt > selected.StartsAt || (grant.StartsAt == selected.StartsAt && grantOpenedAt(grant) > grantOpenedAt(selected)) {
+			selected = grant
+		}
+	}
+	if selected.ID == "" {
+		return courseAccess{}
+	}
+	availableAt := selected.StartsAt
+	if availableAt == "" {
+		availableAt = selected.OpenedAt
+	}
+	visibleAt, _, err := normalizeGrantTimestamp(availableAt, false)
+	if err != nil {
+		return courseAccess{OpenedAt: grantOpenedAt(selected), AvailableAt: availableAt}
+	}
+	openedAtValue := grantOpenedAt(selected)
+	if openedAtValue != "" {
+		openedAt, _, openedErr := normalizeGrantTimestamp(openedAtValue, false)
+		if openedErr == nil && openedAt.After(visibleAt) {
+			visibleAt = openedAt
+			availableAt = openedAtValue
+		}
+	}
+	highlightUntil := visibleAt.Add(time.Hour)
+	return courseAccess{
+		OpenedAt:       openedAtValue,
+		AvailableAt:    availableAt,
+		HighlightUntil: highlightUntil.Format("2006-01-02 15:04:05"),
+		IsNew:          !time.Now().Before(visibleAt) && time.Now().Before(highlightUntil),
+	}
 }
 
 // studentAccessibleSpaceIDs 返回学生通过有效套餐开通的全部学习空间 ID，不区分内容类型。
@@ -1039,6 +1252,17 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			}
 		}
 	}
+	for _, course := range s.previewCoursesForStudent(studentID) {
+		chapter, ready := s.previewChapterForCourse(course)
+		if !ready {
+			continue
+		}
+		for _, material := range s.materials {
+			if material.CourseID == course.ID && material.Chapter == chapter && materialPublished(material.Status) {
+				out = appendMaterialUnique(out, s.decorateMaterial(material))
+			}
+		}
+	}
 	return out
 }
 
@@ -1066,6 +1290,17 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 			}
 		}
 	}
+	for _, course := range s.previewCoursesForStudent(studentID) {
+		chapter, ready := s.previewChapterForCourse(course)
+		if !ready {
+			continue
+		}
+		for _, item := range s.homework {
+			if item.CourseID == course.ID && item.Chapter == chapter && homeworkVisible(item.Status) {
+				out = appendHomeworkUnique(out, item)
+			}
+		}
+	}
 	return out
 }
 
@@ -1089,9 +1324,8 @@ func (s *MemoryStore) learningSpaceIDsForPackage(packageID string) []string {
 
 func (s *MemoryStore) learningSpaceIDsForGrant(grantID string) []string {
 	out := make([]string, 0)
-	today := time.Now().Format("2006-01-02")
 	for _, access := range s.spaceAccess {
-		if access.PackageGrantID == grantID && access.Status == "active" && (access.StartsAt == "" || access.StartsAt <= today) && access.EndsAt >= today && s.learningSpaceEnabled(access.LearningSpaceID) {
+		if access.PackageGrantID == grantID && access.Status == "active" && grantPeriodActive(access.StartsAt, access.EndsAt) && s.learningSpaceEnabled(access.LearningSpaceID) {
 			out = appendUnique(out, access.LearningSpaceID)
 		}
 	}

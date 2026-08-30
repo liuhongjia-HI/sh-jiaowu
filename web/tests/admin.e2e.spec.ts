@@ -154,6 +154,19 @@ test('学生表格将操作列显示在学生列之后', async ({ page }) => {
   expect(studentTableHeaders.slice(0, 3).map((header) => header.trim())).toEqual(['学生', '操作', '家长姓名']);
 });
 
+test('iPad 横屏时学生姓名完整显示且表格可横向查看', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await login(page, '13800000002');
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+  const firstName = page.locator('.student-table .student-name').first();
+  await expect(firstName).toBeVisible();
+  await expect(firstName).not.toHaveText('');
+  const table = page.locator('.student-table .ant-table-content');
+  await expect.poll(() => table.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+});
+
 test('校区管理员可以在学生管理直接开通课程', async ({ page }) => {
   await login(page, '13800000002');
 
@@ -166,10 +179,26 @@ test('校区管理员可以在学生管理直接开通课程', async ({ page }) 
   await drawer.getByRole('tab', { name: '开通学习内容' }).click();
   await expect(drawer.getByText('按需开通学习内容')).toBeVisible();
   await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
+  await expect(drawer.getByText(/当前年级：/)).toBeVisible();
+  const subjectFilter = drawer.getByRole('group', { name: '科目筛选' });
+  await expect(subjectFilter).toBeVisible();
+  await expect(subjectFilter.getByRole('button', { name: /全部（\d+）/ })).toBeVisible();
+  const englishFilter = subjectFilter.getByRole('button', { name: /英文（\d+）/ });
+  await expect(englishFilter).toBeVisible();
+
+  const firstEnglishSpace = drawer.getByRole('checkbox', { name: /英文/ }).first();
+  await firstEnglishSpace.check();
+  await englishFilter.click();
+  await expect(drawer.getByRole('checkbox', { name: /数学/ })).toHaveCount(0);
+  await expect(drawer.getByText('已选 1 个课程范围')).toBeVisible();
+  await expect(firstEnglishSpace).toBeChecked();
+
   await expect(drawer.getByText('学习内容', { exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '习题', exact: true })).toBeVisible();
   await expect(drawer.getByRole('checkbox', { name: '学习资料', exact: true })).toBeVisible();
+  await expect(drawer.getByLabel('开通时间')).toBeVisible();
+  await expect(drawer.getByLabel('结束时间')).toBeVisible();
   await expect(drawer.getByText('课程方案', { exact: true })).toHaveCount(0);
 
   await page.goto('/open');

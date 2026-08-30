@@ -1,7 +1,7 @@
 package store
 
 func schedulingRows(s *MemoryStore) []persistenceRow {
-	rows := make([]persistenceRow, 0, len(s.availability)+len(s.scheduleClasses)*2)
+	rows := make([]persistenceRow, 0, len(s.availability)+len(s.scheduleClasses)*2+len(s.lessonFeedbacks))
 	for _, item := range s.availability {
 		rows = append(rows, simpleRow("availability_slots", "id", item.ID, `INSERT INTO availability_slots (id, owner_type, owner_id, owner_name, day_of_week, start_time, end_time, start_date, end_date, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE owner_type=VALUES(owner_type), owner_id=VALUES(owner_id), owner_name=VALUES(owner_name), day_of_week=VALUES(day_of_week), start_time=VALUES(start_time), end_time=VALUES(end_time), start_date=VALUES(start_date), end_date=VALUES(end_date), remark=VALUES(remark)`, item.ID, item.OwnerType, item.OwnerID, item.OwnerName, item.DayOfWeek, item.StartTime, item.EndTime, nullableDate(item.StartDate), nullableDate(item.EndDate), item.Remark))
 	}
@@ -10,6 +10,9 @@ func schedulingRows(s *MemoryStore) []persistenceRow {
 		for _, student := range item.Students {
 			rows = append(rows, relationRow("schedule_class_students", []string{"schedule_class_id", "student_id"}, []any{item.ID, student.ID}, `INSERT INTO schedule_class_students (schedule_class_id, student_id, student_name) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE student_name=VALUES(student_name)`, item.ID, student.ID, student.Name))
 		}
+	}
+	for _, item := range s.lessonFeedbacks {
+		rows = append(rows, simpleRow("lesson_feedbacks", "id", item.ID, `INSERT INTO lesson_feedbacks (id, schedule_class_id, student_id, student_name, teacher_id, teacher_name, course_name, lesson_date, summary, homework, next_step, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE summary=VALUES(summary), homework=VALUES(homework), next_step=VALUES(next_step), updated_at=VALUES(updated_at)`, item.ID, item.ScheduleClassID, item.StudentID, item.StudentName, item.TeacherID, item.TeacherName, item.CourseName, nullableDate(item.LessonDate), item.Summary, item.Homework, item.NextStep, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt)))
 	}
 	return rows
 }

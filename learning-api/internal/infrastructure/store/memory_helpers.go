@@ -443,6 +443,9 @@ func matchesStudentQuery(student learning.Student, query learning.StudentQuery) 
 	if query.PackageState == "未开通" && len(student.OpenedPackages) > 0 {
 		return false
 	}
+	if query.FollowUpState != "" && student.FollowUpStatus != query.FollowUpState {
+		return false
+	}
 	return true
 }
 
@@ -842,7 +845,7 @@ func (s *MemoryStore) canSeeCommercialStudent(principal learning.Principal, stud
 	if !ok {
 		return false
 	}
-	return canSeeStudent(principal, student, s.coursesForStudent(student.ID))
+	return s.canSeeStudent(principal, student, s.coursesForStudent(student.ID))
 }
 
 func (s *MemoryStore) commercialOrderForWrite(principal learning.Principal, orderID string) (int, learning.CommercialOrder, error) {
@@ -865,7 +868,7 @@ func (s *MemoryStore) commercialOrderForWrite(principal learning.Principal, orde
 	return -1, learning.CommercialOrder{}, errors.New("订单不存在")
 }
 
-func canSeeStudent(principal learning.Principal, student learning.Student, studentCourses []learning.Course) bool {
+func (s *MemoryStore) canSeeStudent(principal learning.Principal, student learning.Student, studentCourses []learning.Course) bool {
 	if hasRole(principal.Roles, learning.RoleSuperAdmin) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleOpsStaff) {
 		return true
 	}
@@ -873,14 +876,7 @@ func canSeeStudent(principal learning.Principal, student learning.Student, stude
 		return principal.StudentID == student.ID
 	}
 	if hasRole(principal.Roles, learning.RoleTeacher) {
-		if len(principal.LearningSpaceIDs) == 0 {
-			return false
-		}
-		for _, course := range studentCourses {
-			if containsString(principal.LearningSpaceIDs, course.LearningSpaceID) {
-				return true
-			}
-		}
+		return teacherHasActiveTutoringAssignment(principal.UserID, student.ID, s.tutoringAssignments)
 	}
 	return false
 }

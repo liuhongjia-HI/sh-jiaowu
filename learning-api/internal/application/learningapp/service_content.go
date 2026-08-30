@@ -69,6 +69,9 @@ func (s *Service) RetryPreviewJob(operator string, principal learning.Principal,
 	return s.content.RetryPreviewJob(operator, principal, fileID)
 }
 func (s *Service) Reviews(p learning.Principal) []learning.Review { return s.content.Reviews(p) }
+func (s *Service) AssignReview(o string, p learning.Principal, id string, r learning.ReviewAssignRequest) (learning.Review, error) {
+	return s.content.AssignReview(o, p, id, r)
+}
 func (s *Service) CompleteReview(o string, p learning.Principal, id string, r learning.ReviewCompleteRequest) (learning.Submission, error) {
 	return s.content.CompleteReview(o, p, id, r)
 }

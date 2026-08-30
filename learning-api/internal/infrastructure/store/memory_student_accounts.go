@@ -75,7 +75,7 @@ func (s *MemoryStore) studentAccountsUnlocked(principal learning.Principal) ([]l
 }
 
 // requestAdditionalStudentUnlocked 为当前家长直接添加学生，不再经过人工审核。
-// 资料提交后立刻可切换；若该年级配置了体验套餐，同时自动开通默认体验。
+// 资料提交后立刻可切换；首章节权限会由内容访问规则自动提供。
 func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Principal, req learning.StudentAccountAddRequest) (learning.StudentAccount, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.StudentAccount, error) {
@@ -123,7 +123,7 @@ func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Princi
 	student := learning.Student{
 		ID: id, Name: req.Name, EnrollmentAcademicYear: s.configuredAcademicYear(), EnrollmentGrade: req.Grade,
 		Phone: guardian.Phone, SchoolName: req.SchoolName, GuardianName: guardianName,
-		OpenedPackages: []string{}, LearningStatus: "未开始", AccountStatus: "正常", BindStatus: "已绑定",
+		OpenedPackages: []string{}, LearningStatus: "未开始", AccountStatus: "正常", RegistrationSource: "小程序", BindStatus: "已绑定",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
 	s.students = append([]learning.Student{student}, s.students...)
@@ -131,10 +131,6 @@ func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Princi
 	s.guardianStudents = append(s.guardianStudents, learning.GuardianStudent{
 		GuardianID: principal.GuardianID, StudentID: student.ID, Relation: learning.GuardianRelationGuardian, Status: learning.GuardianStudentActive,
 	})
-	user, _ := s.findUserByStudentID(student.ID)
-	if err := s.startDefaultStudentTrialUnlocked(principalFromUser(user)); err != nil {
-		return learning.StudentAccount{}, err
-	}
 	s.prependLog("家长", "添加学生", student.Name)
 	return learning.StudentAccount{StudentID: student.ID, Name: student.Name, Grade: s.decorateStudent(student).Grade, Status: "正常", CanSwitch: true}, nil
 }

@@ -11,6 +11,10 @@ type StudentRepository interface {
 	CreateStudent(string, learning.Principal, learning.StudentUpsertRequest) (learning.Student, error)
 	UpdateStudent(string, learning.Principal, string, learning.StudentUpsertRequest) (learning.Student, error)
 	StudentLearningRecords(learning.Principal, string) ([]learning.StudentLearningRecord, error)
+	StudentTutoringAssignments(learning.Principal, string) ([]learning.TutoringAssignment, error)
+	CreateTutoringAssignment(string, learning.Principal, string, learning.TutoringAssignmentCreateRequest) (learning.TutoringAssignment, error)
+	EndTutoringAssignment(string, learning.Principal, string, learning.TutoringAssignmentEndRequest) (learning.TutoringAssignment, error)
+	TransferTutoringAssignment(string, learning.Principal, string, learning.TutoringAssignmentTransferRequest) (learning.TutoringAssignment, error)
 	StudentScores(learning.Principal, string) ([]learning.StudentScoreSummary, error)
 	RemindStudent(string, learning.Principal, string) (learning.StudentRemindResult, error)
 	GenerateStudentBindCode(string, learning.Principal, string) (learning.Student, error)
@@ -18,7 +22,6 @@ type StudentRepository interface {
 	CreateStudentScore(string, learning.Principal, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	UpdateStudentScore(string, learning.Principal, string, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	StudentHome(learning.Principal) (learning.StudentHome, error)
-	StartStudentTrial(learning.Principal, string) (learning.StudentTrialStartResult, error)
 	StudentRecommendations(learning.Principal) ([]learning.StudentPackageRecommendation, error)
 	ConfirmStudentSubscription(string, learning.Principal, learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error)
 	UpdateStudentProfile(string, learning.Principal, learning.StudentProfileUpdateRequest) (learning.Student, error)
@@ -47,6 +50,7 @@ type ContentRepository interface {
 	Materials(learning.Principal, learning.MaterialQuery) []learning.Material
 	Homework(learning.Principal) []learning.Homework
 	Reviews(learning.Principal) []learning.Review
+	AssignReview(string, learning.Principal, string, learning.ReviewAssignRequest) (learning.Review, error)
 	CreateQuestion(string, learning.Principal, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	UpdateQuestion(string, learning.Principal, string, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	CreateMaterial(string, learning.Principal, learning.MaterialUploadRequest) (learning.Material, error)
@@ -91,6 +95,8 @@ type SchedulingRepository interface {
 	CancelScheduleClass(string, learning.Principal, string) (learning.ScheduleClass, error)
 	ReviewScheduleClass(string, learning.Principal, string, bool, string) (learning.ScheduleClass, error)
 	PendingScheduleClasses(learning.Principal) []learning.ScheduleClass
+	LessonFeedbacks(learning.Principal, string) ([]learning.LessonFeedback, error)
+	UpsertLessonFeedback(string, learning.Principal, string, learning.LessonFeedbackUpsertRequest) (learning.LessonFeedback, error)
 }
 
 type CommercialRepository interface {
@@ -125,7 +131,7 @@ type BannerRepository interface {
 }
 
 type SystemRepository interface {
-	Dashboard() learning.DashboardOverview
+	Dashboard(learning.Principal) learning.DashboardOverview
 	SystemReadiness() learning.SystemReadiness
 	Settings() map[string]string
 	UpdateSetting(string, learning.SettingUpdateRequest) (map[string]string, error)

@@ -30,25 +30,6 @@
         </swiper-item>
       </swiper>
     </view>
-    <view class="section" wx:if="{{trial.state === 'eligible'}}">
-      <view class="trial-card">
-        <view class="trial-copy">
-          <view class="trial-kicker">新同学专享</view>
-          <view class="trial-title">先体验，再决定</view>
-          <view class="trial-sub">选一门适合你的课程，免费学习 7 天；到期不会自动扣费。</view>
-        </view>
-        <button class="trial-button" loading="{{trialStarting}}" bindtap="startTrial">免费体验</button>
-      </view>
-    </view>
-    <view class="section" wx:if="{{trial.state === 'active' || trial.state === 'expiring'}}">
-      <view class="trial-status-card {{trial.state === 'expiring' ? 'is-expiring' : ''}}">
-        <view><view class="trial-status-title">{{trial.state === 'expiring' ? '体验即将结束' : '体验学习中'}}</view><view class="trial-status-sub">{{trial.packageName}} · 还剩 {{trial.remainingDays}} 天（至 {{trial.endsAt}}）</view></view>
-        <view class="trial-status-action" bindtap="goStudyDetail">去学习</view>
-      </view>
-    </view>
-    <view class="section" wx:if="{{trial.state === 'expired'}}">
-      <view class="trial-status-card is-expiring"><view><view class="trial-status-title">体验已结束</view><view class="trial-status-sub">学习记录已保留，联系老师即可继续学习。</view></view></view>
-    </view>
     <view class="section">
       <view class="home-banner" bindtap="goStudyDetail">
         <view class="banner-copy">

@@ -16,7 +16,7 @@ func (s *MemoryStore) studentsUnlocked(principal learning.Principal, query learn
 	students := make([]learning.Student, 0, len(s.students))
 	for _, student := range s.students {
 		decorated := s.decorateStudent(student)
-		if canSeeStudent(principal, decorated, s.coursesForStudent(student.ID)) && matchesStudentQuery(decorated, query) {
+		if s.canSeeStudent(principal, decorated, s.coursesForStudent(student.ID)) && matchesStudentQuery(decorated, query) {
 			students = append(students, decorated)
 		}
 	}
@@ -71,6 +71,7 @@ func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.
 		OpenedPackages:         []string{},
 		LearningStatus:         "未开始",
 		AccountStatus:          "正常",
+		RegistrationSource:     "后台",
 		Remark:                 req.Remark,
 		BindStatus:             "待绑定",
 		CreatedAt:              time.Now().Format("2006-01-02 15:04:05"),
@@ -328,6 +329,12 @@ func (s *MemoryStore) studentLearningRecordsUnlocked(principal learning.Principa
 			ID: "review-" + review.ID, Type: "小挑战", Title: review.Homework, Course: review.PackageName,
 			Status: review.Status, Score: review.SystemScore, OccurredAt: "2026-05-22 20:10:00", Description: "提交后等待老师反馈",
 		})
+	}
+	for _, feedback := range s.lessonFeedbacks {
+		if feedback.StudentID != id {
+			continue
+		}
+		records = append(records, learning.StudentLearningRecord{ID: "lesson-" + feedback.ID, Type: "课后反馈", Title: feedback.CourseName, Course: feedback.TeacherName, Status: "已反馈", OccurredAt: firstNonEmpty(feedback.LessonDate, feedback.UpdatedAt), Description: feedback.Summary})
 	}
 	for _, summary := range s.scoreSummariesForStudent(id) {
 		if summary.LatestRecord == nil {

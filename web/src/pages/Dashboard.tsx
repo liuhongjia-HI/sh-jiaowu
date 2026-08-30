@@ -26,9 +26,10 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { getData } from '../services/http';
-import type { DashboardOverview, SystemReadiness } from '../types/starline';
+import type { CurrentUser, DashboardOverview, SystemReadiness } from '../types/starline';
 
-export default function Dashboard() {
+export default function Dashboard({ user }: { user: CurrentUser }) {
+	const teacherOnly = user.roles.includes('teacher') && !user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => getData<DashboardOverview>('/dashboard/overview')
@@ -48,9 +49,9 @@ export default function Dashboard() {
     <div className="page-stack">
       <div className="dashboard-hero">
         <div>
-          <Tag color="green">今日运营</Tag>
-          <Typography.Title level={2}>今日待办</Typography.Title>
-          <Typography.Text>先处理批改、续费和资料发布。</Typography.Text>
+		  <Tag color="green">{teacherOnly ? '我的教学' : '今日运营'}</Tag>
+		  <Typography.Title level={2}>{teacherOnly ? '我的工作台' : '今日待办'}</Typography.Title>
+		  <Typography.Text>{teacherOnly ? '这里只统计我的学生、我的待批改和我负责课程的资料访问。' : '先处理批改、续费和资料发布。'}</Typography.Text>
         </div>
         <Space size={10} wrap>
           <Tooltip title="学生">
@@ -69,14 +70,14 @@ export default function Dashboard() {
       <Row gutter={[16, 16]}>
         <Col xs={24} md={6}>
           <Card className="metric-card metric-green">
-            <Statistic title="学生" value={data.openedStudents} prefix={<TeamOutlined />} />
-            <span>已开通</span>
+			<Statistic title={teacherOnly ? '我的学生' : '学生'} value={data.openedStudents} prefix={<TeamOutlined />} />
+			<span>{teacherOnly ? '有效辅导关系' : '已开通'}</span>
           </Card>
         </Col>
         <Col xs={24} md={6}>
           <Card className="metric-card metric-blue">
-            <Statistic title="课程方案" value={data.packageCount} prefix={<BookOutlined />} />
-            <span>可开通</span>
+			<Statistic title={teacherOnly ? '负责课程' : '课程方案'} value={data.packageCount} prefix={<BookOutlined />} />
+			<span>{teacherOnly ? '我的范围' : '可开通'}</span>
           </Card>
         </Col>
         <Col xs={24} md={6}>

@@ -102,6 +102,8 @@ type DirectGrantCreateRequest struct {
 	StudentID        string   `json:"studentId"`
 	LearningSpaceIDs []string `json:"learningSpaceIds"`
 	ContentTypeCodes []string `json:"contentTypeCodes"`
+	StartsAt         string   `json:"startsAt"`
+	EndsAt           string   `json:"endsAt"`
 }
 
 type DirectGrantResult struct {

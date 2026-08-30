@@ -24,6 +24,7 @@ func (s *MemoryStore) bootstrapPersistAll() error {
 
 func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	deletes := []string{
+		"DELETE FROM student_tutoring_assignments",
 		"DELETE FROM parent_notices",
 		"DELETE FROM renewal_reminders",
 		"DELETE FROM lesson_consumptions",
@@ -41,6 +42,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM preview_jobs",
 		"DELETE FROM starline_file_assets",
 		"DELETE FROM schedule_class_students",
+		"DELETE FROM lesson_feedbacks",
 		"DELETE FROM schedule_classes",
 		"DELETE FROM availability_slots",
 		"DELETE FROM operation_logs",
@@ -99,10 +101,18 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, student := range s.students {
 		if _, err := tx.Exec(
-			`INSERT INTO students (id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, created_at, last_study_at, effective_until, enrollment_academic_year, enrollment_grade, bind_code, bind_code_expires_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			student.ID, student.Name, student.Nickname, student.AvatarURL, student.Grade, student.Phone, student.SchoolName, student.GuardianName, student.OfficialAccountOpenID, student.AccountStatus, student.Remark, student.LearningStatus,
+			`INSERT INTO students (id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, registration_source, remark, learning_status, streak_days, average_score, badge_count, bind_status, created_at, last_study_at, effective_until, enrollment_academic_year, enrollment_grade, bind_code, bind_code_expires_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			student.ID, student.Name, student.Nickname, student.AvatarURL, student.Grade, student.Phone, student.SchoolName, student.GuardianName, student.OfficialAccountOpenID, student.AccountStatus, student.RegistrationSource, student.Remark, student.LearningStatus,
 			student.StreakDays, student.AverageScore, student.BadgeCount, student.BindStatus, nullableDateTime(student.CreatedAt), student.LastStudyAt, student.EffectiveUntil, student.EnrollmentAcademicYear, student.EnrollmentGrade, student.BindCode, student.BindCodeExpiresAt,
+		); err != nil {
+			return err
+		}
+	}
+	for _, item := range s.tutoringAssignments {
+		if _, err := tx.Exec(
+			`INSERT INTO student_tutoring_assignments (id, student_id, teacher_id, teacher_name, campus_id, academic_year, grade_snapshot, subject_id, subject_name, level_code, assignment_role, status, source_type, source_id, starts_at, ends_at, ended_reason, assigned_by, ended_by, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.StudentID, item.TeacherID, item.TeacherName, item.CampusID, item.AcademicYear, item.GradeSnapshot, item.SubjectID, item.SubjectName, item.LevelCode, item.Role, item.Status, item.SourceType, item.SourceID, nullableDate(item.StartsAt), nullableDate(item.EndsAt), item.EndedReason, item.AssignedBy, item.EndedBy, item.Version, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt),
 		); err != nil {
 			return err
 		}
@@ -199,9 +209,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		dbID := index + 1
 		grantIDs[grant.ID] = dbID
 		if _, err := tx.Exec(
-			`INSERT INTO student_package_grants (id, external_id, student_id, package_id, starts_at, ends_at, status, operator_id, operator_name)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, '', '')`,
-			dbID, grant.ID, grant.StudentID, grant.PackageID, nullableDate(grant.StartsAt), nullableDate(grantEndsAt(grant)), grant.Status,
+			`INSERT INTO student_package_grants (id, external_id, student_id, package_id, starts_at, ends_at, opened_at, status, operator_id, operator_name)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', '')`,
+			dbID, grant.ID, grant.StudentID, grant.PackageID, nullableDate(grant.StartsAt), nullableDate(grantEndsAt(grant)), nullableDateTime(grantOpenedAt(grant)), grant.Status,
 		); err != nil {
 			return err
 		}
@@ -272,6 +282,11 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 			}
 		}
 	}
+	for _, item := range s.lessonFeedbacks {
+		if _, err := tx.Exec(`INSERT INTO lesson_feedbacks (id, schedule_class_id, student_id, student_name, teacher_id, teacher_name, course_name, lesson_date, summary, homework, next_step, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.ScheduleClassID, item.StudentID, item.StudentName, item.TeacherID, item.TeacherName, item.CourseName, nullableDate(item.LessonDate), item.Summary, item.Homework, item.NextStep, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt)); err != nil {
+			return err
+		}
+	}
 	for _, item := range s.commercialOrders {
 		if _, err := tx.Exec(
 			`INSERT INTO commercial_orders (id, order_no, student_id, student_name, package_id, package_name, amount_cent, paid_amount_cent, refunded_amount_cent, lesson_total, lesson_consumed, status, contract_status, invoice_status, created_at)
@@ -321,10 +336,10 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, review := range s.reviews {
 		if _, err := tx.Exec(
-			`INSERT INTO pending_reviews (id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO pending_reviews (id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			review.ID, review.StudentID, review.HomeworkID, review.SubmissionID, review.StudentName, review.PackageName, review.Homework,
-			review.SystemScore, review.TeacherComment, review.Reward, review.Status,
+			review.SystemScore, review.TeacherComment, review.Reward, review.Status, review.ReviewerTeacherID, review.ReviewerTeacherName, review.TutoringAssignmentID, nullableDateTime(review.AssignedAt),
 		); err != nil {
 			return err
 		}
