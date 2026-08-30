@@ -446,7 +446,18 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 		seen[studentID] = true
 		student, err := s.visibleStudent(principal, studentID)
 		if err != nil {
-			return learning.ScheduleClass{}, err
+			// 学生列表与详情只能看有效辅导关系；排课提交则是受课程空间
+			// 约束的窄入口，允许老师为自己负责的课程录入实际到课学生。
+			// 这样既不会把全量学生重新暴露给老师，也兼容存量排课数据。
+			if hasRole(principal.Roles, learning.RoleTeacher) && principal.UserID == teacher.ID && containsString(teacher.LearningSpaceIDs, course.LearningSpaceID) {
+				var found bool
+				student, found = s.findStudent(studentID)
+				if !found {
+					return learning.ScheduleClass{}, errors.New("学生不存在")
+				}
+			} else {
+				return learning.ScheduleClass{}, err
+			}
 		}
 		if student.Grade != course.Grade {
 			return learning.ScheduleClass{}, errors.New(student.Name + " 与班级年级不一致，只有同年级才能排一起")

@@ -50,6 +50,7 @@ type ContentRepository interface {
 	Materials(learning.Principal, learning.MaterialQuery) []learning.Material
 	Homework(learning.Principal) []learning.Homework
 	Reviews(learning.Principal) []learning.Review
+	AssignReview(string, learning.Principal, string, learning.ReviewAssignRequest) (learning.Review, error)
 	CreateQuestion(string, learning.Principal, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	UpdateQuestion(string, learning.Principal, string, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	CreateMaterial(string, learning.Principal, learning.MaterialUploadRequest) (learning.Material, error)

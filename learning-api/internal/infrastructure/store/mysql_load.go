@@ -578,7 +578,7 @@ func (s *MemoryStore) loadPreviewJobsFromDB() error {
 }
 
 func (s *MemoryStore) loadReviewsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status FROM pending_reviews ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at FROM pending_reviews ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -586,9 +586,11 @@ func (s *MemoryStore) loadReviewsFromDB() error {
 	out := []learning.Review{}
 	for rows.Next() {
 		var item learning.Review
-		if err := rows.Scan(&item.ID, &item.StudentID, &item.HomeworkID, &item.SubmissionID, &item.StudentName, &item.PackageName, &item.Homework, &item.SystemScore, &item.TeacherComment, &item.Reward, &item.Status); err != nil {
+		var assignedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.HomeworkID, &item.SubmissionID, &item.StudentName, &item.PackageName, &item.Homework, &item.SystemScore, &item.TeacherComment, &item.Reward, &item.Status, &item.ReviewerTeacherID, &item.ReviewerTeacherName, &item.TutoringAssignmentID, &assignedAt); err != nil {
 			return err
 		}
+		item.AssignedAt = dateTimeString(assignedAt)
 		out = append(out, item)
 	}
 	s.reviews = out

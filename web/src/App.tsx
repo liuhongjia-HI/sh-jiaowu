@@ -120,6 +120,7 @@ function isNavGroup(item: NavNode): item is NavGroup {
 
 function buildMenuItems(user: CurrentUser): MenuProps['items'] {
   const items: MenuProps['items'] = [];
+	const teacherOnly = user.roles.includes('teacher') && !user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 
   for (const item of navItems) {
     if (!isNavGroup(item)) {
@@ -138,7 +139,7 @@ function buildMenuItems(user: CurrentUser): MenuProps['items'] {
       .map((child) => ({
         key: child.key,
         icon: child.icon,
-        label: <Link to={child.key}>{child.label}</Link>
+		label: <Link to={child.key}>{child.key === '/students' && teacherOnly ? '我的学生' : child.label}</Link>
       }));
 
     if (children.length > 0) {

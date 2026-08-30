@@ -330,10 +330,10 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, review := range s.reviews {
 		if _, err := tx.Exec(
-			`INSERT INTO pending_reviews (id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO pending_reviews (id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			review.ID, review.StudentID, review.HomeworkID, review.SubmissionID, review.StudentName, review.PackageName, review.Homework,
-			review.SystemScore, review.TeacherComment, review.Reward, review.Status,
+			review.SystemScore, review.TeacherComment, review.Reward, review.Status, review.ReviewerTeacherID, review.ReviewerTeacherName, review.TutoringAssignmentID, nullableDateTime(review.AssignedAt),
 		); err != nil {
 			return err
 		}

@@ -134,6 +134,11 @@ func (s *MemoryStore) endTutoringAssignmentUnlocked(operator string, principal l
 }
 
 func (s *MemoryStore) transferTutoringAssignmentUnlocked(operator string, principal learning.Principal, id string, req learning.TutoringAssignmentTransferRequest) (learning.TutoringAssignment, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.TutoringAssignment, error) {
+			return work.transferTutoringAssignmentUnlocked(operator, principal, id, req)
+		})
+	}
 	if !canManageTutoringAssignments(principal) {
 		return learning.TutoringAssignment{}, errors.New("没有权限转交辅导关系")
 	}
@@ -173,6 +178,22 @@ func (s *MemoryStore) transferTutoringAssignmentUnlocked(operator string, princi
 		TeacherID: req.TeacherID, SubjectID: current.SubjectID, LevelCode: current.LevelCode,
 		Role: current.Role, StartsAt: startsAt, SourceType: "manual", SourceID: current.ID,
 	})
+}
+
+func (s *MemoryStore) primaryTutoringAssignmentForHomework(studentID string, homework learning.Homework) (learning.TutoringAssignment, bool) {
+	levelCode := ""
+	for _, space := range s.learningSpaces {
+		if space.ID == homework.LearningSpaceID {
+			levelCode = space.Level
+			break
+		}
+	}
+	for _, assignment := range s.tutoringAssignments {
+		if assignment.StudentID == studentID && assignment.Status == learning.TutoringAssignmentActive && assignment.Role == learning.TutoringAssignmentPrimary && subjectsMatch(assignment.SubjectName, homework.Subject) && (levelCode == "" || assignment.LevelCode == levelCode) {
+			return assignment, true
+		}
+	}
+	return learning.TutoringAssignment{}, false
 }
 
 func (s *MemoryStore) normalizeTutoringAssignmentRequest(student learning.Student, req learning.TutoringAssignmentCreateRequest) (learning.TutoringAssignmentCreateRequest, learning.User, learning.SubjectMetadata, error) {

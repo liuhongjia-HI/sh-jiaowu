@@ -15,7 +15,7 @@ import ReviewsPage from './ReviewsPage';
 export default function ContentPage({ user }: { user?: CurrentUser }) {
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') || 'courses';
-  const content = tab === 'materials' ? <MaterialsPage user={user} courseId={params.get('courseId') || undefined} packageId={params.get('packageId') || undefined} onClearFilter={() => setParams({ tab: 'materials' })} /> : tab === 'homework' ? <HomeworkPage user={user} /> : tab === 'review' ? <ReviewsPage /> : <CourseCatalog user={user} onViewMaterials={(courseId) => setParams({ tab: 'materials', courseId })} />;
+  const content = tab === 'materials' ? <MaterialsPage user={user} courseId={params.get('courseId') || undefined} packageId={params.get('packageId') || undefined} onClearFilter={() => setParams({ tab: 'materials' })} /> : tab === 'homework' ? <HomeworkPage user={user} /> : tab === 'review' ? <ReviewsPage user={user} /> : <CourseCatalog user={user} onViewMaterials={(courseId) => setParams({ tab: 'materials', courseId })} />;
   return <div className="page-stack"><Card><Tabs activeKey={tab} onChange={(value) => setParams(value === 'courses' ? {} : { tab: value })} items={[{ key: 'courses', label: '课程' }, { key: 'materials', label: '课程讲义' }, { key: 'homework', label: '课后练习' }, { key: 'review', label: '批改反馈' }]} /></Card>{content}</div>;
 }
 

@@ -96,7 +96,12 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			system_score INT NOT NULL DEFAULT 0,
 			teacher_comment TEXT NOT NULL,
 			reward VARCHAR(128) NOT NULL DEFAULT '',
-			status VARCHAR(32) NOT NULL DEFAULT ''
+			status VARCHAR(32) NOT NULL DEFAULT '',
+			reviewer_teacher_id VARCHAR(64) NOT NULL DEFAULT '',
+			reviewer_teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			tutoring_assignment_id VARCHAR(64) NOT NULL DEFAULT '',
+			assigned_at DATETIME NULL,
+			KEY idx_pending_reviews_reviewer (reviewer_teacher_id, status)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS question_bank_items (
 			id VARCHAR(64) PRIMARY KEY,
@@ -407,6 +412,10 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"operation_logs", "user_agent", "TEXT NOT NULL"},
 		{"operation_logs", "detail", "TEXT NOT NULL"},
 		{"question_bank_items", "title", "VARCHAR(128) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "reviewer_teacher_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "reviewer_teacher_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "tutoring_assignment_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "assigned_at", "DATETIME NULL"},
 		{"student_submission_results", "objective_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "final_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "answers_json", "TEXT NOT NULL"},
@@ -483,6 +492,9 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 		return err
 	}
 	if err := s.ensureIndex("schedule_classes", "idx_schedule_term", "academic_year, semester, status"); err != nil {
+		return err
+	}
+	if err := s.ensureIndex("pending_reviews", "idx_pending_reviews_reviewer", "reviewer_teacher_id, status"); err != nil {
 		return err
 	}
 	if err := s.backfillScheduleClassTerms(); err != nil {

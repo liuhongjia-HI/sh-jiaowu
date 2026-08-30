@@ -386,11 +386,18 @@ func (s *MemoryStore) createSubmissionUnlocked(operator string, principal learni
 	s.submissions[submission.ID] = cloneSubmission(submission)
 	if hasText {
 		student, _ := s.findStudent(principal.StudentID)
-		s.reviews = append([]learning.Review{{
+		review := learning.Review{
 			ID: "rev-" + submission.ID, StudentID: principal.StudentID, HomeworkID: homework.ID, SubmissionID: submission.ID,
 			StudentName: student.Name, PackageName: homework.PackageName, Homework: homework.Title, SystemScore: score,
 			TeacherComment: "", Status: "待批改",
-		}}, s.reviews...)
+		}
+		if assignment, found := s.primaryTutoringAssignmentForHomework(principal.StudentID, homework); found {
+			review.ReviewerTeacherID = assignment.TeacherID
+			review.ReviewerTeacherName = assignment.TeacherName
+			review.TutoringAssignmentID = assignment.ID
+			review.AssignedAt = time.Now().Format("2006-01-02 15:04:05")
+		}
+		s.reviews = append([]learning.Review{review}, s.reviews...)
 	}
 	s.prependLog(operator, "提交小挑战", homework.Title)
 	return cloneSubmission(submission), nil

@@ -79,6 +79,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/files/:id/download", h.DownloadFile)
 	g.POST("/files/:id/preview/retry", h.RetryFilePreview)
 	g.GET("/reviews/pending", h.Reviews)
+	g.POST("/reviews/:id/assign", h.AssignReview)
 	g.POST("/reviews/:id/complete", h.CompleteReview)
 	g.POST("/students/:id/scores", h.CreateStudentScore)
 	g.PUT("/students/:id/scores/:scoreId", h.UpdateStudentScore)

@@ -257,6 +257,12 @@ func (s *MemoryStore) CompleteReview(operator string, principal learning.Princip
 	}, nil)
 }
 
+func (s *MemoryStore) AssignReview(operator string, principal learning.Principal, id string, req learning.ReviewAssignRequest) (learning.Review, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.assignReviewUnlocked(operator, principal, id, req)
+}
+
 func (s *MemoryStore) ConnectSchedulingDB(dsn string) error {
 	return s.connectPrepared(dsn, true)
 }

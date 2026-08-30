@@ -124,6 +124,22 @@ func (h *LearningHandler) CompleteReview(c *gin.Context) {
 	OK(c, submission)
 }
 
+func (h *LearningHandler) AssignReview(c *gin.Context) {
+	var req learning.ReviewAssignRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	review, err := h.service.AssignReview(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, review)
+}
+
 func (h *LearningHandler) StudentCourseDetail(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	detail, err := h.service.StudentCourseDetail(principal, c.Param("id"))

@@ -46,6 +46,10 @@ import type {
   StudentScoreSummary,
   StudentScoreUpsertRequest,
   StudentUpsertRequest
+	, SubjectMetadata
+	, Teacher
+	, TutoringAssignment
+	, TutoringAssignmentCreateRequest
 } from '../types/starline';
 
 type StudentFormValues = {
@@ -109,6 +113,8 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
   const allStudents = useQuery({ queryKey: ['students', 'summary'], queryFn: () => getData<Student[]>('/students') });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
+	const teachers = useQuery({ queryKey: ['teachers', 'tutoring-assignment'], enabled: writable, queryFn: () => getData<Teacher[]>('/teachers') });
+	const subjects = useQuery({ queryKey: ['subjects', 'tutoring-assignment'], enabled: writable, queryFn: () => getData<SubjectMetadata[]>('/subjects') });
   const detail = useQuery({
     queryKey: ['students', selected?.id, 'detail'],
     enabled: Boolean(selected),
@@ -305,8 +311,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <Typography.Title level={3}>学生管理</Typography.Title>
-          <Typography.Text type="secondary">小程序自助注册且未开通正式套餐的学生会自动归入待跟进，不影响体验和学习。</Typography.Text>
+          <Typography.Title level={3}>{writable ? '学生管理' : '我的学生'}</Typography.Title>
+          <Typography.Text type="secondary">{writable ? '先确定辅导老师，再排课、批改和跟进；小程序自助注册且未开通正式套餐的学生会自动归入待跟进。' : '这里只显示已分配给我的学生，避免跨班或跨老师查看。'}</Typography.Text>
         </div>
         {writable && (
           <Space>
@@ -472,7 +478,12 @@ export default function Students({ user }: { user: CurrentUser }) {
                   />
                 )
               },
-              {
+			  {
+				key: 'tutoring',
+				label: writable ? '辅导老师' : '我的辅导关系',
+				children: selected ? <TutoringAssignmentPanel student={selected} writable={writable} teachers={teachers.data ?? []} subjects={subjects.data ?? []} learningSpaces={learningSpaces.data ?? []} /> : null
+			  },
+			  ...(writable ? [{
                 key: 'direct-grant',
                 label: '开通学习内容',
                 children: selected ? (
@@ -493,7 +504,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                     onSubmit={() => createDirectGrant.mutate()}
                   />
                 ) : null
-              },
+              }] : []),
               { key: 'records', label: '学习记录', children: <RecordTable detail={detail.data} /> },
               { key: 'scores', label: '成绩对比', children: selected ? <ScorePanel student={selected} canEdit={canManageScores(user)} /> : null },
               { key: 'logs', label: '操作记录', children: <LogTable detail={detail.data} /> }
@@ -674,6 +685,105 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
           <Form.Item name="teacherComment" label="老师建议">
             <RichTextInput placeholder="用家长能看懂的话说明下一步怎么补。" />
           </Form.Item>
+        </Form>
+      </FormDrawer>
+    </Space>
+  );
+}
+
+type TutoringAction = { kind: 'end' | 'transfer'; assignment: TutoringAssignment };
+
+function TutoringAssignmentPanel({
+  student,
+  writable,
+  teachers,
+  subjects,
+  learningSpaces
+}: {
+  student: Student;
+  writable: boolean;
+  teachers: Teacher[];
+  subjects: SubjectMetadata[];
+  learningSpaces: LearningSpace[];
+}) {
+  const [createForm] = Form.useForm<TutoringAssignmentCreateRequest>();
+  const [actionForm] = Form.useForm<{ teacherId?: string; startsAt: string; reason: string }>();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [action, setAction] = useState<TutoringAction | null>(null);
+  const client = useQueryClient();
+  const queryKey = ['students', student.id, 'tutoring-assignments'];
+  const assignments = useQuery({ queryKey, queryFn: () => getData<TutoringAssignment[]>(`/students/${student.id}/tutoring-assignments`) });
+  const selectedSubjectId = Form.useWatch('subjectId', createForm);
+  const selectedLevelCode = Form.useWatch('levelCode', createForm);
+  const studentSpaces = useMemo(() => learningSpaces.filter((space) => space.status === '启用' && space.grade === student.grade), [learningSpaces, student.grade]);
+  const selectableSubjects = useMemo(() => subjects.filter((subject) => studentSpaces.some((space) => space.subject === subject.name)), [subjects, studentSpaces]);
+  const selectedSubject = selectableSubjects.find((subject) => subject.id === selectedSubjectId);
+  const levelOptions = useMemo(() => uniqueOptions(studentSpaces.filter((space) => !selectedSubject || space.subject === selectedSubject.name).map((space) => space.level || 'S')), [studentSpaces, selectedSubject]);
+  const selectableTeachers = useMemo(() => teachers.filter((teacher) => teacher.accountStatus === '正常' && studentSpaces.some((space) => (!selectedSubject || space.subject === selectedSubject.name) && (!selectedLevelCode || (space.level || 'S') === selectedLevelCode) && teacher.learningSpaceIds.includes(space.id))), [teachers, studentSpaces, selectedSubject, selectedLevelCode]);
+  const create = useMutation({
+    mutationFn: (values: TutoringAssignmentCreateRequest) => postData<TutoringAssignment>(`/students/${student.id}/tutoring-assignments`, { ...values, role: values.role || 'primary' }),
+    onSuccess: () => {
+      message.success('辅导关系已生效，老师现在可以查看这名学生。');
+      setCreateOpen(false);
+      createForm.resetFields();
+      client.invalidateQueries({ queryKey });
+      client.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请检查老师的教学范围。')
+  });
+  const update = useMutation({
+    mutationFn: (values: { teacherId?: string; startsAt: string; reason: string }) => {
+      if (!action) throw new Error('请选择要处理的辅导关系');
+      const path = action.kind === 'transfer' ? `/teacher-assignments/${action.assignment.id}/transfer` : `/teacher-assignments/${action.assignment.id}/end`;
+      return postData<TutoringAssignment>(path, action.kind === 'transfer'
+        ? { teacherId: values.teacherId, startsAt: values.startsAt, reason: values.reason, version: action.assignment.version }
+        : { endsAt: values.startsAt, reason: values.reason, version: action.assignment.version });
+    },
+    onSuccess: () => {
+      message.success(action?.kind === 'transfer' ? '已转交给新的辅导老师。' : '辅导关系已结束。');
+      setAction(null);
+      actionForm.resetFields();
+      client.invalidateQueries({ queryKey });
+      client.invalidateQueries({ queryKey: ['students'] });
+      client.invalidateQueries({ queryKey: ['review'] });
+    },
+    onError: (error) => message.error(error instanceof Error ? error.message : '操作失败，请刷新后重试。')
+  });
+
+  function openCreate() {
+    createForm.setFieldsValue({ teacherId: undefined as unknown as string, subjectId: undefined as unknown as string, levelCode: undefined as unknown as string, role: 'primary', startsAt: new Date().toISOString().slice(0, 10) });
+    setCreateOpen(true);
+  }
+
+  function openAction(next: TutoringAction) {
+    setAction(next);
+    actionForm.setFieldsValue({ teacherId: undefined, startsAt: new Date().toISOString().slice(0, 10), reason: '' });
+  }
+
+  if (assignments.isLoading) return <Skeleton active />;
+  if (assignments.error) return <Alert type="error" message="辅导关系加载失败，请稍后重试。" />;
+  const rows = assignments.data ?? [];
+  return (
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <Typography.Text type="secondary">{writable ? '主辅导老师决定学生归属、默认排课范围和新产生的批改任务；协作老师仅用于辅助记录。' : '只有有效辅导关系内的学生才会出现在我的工作范围。'}</Typography.Text>
+        {writable && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>分配老师</Button>}
+      </div>
+      {rows.length === 0 ? <Empty description={writable ? '还没有辅导老师，分配后才能进入老师的工作范围。' : '暂未找到有效辅导关系。'} /> : <CardList rows={rows} rowKey={(item) => item.id} emptyText="还没有辅导关系" renderCard={(item) => <InfoCard title={`${item.subjectName} · ${item.levelCode} · ${item.teacherName}`} subtitle={`${item.startsAt} 起${item.endsAt ? `，${item.endsAt} 结束` : ''}`} status={<Tag color={item.status === 'active' ? 'green' : 'default'}>{item.status === 'active' ? (item.role === 'primary' ? '主辅导老师' : '协作老师') : '已结束'}</Tag>} fields={[{ label: '分配人', value: item.assignedBy || '-' }, { label: '结束原因', value: item.endedReason || '-' }]} actions={writable && item.status === 'active' ? <Space size={4}><Button size="small" onClick={() => openAction({ kind: 'transfer', assignment: item })}>转交</Button><Button size="small" danger onClick={() => openAction({ kind: 'end', assignment: item })}>结束</Button></Space> : undefined} />} />}
+      <FormDrawer title="分配辅导老师" open={createOpen} onCancel={() => setCreateOpen(false)} onSubmit={() => createForm.submit()} submitting={create.isPending} submitText="确认分配">
+        <Form form={createForm} layout="vertical" onFinish={(values) => create.mutate(values)}>
+          <Form.Item name="subjectId" label="辅导学科" rules={[{ required: true, message: '请选择学科' }]}><Select placeholder="先选择学科" options={selectableSubjects.map((subject) => ({ value: subject.id, label: subject.name }))} onChange={() => createForm.setFieldsValue({ levelCode: undefined as unknown as string, teacherId: undefined as unknown as string })} /></Form.Item>
+          <Form.Item name="levelCode" label="课程等级" rules={[{ required: true, message: '请选择等级' }]}><Select placeholder="请选择等级" options={levelOptions} onChange={() => createForm.setFieldsValue({ teacherId: undefined as unknown as string })} /></Form.Item>
+          <Form.Item name="teacherId" label="辅导老师" rules={[{ required: true, message: '请选择老师' }]}><Select placeholder="只显示覆盖该年级、学科和等级的老师" options={selectableTeachers.map((teacher) => ({ value: teacher.id, label: teacher.name }))} /></Form.Item>
+          <Form.Item name="role" label="辅导角色" rules={[{ required: true }]}><Select options={[{ value: 'primary', label: '主辅导老师' }, { value: 'assistant', label: '协作老师' }]} /></Form.Item>
+          <Form.Item name="startsAt" label="生效日期" rules={[{ required: true, message: '请选择生效日期' }]}><Input type="date" /></Form.Item>
+        </Form>
+      </FormDrawer>
+      <FormDrawer title={action?.kind === 'transfer' ? '转交辅导关系' : '结束辅导关系'} open={Boolean(action)} onCancel={() => setAction(null)} onSubmit={() => actionForm.submit()} submitting={update.isPending} submitText={action?.kind === 'transfer' ? '确认转交' : '确认结束'}>
+        <Form form={actionForm} layout="vertical" onFinish={(values) => update.mutate(values)}>
+          {action?.kind === 'transfer' && <Form.Item name="teacherId" label="新的辅导老师" rules={[{ required: true, message: '请选择新的辅导老师' }]}><Select placeholder="请选择老师" options={teachers.filter((teacher) => teacher.accountStatus === '正常' && teacher.id !== action.assignment.teacherId).map((teacher) => ({ value: teacher.id, label: teacher.name }))} /></Form.Item>}
+          <Form.Item name="startsAt" label={action?.kind === 'transfer' ? '转交生效日期' : '结束日期'} rules={[{ required: true, message: '请选择日期' }]}><Input type="date" /></Form.Item>
+          <Form.Item name="reason" label={action?.kind === 'transfer' ? '转交原因' : '结束原因'} rules={[{ required: true, message: '请填写原因，方便后续交接追溯' }]}><Input.TextArea rows={3} placeholder="例如：老师请假、学科调整或学生结课" /></Form.Item>
         </Form>
       </FormDrawer>
     </Space>

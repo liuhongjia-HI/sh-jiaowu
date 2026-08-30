@@ -434,3 +434,64 @@ func TestTextQuestionSubmissionCreatesPendingReview(t *testing.T) {
 		t.Fatalf("expected pending review for submission, reviews=%#v", store.reviews)
 	}
 }
+
+func TestTextSubmissionRoutesReviewToCurrentPrimaryTutor(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("expected admin principal: %v", err)
+	}
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	store.users = append(store.users, learning.User{
+		ID: "user-teacher-002", Name: "英语老师乙", Phone: "13900000004", AccountStatus: "正常",
+		Roles: []learning.Role{learning.RoleTeacher}, CampusID: "campus-main",
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"}, CanReview: true,
+	})
+	otherTeacher := learning.Principal{UserID: "user-teacher-002", Roles: []learning.Role{learning.RoleTeacher}, CampusID: "campus-main", LearningSpaceIDs: []string{"space-g05-english-s1-q1"}, CanReview: true}
+	assignment, err := store.CreateTutoringAssignment("教务", admin, "stu-001", learning.TutoringAssignmentCreateRequest{
+		TeacherID: teacher.UserID, SubjectID: "english", LevelCode: "S",
+	})
+	if err != nil {
+		t.Fatalf("create tutoring assignment: %v", err)
+	}
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	submission, err := store.CreateSubmission("学生", student, learning.SubmissionRequest{
+		HomeworkID: "hw-g05-english-s1-q1",
+		Answers:    []learning.SubmissionAnswer{{QuestionID: "q1", Text: "我会说明答案依据。"}},
+	})
+	if err != nil {
+		t.Fatalf("create submission: %v", err)
+	}
+	var routed learning.Review
+	for _, review := range store.reviews {
+		if review.SubmissionID == submission.ID {
+			routed = review
+			break
+		}
+	}
+	if routed.ID == "" || routed.ReviewerTeacherID != teacher.UserID || routed.TutoringAssignmentID != assignment.ID {
+		t.Fatalf("review must snapshot the primary tutor, got %#v", routed)
+	}
+	if got := store.Reviews(otherTeacher); len(got) != 0 {
+		t.Fatalf("a teacher must not see another tutor's review tasks, got %#v", got)
+	}
+	reassigned, err := store.AssignReview("教务", admin, routed.ID, learning.ReviewAssignRequest{TeacherID: otherTeacher.UserID, Reason: "老师请假"})
+	if err != nil {
+		t.Fatalf("manually assign uncompleted review: %v", err)
+	}
+	if reassigned.ReviewerTeacherID != otherTeacher.UserID || reassigned.TutoringAssignmentID != "" {
+		t.Fatalf("manual reassignment must replace assignee snapshot, got %#v", reassigned)
+	}
+	if got := store.Reviews(teacher); len(got) != 1 || got[0].ID != "rev-001" {
+		t.Fatalf("previous reviewer must no longer see reassigned work, got %#v", got)
+	}
+	if got := store.Reviews(otherTeacher); len(got) != 1 || got[0].ID != routed.ID {
+		t.Fatalf("new reviewer must see exactly the assigned work, got %#v", got)
+	}
+}
