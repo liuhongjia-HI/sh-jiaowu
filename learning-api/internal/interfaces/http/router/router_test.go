@@ -1307,7 +1307,7 @@ func TestMultiChildLoginSwitchThroughAPI(t *testing.T) {
 	}
 }
 
-func TestParentAdditionalStudentRequestNeedsApprovalBeforeSwitching(t *testing.T) {
+func TestParentAdditionalStudentCanSwitchImmediately(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
 
@@ -1321,37 +1321,36 @@ func TestParentAdditionalStudentRequestNeedsApprovalBeforeSwitching(t *testing.T
 		t.Fatalf("expected a single current student to remain visible, got %#v", initialAccounts)
 	}
 
-	var pending learning.StudentAccount
+	var added learning.StudentAccount
 	app.doJSON(t, http.MethodPost, "/api/student/accounts", parent.Token, map[string]any{
 		"name": "小明妹妹", "grade": "五年级", "schoolName": "星河小学",
-	}, http.StatusOK, &pending)
-	if pending.Status != "待审核" || pending.CanSwitch {
-		t.Fatalf("expected a pending account response, got %#v", pending)
+	}, http.StatusOK, &added)
+	if added.Status != "正常" || !added.CanSwitch {
+		t.Fatalf("expected an immediately switchable account response, got %#v", added)
 	}
-	app.doJSON(t, http.MethodPost, "/api/student/accounts/"+pending.StudentID+"/switch", parent.Token, nil, http.StatusForbidden, nil)
-
-	adminToken := app.loginAdmin(t, "13800000001")
-	app.doJSON(t, http.MethodPut, "/api/students/"+pending.StudentID, adminToken, map[string]any{
-		"name": "小明妹妹", "phone": "18500009069", "grade": "五年级", "schoolName": "星河小学", "accountStatus": "正常",
-	}, http.StatusOK, nil)
+	var switched authResponse
+	app.doJSON(t, http.MethodPost, "/api/student/accounts/"+added.StudentID+"/switch", parent.Token, nil, http.StatusOK, &switched)
+	if switched.User.StudentID != added.StudentID {
+		t.Fatalf("expected immediate switching to the added student, got %#v", switched)
+	}
 
 	var accounts []learning.StudentAccount
 	app.doJSON(t, http.MethodGet, "/api/student/accounts", parent.Token, nil, http.StatusOK, &accounts)
 	if len(accounts) != 2 {
-		t.Fatalf("expected the current and approved students, got %#v", accounts)
+		t.Fatalf("expected the current and added students, got %#v", accounts)
 	}
-	approved := false
+	available := false
 	for _, account := range accounts {
-		if account.StudentID == pending.StudentID {
-			approved = account.Status == "正常" && account.CanSwitch
+		if account.StudentID == added.StudentID {
+			available = account.Status == "正常" && account.CanSwitch
 		}
 	}
-	if !approved {
-		t.Fatalf("expected admin approval to unlock the requested student, got %#v", accounts)
+	if !available {
+		t.Fatalf("expected the added student to remain switchable, got %#v", accounts)
 	}
 }
 
-func TestParentAdditionalStudentRequestLimitsPendingApplications(t *testing.T) {
+func TestParentCanAddMultipleStudentsWithoutPendingApplicationLimit(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
 
@@ -1365,7 +1364,7 @@ func TestParentAdditionalStudentRequestLimitsPendingApplications(t *testing.T) {
 	}
 	app.doJSON(t, http.MethodPost, "/api/student/accounts", parentToken, map[string]any{
 		"name": "学生丁", "grade": "五年级", "schoolName": "星河小学",
-	}, http.StatusBadRequest, nil)
+	}, http.StatusOK, nil)
 }
 
 // 一孩多家长：爸爸已经绑过了，妈妈自己的手机号跟任何已有档案都不一样——

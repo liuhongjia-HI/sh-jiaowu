@@ -74,9 +74,8 @@ func (s *MemoryStore) studentAccountsUnlocked(principal learning.Principal) ([]l
 	return accounts, nil
 }
 
-// requestAdditionalStudentUnlocked 创建一份待审核学生档案，并仅以“待审核”关系
-// 挂到当前家长名下。创建时不签发可登录账号，也不授予学习权限；管理员将账号
-// 状态改为“正常”后，updateStudentUnlocked 才会把这条关系激活。
+// requestAdditionalStudentUnlocked 为当前家长直接添加学生，不再经过人工审核。
+// 资料提交后立刻可切换；若该年级配置了体验套餐，同时自动开通默认体验。
 func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Principal, req learning.StudentAccountAddRequest) (learning.StudentAccount, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.StudentAccount, error) {
@@ -105,21 +104,14 @@ func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Princi
 	if !ok || guardian.AccountStatus != "正常" || strings.TrimSpace(guardian.Phone) == "" {
 		return learning.StudentAccount{}, errors.New("家长身份无效，请重新登录后再试")
 	}
-	pendingCount := 0
 	for _, relation := range s.guardianStudents {
 		if relation.GuardianID != principal.GuardianID || (relation.Status != learning.GuardianStudentActive && relation.Status != learning.GuardianStudentPending) {
 			continue
-		}
-		if relation.Status == learning.GuardianStudentPending {
-			pendingCount++
 		}
 		student, found := s.findStudent(relation.StudentID)
 		if found && student.Name == req.Name && s.decorateStudent(student).Grade == req.Grade {
 			return learning.StudentAccount{}, errors.New("名下已有同名同年级学生，请勿重复添加")
 		}
-	}
-	if pendingCount >= 3 {
-		return learning.StudentAccount{}, errors.New("已有 3 个学生申请等待审核，请审核完成后再添加")
 	}
 	guardianName := guardian.Name
 	if guardianName == "" {
@@ -131,16 +123,20 @@ func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Princi
 	student := learning.Student{
 		ID: id, Name: req.Name, EnrollmentAcademicYear: s.configuredAcademicYear(), EnrollmentGrade: req.Grade,
 		Phone: guardian.Phone, SchoolName: req.SchoolName, GuardianName: guardianName,
-		OpenedPackages: []string{}, LearningStatus: "未开始", AccountStatus: "待审核", BindStatus: "待审核",
+		OpenedPackages: []string{}, LearningStatus: "未开始", AccountStatus: "正常", BindStatus: "已绑定",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
 	s.students = append([]learning.Student{student}, s.students...)
 	s.syncStudentUser(student)
 	s.guardianStudents = append(s.guardianStudents, learning.GuardianStudent{
-		GuardianID: principal.GuardianID, StudentID: student.ID, Relation: learning.GuardianRelationGuardian, Status: learning.GuardianStudentPending,
+		GuardianID: principal.GuardianID, StudentID: student.ID, Relation: learning.GuardianRelationGuardian, Status: learning.GuardianStudentActive,
 	})
-	s.prependLog("家长", "申请添加学生", student.Name)
-	return learning.StudentAccount{StudentID: student.ID, Name: student.Name, Grade: s.decorateStudent(student).Grade, Status: "待审核", CanSwitch: false}, nil
+	user, _ := s.findUserByStudentID(student.ID)
+	if err := s.startDefaultStudentTrialUnlocked(principalFromUser(user)); err != nil {
+		return learning.StudentAccount{}, err
+	}
+	s.prependLog("家长", "添加学生", student.Name)
+	return learning.StudentAccount{StudentID: student.ID, Name: student.Name, Grade: s.decorateStudent(student).Grade, Status: "正常", CanSwitch: true}, nil
 }
 
 func (s *MemoryStore) guardianByID(id string) (learning.Guardian, bool) {

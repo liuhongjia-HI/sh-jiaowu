@@ -454,22 +454,56 @@ func TestWechatStudentBindingRejectsDuplicatePhoneWithNonStudentAccount(t *testi
 	}
 }
 
-// 阶段 0 的核心止血点：手机号在后台完全查不到任何学生档案时，不能再静默建一个
-// "待开通"的影子学生——这是过去多子女/多家长脏数据的根源。
-func TestWechatLoginNoLongerAutoCreatesStudentOnUnmatchedPhone(t *testing.T) {
-	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
-	studentCount := len(store.students)
-	userCount := len(store.users)
-
-	_, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
-		Code: "unmatched-phone", Phone: "13600001234", StudentName: "新学生", SchoolName: "星河小学", Grade: "五年级",
-	})
-	if err == nil || !strings.Contains(err.Error(), "请联系老师") {
-		t.Fatalf("expected a clear 联系老师 message instead of silent auto-create, got %v", err)
+func TestWechatLoginCreatesStudentAndStartsDefaultTrialWithoutApproval(t *testing.T) {
+	store := NewMemoryStore()
+	const packageID = "pkg-g05-english-s1-full"
+	const courseID = "course-g05-english-s1-q1"
+	for index := range store.packages {
+		if store.packages[index].ID == packageID {
+			store.packages[index].TrialEnabled = true
+		}
 	}
-	if len(store.students) != studentCount || len(store.users) != userCount {
-		t.Fatalf("expected no student/user to be created, students %d->%d users %d->%d",
-			studentCount, len(store.students), userCount, len(store.users))
+	for index := range store.courses {
+		if store.courses[index].ID == courseID {
+			store.courses[index].Chapters = []string{"第一章", "第二章"}
+		}
+	}
+	store.materials = append(store.materials, learning.Material{
+		ID: "trial-material-chapter-two", CourseID: courseID, LearningSpaceID: "space-g05-english-s1-q1",
+		Title: "第二章讲义", Chapter: "第二章", Status: learning.StatusEnabled,
+	})
+	store.homework = append(store.homework, learning.Homework{
+		ID: "trial-homework-chapter-two", CourseID: courseID, LearningSpaceID: "space-g05-english-s1-q1",
+		Title: "第二章练习", Chapter: "第二章", Status: string(learning.StatusEnabled),
+	})
+
+	principal, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "new-student-openid", Phone: "13600001234", StudentName: "新学生", SchoolName: "星河小学", Grade: "五年级",
+	})
+	if err != nil {
+		t.Fatalf("expected a new mini-program student to sign in directly, got %v", err)
+	}
+	student, ok := store.findStudent(principal.StudentID)
+	if !ok || student.AccountStatus != "正常" {
+		t.Fatalf("expected an active student record without approval, got %#v", student)
+	}
+	trial, ok := store.findTrialRecord(student.ID, store.configuredAcademicYear())
+	if !ok || trial.PackageID != packageID || trial.Status != "active" {
+		t.Fatalf("expected the configured default trial to start, got %#v", trial)
+	}
+	detail, err := store.StudentCourseDetail(principal, courseID)
+	if err != nil {
+		t.Fatalf("expected the trial course to be readable, got %v", err)
+	}
+	for _, material := range detail.Materials {
+		if material.Chapter != "" && material.Chapter != "第一章" {
+			t.Fatalf("trial must not expose later-chapter material, got %#v", detail.Materials)
+		}
+	}
+	for _, homework := range detail.Homework {
+		if homework.Chapter != "" && homework.Chapter != "第一章" {
+			t.Fatalf("trial must not expose later-chapter homework, got %#v", detail.Homework)
+		}
 	}
 }
 

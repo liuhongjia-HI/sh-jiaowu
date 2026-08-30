@@ -145,7 +145,7 @@ Page({
     request("/student/accounts", { method: "POST", data: { name, grade, schoolName } })
       .then(() => {
         this.setData({ studentAddOpen: false });
-        wx.showToast({ title: "已提交，等待管理员审核", icon: "success" });
+        wx.showToast({ title: "添加成功，已开通体验", icon: "success" });
         this.loadStudentAccounts();
       })
       .catch((error) => wx.showToast({ title: error.message || "提交失败，请重试", icon: "none" }))

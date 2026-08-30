@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -68,6 +69,23 @@ func (s *MemoryStore) startStudentTrialUnlocked(principal learning.Principal, pa
 	s.trials = append(s.trials, record)
 	s.prependLog("学生体验", "领取免费体验", student.Name+" / "+pkg.Name)
 	return learning.StudentTrialStartResult{Trial: s.studentTrialForRecord(record), FirstCourseID: s.firstCourseIDForPackage(pkg.ID)}, nil
+}
+
+// startDefaultStudentTrialUnlocked 在首次建档时自动领取体验。运营通过套餐的
+// TrialEnabled 配置决定哪些内容可体验；同一年级若配置了多个体验套餐，按套餐 ID
+// 稳定选择第一个，避免请求顺序影响用户看到的体验内容。
+func (s *MemoryStore) startDefaultStudentTrialUnlocked(principal learning.Principal) error {
+	student, ok := s.findStudent(principal.StudentID)
+	if !ok {
+		return errors.New("student not found")
+	}
+	options := s.trialOptionsForStudent(student, s.configuredAcademicYear())
+	if len(options) == 0 {
+		return nil
+	}
+	sort.Slice(options, func(i, j int) bool { return options[i].PackageID < options[j].PackageID })
+	_, err := s.startStudentTrialUnlocked(principal, options[0].PackageID)
+	return err
 }
 
 func (s *MemoryStore) hasActiveFormalGrant(studentID string) bool {
@@ -203,4 +221,25 @@ func (s *MemoryStore) firstCourseIDForPackage(packageID string) string {
 		}
 	}
 	return ""
+}
+
+// trialFirstChapterForGrant 只在授权仍完全等同于体验记录时返回首章。
+// 后台后续把同一套餐正式开通后会更新授权有效期，此时不再把正式权限误限为体验权限。
+func (s *MemoryStore) trialFirstChapterForGrant(grant packageGrant, courseID string) (string, bool) {
+	record, ok := s.findTrialRecord(grant.StudentID, s.configuredAcademicYear())
+	if !ok || record.Status != "active" || record.PackageID != grant.PackageID || record.StartsAt != grant.StartsAt || record.EndsAt != grantEndsAt(grant) {
+		return "", false
+	}
+	for _, course := range s.courses {
+		if course.ID != courseID {
+			continue
+		}
+		for _, chapter := range course.Chapters {
+			if chapter = strings.TrimSpace(chapter); chapter != "" {
+				return chapter, true
+			}
+		}
+		return "", false
+	}
+	return "", false
 }

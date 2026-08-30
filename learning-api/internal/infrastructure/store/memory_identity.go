@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"starline/learning-api/internal/domain/learning"
 
@@ -229,13 +230,35 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 	return principal, true, nil
 }
 
-// createWechatStudentAccount 曾经会在手机号匹配不到任何后台档案时自动建一个学生账号。
-// 这是多子女/多家长脏数据的根源：家长换个手机号授权（比如爸爸换成妈妈的号），
-// 系统会静默地把同一个孩子建出第二份档案、第二套套餐，作业记录也跟着分裂成两边，
-// 且过程中没有任何报错提示。建档现在必须只走后台，微信这边查不到就明确告诉家长
-// 联系老师，而不是替他建一个"待开通"的影子账号。
+// createWechatStudentAccount 为首次从小程序进入、且手机号尚未命中档案的学生直接建档。
+// 手机号 + OpenID 都已由微信授权链路确认；年级、姓名和学校由首次表单提供，因此不再
+// 进入人工审核。后续同一手机号会优先命中这份档案，不会重复创建。
 func (s *MemoryStore) createWechatStudentAccount(openID string, req learning.WechatLoginRequest) (learning.Principal, error) {
-	return learning.Principal{}, errors.New("未找到学生档案，请联系老师完成学生建档后再授权绑定")
+	if req.StudentName == "" || req.SchoolName == "" || req.Grade == "" {
+		return learning.Principal{}, errors.New("请填写学生姓名、学校和年级后再绑定")
+	}
+	if len([]rune(req.StudentName)) > 32 || len([]rune(req.Grade)) > 32 || len([]rune(req.SchoolName)) > 64 {
+		return learning.Principal{}, errors.New("填写内容过长，请检查后重试")
+	}
+	id := "stu-" + time.Now().Format("20060102150405.000000000")
+	student := learning.Student{
+		ID: id, Name: req.StudentName, EnrollmentAcademicYear: s.configuredAcademicYear(), EnrollmentGrade: req.Grade,
+		Phone: req.Phone, SchoolName: req.SchoolName, AccountStatus: "正常", BindStatus: "已绑定",
+		Remark: "小程序自助建档", LearningStatus: "未开始", CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+	}
+	user := learning.User{
+		ID: "user-" + id, Name: student.Name, Phone: student.Phone, OpenID: openID, AccountStatus: "正常",
+		Roles: []learning.Role{learning.RoleStudent}, StudentID: student.ID,
+	}
+	s.students = append([]learning.Student{student}, s.students...)
+	s.users = append(s.users, user)
+	principal := principalFromUser(user)
+	principal.GuardianID = s.ensureGuardianLink(student.Phone, openID, student.ID)
+	if err := s.startDefaultStudentTrialUnlocked(principal); err != nil {
+		return learning.Principal{}, err
+	}
+	s.prependLog(student.Name, "小程序自助建档", student.Name)
+	return principal, nil
 }
 
 // studentSelectionCandidates 把命中同一手机号的多个 user 记录转成家长可以看懂的

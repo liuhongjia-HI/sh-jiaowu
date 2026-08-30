@@ -1031,6 +1031,9 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 		}
 		spaceIDs := s.learningSpaceIDsForGrant(grant.ID)
 		for _, material := range s.materials {
+			if firstChapter, limited := s.trialFirstChapterForGrant(grant, material.CourseID); limited && material.Chapter != firstChapter {
+				continue
+			}
 			if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) {
 				out = appendMaterialUnique(out, s.decorateMaterial(material))
 			}
@@ -1055,6 +1058,9 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 		}
 		spaceIDs := s.learningSpaceIDsForGrant(grant.ID)
 		for _, item := range s.homework {
+			if firstChapter, limited := s.trialFirstChapterForGrant(grant, item.CourseID); limited && item.Chapter != firstChapter {
+				continue
+			}
 			if homeworkVisible(item.Status) && containsString(spaceIDs, item.LearningSpaceID) {
 				out = appendHomeworkUnique(out, item)
 			}

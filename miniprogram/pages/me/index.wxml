@@ -37,7 +37,7 @@
       <view class="student-switcher-list">
         <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}} {{!item.canSwitch ? 'pending' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{item.active || !item.canSwitch || switchingStudentId}}">
           <text>{{item.name}} · {{item.grade}}</text>
-          <text wx:if="{{!item.canSwitch}}" class="student-switch-status">待审核</text>
+          <text wx:if="{{!item.canSwitch}}" class="student-switch-status">暂不可切换</text>
         </button>
         <button class="student-add-button" bindtap="openStudentAddModal">＋ 添加学生</button>
       </view>
@@ -113,7 +113,7 @@
         <view class="profile-modal-head">
           <view>
             <view class="profile-modal-title">添加学生</view>
-            <view class="profile-modal-subtitle">填写孩子的基本信息，管理员审核通过后即可切换查看。</view>
+            <view class="profile-modal-subtitle">填写孩子的基本信息，即可切换查看和开始体验。</view>
           </view>
           <view class="profile-modal-close" bindtap="closeStudentAddModal">×</view>
         </view>
@@ -123,8 +123,8 @@
             <view class="form-input form-picker {{studentAddForm.grade ? '' : 'placeholder'}}">{{studentAddForm.grade || "请选择年级"}}</view>
           </picker>
           <input class="form-input" value="{{studentAddForm.schoolName}}" data-field="schoolName" bindinput="onStudentAddInput" placeholder="学校" maxlength="64" />
-          <view class="student-add-hint">提交后会显示“待审核”，审核通过前不会开放该学生的学习内容。</view>
-          <button class="profile-save" bindtap="submitStudentAdd" loading="{{addingStudent}}" disabled="{{addingStudent}}">提交审核</button>
+          <view class="student-add-hint">添加后立即可用；已配置体验的课程会开放第一章内容。</view>
+          <button class="profile-save" bindtap="submitStudentAdd" loading="{{addingStudent}}" disabled="{{addingStudent}}">确认添加</button>
         </view>
       </view>
     </view>
