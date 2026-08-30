@@ -1,55 +1,84 @@
 package learning
 
+type CurriculumNodeType string
+
+const (
+	CurriculumUnit    CurriculumNodeType = "unit"
+	CurriculumChapter CurriculumNodeType = "chapter"
+	CurriculumLesson  CurriculumNodeType = "lesson"
+)
+
+// CurriculumNode 是课程目录的标准节点。内容只能绑定 type=lesson 的叶子节点。
+type CurriculumNode struct {
+	ID        string             `json:"id"`
+	ParentID  string             `json:"parentId,omitempty"`
+	Type      CurriculumNodeType `json:"type"`
+	Name      string             `json:"name"`
+	SortOrder int                `json:"sortOrder"`
+}
+
+type CurriculumPath struct {
+	Unit    string `json:"unit"`
+	Chapter string `json:"chapter"`
+	Lesson  string `json:"lesson"`
+}
+
 type Course struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Subject         string   `json:"subject"`
-	Grade           string   `json:"grade"`
-	LearningSpaceID string   `json:"learningSpaceId,omitempty"`
-	ChapterCount    int      `json:"chapterCount"`
-	Chapters        []string `json:"chapters,omitempty"`
-	MaterialNum     int      `json:"materialNum"`
-	HomeworkNum     int      `json:"homeworkNum"`
-	Status          Status   `json:"status"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	Subject         string           `json:"subject"`
+	Grade           string           `json:"grade"`
+	LearningSpaceID string           `json:"learningSpaceId,omitempty"`
+	LessonCount     int              `json:"lessonCount"`
+	Curriculum      []CurriculumNode `json:"curriculum"`
+	// 临时仅供同一版本内尚未迁移的内部派生逻辑使用，不对 API 暴露。
+	ChapterCount int      `json:"-"`
+	Chapters     []string `json:"-"`
+	MaterialNum  int      `json:"materialNum"`
+	HomeworkNum  int      `json:"homeworkNum"`
+	Status       Status   `json:"status"`
 }
 
 type CourseUpsertRequest struct {
-	Name            string   `json:"name"`
-	LearningSpaceID string   `json:"learningSpaceId"`
-	ChapterCount    int      `json:"chapterCount"`
-	Chapters        []string `json:"chapters"`
-	Status          Status   `json:"status"`
+	Name            string           `json:"name"`
+	LearningSpaceID string           `json:"learningSpaceId"`
+	Curriculum      []CurriculumNode `json:"curriculum"`
+	ChapterCount    int              `json:"-"`
+	Chapters        []string         `json:"-"`
+	Status          Status           `json:"status"`
 }
 
 type Material struct {
-	ID               string `json:"id"`
-	Title            string `json:"title"`
-	CourseID         string `json:"courseId,omitempty"`
-	Course           string `json:"course"`
-	LearningSpaceID  string `json:"learningSpaceId,omitempty"`
-	Grade            string `json:"grade,omitempty"`
-	Semester         string `json:"semester,omitempty"`
-	Subject          string `json:"subject,omitempty"`
-	Chapter          string `json:"chapter"`
-	TagCode          string `json:"tagCode,omitempty"`
-	Type             string `json:"type"`
-	ViewCount        int    `json:"viewCount"`
-	OwnerTeacherID   string `json:"ownerTeacherId,omitempty"`
-	OwnerTeacherName string `json:"ownerTeacherName,omitempty"`
-	PublishStatus    string `json:"publishStatus,omitempty"`
-	FileID           string `json:"fileId,omitempty"`
-	FileName         string `json:"fileName,omitempty"`
-	FileSize         int64  `json:"fileSize,omitempty"`
-	FileType         string `json:"fileType,omitempty"`
-	PreviewStatus    string `json:"previewStatus,omitempty"`
-	PreviewError     string `json:"previewError,omitempty"`
-	PreviewURL       string `json:"previewUrl,omitempty"`
-	DownloadURL      string `json:"downloadUrl,omitempty"`
-	WatermarkText    string `json:"watermarkText,omitempty"`
-	SecurityNotice   string `json:"securityNotice,omitempty"`
-	CreatedAt        string `json:"createdAt,omitempty"`
-	SortOrder        int    `json:"sortOrder"`
-	Status           Status `json:"status"`
+	ID               string         `json:"id"`
+	Title            string         `json:"title"`
+	CourseID         string         `json:"courseId,omitempty"`
+	Course           string         `json:"course"`
+	LearningSpaceID  string         `json:"learningSpaceId,omitempty"`
+	Grade            string         `json:"grade,omitempty"`
+	Semester         string         `json:"semester,omitempty"`
+	Subject          string         `json:"subject,omitempty"`
+	LessonID         string         `json:"lessonId"`
+	Curriculum       CurriculumPath `json:"curriculum"`
+	Chapter          string         `json:"-"`
+	TagCode          string         `json:"tagCode,omitempty"`
+	Type             string         `json:"type"`
+	ViewCount        int            `json:"viewCount"`
+	OwnerTeacherID   string         `json:"ownerTeacherId,omitempty"`
+	OwnerTeacherName string         `json:"ownerTeacherName,omitempty"`
+	PublishStatus    string         `json:"publishStatus,omitempty"`
+	FileID           string         `json:"fileId,omitempty"`
+	FileName         string         `json:"fileName,omitempty"`
+	FileSize         int64          `json:"fileSize,omitempty"`
+	FileType         string         `json:"fileType,omitempty"`
+	PreviewStatus    string         `json:"previewStatus,omitempty"`
+	PreviewError     string         `json:"previewError,omitempty"`
+	PreviewURL       string         `json:"previewUrl,omitempty"`
+	DownloadURL      string         `json:"downloadUrl,omitempty"`
+	WatermarkText    string         `json:"watermarkText,omitempty"`
+	SecurityNotice   string         `json:"securityNotice,omitempty"`
+	CreatedAt        string         `json:"createdAt,omitempty"`
+	SortOrder        int            `json:"sortOrder"`
+	Status           Status         `json:"status"`
 }
 
 type MaterialQuery struct {
@@ -65,7 +94,8 @@ type MaterialUpdateRequest struct {
 	Title           string `json:"title"`
 	CourseID        string `json:"courseId"`
 	LearningSpaceID string `json:"learningSpaceId"`
-	Chapter         string `json:"chapter"`
+	LessonID        string `json:"lessonId"`
+	Chapter         string `json:"-"`
 	TagCode         string `json:"tagCode"`
 	Status          Status `json:"status"`
 }
@@ -76,48 +106,51 @@ type MaterialReorderRequest struct {
 }
 
 type Homework struct {
-	ID               string     `json:"id"`
-	Title            string     `json:"title"`
-	Chapter          string     `json:"chapter,omitempty"`
-	TagCode          string     `json:"tagCode,omitempty"`
-	PackageName      string     `json:"packageName"`
-	CourseID         string     `json:"courseId,omitempty"`
-	Course           string     `json:"course"`
-	LearningSpaceID  string     `json:"learningSpaceId,omitempty"`
-	Grade            string     `json:"grade,omitempty"`
-	Semester         string     `json:"semester,omitempty"`
-	Subject          string     `json:"subject,omitempty"`
-	QuestionNum      int        `json:"questionNum"`
-	QuestionIDs      []string   `json:"questionIds,omitempty"`
-	Questions        []Question `json:"questions,omitempty"`
-	Deadline         string     `json:"deadline"`
-	DeadlineAt       string     `json:"deadlineAt,omitempty"`
-	AssessmentType   string     `json:"assessmentType,omitempty"`
-	IsOverdue        bool       `json:"isOverdue,omitempty"`
-	SubmittedNum     int        `json:"submittedNum"`
-	TotalNum         int        `json:"totalNum"`
-	OwnerTeacherID   string     `json:"ownerTeacherId,omitempty"`
-	OwnerTeacherName string     `json:"ownerTeacherName,omitempty"`
-	PublishStatus    string     `json:"publishStatus,omitempty"`
-	FileID           string     `json:"fileId,omitempty"`
-	FileName         string     `json:"fileName,omitempty"`
-	FileSize         int64      `json:"fileSize,omitempty"`
-	FileType         string     `json:"fileType,omitempty"`
-	PreviewStatus    string     `json:"previewStatus,omitempty"`
-	PreviewError     string     `json:"previewError,omitempty"`
-	PreviewURL       string     `json:"previewUrl,omitempty"`
-	DownloadURL      string     `json:"downloadUrl,omitempty"`
-	WatermarkText    string     `json:"watermarkText,omitempty"`
-	SecurityNotice   string     `json:"securityNotice,omitempty"`
-	SortOrder        int        `json:"sortOrder"`
-	Status           string     `json:"status"`
+	ID               string         `json:"id"`
+	Title            string         `json:"title"`
+	LessonID         string         `json:"lessonId"`
+	Curriculum       CurriculumPath `json:"curriculum"`
+	Chapter          string         `json:"-"`
+	TagCode          string         `json:"tagCode,omitempty"`
+	PackageName      string         `json:"packageName"`
+	CourseID         string         `json:"courseId,omitempty"`
+	Course           string         `json:"course"`
+	LearningSpaceID  string         `json:"learningSpaceId,omitempty"`
+	Grade            string         `json:"grade,omitempty"`
+	Semester         string         `json:"semester,omitempty"`
+	Subject          string         `json:"subject,omitempty"`
+	QuestionNum      int            `json:"questionNum"`
+	QuestionIDs      []string       `json:"questionIds,omitempty"`
+	Questions        []Question     `json:"questions,omitempty"`
+	Deadline         string         `json:"deadline"`
+	DeadlineAt       string         `json:"deadlineAt,omitempty"`
+	AssessmentType   string         `json:"assessmentType,omitempty"`
+	IsOverdue        bool           `json:"isOverdue,omitempty"`
+	SubmittedNum     int            `json:"submittedNum"`
+	TotalNum         int            `json:"totalNum"`
+	OwnerTeacherID   string         `json:"ownerTeacherId,omitempty"`
+	OwnerTeacherName string         `json:"ownerTeacherName,omitempty"`
+	PublishStatus    string         `json:"publishStatus,omitempty"`
+	FileID           string         `json:"fileId,omitempty"`
+	FileName         string         `json:"fileName,omitempty"`
+	FileSize         int64          `json:"fileSize,omitempty"`
+	FileType         string         `json:"fileType,omitempty"`
+	PreviewStatus    string         `json:"previewStatus,omitempty"`
+	PreviewError     string         `json:"previewError,omitempty"`
+	PreviewURL       string         `json:"previewUrl,omitempty"`
+	DownloadURL      string         `json:"downloadUrl,omitempty"`
+	WatermarkText    string         `json:"watermarkText,omitempty"`
+	SecurityNotice   string         `json:"securityNotice,omitempty"`
+	SortOrder        int            `json:"sortOrder"`
+	Status           string         `json:"status"`
 }
 
 type HomeworkUpdateRequest struct {
 	Title           string   `json:"title"`
 	CourseID        string   `json:"courseId"`
 	LearningSpaceID string   `json:"learningSpaceId"`
-	Chapter         string   `json:"chapter"`
+	LessonID        string   `json:"lessonId"`
+	Chapter         string   `json:"-"`
 	TagCode         string   `json:"tagCode"`
 	Deadline        string   `json:"deadline"`
 	DeadlineAt      string   `json:"deadlineAt"`
@@ -292,6 +325,7 @@ type MaterialUploadRequest struct {
 	Title           string
 	LearningSpaceID string
 	CourseID        string
+	LessonID        string
 	Chapter         string
 	TagCode         string
 	File            FileAsset
@@ -301,7 +335,8 @@ type HomeworkUploadRequest struct {
 	Title           string    `json:"title"`
 	LearningSpaceID string    `json:"learningSpaceId"`
 	CourseID        string    `json:"courseId"`
-	Chapter         string    `json:"chapter"`
+	LessonID        string    `json:"lessonId"`
+	Chapter         string    `json:"-"`
 	TagCode         string    `json:"tagCode"`
 	Deadline        string    `json:"deadline"`
 	DeadlineAt      string    `json:"deadlineAt"`

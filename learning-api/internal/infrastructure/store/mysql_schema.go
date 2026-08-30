@@ -23,6 +23,16 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		return err
 	}
 	statements := []string{
+		`CREATE TABLE IF NOT EXISTS course_curriculum_nodes (
+			id VARCHAR(64) PRIMARY KEY,
+			course_id VARCHAR(64) NOT NULL,
+			parent_id VARCHAR(64) NOT NULL DEFAULT '',
+			node_type VARCHAR(16) NOT NULL,
+			name VARCHAR(128) NOT NULL,
+			sort_order INT NOT NULL DEFAULT 0,
+			UNIQUE KEY uk_course_curriculum_name (course_id, parent_id, name),
+			KEY idx_course_curriculum_parent (course_id, parent_id, sort_order)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS student_tutoring_assignments (
 			id VARCHAR(64) PRIMARY KEY,
 			student_id VARCHAR(64) NOT NULL,
@@ -368,9 +378,11 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"materials", "download_url", "TEXT NOT NULL"},
 		{"materials", "sort_order", "INT NOT NULL DEFAULT 0"},
 		{"materials", "tag_code", "VARCHAR(16) NOT NULL DEFAULT ''"},
+		{"materials", "lesson_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "package_name", "VARCHAR(128) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "chapter_name", "VARCHAR(128) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "tag_code", "VARCHAR(16) NOT NULL DEFAULT ''"},
+		{"homework_tasks", "lesson_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "sort_order", "INT NOT NULL DEFAULT 0"},
 		{"homework_tasks", "grade", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"homework_tasks", "semester", "VARCHAR(32) NOT NULL DEFAULT ''"},
@@ -447,6 +459,29 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		}
 	}
 	if _, err := s.db.Exec("UPDATE students SET registration_source = '小程序' WHERE registration_source = '' AND remark = '小程序自助建档'"); err != nil {
+		return err
+	}
+	// 小程序新用户和家长新增孩子现已不需要人工审核。升级前留下的待审核
+	// 记录若不迁移，会在登录时被拒绝、或一直不能切换孩子。只处理明确可
+	// 识别的小程序记录及存在待审核家长关系的记录，避免误激活后台手工停留的账号。
+	legacySelfServicePending := "(s.registration_source = '小程序' OR s.remark = '小程序自助建档' OR gs.student_id IS NOT NULL)"
+	if _, err := s.db.Exec(`UPDATE users u
+		INNER JOIN students s ON s.id = u.student_id
+		LEFT JOIN guardian_students gs ON gs.student_id = s.id AND gs.status = '待审核'
+		SET u.account_status = '正常'
+		WHERE u.account_status = '待审核' AND s.account_status = '待审核' AND ` + legacySelfServicePending); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`UPDATE students s
+		LEFT JOIN guardian_students gs ON gs.student_id = s.id AND gs.status = '待审核'
+		SET s.account_status = '正常'
+		WHERE s.account_status = '待审核' AND ` + legacySelfServicePending); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`UPDATE guardian_students gs
+		INNER JOIN students s ON s.id = gs.student_id
+		SET gs.status = '在读'
+		WHERE gs.status = '待审核' AND s.account_status = '正常'`); err != nil {
 		return err
 	}
 	// ensureColumn only adds missing columns. Existing deployments created the

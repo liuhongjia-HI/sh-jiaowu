@@ -149,6 +149,23 @@ func TestLoginWithWechatCodeBindsStudentByPhone(t *testing.T) {
 	}
 }
 
+func TestWechatLoginExplainsPendingStudentAccount(t *testing.T) {
+	store := NewMemoryStore()
+	for index := range store.users {
+		if store.users[index].ID == "user-student-001" {
+			store.users[index].AccountStatus = "待审核"
+			break
+		}
+	}
+
+	_, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "pending-student", Phone: "18500009069", StudentName: "小明", SchoolName: "星河小学", Grade: "五年级",
+	})
+	if err == nil || !strings.Contains(err.Error(), "账号仍待审核") {
+		t.Fatalf("expected pending-account guidance instead of a disabled-account message, got %v", err)
+	}
+}
+
 // 复现真实场景：家长先用手机号绑定了老大（这时候这个手机号下还只有一个
 // 孩子，不会触发多子女的关系建立），后台之后又给同一个手机号加了老二，
 // 家长完全没有重新走一遍手机号授权，只是照常打开小程序（静默登录，只带

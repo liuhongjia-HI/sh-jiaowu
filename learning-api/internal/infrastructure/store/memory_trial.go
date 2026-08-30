@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"strings"
 
 	"starline/learning-api/internal/domain/learning"
 )
@@ -27,9 +26,8 @@ func (s *MemoryStore) findTrialRecord(studentID, academicYear string) (studentTr
 	return studentTrialRecord{}, false
 }
 
-// trialFirstChapterForGrant 仅用于兼容已发放的历史体验授权。历史授权到期前仍
-// 只能访问首章；新的永久首章权限完全不依赖这张体验记录。
-func (s *MemoryStore) trialFirstChapterForGrant(grant packageGrant, courseID string) (string, bool) {
+// trialFirstLessonForGrant 仅用于体验授权；体验内容固定为课程目录中的首个 Lesson。
+func (s *MemoryStore) trialFirstLessonForGrant(grant packageGrant, courseID string) (string, bool) {
 	record, ok := s.findTrialRecord(grant.StudentID, s.configuredAcademicYear())
 	if !ok || record.Status != "active" || record.PackageID != grant.PackageID || record.StartsAt != grant.StartsAt || record.EndsAt != grantEndsAt(grant) {
 		return "", false
@@ -38,10 +36,14 @@ func (s *MemoryStore) trialFirstChapterForGrant(grant packageGrant, courseID str
 		if course.ID != courseID {
 			continue
 		}
-		for _, chapter := range course.Chapters {
-			if chapter = strings.TrimSpace(chapter); chapter != "" {
-				return chapter, true
+		lessons := make([]learning.CurriculumNode, 0)
+		for _, node := range course.Curriculum {
+			if node.Type == learning.CurriculumLesson {
+				lessons = append(lessons, node)
 			}
+		}
+		if len(lessons) > 0 {
+			return lessons[0].ID, true
 		}
 		return "", false
 	}

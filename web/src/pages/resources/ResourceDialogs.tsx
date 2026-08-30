@@ -22,7 +22,7 @@ type SettingFormValues = SettingUpdateRequest;
 type ContentFormValues = {
   title: string;
   courseId: string;
-  chapter?: string;
+	lessonId: string;
   deadline?: string;
 	deadlineAt?: string;
 	assessmentType?: 'practice' | 'mock_exam';
@@ -374,10 +374,18 @@ export function CourseDialog({
             options={spaceOptions}
           />
         </Form.Item>
-        <Form.Item name="chapters" label="章节目录" extra="按输入顺序展示；输入名称后按回车新增。">
-          <Select mode="tags" tokenSeparators={[',', '，']} placeholder="例如：第一章、第二章" onChange={(chapters) => form.setFieldValue('chapterCount', chapters.length)} />
-        </Form.Item>
-        <Form.Item name="chapterCount" hidden><InputNumber /></Form.Item>
+		<Form.List name="curriculum">
+			{(fields, { add, remove }) => <Form.Item label="课程目录" extra="按 Unit、Chapter、Lesson 依次新增；讲义和作业只能绑定 Lesson。">
+				{fields.map((field) => <Space key={field.key} align="start" style={{ display: 'flex', marginBottom: 8 }}>
+					<Form.Item {...field} name={[field.name, 'type']} rules={[{ required: true, message: '请选择层级' }]}><Select style={{ width: 110 }} options={[{ value: 'unit', label: 'Unit' }, { value: 'chapter', label: 'Chapter' }, { value: 'lesson', label: 'Lesson' }]} /></Form.Item>
+					<Form.Item noStyle shouldUpdate>{() => <Form.Item {...field} name={[field.name, 'parentId']}><Select allowClear style={{ width: 150 }} placeholder="选择上级" options={(form.getFieldValue('curriculum') ?? []).filter((node: { id?: string }) => node.id !== form.getFieldValue(['curriculum', field.name, 'id'])).map((node: { id: string; name?: string; type?: string }) => ({ value: node.id, label: `${node.type || '节点'} · ${node.name || '未命名'}` }))} /></Form.Item>}</Form.Item>
+					<Form.Item {...field} name={[field.name, 'name']} rules={[{ required: true, message: '请输入名称' }]}><Input placeholder="名称" /></Form.Item>
+					<Form.Item {...field} name={[field.name, 'id']} hidden><Input /></Form.Item>
+					<Button danger type="text" onClick={() => remove(field.name)}>删除</Button>
+				</Space>)}
+				<Button onClick={() => add({ id: `node-${Date.now()}-${fields.length}`, type: 'unit', sortOrder: fields.length + 1 })}>新增目录节点</Button>
+			</Form.Item>}
+		</Form.List>
         <Form.Item name="status" label="状态">
           <Select
             options={[
@@ -923,7 +931,7 @@ export function UploadDialog({
   questions: QuestionBankItem[];
   learningSpaces: LearningSpace[];
   onCancel: () => void;
-  onSubmit: (values: { title: string; courseId: string; chapter?: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
+  onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
 }) {
   const [form] = Form.useForm();
   const courseId = Form.useWatch('courseId', form);
@@ -957,15 +965,9 @@ export function UploadDialog({
         <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
         </Form.Item>
-        {kind === 'materials' ? (
-          <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
-            <Select allowClear placeholder="不填则归为未分章节" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
-          </Form.Item>
-        ) : (
+        {kind === 'materials' ? <LessonSelect course={selectedCourse} /> : (
           <>
-            <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
-              <Select allowClear placeholder="不填则按同课程匹配小挑战" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
-            </Form.Item>
+            <LessonSelect course={selectedCourse} />
             <Alert
               type="info"
               showIcon
@@ -1068,15 +1070,9 @@ export function ContentEditDialog({
         <Form.Item name="tagCode" label="主标签">
           <Select allowClear placeholder="选择一个主标签" options={contentTagOptions} />
         </Form.Item>
-        {kind === 'materials' ? (
-          <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
-            <Select allowClear placeholder="不填则归为未分章节" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
-          </Form.Item>
-        ) : (
+        {kind === 'materials' ? <LessonSelect course={selectedCourse} /> : (
           <>
-            <Form.Item name="chapter" label="章节" extra={selectedCourse?.chapters?.length ? undefined : <>章节请在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 中编辑该课程后维护。</>}>
-              <Select allowClear placeholder="不填则按同课程匹配小挑战" options={(selectedCourse?.chapters ?? []).map((chapter) => ({ label: chapter, value: chapter }))} notFoundContent="该课程尚未维护章节目录" />
-            </Form.Item>
+            <LessonSelect course={selectedCourse} />
             <Form.Item name="assessmentType" label="类型">
               <Radio.Group options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} />
             </Form.Item>
@@ -1110,4 +1106,17 @@ export function ContentEditDialog({
       </Form>
     </FormDrawer>
   );
+}
+
+function LessonSelect({ course }: { course?: Course }) {
+	const nodes = course?.curriculum ?? [];
+	const byID = new Map(nodes.map((node) => [node.id, node]));
+	const options = nodes.filter((node) => node.type === 'lesson').map((lesson) => {
+		const chapter = byID.get(lesson.parentId || '');
+		const unit = chapter ? byID.get(chapter.parentId || '') : undefined;
+		return { value: lesson.id, label: `${unit?.name || 'Unit'} · ${chapter?.name || 'Chapter'} · ${lesson.name}` };
+	});
+	return <Form.Item name="lessonId" label="课节" rules={[{ required: true, message: '请选择课节' }]} extra={options.length ? undefined : <>请先在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 维护 Unit、Chapter 和 Lesson。</>}>
+		<Select placeholder="选择 Unit · Chapter · Lesson" options={options} notFoundContent="该课程尚未维护完整目录" />
+	</Form.Item>;
 }

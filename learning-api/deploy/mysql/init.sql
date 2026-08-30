@@ -204,10 +204,22 @@ CREATE TABLE IF NOT EXISTS courses (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS course_curriculum_nodes (
+  id VARCHAR(64) PRIMARY KEY,
+  course_id VARCHAR(64) NOT NULL,
+  parent_id VARCHAR(64) NOT NULL DEFAULT '',
+  node_type VARCHAR(16) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_course_curriculum_name (course_id, parent_id, name),
+  KEY idx_course_curriculum_parent (course_id, parent_id, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS package_course_relations (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   package_id VARCHAR(64) NOT NULL,
   course_id VARCHAR(64) NOT NULL,
+  lesson_id VARCHAR(64) NOT NULL DEFAULT '',
   UNIQUE KEY uk_package_course (package_id, course_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -304,6 +316,7 @@ CREATE TABLE IF NOT EXISTS schedule_classes (
   id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(128) NOT NULL,
   course_id VARCHAR(64) NOT NULL,
+  lesson_id VARCHAR(64) NOT NULL DEFAULT '',
   course_name VARCHAR(128) NOT NULL DEFAULT '',
   teacher_id VARCHAR(64) NOT NULL,
   teacher_name VARCHAR(64) NOT NULL DEFAULT '',

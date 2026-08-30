@@ -7,6 +7,46 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func TestContentMustBindToLeafLessonInItsCourseCurriculum(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	course, err := store.CreateCourse("英语老师", teacher, learning.CourseUpsertRequest{
+		Name: "三级目录课程", LearningSpaceID: "space-g05-english-s1-q1", Status: learning.StatusEnabled,
+		Curriculum: []learning.CurriculumNode{
+			{ID: "unit-reading", Type: learning.CurriculumUnit, Name: "阅读单元"},
+			{ID: "chapter-map", ParentID: "unit-reading", Type: learning.CurriculumChapter, Name: "地图阅读"},
+			{ID: "lesson-symbol", ParentID: "chapter-map", Type: learning.CurriculumLesson, Name: "地图符号"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	if course.LessonCount != 1 {
+		t.Fatalf("lesson count = %d, want 1", course.LessonCount)
+	}
+
+	_, err = store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "HD_地图符号讲义", CourseID: course.ID, LearningSpaceID: course.LearningSpaceID, LessonID: "chapter-map",
+	})
+	if err == nil || !strings.Contains(err.Error(), "课节") {
+		t.Fatalf("chapter binding should fail, got %v", err)
+	}
+
+	material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "HD_地图符号讲义", CourseID: course.ID, LearningSpaceID: course.LearningSpaceID, LessonID: "lesson-symbol",
+	})
+	if err != nil {
+		t.Fatalf("create material: %v", err)
+	}
+	if material.LessonID != "lesson-symbol" || material.Curriculum.Lesson != "地图符号" {
+		t.Fatalf("material curriculum = %#v", material)
+	}
+}
+
 func TestMaterialsFilterByTitleSubjectUploaderAndUploadedRange(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.PrincipalByUserID("user-super")
@@ -29,7 +69,7 @@ func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) 
 	teacher, _ := store.PrincipalByUserID("user-teacher")
 	student, _ := store.PrincipalByUserID("user-student-001")
 	material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
-		Title: "HD 阅读讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", Chapter: "第一章", TagCode: "HD",
+		Title: "HD 阅读讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "HD",
 	})
 	if err != nil {
 		t.Fatalf("create tagged material: %v", err)
@@ -44,12 +84,12 @@ func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) 
 		t.Fatalf("create question: %v", err)
 	}
 	homework, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
-		Title: "HW 第一章练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", Chapter: "第一章", TagCode: "HW", QuestionIDs: []string{question.ID}, Status: string(learning.StatusEnabled),
+		Title: "HW 第一章练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "HW", QuestionIDs: []string{question.ID}, Status: string(learning.StatusEnabled),
 	})
 	if err != nil {
 		t.Fatalf("create tagged homework: %v", err)
 	}
-	if homework.TagCode != "HW" || homework.Chapter != "第一章" {
+	if homework.TagCode != "HW" || homework.LessonID != "course-g05-english-s1-q1-lesson-1" {
 		t.Fatalf("homework dimensions not returned: %#v", homework)
 	}
 	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
@@ -69,7 +109,7 @@ func TestContentTagIsInferredFromTitleWhenUploadOmitsIt(t *testing.T) {
 	}
 
 	material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
-		Title: "Blank_G5S1Q1_1.1.2 Elements of a Map", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1",
+		Title: "Blank_G5S1Q1_1.1.2 Elements of a Map", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1",
 	})
 	if err != nil {
 		t.Fatalf("create material: %v", err)
@@ -149,7 +189,7 @@ func TestMockExamRequiresDeadlineAndExpiredHomeworkRejectsSubmission(t *testing.
 	store := NewMemoryStore()
 	teacher, _ := store.PrincipalByUserID("user-teacher")
 	student, _ := store.PrincipalByUserID("user-student-001")
-	_, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{Title: "模拟考试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", AssessmentType: "mock_exam", QuestionIDs: []string{"q1"}})
+	_, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{Title: "模拟考试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", AssessmentType: "mock_exam", QuestionIDs: []string{"q1"}})
 	if err == nil || !strings.Contains(err.Error(), "截止") {
 		t.Fatalf("mock exam should require deadline, got %v", err)
 	}
@@ -187,6 +227,7 @@ func TestUpdateHomeworkRejectsTeacherOutsideScope(t *testing.T) {
 	if _, err := store.UpdateHomework("英语老师", teacher, outside.ID, learning.HomeworkUpdateRequest{
 		Title:    "跨范围题目",
 		CourseID: courses[0].ID,
+		LessonID: "course-g05-english-s1-q1-lesson-1",
 		Status:   string(learning.StatusEnabled),
 	}); err == nil {
 		t.Fatal("expected cross-scope homework update to fail")
@@ -225,6 +266,7 @@ func TestDisabledHomeworkIsHiddenFromStudent(t *testing.T) {
 	if _, err := store.UpdateHomework("英语老师", teacher, "hw-g05-english-s1-q1", learning.HomeworkUpdateRequest{
 		Title:    "停用练习",
 		CourseID: "course-g05-english-s1-q1",
+		LessonID: "course-g05-english-s1-q1-lesson-1",
 		Deadline: "2026-10-30",
 		Status:   string(learning.StatusDisabled),
 	}); err != nil {
@@ -262,6 +304,7 @@ func TestDeleteHomeworkRemovesUnsubmittedTaskAndProtectsSubmittedWork(t *testing
 	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
 		Title:       "待删除课后练习",
 		CourseID:    "course-g05-english-s1-q1",
+		LessonID:    "course-g05-english-s1-q1-lesson-1",
 		QuestionIDs: []string{"qb-g05-english-s1-q1"},
 		Status:      string(learning.StatusEnabled),
 	})
@@ -293,6 +336,7 @@ func TestDeleteHomeworkRemovesUnsubmittedTaskAndProtectsSubmittedWork(t *testing
 	protected, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
 		Title:       "已有提交的课后练习",
 		CourseID:    "course-g05-english-s1-q1",
+		LessonID:    "course-g05-english-s1-q1-lesson-1",
 		QuestionIDs: []string{"qb-g05-english-s1-q1"},
 		Status:      string(learning.StatusEnabled),
 	})
@@ -325,7 +369,7 @@ func TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow(t *test
 		t.Fatalf("expected question creation to succeed: %v", err)
 	}
 	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
-		Title: "题库组卷练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1",
+		Title: "题库组卷练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1",
 		Deadline: "2026-11-01", Status: string(learning.StatusEnabled), QuestionIDs: []string{item.ID},
 	})
 	if err != nil {

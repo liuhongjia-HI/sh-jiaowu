@@ -10,7 +10,7 @@ import type { Course, CurrentUser, Homework, HomeworkSubmissionSummary, Learning
 import type { UploadFile } from 'antd';
 
 type ResourceKind = 'materials' | 'homework';
-type UploadValues = { title: string; courseId: string; chapter?: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
+type UploadValues = { title: string; courseId: string; lessonId: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
 type ContentValues = Omit<UploadValues, 'fileList'> & { status: string };
 
 function materialTitleFromFile(fileName: string) {
@@ -75,7 +75,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     mutationFn: async (values: UploadValues) => {
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
       if (!course) throw new Error('请选择课程');
-      if (kind === 'homework') return postData<Homework>('/homework', { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId || '', chapter: values.chapter || '', tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: '启用', questionIds: values.questionIds ?? [] });
+	  if (kind === 'homework') return postData<Homework>('/homework', { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId || '', lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: '启用', questionIds: values.questionIds ?? [] });
       const files = (values.fileList ?? []).map((item) => item.originFileObj).filter(Boolean) as File[];
       if (files.length === 0) throw new Error('请选择文件');
       const uploaded: Material[] = [];
@@ -84,7 +84,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         data.append('title', files.length === 1 && values.title?.trim() ? values.title.trim() : materialTitleFromFile(file.name));
         data.append('courseId', course.id);
         data.append('learningSpaceId', course.learningSpaceId || '');
-        data.append('chapter', values.chapter || '');
+		data.append('lessonId', values.lessonId);
         data.append('tagCode', values.tagCode || suggestTagCode(file.name));
         data.append('file', file);
         uploaded.push(await postForm<Material>('/materials', data));
@@ -104,8 +104,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       if (!editing) throw new Error('请选择要维护的内容');
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
       if (!course) throw new Error('请选择课程范围');
-      if (kind === 'materials') return putData<Material>(`/materials/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, chapter: values.chapter || '', tagCode: values.tagCode || '', status: values.status || '已发布' });
-      return putData<Homework>(`/homework/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, chapter: values.chapter || '', tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: values.status || '启用', questionIds: values.questionIds ?? [] });
+	  if (kind === 'materials') return putData<Material>(`/materials/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', status: values.status || '已发布' });
+	  return putData<Homework>(`/homework/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: values.status || '启用', questionIds: values.questionIds ?? [] });
     },
     onSuccess: () => {
       message.success(kind === 'materials' ? '课程讲义已保存。' : '题目已保存。');
@@ -166,7 +166,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     contentForm.setFieldsValue({
       title: item.title,
       courseId: item.courseId || '',
-      chapter: item.chapter || '',
+	  lessonId: item.lessonId || '',
       tagCode: item.tagCode || '',
       deadline: 'deadline' in item ? item.deadline : '',
 		deadlineAt: 'deadlineAt' in item ? item.deadlineAt?.slice(0, 16) : '',
@@ -259,7 +259,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         columns={[
           ...(kind === 'materials' && canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: Material | Homework) => <button type="button" className="material-sort-handle" title="拖动调整顺序；键盘可用上下方向键" aria-label={`拖动 ${String((row as Material).title)} 调整顺序`} draggable={!allMaterials.isLoading} onDragStart={(event) => { setDraggingMaterialId((row as Material).id); event.dataTransfer.effectAllowed = 'move'; }} onKeyDown={(event) => { const offset = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0; if (offset) { event.preventDefault(); moveMaterialByOffset(row as Material, offset); } }}><HolderOutlined /></button> }] : []),
           { title: '标题', dataIndex: 'title' },
-          ...(kind === 'materials' ? [{ title: '学科', dataIndex: 'subject' }, { title: '上传人', dataIndex: 'ownerTeacherName' }, { title: '上传时间', dataIndex: 'createdAt' }] : [{ title: '章节', render: (_: unknown, row: Material | Homework) => (row as Homework).chapter || '未设置' }, { title: '类型', render: (_: unknown, row: Material | Homework) => (row as Homework).assessmentType === 'mock_exam' ? '模拟考试' : '常规练习' }, { title: '截止时间', render: (_: unknown, row: Material | Homework) => (row as Homework).deadlineAt ? new Date((row as Homework).deadlineAt as string).toLocaleString() : '不设截止' }]),
+		  { title: '目录', render: (_: unknown, row: Material | Homework) => { const path = row.curriculum; return path ? `${path.unit} · ${path.chapter} · ${path.lesson}` : '—'; } },
+		  ...(kind === 'materials' ? [{ title: '学科', dataIndex: 'subject' }, { title: '上传人', dataIndex: 'ownerTeacherName' }, { title: '上传时间', dataIndex: 'createdAt' }] : [{ title: '类型', render: (_: unknown, row: Material | Homework) => (row as Homework).assessmentType === 'mock_exam' ? '模拟考试' : '常规练习' }, { title: '截止时间', render: (_: unknown, row: Material | Homework) => (row as Homework).deadlineAt ? new Date((row as Homework).deadlineAt as string).toLocaleString() : '不设截止' }]),
           { title: '课程', dataIndex: 'course' },
           { title: '状态', render: (_: unknown, row: Material | Homework) => { const status = kind === 'materials' ? ((row as Material).previewStatus || (row as Material).publishStatus) : row.status; return <div><div>{status}</div>{row.previewError && <Typography.Text type={status === '转换失败' ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>{row.previewError}</Typography.Text>}</div>; } },
           { title: '操作', render: (_: unknown, row: Material | Homework) => {

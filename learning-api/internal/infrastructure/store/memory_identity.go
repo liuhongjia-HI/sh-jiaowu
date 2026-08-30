@@ -75,7 +75,7 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 			return learning.Principal{}, errors.New("该手机号已绑定其他微信，请联系管理员处理")
 		}
 		if user.AccountStatus != "正常" {
-			return learning.Principal{}, errors.New("账号已停用，请联系管理员")
+			return learning.Principal{}, unavailableAccountLoginError(user.AccountStatus)
 		}
 		if hasRole(user.Roles, learning.RoleStudent) {
 			if err := s.validateStudentWechatBinding(user, openID, req); err != nil {
@@ -105,7 +105,7 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 			continue
 		}
 		if user.AccountStatus != "正常" {
-			return learning.Principal{}, errors.New("账号已停用，请联系管理员")
+			return learning.Principal{}, unavailableAccountLoginError(user.AccountStatus)
 		}
 		if !hasRole(user.Roles, learning.RoleStudent) {
 			return principalFromUser(user), nil
@@ -206,7 +206,7 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 		}
 	}
 	if user.AccountStatus != "正常" {
-		return learning.Principal{}, true, errors.New("账号已停用，请联系管理员")
+		return learning.Principal{}, true, unavailableAccountLoginError(user.AccountStatus)
 	}
 	if err := s.validateStudentWechatBinding(user, openID, req); err != nil {
 		return learning.Principal{}, true, err
@@ -228,6 +228,13 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 	principal := principalFromUser(user)
 	principal.GuardianID = s.ensureGuardianLink(req.Phone, openID, student.ID)
 	return principal, true, nil
+}
+
+func unavailableAccountLoginError(status string) error {
+	if strings.TrimSpace(status) == "待审核" {
+		return errors.New("账号仍待审核，请联系老师或管理员处理")
+	}
+	return errors.New("账号已停用，请联系管理员")
 }
 
 // createWechatStudentAccount 为首次从小程序进入、且手机号尚未命中档案的学生直接建档。

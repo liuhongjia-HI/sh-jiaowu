@@ -342,8 +342,8 @@ export type Course = {
   subject: string;
   grade: string;
   learningSpaceId?: string;
-  chapterCount: number;
-  chapters?: string[];
+  lessonCount: number;
+  curriculum: CurriculumNode[];
   materialNum: number;
   homeworkNum: number;
   status: string;
@@ -352,9 +352,22 @@ export type Course = {
 export type CourseUpsertRequest = {
   name: string;
   learningSpaceId: string;
-  chapterCount: number;
-  chapters?: string[];
+  curriculum: CurriculumNode[];
   status: string;
+};
+
+export type CurriculumNode = {
+  id: string;
+  parentId?: string;
+  type: 'unit' | 'chapter' | 'lesson';
+  name: string;
+  sortOrder: number;
+};
+
+export type CurriculumPath = {
+  unit: string;
+  chapter: string;
+  lesson: string;
 };
 
 export type SettingUpdateRequest = {
@@ -382,7 +395,8 @@ export type Material = {
   grade?: string;
   semester?: string;
   subject?: string;
-  chapter: string;
+  lessonId: string;
+  curriculum: CurriculumPath;
   tagCode?: string;
   type: string;
   viewCount: number;
@@ -408,7 +422,7 @@ export type MaterialUpdateRequest = {
   title: string;
   courseId: string;
   learningSpaceId?: string;
-  chapter: string;
+  lessonId: string;
   tagCode?: string;
   status: string;
 };
@@ -428,7 +442,8 @@ export type Homework = {
   grade?: string;
   semester?: string;
   subject?: string;
-  chapter?: string;
+  lessonId: string;
+  curriculum: CurriculumPath;
   tagCode?: string;
   questionNum: number;
   questionIds?: string[];
@@ -478,7 +493,7 @@ export type HomeworkUpdateRequest = {
   courseId: string;
   learningSpaceId?: string;
   tagCode?: string;
-  chapter: string;
+  lessonId: string;
   deadline: string;
   deadlineAt?: string;
   assessmentType?: 'practice' | 'mock_exam';

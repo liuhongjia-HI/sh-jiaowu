@@ -43,7 +43,7 @@ func (h *LearningHandler) CreateMaterial(c *gin.Context) {
 		Title:           strings.TrimSpace(c.PostForm("title")),
 		LearningSpaceID: strings.TrimSpace(c.PostForm("learningSpaceId")),
 		CourseID:        strings.TrimSpace(c.PostForm("courseId")),
-		Chapter:         strings.TrimSpace(c.PostForm("chapter")),
+		LessonID:        strings.TrimSpace(c.PostForm("lessonId")),
 		TagCode:         strings.TrimSpace(c.PostForm("tagCode")),
 		File:            asset,
 	})
@@ -122,7 +122,7 @@ func (h *LearningHandler) CreateHomework(c *gin.Context) {
 		Title:           strings.TrimSpace(c.PostForm("title")),
 		LearningSpaceID: strings.TrimSpace(c.PostForm("learningSpaceId")),
 		CourseID:        strings.TrimSpace(c.PostForm("courseId")),
-		Chapter:         strings.TrimSpace(c.PostForm("chapter")),
+		LessonID:        strings.TrimSpace(c.PostForm("lessonId")),
 		TagCode:         strings.TrimSpace(c.PostForm("tagCode")),
 		Deadline:        strings.TrimSpace(c.PostForm("deadline")),
 		File:            asset,

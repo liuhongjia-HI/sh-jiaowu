@@ -480,20 +480,24 @@ func seedPermissionDemoData(s *MemoryStore) {
 				for phaseIndex, phase := range demoPhases {
 					spaceID := learningSpaceID(gradeIndex, subject, semesterIndex, phaseIndex)
 					spaceName := grade + subject + semester + phase
+					courseID := courseID(spaceID)
 					courseName := spaceName + "课程"
+					curriculum := demoCourseCurriculum(courseID)
+					lessonID := curriculum[2].ID
+					path := learning.CurriculumPath{Unit: curriculum[0].Name, Chapter: curriculum[1].Name, Lesson: curriculum[2].Name}
 					s.courses = append(s.courses, learning.Course{
-						ID: courseID(spaceID), Name: courseName, Subject: subject, Grade: grade, LearningSpaceID: spaceID,
-						ChapterCount: 8, MaterialNum: 1, HomeworkNum: 1, Status: learning.StatusEnabled,
+						ID: courseID, Name: courseName, Subject: subject, Grade: grade, LearningSpaceID: spaceID,
+						LessonCount: 1, Curriculum: curriculum, MaterialNum: 1, HomeworkNum: 1, Status: learning.StatusEnabled,
 					})
 					s.materials = append(s.materials, learning.Material{
-						ID: materialID(spaceID), Title: spaceName + "核心学习资料", CourseID: courseID(spaceID), Course: courseName, LearningSpaceID: spaceID,
-						Chapter: "基础巩固", Type: "学习资料", ViewCount: demoViewCount(gradeIndex, semesterIndex, phaseIndex),
+						ID: materialID(spaceID), Title: spaceName + "核心学习资料", CourseID: courseID, Course: courseName, LearningSpaceID: spaceID,
+						LessonID: lessonID, Curriculum: path, Type: "课程讲义", ViewCount: demoViewCount(gradeIndex, semesterIndex, phaseIndex),
 						OwnerTeacherID: "teacher-" + subjectSlug(subject), OwnerTeacherName: subject + "老师", PublishStatus: "已发布", Status: learning.StatusEnabled,
 					})
 					questions := s.ensureDemoQuestionBank(grade, semester, subject)
 					s.homework = append(s.homework, learning.Homework{
 						ID: homeworkID(spaceID), Title: spaceName + "练习题", PackageName: subject + "题",
-						CourseID: courseID(spaceID), Course: courseName, LearningSpaceID: spaceID, Grade: grade, Semester: semester, Subject: subject,
+						CourseID: courseID, Course: courseName, LearningSpaceID: spaceID, LessonID: lessonID, Curriculum: path, Grade: grade, Semester: semester, Subject: subject,
 						QuestionNum: len(questions), QuestionIDs: questionIDs(questions), Questions: questions, Deadline: demoDeadline(semesterIndex, phaseIndex),
 						SubmittedNum: 0, TotalNum: 0, OwnerTeacherID: "teacher-" + subjectSlug(subject),
 						OwnerTeacherName: subject + "老师", PublishStatus: "已发布", Status: "已发布",
@@ -534,6 +538,14 @@ func seedPermissionDemoData(s *MemoryStore) {
 		if pkg, ok := s.findPackage(grant.PackageID); ok {
 			s.addStudentOpenedPackage(grant.StudentID, pkg.Name)
 		}
+	}
+}
+
+func demoCourseCurriculum(courseID string) []learning.CurriculumNode {
+	return []learning.CurriculumNode{
+		{ID: courseID + "-unit-1", Type: learning.CurriculumUnit, Name: "Unit 1", SortOrder: 1},
+		{ID: courseID + "-chapter-1", ParentID: courseID + "-unit-1", Type: learning.CurriculumChapter, Name: "Chapter 1", SortOrder: 1},
+		{ID: courseID + "-lesson-1", ParentID: courseID + "-chapter-1", Type: learning.CurriculumLesson, Name: "基础巩固", SortOrder: 1},
 	}
 }
 

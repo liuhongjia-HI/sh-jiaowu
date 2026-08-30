@@ -20,6 +20,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadGuardianStudentsFromDB,
 		s.loadPackagesFromDB,
 		s.loadCoursesFromDB,
+		s.loadCourseCurriculumFromDB,
 		s.loadQuestionBankFromDB,
 		s.loadMaterialsFromDB,
 		s.loadHomeworkFromDB,
@@ -384,8 +385,33 @@ func (s *MemoryStore) loadCoursesFromDB() error {
 	return rows.Err()
 }
 
+func (s *MemoryStore) loadCourseCurriculumFromDB() error {
+	rows, err := s.db.Query(`SELECT id, course_id, parent_id, node_type, name, sort_order FROM course_curriculum_nodes ORDER BY course_id, parent_id, sort_order, id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	byCourse := map[string][]learning.CurriculumNode{}
+	for rows.Next() {
+		var node learning.CurriculumNode
+		var courseID string
+		if err := rows.Scan(&node.ID, &courseID, &node.ParentID, &node.Type, &node.Name, &node.SortOrder); err != nil {
+			return err
+		}
+		byCourse[courseID] = append(byCourse[courseID], node)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for index := range s.courses {
+		s.courses[index].Curriculum = byCourse[s.courses[index].ID]
+		s.courses[index].LessonCount = countCurriculumLessons(s.courses[index].Curriculum)
+	}
+	return nil
+}
+
 func (s *MemoryStore) loadMaterialsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, sort_order, created_at FROM materials ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, created_at, id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, sort_order, created_at FROM materials ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, created_at, id`)
 	if err != nil {
 		return err
 	}
@@ -394,7 +420,7 @@ func (s *MemoryStore) loadMaterialsFromDB() error {
 	for rows.Next() {
 		var item learning.Material
 		var createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Chapter, &item.TagCode, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &item.SortOrder, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.LessonID, &item.Title, &item.Chapter, &item.TagCode, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &item.SortOrder, &createdAt); err != nil {
 			return err
 		}
 		item.Status = normalizeMaterialStatus(item.Status)
@@ -435,7 +461,7 @@ func (s *MemoryStore) loadQuestionBankFromDB() error {
 }
 
 func (s *MemoryStore) loadHomeworkFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, title, chapter_name, tag_code, grade, semester, subject, question_ids_json, deadline, deadline_at, assessment_type, owner_teacher_id, owner_teacher_name, publish_status, status, sort_order, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM homework_tasks ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, grade, semester, subject, question_ids_json, deadline, deadline_at, assessment_type, owner_teacher_id, owner_teacher_name, publish_status, status, sort_order, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM homework_tasks ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, id`)
 	if err != nil {
 		return err
 	}
@@ -446,7 +472,7 @@ func (s *MemoryStore) loadHomeworkFromDB() error {
 		var questionIDsJSON string
 		var deadline sql.NullTime
 		var deadlineAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.Title, &item.Chapter, &item.TagCode, &item.Grade, &item.Semester, &item.Subject, &questionIDsJSON, &deadline, &deadlineAt, &item.AssessmentType, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.SortOrder, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.LessonID, &item.Title, &item.Chapter, &item.TagCode, &item.Grade, &item.Semester, &item.Subject, &questionIDsJSON, &deadline, &deadlineAt, &item.AssessmentType, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.SortOrder, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
 			return err
 		}
 		item.Deadline = dateString(deadline)

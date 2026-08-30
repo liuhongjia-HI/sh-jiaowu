@@ -704,12 +704,9 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 	if req.LearningSpaceID == "" {
 		return learning.Course{}, errors.New("请选择课程所属学习空间")
 	}
-	if req.ChapterCount < 0 {
-		return learning.Course{}, errors.New("章节数不能小于 0")
-	}
-	req.Chapters = cleanPhrases(req.Chapters)
-	if len(req.Chapters) > 0 {
-		req.ChapterCount = len(req.Chapters)
+	curriculum, err := normalizeCurriculum(req.Curriculum)
+	if err != nil {
+		return learning.Course{}, err
 	}
 	if req.Status == "" {
 		req.Status = learning.StatusEnabled
@@ -727,14 +724,109 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 		Subject:         space.Subject,
 		Grade:           space.Grade,
 		LearningSpaceID: space.ID,
-		ChapterCount:    req.ChapterCount,
-		Chapters:        req.Chapters,
+		LessonCount:     countCurriculumLessons(curriculum),
+		Curriculum:      curriculum,
 		Status:          req.Status,
 	}
 	if !canSeeCourse(principal, course) {
 		return learning.Course{}, errors.New("不能维护未负责的课程范围")
 	}
 	return course, nil
+}
+
+func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.CurriculumNode, error) {
+	if len(nodes) == 0 {
+		return nil, errors.New("请至少维护一个 Unit、Chapter 和 Lesson")
+	}
+	result := make([]learning.CurriculumNode, 0, len(nodes))
+	byID := make(map[string]learning.CurriculumNode, len(nodes))
+	nameByParent := make(map[string]map[string]bool)
+	for index, node := range nodes {
+		node.ID = strings.TrimSpace(node.ID)
+		node.ParentID = strings.TrimSpace(node.ParentID)
+		node.Name = strings.TrimSpace(node.Name)
+		if node.ID == "" || node.Name == "" {
+			return nil, errors.New("目录节点名称不能为空")
+		}
+		if _, exists := byID[node.ID]; exists {
+			return nil, errors.New("目录节点 ID 不能重复")
+		}
+		if node.Type != learning.CurriculumUnit && node.Type != learning.CurriculumChapter && node.Type != learning.CurriculumLesson {
+			return nil, errors.New("目录节点类型不正确")
+		}
+		if nameByParent[node.ParentID] == nil {
+			nameByParent[node.ParentID] = map[string]bool{}
+		}
+		if nameByParent[node.ParentID][node.Name] {
+			return nil, errors.New("同一级目录名称不能重复")
+		}
+		nameByParent[node.ParentID][node.Name] = true
+		if node.SortOrder <= 0 {
+			node.SortOrder = index + 1
+		}
+		byID[node.ID] = node
+		result = append(result, node)
+	}
+	unitCount, chapterCount, lessonCount := 0, 0, 0
+	for _, node := range result {
+		switch node.Type {
+		case learning.CurriculumUnit:
+			if node.ParentID != "" {
+				return nil, errors.New("Unit 不能设置上级目录")
+			}
+			unitCount++
+		case learning.CurriculumChapter:
+			parent, ok := byID[node.ParentID]
+			if !ok || parent.Type != learning.CurriculumUnit {
+				return nil, errors.New("Chapter 必须归属 Unit")
+			}
+			chapterCount++
+		case learning.CurriculumLesson:
+			parent, ok := byID[node.ParentID]
+			if !ok || parent.Type != learning.CurriculumChapter {
+				return nil, errors.New("Lesson 必须归属 Chapter")
+			}
+			lessonCount++
+		}
+	}
+	if unitCount == 0 || chapterCount == 0 || lessonCount == 0 {
+		return nil, errors.New("课程目录必须包含 Unit、Chapter 和 Lesson")
+	}
+	return result, nil
+}
+
+func countCurriculumLessons(nodes []learning.CurriculumNode) int {
+	count := 0
+	for _, node := range nodes {
+		if node.Type == learning.CurriculumLesson {
+			count++
+		}
+	}
+	return count
+}
+
+func curriculumPathForLesson(course learning.Course, lessonID string) (learning.CurriculumPath, error) {
+	lessonID = strings.TrimSpace(lessonID)
+	if lessonID == "" {
+		return learning.CurriculumPath{}, errors.New("请选择课节")
+	}
+	byID := make(map[string]learning.CurriculumNode, len(course.Curriculum))
+	for _, node := range course.Curriculum {
+		byID[node.ID] = node
+	}
+	lesson, ok := byID[lessonID]
+	if !ok || lesson.Type != learning.CurriculumLesson {
+		return learning.CurriculumPath{}, errors.New("请选择当前课程下的有效课节")
+	}
+	chapter, ok := byID[lesson.ParentID]
+	if !ok || chapter.Type != learning.CurriculumChapter {
+		return learning.CurriculumPath{}, errors.New("课节目录不完整")
+	}
+	unit, ok := byID[chapter.ParentID]
+	if !ok || unit.Type != learning.CurriculumUnit {
+		return learning.CurriculumPath{}, errors.New("课节目录不完整")
+	}
+	return learning.CurriculumPath{Unit: unit.Name, Chapter: chapter.Name, Lesson: lesson.Name}, nil
 }
 
 func (s *MemoryStore) courseNameExists(currentID, name string) bool {
@@ -996,7 +1088,7 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 	return out
 }
 
-// previewCoursesForStudent 为未购课学生提供本年级每门学科的首章节入口。
+// previewCoursesForStudent 为未购课学生提供本年级每门学科的首个课节入口。
 // 预览是由课程内容实时派生的永久权限，不写入套餐授权：内容发布完整后即可
 // 自动出现，也不会与正式套餐的有效期或学习状态混在一起。
 func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Course {
@@ -1013,7 +1105,7 @@ func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Cour
 		if !exists || space.Status != learning.StatusEnabled || space.Grade != student.Grade {
 			continue
 		}
-		if _, ready := s.previewChapterForCourse(course); !ready {
+		if _, ready := s.previewLessonForCourse(course); !ready {
 			continue
 		}
 		key := subjectSlug(course.Subject)
@@ -1059,69 +1151,31 @@ func (s *MemoryStore) previewCourseOrder(course learning.Course) string {
 	return semester + phase + level + course.ID
 }
 
-// previewChapterForCourse 只在首章同时具备已发布讲义和习题时返回。课程编排
-// 优先以课程章节顺序为准；老数据没有章节目录时，再从已发布内容的排序中推断。
-func (s *MemoryStore) previewChapterForCourse(course learning.Course) (string, bool) {
-	chapters := make([]string, 0, len(course.Chapters))
-	for _, chapter := range course.Chapters {
-		if chapter = strings.TrimSpace(chapter); chapter != "" {
-			chapters = append(chapters, chapter)
+// previewLessonForCourse 仅在首个 Lesson 同时具备已发布讲义和习题时返回。
+func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bool) {
+	lessons := make([]learning.CurriculumNode, 0)
+	for _, node := range course.Curriculum {
+		if node.Type == learning.CurriculumLesson {
+			lessons = append(lessons, node)
 		}
 	}
-	if len(chapters) > 0 {
-		return chapters[0], s.previewChapterHasContent(course.ID, chapters[0])
-	}
-	chapters = s.publishedChaptersForCourse(course.ID)
-	if len(chapters) == 0 {
+	sort.Slice(lessons, func(i, j int) bool { return lessons[i].SortOrder < lessons[j].SortOrder })
+	if len(lessons) == 0 {
 		return "", false
 	}
-	return chapters[0], s.previewChapterHasContent(course.ID, chapters[0])
+	return lessons[0].ID, s.previewLessonHasContent(course.ID, lessons[0].ID)
 }
 
-func (s *MemoryStore) publishedChaptersForCourse(courseID string) []string {
-	positions := map[string]int{}
-	add := func(chapter string, position int) {
-		chapter = strings.TrimSpace(chapter)
-		if chapter == "" {
-			return
-		}
-		if current, exists := positions[chapter]; !exists || position < current {
-			positions[chapter] = position
-		}
-	}
-	for _, material := range s.materials {
-		if material.CourseID == courseID && materialPublished(material.Status) {
-			add(material.Chapter, material.SortOrder)
-		}
-	}
-	for _, homework := range s.homework {
-		if homework.CourseID == courseID && homeworkVisible(homework.Status) {
-			add(homework.Chapter, homework.SortOrder)
-		}
-	}
-	chapters := make([]string, 0, len(positions))
-	for chapter := range positions {
-		chapters = append(chapters, chapter)
-	}
-	sort.Slice(chapters, func(i, j int) bool {
-		if positions[chapters[i]] != positions[chapters[j]] {
-			return positions[chapters[i]] < positions[chapters[j]]
-		}
-		return chapters[i] < chapters[j]
-	})
-	return chapters
-}
-
-func (s *MemoryStore) previewChapterHasContent(courseID, chapter string) bool {
+func (s *MemoryStore) previewLessonHasContent(courseID, lessonID string) bool {
 	hasMaterial, hasHomework := false, false
 	for _, material := range s.materials {
-		if material.CourseID == courseID && material.Chapter == chapter && materialPublished(material.Status) {
+		if material.CourseID == courseID && material.LessonID == lessonID && materialPublished(material.Status) {
 			hasMaterial = true
 			break
 		}
 	}
 	for _, homework := range s.homework {
-		if homework.CourseID == courseID && homework.Chapter == chapter && homeworkVisible(homework.Status) {
+		if homework.CourseID == courseID && homework.LessonID == lessonID && homeworkVisible(homework.Status) {
 			hasHomework = true
 			break
 		}
@@ -1223,7 +1277,7 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 		}
 		spaceIDs := s.learningSpaceIDsForGrant(grant.ID)
 		for _, material := range s.materials {
-			if firstChapter, limited := s.trialFirstChapterForGrant(grant, material.CourseID); limited && material.Chapter != firstChapter {
+			if firstLesson, limited := s.trialFirstLessonForGrant(grant, material.CourseID); limited && material.LessonID != firstLesson {
 				continue
 			}
 			if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) {
@@ -1232,12 +1286,12 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(studentID) {
-		chapter, ready := s.previewChapterForCourse(course)
+		lessonID, ready := s.previewLessonForCourse(course)
 		if !ready {
 			continue
 		}
 		for _, material := range s.materials {
-			if material.CourseID == course.ID && material.Chapter == chapter && materialPublished(material.Status) {
+			if material.CourseID == course.ID && material.LessonID == lessonID && materialPublished(material.Status) {
 				out = appendMaterialUnique(out, s.decorateMaterial(material))
 			}
 		}
@@ -1261,7 +1315,7 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 		}
 		spaceIDs := s.learningSpaceIDsForGrant(grant.ID)
 		for _, item := range s.homework {
-			if firstChapter, limited := s.trialFirstChapterForGrant(grant, item.CourseID); limited && item.Chapter != firstChapter {
+			if firstLesson, limited := s.trialFirstLessonForGrant(grant, item.CourseID); limited && item.LessonID != firstLesson {
 				continue
 			}
 			if homeworkVisible(item.Status) && containsString(spaceIDs, item.LearningSpaceID) {
@@ -1270,12 +1324,12 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(studentID) {
-		chapter, ready := s.previewChapterForCourse(course)
+		lessonID, ready := s.previewLessonForCourse(course)
 		if !ready {
 			continue
 		}
 		for _, item := range s.homework {
-			if item.CourseID == course.ID && item.Chapter == chapter && homeworkVisible(item.Status) {
+			if item.CourseID == course.ID && item.LessonID == lessonID && homeworkVisible(item.Status) {
 				out = appendHomeworkUnique(out, item)
 			}
 		}

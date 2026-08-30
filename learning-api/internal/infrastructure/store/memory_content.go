@@ -177,13 +177,12 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	req.Title = strings.TrimSpace(req.Title)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.CourseID = strings.TrimSpace(req.CourseID)
-	req.Chapter = strings.TrimSpace(req.Chapter)
+	req.LessonID = strings.TrimSpace(req.LessonID)
 	tagCode, err := normalizeContentTagCode(req.TagCode)
 	if err != nil {
 		return learning.Material{}, err
 	}
 	tagCode = contentTagCodeOrInferred(tagCode, req.Title, req.File.FileName)
-	req.Chapter = strings.TrimSpace(req.Chapter)
 	if req.Title == "" {
 		return learning.Material{}, errors.New("请输入学习资料标题")
 	}
@@ -194,8 +193,9 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	if !canUploadHandout(principal) {
 		return learning.Material{}, errors.New("当前账号没有上传学习资料权限，请联系管理员开通")
 	}
-	if req.Chapter == "" {
-		req.Chapter = "未分章节"
+	curriculum, err := curriculumPathForLesson(course, req.LessonID)
+	if err != nil {
+		return learning.Material{}, err
 	}
 	asset := req.File
 	s.fileAssets[asset.ID] = asset
@@ -208,7 +208,8 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 		CourseID:         course.ID,
 		Course:           course.Name,
 		LearningSpaceID:  course.LearningSpaceID,
-		Chapter:          req.Chapter,
+		LessonID:         req.LessonID,
+		Curriculum:       curriculum,
 		TagCode:          tagCode,
 		Type:             "课程讲义",
 		OwnerTeacherID:   principal.UserID,
@@ -333,7 +334,7 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 	req.Title = strings.TrimSpace(req.Title)
 	req.CourseID = strings.TrimSpace(req.CourseID)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
-	req.Chapter = strings.TrimSpace(req.Chapter)
+	req.LessonID = strings.TrimSpace(req.LessonID)
 	tagCode, err := normalizeContentTagCode(req.TagCode)
 	if err != nil {
 		return learning.Material{}, err
@@ -353,8 +354,9 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 	if !canUploadHandout(principal) {
 		return learning.Material{}, errors.New("当前账号没有维护学习资料权限，请联系管理员开通")
 	}
-	if req.Chapter == "" {
-		req.Chapter = "未分章节"
+	curriculum, err := curriculumPathForLesson(course, req.LessonID)
+	if err != nil {
+		return learning.Material{}, err
 	}
 	for index := range s.materials {
 		if s.materials[index].ID != id {
@@ -368,7 +370,8 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 		s.materials[index].CourseID = course.ID
 		s.materials[index].Course = course.Name
 		s.materials[index].LearningSpaceID = course.LearningSpaceID
-		s.materials[index].Chapter = req.Chapter
+		s.materials[index].LessonID = req.LessonID
+		s.materials[index].Curriculum = curriculum
 		s.materials[index].TagCode = tagCode
 		s.materials[index].Status = req.Status
 		s.materials[index].PublishStatus = publishStatus(req.Status)
@@ -671,7 +674,7 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	req.Title = strings.TrimSpace(req.Title)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.CourseID = strings.TrimSpace(req.CourseID)
-	req.Chapter = strings.TrimSpace(req.Chapter)
+	req.LessonID = strings.TrimSpace(req.LessonID)
 	req.Deadline = strings.TrimSpace(req.Deadline)
 	req.DeadlineAt = strings.TrimSpace(req.DeadlineAt)
 	req.AssessmentType = normalizeAssessmentType(req.AssessmentType)
@@ -689,6 +692,10 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	}
 	if !canUploadQuestion(principal) {
 		return learning.Homework{}, errors.New("当前账号没有上传题目权限，请联系管理员开通")
+	}
+	curriculum, err := curriculumPathForLesson(course, req.LessonID)
+	if err != nil {
+		return learning.Homework{}, err
 	}
 	deadlineAt, err := normalizeDeadlineAt(req.DeadlineAt, req.Deadline, req.AssessmentType, true)
 	if err != nil {
@@ -713,7 +720,8 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 	item := learning.Homework{
 		ID:               "homework-" + time.Now().Format("20060102150405.000000000"),
 		Title:            req.Title,
-		Chapter:          req.Chapter,
+		LessonID:         req.LessonID,
+		Curriculum:       curriculum,
 		TagCode:          tagCode,
 		PackageName:      course.Subject + "题",
 		CourseID:         course.ID,
@@ -758,7 +766,7 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 	id = strings.TrimSpace(id)
 	req.Title = strings.TrimSpace(req.Title)
 	req.CourseID = strings.TrimSpace(req.CourseID)
-	req.Chapter = strings.TrimSpace(req.Chapter)
+	req.LessonID = strings.TrimSpace(req.LessonID)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.Deadline = strings.TrimSpace(req.Deadline)
 	req.DeadlineAt = strings.TrimSpace(req.DeadlineAt)
@@ -782,6 +790,10 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 	if !canUploadQuestion(principal) {
 		return learning.Homework{}, errors.New("当前账号没有维护题目权限，请联系管理员开通")
 	}
+	curriculum, err := curriculumPathForLesson(course, req.LessonID)
+	if err != nil {
+		return learning.Homework{}, err
+	}
 	deadlineAt, err := normalizeDeadlineAt(req.DeadlineAt, req.Deadline, req.AssessmentType, false)
 	if err != nil {
 		return learning.Homework{}, err
@@ -799,7 +811,8 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 		}
 		before := s.homework[index]
 		s.homework[index].Title = req.Title
-		s.homework[index].Chapter = req.Chapter
+		s.homework[index].LessonID = req.LessonID
+		s.homework[index].Curriculum = curriculum
 		s.homework[index].TagCode = tagCode
 		s.homework[index].PackageName = course.Subject + "题"
 		s.homework[index].CourseID = course.ID

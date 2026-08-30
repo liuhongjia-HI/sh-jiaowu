@@ -4,9 +4,72 @@ import (
 	"database/sql"
 	"os"
 	"testing"
+	"time"
 
 	"starline/learning-api/internal/domain/learning"
 )
+
+func TestMySQLSchemaActivatesLegacyPendingSelfServiceStudents(t *testing.T) {
+	dsn := os.Getenv("STARLINE_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("STARLINE_TEST_MYSQL_DSN is not configured")
+	}
+	store := NewMemoryStoreWithOptions(Options{SkipBaseData: true})
+	if err := store.ConnectDatabase(dsn); err != nil {
+		t.Fatalf("connect store: %v", err)
+	}
+	defer store.db.Close()
+
+	nonce := time.Now().Format("20060102150405.000000000")
+	selfServiceID := "legacy-self-service-" + nonce
+	guardianID := "legacy-pending-guardian-" + nonce
+	guardianStudentID := "legacy-pending-child-" + nonce
+	for _, student := range []struct {
+		id     string
+		source string
+	}{
+		{id: selfServiceID, source: "小程序"},
+		{id: guardianStudentID, source: ""},
+	} {
+		if _, err := store.db.Exec(`INSERT INTO students (id, name, grade, phone, account_status, registration_source)
+			VALUES (?, '迁移测试学生', '五年级', ?, '待审核', ?)`, student.id, "178"+nonce[15:24], student.source); err != nil {
+			t.Fatalf("insert pending student %s: %v", student.id, err)
+		}
+		if _, err := store.db.Exec(`INSERT INTO users (id, name, phone, account_status, student_id, password_hash)
+			VALUES (?, '迁移测试学生', ?, '待审核', ?, '')`, "user-"+student.id, "178"+nonce[15:24], student.id); err != nil {
+			t.Fatalf("insert pending user %s: %v", student.id, err)
+		}
+	}
+	if _, err := store.db.Exec(`INSERT INTO guardians (id, phone) VALUES (?, ?)`, guardianID, "178"+nonce[15:24]); err != nil {
+		t.Fatalf("insert guardian: %v", err)
+	}
+	if _, err := store.db.Exec(`INSERT INTO guardian_students (guardian_id, student_id, status) VALUES (?, ?, '待审核')`, guardianID, guardianStudentID); err != nil {
+		t.Fatalf("insert pending guardian relation: %v", err)
+	}
+
+	if err := store.ensurePersistenceSchema(); err != nil {
+		t.Fatalf("run legacy self-service migration: %v", err)
+	}
+	for _, studentID := range []string{selfServiceID, guardianStudentID} {
+		var studentStatus, userStatus string
+		if err := store.db.QueryRow(`SELECT account_status FROM students WHERE id = ?`, studentID).Scan(&studentStatus); err != nil {
+			t.Fatalf("read migrated student %s: %v", studentID, err)
+		}
+		if err := store.db.QueryRow(`SELECT account_status FROM users WHERE student_id = ?`, studentID).Scan(&userStatus); err != nil {
+			t.Fatalf("read migrated user %s: %v", studentID, err)
+		}
+		if studentStatus != "正常" || userStatus != "正常" {
+			t.Fatalf("legacy student %s not activated: student=%q user=%q", studentID, studentStatus, userStatus)
+		}
+	}
+	var relationStatus string
+	if err := store.db.QueryRow(`SELECT status FROM guardian_students WHERE guardian_id = ? AND student_id = ?`, guardianID, guardianStudentID).Scan(&relationStatus); err != nil {
+		t.Fatalf("read migrated guardian relation: %v", err)
+	}
+	if relationStatus != "在读" {
+		t.Fatalf("legacy guardian relation status = %q, want 在读", relationStatus)
+	}
+}
 
 func TestMySQLNoticeExternalIDSchema(t *testing.T) {
 	dsn := os.Getenv("STARLINE_TEST_MYSQL_DSN")
