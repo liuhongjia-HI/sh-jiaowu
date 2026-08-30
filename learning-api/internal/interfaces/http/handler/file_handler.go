@@ -150,6 +150,16 @@ func (h *LearningHandler) UpdateHomework(c *gin.Context) {
 	OK(c, updated)
 }
 
+func (h *LearningHandler) DeleteHomework(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.DeleteHomework(operator.(string), principal, c.Param("id")); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"deleted": true})
+}
+
 func (h *LearningHandler) PreviewFile(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	asset, err := h.service.ContentFile(principal, c.Param("id"))

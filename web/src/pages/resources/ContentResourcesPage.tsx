@@ -116,11 +116,12 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     },
     onError: (error: Error) => message.error(error.message || '保存失败，请检查课程范围和发布状态。')
   });
-  const removeMaterial = useMutation({
-    mutationFn: (id: string) => deleteData(`/materials/${id}`),
+  const removeContent = useMutation({
+    mutationFn: (id: string) => deleteData(`${path}/${id}`),
     onSuccess: () => {
-      message.success('课程讲义已删除');
+      message.success(kind === 'materials' ? '课程讲义已删除。' : '课后练习已删除。');
       client.invalidateQueries({ queryKey: [kind] });
+		if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials', 'all-for-reorder'] });
     },
     onError: (error: Error) => message.error(error.message || '删除失败，请稍后重试。')
   });
@@ -261,7 +262,19 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
           ...(kind === 'materials' ? [{ title: '学科', dataIndex: 'subject' }, { title: '上传人', dataIndex: 'ownerTeacherName' }, { title: '上传时间', dataIndex: 'createdAt' }] : [{ title: '章节', render: (_: unknown, row: Material | Homework) => (row as Homework).chapter || '未设置' }, { title: '类型', render: (_: unknown, row: Material | Homework) => (row as Homework).assessmentType === 'mock_exam' ? '模拟考试' : '常规练习' }, { title: '截止时间', render: (_: unknown, row: Material | Homework) => (row as Homework).deadlineAt ? new Date((row as Homework).deadlineAt as string).toLocaleString() : '不设截止' }]),
           { title: '课程', dataIndex: 'course' },
           { title: '状态', render: (_: unknown, row: Material | Homework) => { const status = kind === 'materials' ? ((row as Material).previewStatus || (row as Material).publishStatus) : row.status; return <div><div>{status}</div>{row.previewError && <Typography.Text type={status === '转换失败' ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>{row.previewError}</Typography.Text>}</div>; } },
-          { title: '操作', render: (_: unknown, row: Material | Homework) => kind === 'materials' ? <Space><ActionButton tooltip="预览" icon={<EyeOutlined />} disabled={(row as Material).previewStatus !== '可预览'} onClick={() => openFile((row as Material).previewUrl, false, (row as Material).fileName)} />{canManage && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(row)} />}<ActionButton tooltip="下载" icon={<DownloadOutlined />} onClick={() => openFile((row as Material).downloadUrl, true, (row as Material).fileName)} /></Space> : <Space><ActionButton tooltip="查看提交详情" icon={<EyeOutlined />} onClick={() => setSubmissionHomework(row as Homework)} />{canManage && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(row)} />}</Space> }
+          { title: '操作', render: (_: unknown, row: Material | Homework) => {
+            const deleteAction = canManage ? <Popconfirm
+              title={`确定删除“${row.title}”吗？`}
+              description={kind === 'materials' ? '删除后，学生将无法再查看这份讲义。' : '删除后，学生将无法再查看这份练习；已有学生提交记录的练习不能删除，请改为停用。'}
+              okText="删除"
+              okButtonProps={{ danger: true, loading: removeContent.isPending }}
+              cancelText="取消"
+              onConfirm={() => removeContent.mutate(row.id)}
+            ><ActionButton tooltip="删除" danger icon={<DeleteOutlined />} /></Popconfirm> : null;
+            return kind === 'materials'
+              ? <Space><ActionButton tooltip="预览" icon={<EyeOutlined />} disabled={(row as Material).previewStatus !== '可预览'} onClick={() => openFile((row as Material).previewUrl, false, (row as Material).fileName)} />{canManage && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(row)} />}{deleteAction}<ActionButton tooltip="下载" icon={<DownloadOutlined />} onClick={() => openFile((row as Material).downloadUrl, true, (row as Material).fileName)} /></Space>
+              : <Space><ActionButton tooltip="查看提交详情" icon={<EyeOutlined />} onClick={() => setSubmissionHomework(row as Homework)} />{canManage && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(row)} />}{deleteAction}</Space>;
+          } }
         ]}
       />
     </Card>}

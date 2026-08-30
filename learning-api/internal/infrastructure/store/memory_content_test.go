@@ -262,7 +262,7 @@ func TestDeleteHomeworkRemovesUnsubmittedTaskAndProtectsSubmittedWork(t *testing
 	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
 		Title:       "待删除课后练习",
 		CourseID:    "course-g05-english-s1-q1",
-		QuestionIDs: []string{"q1"},
+		QuestionIDs: []string{"qb-g05-english-s1-q1"},
 		Status:      string(learning.StatusEnabled),
 	})
 	if err != nil {
@@ -290,7 +290,17 @@ func TestDeleteHomeworkRemovesUnsubmittedTaskAndProtectsSubmittedWork(t *testing
 	if err := store.DeleteHomework("英语老师", teacher, "homework-does-not-exist"); err == nil {
 		t.Fatal("expected deleting a nonexistent homework item to fail")
 	}
-	if err := store.DeleteHomework("英语老师", teacher, "hw-g05-english-s1-q1"); err == nil {
+	protected, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
+		Title:       "已有提交的课后练习",
+		CourseID:    "course-g05-english-s1-q1",
+		QuestionIDs: []string{"qb-g05-english-s1-q1"},
+		Status:      string(learning.StatusEnabled),
+	})
+	if err != nil {
+		t.Fatalf("expected protected homework creation to succeed: %v", err)
+	}
+	store.submissions["submission-delete-protected"] = learning.Submission{ID: "submission-delete-protected", HomeworkID: protected.ID, StudentID: student.StudentID}
+	if err := store.DeleteHomework("英语老师", teacher, protected.ID); err == nil {
 		t.Fatal("expected homework with submissions to be protected from deletion")
 	}
 }

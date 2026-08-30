@@ -825,6 +825,38 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 	return learning.Homework{}, errors.New("题目不存在")
 }
 
+// deleteHomeworkUnlocked 只允许删除尚未产生学生提交的练习。已提交练习承载
+// 学生答案和批改记录，改为停用才能保留学习历史，避免误删学习成果。
+func (s *MemoryStore) deleteHomeworkUnlocked(operator string, principal learning.Principal, id string) error {
+	if s.db != nil {
+		return persistentMutationError(s, func(work *MemoryStore) error {
+			return work.deleteHomeworkUnlocked(operator, principal, id)
+		})
+	}
+	id = strings.TrimSpace(id)
+	if !canUploadQuestion(principal) {
+		return errors.New("当前账号没有维护题目权限，请联系管理员开通")
+	}
+	for index := range s.homework {
+		if s.homework[index].ID != id {
+			continue
+		}
+		if !canSeeCourse(principal, learning.Course{ID: s.homework[index].CourseID, LearningSpaceID: s.homework[index].LearningSpaceID}) {
+			return errors.New("不能删除未负责的题目")
+		}
+		for _, submission := range s.submissions {
+			if submission.HomeworkID == id {
+				return errors.New("已有学生提交记录，不能删除练习；请改为停用")
+			}
+		}
+		title := s.homework[index].Title
+		s.homework = append(s.homework[:index:index], s.homework[index+1:]...)
+		s.prependLogDetail(operator, "删除课后练习", title, "")
+		return nil
+	}
+	return errors.New("课后练习不存在")
+}
+
 func (s *MemoryStore) contentFileUnlocked(principal learning.Principal, fileID string) (learning.FileAsset, error) {
 	asset, ok := s.fileAssets[fileID]
 	if !ok {

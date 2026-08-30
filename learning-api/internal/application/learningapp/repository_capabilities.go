@@ -56,6 +56,7 @@ type ContentRepository interface {
 	HomeworkSubmissions(learning.Principal, string) (learning.HomeworkSubmissionSummary, error)
 	CreateHomework(string, learning.Principal, learning.HomeworkUploadRequest) (learning.Homework, error)
 	UpdateHomework(string, learning.Principal, string, learning.HomeworkUpdateRequest) (learning.Homework, error)
+	DeleteHomework(string, learning.Principal, string) error
 	ContentFile(learning.Principal, string) (learning.FileAsset, error)
 	RecoverPreviewJobs() error
 	ClaimPreviewJob() (learning.PreviewJob, bool, error)

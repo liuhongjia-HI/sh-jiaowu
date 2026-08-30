@@ -230,6 +230,13 @@ func (s *MemoryStore) UpdateHomework(operator string, principal learning.Princip
 	}, nil)
 }
 
+func (s *MemoryStore) DeleteHomework(operator string, principal learning.Principal, id string) error {
+	_, err := noticeMutation(s, func(work *MemoryStore) (struct{}, error) {
+		return struct{}{}, work.deleteHomeworkUnlocked(operator, principal, id)
+	}, nil)
+	return err
+}
+
 func (s *MemoryStore) ContentFile(principal learning.Principal, fileID string) (learning.FileAsset, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

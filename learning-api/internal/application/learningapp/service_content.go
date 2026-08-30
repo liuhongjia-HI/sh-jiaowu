@@ -43,6 +43,9 @@ func (s *Service) CreateHomework(o string, p learning.Principal, r learning.Home
 func (s *Service) UpdateHomework(o string, p learning.Principal, id string, r learning.HomeworkUpdateRequest) (learning.Homework, error) {
 	return s.content.UpdateHomework(o, p, id, r)
 }
+func (s *Service) DeleteHomework(o string, p learning.Principal, id string) error {
+	return s.content.DeleteHomework(o, p, id)
+}
 func (s *Service) ContentFile(p learning.Principal, id string) (learning.FileAsset, error) {
 	return s.content.ContentFile(p, id)
 }
