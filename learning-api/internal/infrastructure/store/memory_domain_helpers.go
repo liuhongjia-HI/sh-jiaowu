@@ -978,6 +978,9 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 			}
 		}
 	}
+	for _, course := range s.previewCoursesForStudent(studentID) {
+		out = appendCourseUnique(out, s.decorateCourse(course))
+	}
 	sort.SliceStable(out, func(i, j int) bool {
 		left := s.courseAccessForStudent(studentID, out[i])
 		right := s.courseAccessForStudent(studentID, out[j])
@@ -987,6 +990,139 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 		return out[i].Name < out[j].Name
 	})
 	return out
+}
+
+// previewCoursesForStudent 为未购课学生提供本年级每门学科的首章节入口。
+// 预览是由课程内容实时派生的永久权限，不写入套餐授权：内容发布完整后即可
+// 自动出现，也不会与正式套餐的有效期或学习状态混在一起。
+func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Course {
+	student, ok := s.findStudent(studentID)
+	if !ok || student.AccountStatus != "正常" {
+		return nil
+	}
+	selected := make(map[string]learning.Course)
+	for _, course := range s.courses {
+		if course.Status != learning.StatusEnabled || course.Grade != student.Grade {
+			continue
+		}
+		space, exists := s.findLearningSpace(course.LearningSpaceID)
+		if !exists || space.Status != learning.StatusEnabled || space.Grade != student.Grade {
+			continue
+		}
+		if _, ready := s.previewChapterForCourse(course); !ready {
+			continue
+		}
+		key := subjectSlug(course.Subject)
+		current, exists := selected[key]
+		if !exists || s.previewCourseOrder(course) < s.previewCourseOrder(current) {
+			selected[key] = course
+		}
+	}
+	out := make([]learning.Course, 0, len(selected))
+	for _, course := range selected {
+		out = append(out, course)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Subject != out[j].Subject {
+			return out[i].Subject < out[j].Subject
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
+}
+
+func (s *MemoryStore) previewCourseOrder(course learning.Course) string {
+	space, ok := s.findLearningSpace(course.LearningSpaceID)
+	if !ok {
+		return course.ID
+	}
+	semester := "9"
+	if semesterNumber(space.Semester) == "1" {
+		semester = "1"
+	} else if semesterNumber(space.Semester) == "2" {
+		semester = "2"
+	}
+	phase := "9"
+	if strings.Contains(space.Phase, "Q1") || strings.Contains(space.Phase, "期中") {
+		phase = "1"
+	} else if strings.Contains(space.Phase, "Q2") || strings.Contains(space.Phase, "期末") {
+		phase = "2"
+	}
+	level := "1"
+	if strings.TrimSpace(space.Level) == "S" || strings.TrimSpace(space.Level) == "" {
+		level = "0"
+	}
+	return semester + phase + level + course.ID
+}
+
+// previewChapterForCourse 只在首章同时具备已发布讲义和习题时返回。课程编排
+// 优先以课程章节顺序为准；老数据没有章节目录时，再从已发布内容的排序中推断。
+func (s *MemoryStore) previewChapterForCourse(course learning.Course) (string, bool) {
+	chapters := make([]string, 0, len(course.Chapters))
+	for _, chapter := range course.Chapters {
+		if chapter = strings.TrimSpace(chapter); chapter != "" {
+			chapters = append(chapters, chapter)
+		}
+	}
+	if len(chapters) > 0 {
+		return chapters[0], s.previewChapterHasContent(course.ID, chapters[0])
+	}
+	chapters = s.publishedChaptersForCourse(course.ID)
+	if len(chapters) == 0 {
+		return "", false
+	}
+	return chapters[0], s.previewChapterHasContent(course.ID, chapters[0])
+}
+
+func (s *MemoryStore) publishedChaptersForCourse(courseID string) []string {
+	positions := map[string]int{}
+	add := func(chapter string, position int) {
+		chapter = strings.TrimSpace(chapter)
+		if chapter == "" {
+			return
+		}
+		if current, exists := positions[chapter]; !exists || position < current {
+			positions[chapter] = position
+		}
+	}
+	for _, material := range s.materials {
+		if material.CourseID == courseID && materialPublished(material.Status) {
+			add(material.Chapter, material.SortOrder)
+		}
+	}
+	for _, homework := range s.homework {
+		if homework.CourseID == courseID && homeworkVisible(homework.Status) {
+			add(homework.Chapter, homework.SortOrder)
+		}
+	}
+	chapters := make([]string, 0, len(positions))
+	for chapter := range positions {
+		chapters = append(chapters, chapter)
+	}
+	sort.Slice(chapters, func(i, j int) bool {
+		if positions[chapters[i]] != positions[chapters[j]] {
+			return positions[chapters[i]] < positions[chapters[j]]
+		}
+		return chapters[i] < chapters[j]
+	})
+	return chapters
+}
+
+func (s *MemoryStore) previewChapterHasContent(courseID, chapter string) bool {
+	hasMaterial, hasHomework := false, false
+	for _, material := range s.materials {
+		if material.CourseID == courseID && material.Chapter == chapter && materialPublished(material.Status) {
+			hasMaterial = true
+			break
+		}
+	}
+	for _, homework := range s.homework {
+		if homework.CourseID == courseID && homework.Chapter == chapter && homeworkVisible(homework.Status) {
+			hasHomework = true
+			break
+		}
+	}
+	return hasMaterial && hasHomework
 }
 
 type courseAccess struct {
@@ -1091,6 +1227,17 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			}
 		}
 	}
+	for _, course := range s.previewCoursesForStudent(studentID) {
+		chapter, ready := s.previewChapterForCourse(course)
+		if !ready {
+			continue
+		}
+		for _, material := range s.materials {
+			if material.CourseID == course.ID && material.Chapter == chapter && materialPublished(material.Status) {
+				out = appendMaterialUnique(out, s.decorateMaterial(material))
+			}
+		}
+	}
 	return out
 }
 
@@ -1114,6 +1261,17 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 				continue
 			}
 			if homeworkVisible(item.Status) && containsString(spaceIDs, item.LearningSpaceID) {
+				out = appendHomeworkUnique(out, item)
+			}
+		}
+	}
+	for _, course := range s.previewCoursesForStudent(studentID) {
+		chapter, ready := s.previewChapterForCourse(course)
+		if !ready {
+			continue
+		}
+		for _, item := range s.homework {
+			if item.CourseID == course.ID && item.Chapter == chapter && homeworkVisible(item.Status) {
 				out = appendHomeworkUnique(out, item)
 			}
 		}

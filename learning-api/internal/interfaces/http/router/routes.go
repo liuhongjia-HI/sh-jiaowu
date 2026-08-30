@@ -154,7 +154,6 @@ func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
 	g := api.Group("/student", middleware.AuthRequired(tokens, service, learning.RoleStudent))
 	g.GET("/home", h.StudentHome)
-	g.POST("/trial/start", h.StartStudentTrial)
 	g.GET("/banners", h.StudentBanners)
 	g.GET("/recommendations", h.StudentRecommendations)
 	g.POST("/subscription", h.ConfirmStudentSubscription)

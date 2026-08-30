@@ -122,9 +122,6 @@ func (s *MemoryStore) createPackageUnlocked(operator string, req learning.Packag
 	if err != nil {
 		return learning.Package{}, err
 	}
-	if err := s.validateTrialPackageConfig(pkg, req.LearningSpaceIDs, req.ContentTypeCodes); err != nil {
-		return learning.Package{}, err
-	}
 	if s.packageNameExists("", pkg.Name) {
 		return learning.Package{}, errors.New("学习套餐名称已存在")
 	}
@@ -144,9 +141,6 @@ func (s *MemoryStore) updatePackageUnlocked(operator string, id string, req lear
 	id = strings.TrimSpace(id)
 	pkg, err := s.packageFromRequest(id, req)
 	if err != nil {
-		return learning.Package{}, err
-	}
-	if err := s.validateTrialPackageConfig(pkg, req.LearningSpaceIDs, req.ContentTypeCodes); err != nil {
 		return learning.Package{}, err
 	}
 	if s.packageNameExists(id, pkg.Name) {

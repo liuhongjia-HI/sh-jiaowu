@@ -30,6 +30,13 @@ body {
     #eef3f7;
 }
 
+.app-shell > .ant-layout,
+.app-content,
+.page-stack,
+.list-panel {
+  min-width: 0;
+}
+
 .app-sider {
   position: sticky;
   top: 0;
@@ -2260,6 +2267,20 @@ button.schedule-block:hover {
 
 .student-table .ant-table-cell {
   overflow-wrap: anywhere;
+}
+
+.student-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.student-table .student-name {
+  display: inline-block;
+  min-width: 96px;
+  overflow: visible;
+  white-space: normal;
 }
 
 .student-table .ant-tag {

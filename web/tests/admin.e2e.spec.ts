@@ -154,6 +154,19 @@ test('学生表格将操作列显示在学生列之后', async ({ page }) => {
   expect(studentTableHeaders.slice(0, 3).map((header) => header.trim())).toEqual(['学生', '操作', '家长姓名']);
 });
 
+test('iPad 横屏时学生姓名完整显示且表格可横向查看', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await login(page, '13800000002');
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+  const firstName = page.locator('.student-table .student-name').first();
+  await expect(firstName).toBeVisible();
+  await expect(firstName).not.toHaveText('');
+  const table = page.locator('.student-table .ant-table-content');
+  await expect.poll(() => table.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+});
+
 test('校区管理员可以在学生管理直接开通课程', async ({ page }) => {
   await login(page, '13800000002');
 

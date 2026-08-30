@@ -228,7 +228,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       title: '学生',
       dataIndex: 'name',
       width: 170,
-      render: (value, record) => <Space direction="vertical" size={0}><Typography.Text strong>{value}</Typography.Text><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
+      render: (value, record) => <Space direction="vertical" size={0}><Typography.Text strong className="student-name">{value}</Typography.Text><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
     },
     {
       title: '操作',
@@ -368,7 +368,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <Table className="student-table" rowKey="id" columns={columns} dataSource={rows} tableLayout="fixed" pagination={{ pageSize: 8 }} />
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} tableLayout="fixed" scroll={{ x: 1536 }} pagination={{ pageSize: 8 }} /></div>
           )}
         </div>
       </Card>

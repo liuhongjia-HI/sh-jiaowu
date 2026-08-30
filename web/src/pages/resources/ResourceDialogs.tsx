@@ -590,10 +590,6 @@ export function PackageDialog({
             ]}
           />
         </Form.Item>
-        <Form.Item name="trialEnabled" valuePropName="checked">
-          <Checkbox>允许首次登录且未开通套餐的学生免费体验 7 天</Checkbox>
-        </Form.Item>
-        <Typography.Text type="secondary">开启体验的方案必须处于启用状态，并同时包含课程和题目；体验到期不会自动扣费。</Typography.Text>
         <Space size={12} align="start" wrap style={{ width: '100%' }}>
           <Form.Item name="phaseScope" label="适用阶段">
             <Input style={{ width: 180 }} placeholder="全学期" />

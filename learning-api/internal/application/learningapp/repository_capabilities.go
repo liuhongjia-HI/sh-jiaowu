@@ -18,7 +18,6 @@ type StudentRepository interface {
 	CreateStudentScore(string, learning.Principal, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	UpdateStudentScore(string, learning.Principal, string, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	StudentHome(learning.Principal) (learning.StudentHome, error)
-	StartStudentTrial(learning.Principal, string) (learning.StudentTrialStartResult, error)
 	StudentRecommendations(learning.Principal) ([]learning.StudentPackageRecommendation, error)
 	ConfirmStudentSubscription(string, learning.Principal, learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error)
 	UpdateStudentProfile(string, learning.Principal, learning.StudentProfileUpdateRequest) (learning.Student, error)

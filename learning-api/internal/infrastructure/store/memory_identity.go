@@ -254,9 +254,6 @@ func (s *MemoryStore) createWechatStudentAccount(openID string, req learning.Wec
 	s.users = append(s.users, user)
 	principal := principalFromUser(user)
 	principal.GuardianID = s.ensureGuardianLink(student.Phone, openID, student.ID)
-	if err := s.startDefaultStudentTrialUnlocked(principal); err != nil {
-		return learning.Principal{}, err
-	}
 	s.prependLog(student.Name, "小程序自助建档", student.Name)
 	return principal, nil
 }
