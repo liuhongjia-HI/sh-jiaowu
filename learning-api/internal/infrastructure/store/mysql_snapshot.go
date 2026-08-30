@@ -24,6 +24,7 @@ func (s *MemoryStore) bootstrapPersistAll() error {
 
 func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	deletes := []string{
+		"DELETE FROM student_tutoring_assignments",
 		"DELETE FROM parent_notices",
 		"DELETE FROM renewal_reminders",
 		"DELETE FROM lesson_consumptions",
@@ -103,6 +104,14 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			student.ID, student.Name, student.Nickname, student.AvatarURL, student.Grade, student.Phone, student.SchoolName, student.GuardianName, student.OfficialAccountOpenID, student.AccountStatus, student.RegistrationSource, student.Remark, student.LearningStatus,
 			student.StreakDays, student.AverageScore, student.BadgeCount, student.BindStatus, nullableDateTime(student.CreatedAt), student.LastStudyAt, student.EffectiveUntil, student.EnrollmentAcademicYear, student.EnrollmentGrade, student.BindCode, student.BindCodeExpiresAt,
+		); err != nil {
+			return err
+		}
+	}
+	for _, item := range s.tutoringAssignments {
+		if _, err := tx.Exec(
+			`INSERT INTO student_tutoring_assignments (id, student_id, teacher_id, teacher_name, campus_id, academic_year, grade_snapshot, subject_id, subject_name, level_code, assignment_role, status, source_type, source_id, starts_at, ends_at, ended_reason, assigned_by, ended_by, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.StudentID, item.TeacherID, item.TeacherName, item.CampusID, item.AcademicYear, item.GradeSnapshot, item.SubjectID, item.SubjectName, item.LevelCode, item.Role, item.Status, item.SourceType, item.SourceID, nullableDate(item.StartsAt), nullableDate(item.EndsAt), item.EndedReason, item.AssignedBy, item.EndedBy, item.Version, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt),
 		); err != nil {
 			return err
 		}

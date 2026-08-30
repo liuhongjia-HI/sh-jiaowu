@@ -29,6 +29,18 @@ func (s *Service) StudentGrants(principal learning.Principal, id string) ([]lear
 func (s *Service) StudentLearningRecords(principal learning.Principal, id string) ([]learning.StudentLearningRecord, error) {
 	return s.student.StudentLearningRecords(principal, id)
 }
+func (s *Service) StudentTutoringAssignments(principal learning.Principal, id string) ([]learning.TutoringAssignment, error) {
+	return s.student.StudentTutoringAssignments(principal, id)
+}
+func (s *Service) CreateTutoringAssignment(operator string, principal learning.Principal, studentID string, req learning.TutoringAssignmentCreateRequest) (learning.TutoringAssignment, error) {
+	return s.student.CreateTutoringAssignment(operator, principal, studentID, req)
+}
+func (s *Service) EndTutoringAssignment(operator string, principal learning.Principal, id string, req learning.TutoringAssignmentEndRequest) (learning.TutoringAssignment, error) {
+	return s.student.EndTutoringAssignment(operator, principal, id, req)
+}
+func (s *Service) TransferTutoringAssignment(operator string, principal learning.Principal, id string, req learning.TutoringAssignmentTransferRequest) (learning.TutoringAssignment, error) {
+	return s.student.TransferTutoringAssignment(operator, principal, id, req)
+}
 func (s *Service) StudentScores(principal learning.Principal, id string) ([]learning.StudentScoreSummary, error) {
 	return s.student.StudentScores(principal, id)
 }

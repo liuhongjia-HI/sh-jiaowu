@@ -14,6 +14,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadSubjectsFromDB,
 		s.loadLearningSpacesFromDB,
 		s.loadStudentsFromDB,
+		s.loadTutoringAssignmentsFromDB,
 		s.loadUsersFromDB,
 		s.loadGuardiansFromDB,
 		s.loadGuardianStudentsFromDB,
@@ -53,6 +54,24 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 	}
 	s.scheduleClasses = classes
 	return nil
+}
+
+func (s *MemoryStore) loadTutoringAssignmentsFromDB() error {
+	rows, err := s.db.Query(`SELECT id, student_id, teacher_id, teacher_name, campus_id, academic_year, grade_snapshot, subject_id, subject_name, level_code, assignment_role, status, source_type, source_id, DATE_FORMAT(starts_at, '%Y-%m-%d'), COALESCE(DATE_FORMAT(ends_at, '%Y-%m-%d'), ''), ended_reason, assigned_by, ended_by, version, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') FROM student_tutoring_assignments ORDER BY student_id, starts_at DESC, created_at DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.TutoringAssignment{}
+	for rows.Next() {
+		var item learning.TutoringAssignment
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.TeacherID, &item.TeacherName, &item.CampusID, &item.AcademicYear, &item.GradeSnapshot, &item.SubjectID, &item.SubjectName, &item.LevelCode, &item.Role, &item.Status, &item.SourceType, &item.SourceID, &item.StartsAt, &item.EndsAt, &item.EndedReason, &item.AssignedBy, &item.EndedBy, &item.Version, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return err
+		}
+		out = append(out, item)
+	}
+	s.tutoringAssignments = out
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadSubjectsFromDB() error {

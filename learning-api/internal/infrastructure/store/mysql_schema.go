@@ -23,6 +23,34 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		return err
 	}
 	statements := []string{
+		`CREATE TABLE IF NOT EXISTS student_tutoring_assignments (
+			id VARCHAR(64) PRIMARY KEY,
+			student_id VARCHAR(64) NOT NULL,
+			teacher_id VARCHAR(64) NOT NULL,
+			teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			campus_id VARCHAR(64) NOT NULL DEFAULT '',
+			academic_year VARCHAR(32) NOT NULL,
+			grade_snapshot VARCHAR(32) NOT NULL DEFAULT '',
+			subject_id VARCHAR(64) NOT NULL,
+			subject_name VARCHAR(64) NOT NULL DEFAULT '',
+			level_code VARCHAR(16) NOT NULL DEFAULT 'S',
+			assignment_role VARCHAR(16) NOT NULL DEFAULT 'primary',
+			status VARCHAR(16) NOT NULL DEFAULT 'active',
+			source_type VARCHAR(32) NOT NULL DEFAULT 'manual',
+			source_id VARCHAR(64) NOT NULL DEFAULT '',
+			starts_at DATE NOT NULL,
+			ends_at DATE NULL,
+			ended_reason VARCHAR(255) NOT NULL DEFAULT '',
+			assigned_by VARCHAR(64) NOT NULL DEFAULT '',
+			ended_by VARCHAR(64) NOT NULL DEFAULT '',
+			version INT NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			active_marker TINYINT GENERATED ALWAYS AS (CASE WHEN status = 'active' AND assignment_role = 'primary' THEN 1 ELSE NULL END) STORED,
+			UNIQUE KEY uk_student_active_primary_assignment (student_id, academic_year, subject_id, level_code, active_marker),
+			KEY idx_tutoring_assignment_teacher (teacher_id, status, starts_at),
+			KEY idx_tutoring_assignment_student (student_id, status, starts_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS subjects (
 			id VARCHAR(64) PRIMARY KEY,
 			name VARCHAR(64) NOT NULL,

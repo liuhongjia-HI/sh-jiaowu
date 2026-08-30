@@ -186,7 +186,7 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 	eligible := make([]learning.CandidateStudent, 0)
 	for _, student := range s.students {
 		decorated := s.decorateStudent(student)
-		if !canSeeStudent(principal, decorated, s.coursesForStudent(student.ID)) {
+		if !s.canSeeStudent(principal, decorated, s.coursesForStudent(student.ID)) {
 			continue
 		}
 		if decorated.Grade != req.Grade || !s.studentHasSubjectGradeLevel(student.ID, req.Subject, req.Grade, req.Level) {

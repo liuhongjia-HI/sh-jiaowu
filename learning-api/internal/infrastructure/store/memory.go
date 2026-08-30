@@ -51,6 +51,7 @@ type MemoryStore struct {
 	grants                          []packageGrant
 	trials                          []studentTrialRecord
 	availability                    []learning.AvailabilitySlot
+	tutoringAssignments             []learning.TutoringAssignment
 	scheduleClasses                 []learning.ScheduleClass
 	commercialOrders                []learning.CommercialOrder
 	payments                        []learning.PaymentRecord

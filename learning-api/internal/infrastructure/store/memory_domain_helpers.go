@@ -30,7 +30,7 @@ func (s *MemoryStore) visibleStudent(principal learning.Principal, id string) (l
 	if !ok {
 		return learning.Student{}, errors.New("student not found")
 	}
-	if !canSeeStudent(principal, student, s.coursesForStudent(student.ID)) {
+	if !s.canSeeStudent(principal, student, s.coursesForStudent(student.ID)) {
 		return learning.Student{}, errors.New("没有权限访问该学生")
 	}
 	return student, nil

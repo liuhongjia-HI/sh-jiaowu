@@ -74,6 +74,19 @@ func TestAdminStudentManagementLifecycleThroughAPI(t *testing.T) {
 
 	app.doJSON(t, http.MethodGet, "/api/students/"+created.ID+"/grants", token, nil, http.StatusOK, nil)
 	app.doJSON(t, http.MethodGet, "/api/students/"+created.ID+"/learning-records", token, nil, http.StatusOK, nil)
+
+	var assignment learning.TutoringAssignment
+	app.doJSON(t, http.MethodPost, "/api/students/stu-001/tutoring-assignments", token, learning.TutoringAssignmentCreateRequest{
+		TeacherID: "user-teacher", SubjectID: "english", LevelCode: "S", StartsAt: "2026-08-30",
+	}, http.StatusOK, &assignment)
+	if assignment.ID == "" || assignment.Status != learning.TutoringAssignmentActive || assignment.TeacherID != "user-teacher" {
+		t.Fatalf("unexpected tutoring assignment: %#v", assignment)
+	}
+	var assignments []learning.TutoringAssignment
+	app.doJSON(t, http.MethodGet, "/api/students/stu-001/tutoring-assignments", token, nil, http.StatusOK, &assignments)
+	if len(assignments) != 1 || assignments[0].ID != assignment.ID {
+		t.Fatalf("expected student tutoring assignment, got %#v", assignments)
+	}
 }
 
 func TestAdminTeachingContentAndFeedbackThroughAPI(t *testing.T) {

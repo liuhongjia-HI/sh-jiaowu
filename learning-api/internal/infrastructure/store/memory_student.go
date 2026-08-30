@@ -16,7 +16,7 @@ func (s *MemoryStore) studentsUnlocked(principal learning.Principal, query learn
 	students := make([]learning.Student, 0, len(s.students))
 	for _, student := range s.students {
 		decorated := s.decorateStudent(student)
-		if canSeeStudent(principal, decorated, s.coursesForStudent(student.ID)) && matchesStudentQuery(decorated, query) {
+		if s.canSeeStudent(principal, decorated, s.coursesForStudent(student.ID)) && matchesStudentQuery(decorated, query) {
 			students = append(students, decorated)
 		}
 	}

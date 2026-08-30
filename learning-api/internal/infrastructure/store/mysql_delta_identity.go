@@ -1,7 +1,12 @@
 package store
 
 func identityRows(s *MemoryStore) []persistenceRow {
-	rows := make([]persistenceRow, 0, len(s.students)+len(s.users)*3+len(s.learningSpaces)+len(s.guardians)+len(s.guardianStudents))
+	rows := make([]persistenceRow, 0, len(s.students)+len(s.users)*3+len(s.learningSpaces)+len(s.guardians)+len(s.guardianStudents)+len(s.tutoringAssignments))
+	for _, item := range s.tutoringAssignments {
+		rows = append(rows, simpleRow("student_tutoring_assignments", "id", item.ID,
+			`INSERT INTO student_tutoring_assignments (id, student_id, teacher_id, teacher_name, campus_id, academic_year, grade_snapshot, subject_id, subject_name, level_code, assignment_role, status, source_type, source_id, starts_at, ends_at, ended_reason, assigned_by, ended_by, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE teacher_id=VALUES(teacher_id), teacher_name=VALUES(teacher_name), campus_id=VALUES(campus_id), academic_year=VALUES(academic_year), grade_snapshot=VALUES(grade_snapshot), subject_id=VALUES(subject_id), subject_name=VALUES(subject_name), level_code=VALUES(level_code), assignment_role=VALUES(assignment_role), status=VALUES(status), source_type=VALUES(source_type), source_id=VALUES(source_id), starts_at=VALUES(starts_at), ends_at=VALUES(ends_at), ended_reason=VALUES(ended_reason), assigned_by=VALUES(assigned_by), ended_by=VALUES(ended_by), version=VALUES(version), updated_at=VALUES(updated_at)`,
+			item.ID, item.StudentID, item.TeacherID, item.TeacherName, item.CampusID, item.AcademicYear, item.GradeSnapshot, item.SubjectID, item.SubjectName, item.LevelCode, item.Role, item.Status, item.SourceType, item.SourceID, nullableDate(item.StartsAt), nullableDate(item.EndsAt), item.EndedReason, item.AssignedBy, item.EndedBy, item.Version, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt)))
+	}
 	for _, guardian := range s.guardians {
 		rows = append(rows, simpleRow("guardians", "id", guardian.ID,
 			`INSERT INTO guardians (id, phone, open_id, union_id, name, nickname, last_student_id, account_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE phone=VALUES(phone), open_id=VALUES(open_id), union_id=VALUES(union_id), name=VALUES(name), nickname=VALUES(nickname), last_student_id=VALUES(last_student_id), account_status=VALUES(account_status)`,
