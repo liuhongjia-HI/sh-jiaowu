@@ -26,7 +26,7 @@ import {
 import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getData, postData, postForm, putData } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
@@ -45,11 +45,13 @@ import type {
   StudentScoreRecord,
   StudentScoreSummary,
   StudentScoreUpsertRequest,
-  StudentUpsertRequest
-	, SubjectMetadata
-	, Teacher
-	, TutoringAssignment
-	, TutoringAssignmentCreateRequest
+	StudentUpsertRequest,
+	SubjectMetadata,
+	Teacher,
+	TutoringAssignment,
+	TutoringAssignmentCreateRequest,
+	ScheduleClass,
+	LessonFeedback
 } from '../types/starline';
 
 type StudentFormValues = {
@@ -483,6 +485,7 @@ export default function Students({ user }: { user: CurrentUser }) {
 				label: writable ? '辅导老师' : '我的辅导关系',
 				children: selected ? <TutoringAssignmentPanel student={selected} writable={writable} teachers={teachers.data ?? []} subjects={subjects.data ?? []} learningSpaces={learningSpaces.data ?? []} /> : null
 			  },
+			  { key: 'lesson-feedback', label: '课后反馈', children: selected ? <LessonFeedbackPanel student={selected} user={user} /> : null },
 			  ...(writable ? [{
                 key: 'direct-grant',
                 label: '开通学习内容',
@@ -692,6 +695,52 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
 }
 
 type TutoringAction = { kind: 'end' | 'transfer'; assignment: TutoringAssignment };
+
+function LessonFeedbackPanel({ student, user }: { student: Student; user: CurrentUser }) {
+	const [form] = Form.useForm<Pick<LessonFeedback, 'summary' | 'homework' | 'nextStep'>>();
+	const [selectedClass, setSelectedClass] = useState<ScheduleClass | null>(null);
+	const client = useQueryClient();
+	const canWrite = user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));
+	const classes = useQuery({ queryKey: ['schedule-classes', 'feedback'], enabled: canWrite, queryFn: () => getData<ScheduleClass[]>('/schedule-classes') });
+	const eligible = (classes.data ?? []).filter((item) => item.students.some((row) => row.id === student.id) && item.auditStatus === '已通过' && item.status !== '已取消');
+	const feedbacks = useQuery({ queryKey: ['lesson-feedbacks', selectedClass?.id], enabled: Boolean(selectedClass), queryFn: () => getData<LessonFeedback[]>(`/schedule-classes/${selectedClass?.id}/feedbacks`) });
+	const save = useMutation({
+		mutationFn: (values: Pick<LessonFeedback, 'summary' | 'homework' | 'nextStep'>) => {
+			if (!selectedClass) throw new Error('请选择课次');
+			return putData<LessonFeedback>(`/schedule-classes/${selectedClass.id}/feedbacks`, { studentId: student.id, ...values });
+		},
+		onSuccess: () => {
+			message.success('课后反馈已保存，并同步到家长可见的成长记录。');
+			client.invalidateQueries({ queryKey: ['lesson-feedbacks', selectedClass?.id] });
+			client.invalidateQueries({ queryKey: ['students', student.id, 'detail'] });
+		},
+		onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请稍后重试。')
+	});
+	useEffect(() => {
+		if (!selectedClass || feedbacks.isLoading) return;
+		const existing = (feedbacks.data ?? []).find((row) => row.studentId === student.id);
+		form.setFieldsValue(existing ? { summary: existing.summary, homework: existing.homework, nextStep: existing.nextStep } : { summary: '', homework: '', nextStep: '' });
+	}, [feedbacks.data, feedbacks.isLoading, form, selectedClass, student.id]);
+
+	function chooseClass(id: string) {
+		const item = eligible.find((row) => row.id === id) ?? null;
+		setSelectedClass(item);
+	}
+
+	if (!canWrite) return <Empty description="课后反馈由授课老师填写。" />;
+	return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+		<Typography.Text type="secondary">选择已通过审核的课次，为这名学生记录课堂表现、课后任务和下一步建议。</Typography.Text>
+		<Select placeholder="选择课次" value={selectedClass?.id} loading={classes.isLoading} onChange={chooseClass} options={eligible.map((item) => ({ value: item.id, label: `${item.lessonDate} · ${item.courseName} · ${item.teacherName}` }))} />
+		{eligible.length === 0 && !classes.isLoading && <Empty description="暂无可填写反馈的已生效课次。" />}
+		{selectedClass && <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
+			<Form.Item name="summary" label="课堂表现" rules={[{ required: true, message: '请填写本节课表现' }]}><Input.TextArea rows={3} placeholder="用家长能理解的话说明收获和需关注的地方" /></Form.Item>
+			<Form.Item name="homework" label="课后任务"><Input.TextArea rows={2} /></Form.Item>
+			<Form.Item name="nextStep" label="下一步建议"><Input.TextArea rows={2} /></Form.Item>
+			<Button type="primary" loading={save.isPending} onClick={() => form.submit()}>保存并同步成长记录</Button>
+		</Form>}
+		{feedbacks.data?.find((row) => row.studentId === student.id) && <Alert type="success" message={`已保存，最近更新于 ${feedbacks.data.find((row) => row.studentId === student.id)?.updatedAt}`} />}
+	</Space>;
+}
 
 function TutoringAssignmentPanel({
   student,
