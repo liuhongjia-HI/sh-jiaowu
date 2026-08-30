@@ -53,7 +53,30 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		return err
 	}
 	s.scheduleClasses = classes
+	if err := s.loadLessonFeedbacksFromDB(); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *MemoryStore) loadLessonFeedbacksFromDB() error {
+	rows, err := s.db.Query(`SELECT id, schedule_class_id, student_id, student_name, teacher_id, teacher_name, course_name, lesson_date, summary, homework, next_step, created_at, updated_at FROM lesson_feedbacks ORDER BY lesson_date DESC, updated_at DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.LessonFeedback{}
+	for rows.Next() {
+		var item learning.LessonFeedback
+		var lessonDate, createdAt, updatedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.ScheduleClassID, &item.StudentID, &item.StudentName, &item.TeacherID, &item.TeacherName, &item.CourseName, &lessonDate, &item.Summary, &item.Homework, &item.NextStep, &createdAt, &updatedAt); err != nil {
+			return err
+		}
+		item.LessonDate, item.CreatedAt, item.UpdatedAt = dateString(lessonDate), dateTimeString(createdAt), dateTimeString(updatedAt)
+		out = append(out, item)
+	}
+	s.lessonFeedbacks = out
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadTutoringAssignmentsFromDB() error {

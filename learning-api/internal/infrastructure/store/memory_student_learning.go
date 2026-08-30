@@ -106,6 +106,12 @@ func (s *MemoryStore) studentGrowthUnlocked(principal learning.Principal) ([]lea
 			Status: "已学习", OccurredAt: firstNonEmpty(student.LastStudyAt, "2026-05-22 18:20:00"), Description: "查看课件资料",
 		})
 	}
+	for _, feedback := range s.lessonFeedbacks {
+		if feedback.StudentID != principal.StudentID {
+			continue
+		}
+		records = append(records, learning.StudentLearningRecord{ID: "growth-lesson-" + feedback.ID, Type: "课后反馈", Title: feedback.CourseName, Course: feedback.TeacherName, Status: "已反馈", OccurredAt: firstNonEmpty(feedback.LessonDate, feedback.UpdatedAt), Description: feedback.Summary})
+	}
 	for _, summary := range s.scoreSummariesForStudent(principal.StudentID) {
 		if summary.LatestRecord == nil {
 			continue

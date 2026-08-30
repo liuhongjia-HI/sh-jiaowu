@@ -42,6 +42,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM preview_jobs",
 		"DELETE FROM starline_file_assets",
 		"DELETE FROM schedule_class_students",
+		"DELETE FROM lesson_feedbacks",
 		"DELETE FROM schedule_classes",
 		"DELETE FROM availability_slots",
 		"DELETE FROM operation_logs",
@@ -279,6 +280,11 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 			); err != nil {
 				return err
 			}
+		}
+	}
+	for _, item := range s.lessonFeedbacks {
+		if _, err := tx.Exec(`INSERT INTO lesson_feedbacks (id, schedule_class_id, student_id, student_name, teacher_id, teacher_name, course_name, lesson_date, summary, homework, next_step, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.ScheduleClassID, item.StudentID, item.StudentName, item.TeacherID, item.TeacherName, item.CourseName, nullableDate(item.LessonDate), item.Summary, item.Homework, item.NextStep, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt)); err != nil {
+			return err
 		}
 	}
 	for _, item := range s.commercialOrders {

@@ -53,6 +53,7 @@ type MemoryStore struct {
 	availability                    []learning.AvailabilitySlot
 	tutoringAssignments             []learning.TutoringAssignment
 	scheduleClasses                 []learning.ScheduleClass
+	lessonFeedbacks                 []learning.LessonFeedback
 	commercialOrders                []learning.CommercialOrder
 	payments                        []learning.PaymentRecord
 	refunds                         []learning.RefundRecord

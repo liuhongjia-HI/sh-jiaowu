@@ -275,6 +275,72 @@ func (s *MemoryStore) scheduleClassesUnlocked(principal learning.Principal) []le
 	return out
 }
 
+func (s *MemoryStore) lessonFeedbacksUnlocked(principal learning.Principal, classID string) ([]learning.LessonFeedback, error) {
+	var class learning.ScheduleClass
+	for _, item := range s.scheduleClasses {
+		if item.ID == strings.TrimSpace(classID) {
+			class = item
+			break
+		}
+	}
+	if class.ID == "" || !s.canSeeScheduleClass(principal, class) {
+		return nil, errors.New("没有权限查看该课次反馈")
+	}
+	out := make([]learning.LessonFeedback, 0)
+	for _, item := range s.lessonFeedbacks {
+		if item.ScheduleClassID == class.ID {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
+func (s *MemoryStore) upsertLessonFeedbackUnlocked(operator string, principal learning.Principal, classID string, req learning.LessonFeedbackUpsertRequest) (learning.LessonFeedback, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.LessonFeedback, error) {
+			return work.upsertLessonFeedbackUnlocked(operator, principal, classID, req)
+		})
+	}
+	req.StudentID, req.Summary, req.Homework, req.NextStep = strings.TrimSpace(req.StudentID), sanitizeRichText(req.Summary), sanitizeRichText(req.Homework), sanitizeRichText(req.NextStep)
+	if req.StudentID == "" || req.Summary == "" {
+		return learning.LessonFeedback{}, errors.New("请选择学生并填写本节课反馈")
+	}
+	for _, class := range s.scheduleClasses {
+		if class.ID != strings.TrimSpace(classID) {
+			continue
+		}
+		if class.TeacherID != principal.UserID && !scheduleCanApprove(principal) {
+			return learning.LessonFeedback{}, errors.New("只能填写自己授课的课后反馈")
+		}
+		if class.Status == "已取消" || class.AuditStatus != learning.AuditApproved {
+			return learning.LessonFeedback{}, errors.New("课程未生效，不能填写课后反馈")
+		}
+		var student learning.CandidateStudent
+		for _, item := range class.Students {
+			if item.ID == req.StudentID {
+				student = item
+				break
+			}
+		}
+		if student.ID == "" {
+			return learning.LessonFeedback{}, errors.New("该学生不在本节课名单中")
+		}
+		now := time.Now().Format("2006-01-02 15:04:05")
+		for index := range s.lessonFeedbacks {
+			item := &s.lessonFeedbacks[index]
+			if item.ScheduleClassID == class.ID && item.StudentID == student.ID {
+				item.Summary, item.Homework, item.NextStep, item.UpdatedAt = req.Summary, req.Homework, req.NextStep, now
+				return *item, nil
+			}
+		}
+		item := learning.LessonFeedback{ID: "feedback-" + class.ID + "-" + student.ID, ScheduleClassID: class.ID, StudentID: student.ID, StudentName: student.Name, TeacherID: class.TeacherID, TeacherName: class.TeacherName, CourseName: class.CourseName, LessonDate: class.LessonDate, Summary: req.Summary, Homework: req.Homework, NextStep: req.NextStep, CreatedAt: now, UpdatedAt: now}
+		s.lessonFeedbacks = append(s.lessonFeedbacks, item)
+		s.prependLogDetail(operator, "填写课后反馈", student.Name, class.CourseName)
+		return item, nil
+	}
+	return learning.LessonFeedback{}, errors.New("课程不存在")
+}
+
 func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal learning.Principal, req learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.ScheduleClass, error) {

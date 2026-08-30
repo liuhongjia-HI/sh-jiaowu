@@ -262,6 +262,23 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			channel VARCHAR(32) NOT NULL DEFAULT '',
 			failure_reason TEXT NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS lesson_feedbacks (
+			id VARCHAR(160) PRIMARY KEY,
+			schedule_class_id VARCHAR(64) NOT NULL,
+			student_id VARCHAR(64) NOT NULL,
+			student_name VARCHAR(64) NOT NULL DEFAULT '',
+			teacher_id VARCHAR(64) NOT NULL DEFAULT '',
+			teacher_name VARCHAR(64) NOT NULL DEFAULT '',
+			course_name VARCHAR(128) NOT NULL DEFAULT '',
+			lesson_date DATE NULL,
+			summary TEXT NOT NULL,
+			homework TEXT NOT NULL,
+			next_step TEXT NOT NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			UNIQUE KEY uk_lesson_feedback_student (schedule_class_id, student_id),
+			KEY idx_lesson_feedback_student (student_id, lesson_date)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		// banners 是学生端小程序首页的运营轮播图，纯新表，不像其它表那样有历史数据要迁移，
 		// 直接建表即可，不需要额外的 ensureColumnDefinition 补列步骤。
 		`CREATE TABLE IF NOT EXISTS banners (

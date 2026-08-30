@@ -330,6 +330,12 @@ func (s *MemoryStore) studentLearningRecordsUnlocked(principal learning.Principa
 			Status: review.Status, Score: review.SystemScore, OccurredAt: "2026-05-22 20:10:00", Description: "提交后等待老师反馈",
 		})
 	}
+	for _, feedback := range s.lessonFeedbacks {
+		if feedback.StudentID != id {
+			continue
+		}
+		records = append(records, learning.StudentLearningRecord{ID: "lesson-" + feedback.ID, Type: "课后反馈", Title: feedback.CourseName, Course: feedback.TeacherName, Status: "已反馈", OccurredAt: firstNonEmpty(feedback.LessonDate, feedback.UpdatedAt), Description: feedback.Summary})
+	}
 	for _, summary := range s.scoreSummariesForStudent(id) {
 		if summary.LatestRecord == nil {
 			continue

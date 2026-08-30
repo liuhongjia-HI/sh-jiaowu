@@ -521,6 +521,18 @@ func (s *MemoryStore) PendingScheduleClasses(principal learning.Principal) []lea
 	return s.pendingScheduleClassesUnlocked(principal)
 }
 
+func (s *MemoryStore) LessonFeedbacks(principal learning.Principal, classID string) ([]learning.LessonFeedback, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lessonFeedbacksUnlocked(principal, classID)
+}
+
+func (s *MemoryStore) UpsertLessonFeedback(operator string, principal learning.Principal, classID string, req learning.LessonFeedbackUpsertRequest) (learning.LessonFeedback, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.upsertLessonFeedbackUnlocked(operator, principal, classID, req)
+}
+
 func (s *MemoryStore) Dashboard(principal learning.Principal) learning.DashboardOverview {
 	s.mu.Lock()
 	defer s.mu.Unlock()

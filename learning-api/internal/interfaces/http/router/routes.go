@@ -90,6 +90,8 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/availability", h.Availability)
 	g.PUT("/availability", h.SaveAvailability)
 	g.GET("/schedule-classes", h.ScheduleClasses)
+	g.GET("/schedule-classes/:id/feedbacks", h.LessonFeedbacks)
+	g.PUT("/schedule-classes/:id/feedbacks", h.UpsertLessonFeedback)
 	// 排课权限下放：老师可以直接建课，落「待审核」，通过后才对学生可见。
 	// 能不能改某一节由 scheduleEditPermission 判定，不靠路由分组区分。
 	g.POST("/schedule-classes", h.CreateScheduleClass)

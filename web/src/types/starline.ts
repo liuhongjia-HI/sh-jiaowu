@@ -847,3 +847,19 @@ export type ScheduleClass = {
   status: string;
   createdAt: string;
 };
+
+export type LessonFeedback = {
+  id: string;
+  scheduleClassId: string;
+  studentId: string;
+  studentName: string;
+  teacherId: string;
+  teacherName: string;
+  courseName: string;
+  lessonDate: string;
+  summary: string;
+  homework?: string;
+  nextStep?: string;
+  createdAt: string;
+  updatedAt: string;
+};

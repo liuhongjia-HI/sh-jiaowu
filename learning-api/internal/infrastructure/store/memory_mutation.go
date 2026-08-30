@@ -83,6 +83,7 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	for index, item := range s.scheduleClasses {
 		work.scheduleClasses[index] = cloneScheduleClass(item)
 	}
+	work.lessonFeedbacks = append([]learning.LessonFeedback(nil), s.lessonFeedbacks...)
 	work.commercialOrders = append([]learning.CommercialOrder(nil), s.commercialOrders...)
 	work.payments = append([]learning.PaymentRecord(nil), s.payments...)
 	work.refunds = append([]learning.RefundRecord(nil), s.refunds...)
@@ -175,6 +176,7 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.availability = work.availability
 	s.tutoringAssignments = work.tutoringAssignments
 	s.scheduleClasses = work.scheduleClasses
+	s.lessonFeedbacks = work.lessonFeedbacks
 	s.commercialOrders = work.commercialOrders
 	s.payments = work.payments
 	s.refunds = work.refunds
