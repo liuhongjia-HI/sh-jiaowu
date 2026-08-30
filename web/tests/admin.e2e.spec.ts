@@ -167,6 +167,26 @@ test('iPad 横屏时学生姓名完整显示且表格可横向查看', async ({ 
   await expect.poll(() => table.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
 });
 
+test('点击学生课程标签查看该学生已开通的课程', async ({ page }) => {
+  await login(page, '13800000002');
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+
+  const packageLink = page.locator('.student-table tbody tr a').first();
+  const row = packageLink.locator('xpath=ancestor::tr');
+  const studentName = (await row.locator('.student-name').innerText()).trim();
+  const packageName = (await packageLink.innerText()).trim();
+  await packageLink.click();
+
+  await expect(page).toHaveURL(/\/students$/);
+  const drawer = page.locator('.ant-drawer-content').last();
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText(studentName, { exact: true }).first()).toBeVisible();
+  await expect(drawer.getByRole('tab', { name: '开通课程' })).toHaveAttribute('aria-selected', 'true');
+  await expect(drawer.getByText(packageName, { exact: true })).toBeVisible();
+  await expect(drawer.getByText('开放课程', { exact: true })).toBeVisible();
+});
+
 test('校区管理员可以在学生管理直接开通课程', async ({ page }) => {
   await login(page, '13800000002');
 

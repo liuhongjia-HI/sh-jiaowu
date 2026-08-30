@@ -27,7 +27,6 @@ import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getData, postData, postForm, putData } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
@@ -92,7 +91,6 @@ function packageStatusTag(student: Student) {
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
-  const navigate = useNavigate();
   const [filters, setFilters] = useState<StudentFilters>({});
   const [studentForm] = Form.useForm<StudentFormValues>();
   const [editing, setEditing] = useState<Student | null>(null);
@@ -276,7 +274,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       title: '课程',
       dataIndex: 'openedPackageRefs',
       width: 220,
-      render: (values: StudentPackageRef[]) => <PackageLinks values={values} onOpen={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)} />
+      render: (values: StudentPackageRef[], record) => <PackageLinks values={values} onOpen={() => openStudentDetail(record, 'courses')} />
     },
     {
       title: '学习情况',
@@ -288,9 +286,9 @@ export default function Students({ user }: { user: CurrentUser }) {
     { title: '最近学习', dataIndex: 'lastStudyAt', width: 150, ellipsis: true, render: (value) => value || '-' }
   ];
 
-  function openStudentDetail(student: Student) {
+  function openStudentDetail(student: Student, tab = 'profile') {
     setSelected(student);
-    setStudentDrawerTab('profile');
+    setStudentDrawerTab(tab);
     setDirectLearningSpaceIds([]);
     setDirectContentTypeCodes([]);
     setDirectStartsAt('');
@@ -378,7 +376,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                         : '-'
                     }
                   ]}
-                  tags={<PackageLinks values={record.openedPackageRefs} onOpen={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)} />}
+                  tags={<PackageLinks values={record.openedPackageRefs} onOpen={() => openStudentDetail(record, 'courses')} />}
                   actions={(
                     <>
                       <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
@@ -476,10 +474,10 @@ export default function Students({ user }: { user: CurrentUser }) {
                     writable={writable}
                     generatingBindCode={generateBindCode.isPending}
                     onGenerateBindCode={() => generateBindCode.mutate(detail.data!.student.id)}
-                    onOpenPackage={(packageId) => navigate(`/content?tab=materials&packageId=${encodeURIComponent(packageId)}`)}
                   />
                 )
               },
+			  { key: 'courses', label: '开通课程', children: <StudentCourses detail={detail.data} /> },
 			  {
 				key: 'tutoring',
 				label: writable ? '辅导老师' : '我的辅导关系',
@@ -843,14 +841,12 @@ function StudentProfile({
   detail,
   writable,
   generatingBindCode,
-  onGenerateBindCode,
-  onOpenPackage
+  onGenerateBindCode
 }: {
   detail: StudentDetail;
   writable: boolean;
   generatingBindCode: boolean;
   onGenerateBindCode: () => void;
-  onOpenPackage: (packageId: string) => void;
 }) {
   const codeExpired = Boolean(detail.student.bindCodeExpiresAt && detail.student.bindCodeExpiresAt < new Date().toISOString().slice(0, 10));
   return (
@@ -900,15 +896,21 @@ function StudentProfile({
           )}
         </Space>
       </Card>
+    </Space>
+  );
+}
+
+function StudentCourses({ detail }: { detail: StudentDetail }) {
+  return (
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Typography.Text type="secondary">以下内容仅代表当前学生实际已开通的学习权限。</Typography.Text>
       <CardList
         rows={detail.grants}
         rowKey={(record) => record.packageId}
         emptyText="暂未开通课程"
         renderCard={(record) => (
           <InfoCard
-            title={record.packageId.startsWith('direct-')
-              ? <Typography.Text strong>{record.packageName}</Typography.Text>
-              : <Typography.Link onClick={() => onOpenPackage(record.packageId)}>{record.packageName}</Typography.Link>}
+            title={<Typography.Text strong>{record.packageName}</Typography.Text>}
             subtitle={`${record.startsAt || '-'} 至 ${record.effectiveUntil || '-'}`}
             status={tagStatus(record.permissionState)}
           />
@@ -1077,14 +1079,12 @@ function toDateTimeInput(value: Date) {
   return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
-function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: (packageId: string) => void }) {
+function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: () => void }) {
   if (!values?.length) return <Typography.Text type="secondary">暂未开通课程</Typography.Text>;
   return (
     <Space size={[4, 4]} wrap>
       {values.map((item) => (
-        item.packageId.startsWith('direct-')
-          ? <Tag key={item.packageId} color="blue">{item.packageName}</Tag>
-          : <Typography.Link key={item.packageId} onClick={() => onOpen(item.packageId)}><Tag color="blue">{item.packageName}</Tag></Typography.Link>
+        <Typography.Link key={item.packageId} onClick={onOpen}><Tag color="blue">{item.packageName}</Tag></Typography.Link>
       ))}
     </Space>
   );
