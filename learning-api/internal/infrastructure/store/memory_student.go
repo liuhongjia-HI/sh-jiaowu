@@ -71,6 +71,7 @@ func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.
 		OpenedPackages:         []string{},
 		LearningStatus:         "未开始",
 		AccountStatus:          "正常",
+		RegistrationSource:     "后台",
 		Remark:                 req.Remark,
 		BindStatus:             "待绑定",
 		CreatedAt:              time.Now().Format("2006-01-02 15:04:05"),

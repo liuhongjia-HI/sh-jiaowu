@@ -175,6 +175,8 @@ export type Student = {
   openedPackageRefs: StudentPackageRef[];
   learningStatus: string;
   accountStatus: string;
+  registrationSource?: string;
+  followUpStatus?: string;
   streakDays: number;
   averageScore: number;
   badgeCount: number;

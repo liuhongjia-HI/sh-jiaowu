@@ -92,7 +92,7 @@ func (s *MemoryStore) loadLearningSpacesFromDB() error {
 }
 
 func (s *MemoryStore) loadStudentsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, remark, learning_status, streak_days, average_score, badge_count, bind_status, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), last_study_at, effective_until, enrollment_academic_year, enrollment_grade, bind_code, bind_code_expires_at FROM students ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, registration_source, remark, learning_status, streak_days, average_score, badge_count, bind_status, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), last_study_at, effective_until, enrollment_academic_year, enrollment_grade, bind_code, bind_code_expires_at FROM students ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (s *MemoryStore) loadStudentsFromDB() error {
 	out := []learning.Student{}
 	for rows.Next() {
 		var item learning.Student
-		if err := rows.Scan(&item.ID, &item.Name, &item.Nickname, &item.AvatarURL, &item.Grade, &item.Phone, &item.SchoolName, &item.GuardianName, &item.OfficialAccountOpenID, &item.AccountStatus, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.CreatedAt, &item.LastStudyAt, &item.EffectiveUntil, &item.EnrollmentAcademicYear, &item.EnrollmentGrade, &item.BindCode, &item.BindCodeExpiresAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Nickname, &item.AvatarURL, &item.Grade, &item.Phone, &item.SchoolName, &item.GuardianName, &item.OfficialAccountOpenID, &item.AccountStatus, &item.RegistrationSource, &item.Remark, &item.LearningStatus, &item.StreakDays, &item.AverageScore, &item.BadgeCount, &item.BindStatus, &item.CreatedAt, &item.LastStudyAt, &item.EffectiveUntil, &item.EnrollmentAcademicYear, &item.EnrollmentGrade, &item.BindCode, &item.BindCodeExpiresAt); err != nil {
 			return err
 		}
 		out = append(out, item)

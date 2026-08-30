@@ -443,6 +443,9 @@ func matchesStudentQuery(student learning.Student, query learning.StudentQuery) 
 	if query.PackageState == "未开通" && len(student.OpenedPackages) > 0 {
 		return false
 	}
+	if query.FollowUpState != "" && student.FollowUpStatus != query.FollowUpState {
+		return false
+	}
 	return true
 }
 

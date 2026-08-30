@@ -296,6 +296,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"students", "average_score", "INT NOT NULL DEFAULT 0"},
 		{"students", "badge_count", "INT NOT NULL DEFAULT 0"},
 		{"students", "bind_status", "VARCHAR(32) NOT NULL DEFAULT '待绑定'"},
+		{"students", "registration_source", "VARCHAR(16) NOT NULL DEFAULT ''"},
 		{"students", "last_study_at", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "effective_until", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "enrollment_academic_year", "VARCHAR(32) NOT NULL DEFAULT ''"},
@@ -390,6 +391,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		if err := s.ensureColumn(column.table, column.name, column.def); err != nil {
 			return err
 		}
+	}
+	if _, err := s.db.Exec("UPDATE students SET registration_source = '小程序' WHERE registration_source = '' AND remark = '小程序自助建档'"); err != nil {
+		return err
 	}
 	// ensureColumn only adds missing columns. Existing deployments created the
 	// notices key as VARCHAR(64), so explicitly normalize it before upserts

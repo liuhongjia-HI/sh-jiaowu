@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Checkbox,
@@ -63,6 +64,7 @@ type StudentFilters = {
   accountStatus?: string;
   learningStatus?: string;
   packageState?: string;
+  followUpState?: string;
 };
 
 function canWrite(user: CurrentUser) {
@@ -71,6 +73,16 @@ function canWrite(user: CurrentUser) {
 
 function canManageScores(user: CurrentUser) {
   return user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));
+}
+
+function bindStatusText(status: string) {
+  return status === '已绑定' ? '已关联微信' : '待关联微信';
+}
+
+function packageStatusTag(student: Student) {
+  if (student.followUpStatus === '待跟进') return <Tag color="red">待跟进</Tag>;
+  if ((student.openedPackages?.length ?? 0) > 0) return <Tag color="green">已开通</Tag>;
+  return <Tag>未开通</Tag>;
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
@@ -95,6 +107,7 @@ export default function Students({ user }: { user: CurrentUser }) {
     queryKey: ['students', filters],
     queryFn: () => getData<Student[]>('/students', compactParams(filters))
   });
+  const allStudents = useQuery({ queryKey: ['students', 'summary'], queryFn: () => getData<Student[]>('/students') });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const detail = useQuery({
     queryKey: ['students', selected?.id, 'detail'],
@@ -122,7 +135,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       return postData<Student>('/students', body);
     },
     onSuccess: () => {
-      message.success(editing?.accountStatus === '待审核' ? '审核结果已保存' : editing ? '学生信息已保存' : '学生已新增');
+      message.success(editing ? '学生信息已保存' : '学生已新增');
       setStudentDrawerOpen(false);
       setEditing(null);
       queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -192,16 +205,16 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
 
   const rows = students.data ?? [];
-  const reviewingStudentRequest = editing?.accountStatus === '待审核';
+  const allRows = allStudents.data ?? [];
   const gradeOptions = useMemo(() => uniqueOptions(rows.map((item) => item.grade)), [rows]);
   const learningOptions = useMemo(() => uniqueOptions(rows.map((item) => item.learningStatus)), [rows]);
   const accountOptions = useMemo(() => uniqueOptions(rows.map((item) => item.accountStatus)), [rows]);
   const stats = useMemo(() => ({
-    total: rows.length,
-    opened: rows.filter((item) => (item.openedPackages?.length ?? 0) > 0).length,
-    waiting: rows.filter((item) => item.accountStatus.includes('待') || item.learningStatus.includes('未')).length,
-    disabled: rows.filter((item) => item.accountStatus === '停用').length
-  }), [rows]);
+    total: allRows.length,
+    opened: allRows.filter((item) => (item.openedPackages?.length ?? 0) > 0).length,
+    waiting: allRows.filter((item) => item.followUpStatus === '待跟进').length,
+    disabled: allRows.filter((item) => item.accountStatus === '停用').length
+  }), [allRows]);
 
   function openCreate() {
     setEditing(null);
@@ -228,7 +241,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       title: '学生',
       dataIndex: 'name',
       width: 170,
-      render: (value, record) => <Space direction="vertical" size={0}><Typography.Text strong className="student-name">{value}</Typography.Text><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
+      render: (value, record) => <Space direction="vertical" size={0}><Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f"><Typography.Text strong className="student-name">{value}</Typography.Text></Badge><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
     },
     {
       title: '操作',
@@ -246,10 +259,11 @@ export default function Students({ user }: { user: CurrentUser }) {
     { title: '年级', dataIndex: 'grade', width: 88 },
     { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
     {
-      title: '关联状态',
+      title: '微信关联',
       width: 108,
-      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag></Space>
+      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag></Space>
     },
+    { title: '套餐状态', width: 96, render: (_, record) => packageStatusTag(record) },
     {
       title: '课程',
       dataIndex: 'openedPackageRefs',
@@ -292,7 +306,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>学生管理</Typography.Title>
-          <Typography.Text type="secondary">查看学生状态，并按课程范围直接开通需要的学习内容。</Typography.Text>
+          <Typography.Text type="secondary">小程序自助注册且未开通正式套餐的学生会自动归入待跟进，不影响体验和学习。</Typography.Text>
         </div>
         {writable && (
           <Space>
@@ -305,7 +319,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       <div className="student-stat-grid">
         <Card><Statistic title="学生总数" value={stats.total} /></Card>
         <Card><Statistic title="已开通课程" value={stats.opened} /></Card>
-        <Card><Statistic title="待跟进" value={stats.waiting} /></Card>
+        <Card hoverable onClick={() => setFilters((prev) => prev.followUpState === '待跟进' ? {} : { followUpState: '待跟进' })}><Statistic title="待跟进（点击筛选）" value={stats.waiting} valueStyle={{ color: stats.waiting ? '#cf1322' : undefined }} /></Card>
         <Card><Statistic title="已停用" value={stats.disabled} /></Card>
       </div>
 
@@ -319,11 +333,12 @@ export default function Students({ user }: { user: CurrentUser }) {
               <Select allowClear placeholder="学习状态" options={learningOptions} style={{ width: 150 }} onChange={(learningStatus) => setFilters((prev) => ({ ...prev, learningStatus }))} />
               <Select
                 allowClear
-                placeholder="开通状态"
+                placeholder="套餐开通状态"
                 options={[{ label: '已开通', value: '已开通' }, { label: '未开通', value: '未开通' }]}
                 style={{ width: 140 }}
                 onChange={(packageState) => setFilters((prev) => ({ ...prev, packageState }))}
               />
+              <Select allowClear value={filters.followUpState} placeholder="跟进状态" options={[{ label: '待跟进', value: '待跟进' }]} style={{ width: 140 }} onChange={(followUpState) => setFilters((prev) => ({ ...prev, followUpState }))} />
             </Space>
             <ListViewToggle storageKey="starline:list-view:students" value={viewMode} onChange={setViewMode} />
           </div>
@@ -334,11 +349,11 @@ export default function Students({ user }: { user: CurrentUser }) {
               emptyText="还没有学生，先新增学生或批量导入。"
               renderCard={(record) => (
                 <InfoCard
-                  title={record.name}
+                  title={<Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f">{record.name}</Badge>}
                   subtitle={`${record.grade} · ${record.phone}`}
-                  status={<Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>}
+                  status={<Space size={4}><Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>{packageStatusTag(record)}</Space>}
                   fields={[
-                    { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
+                    { label: '微信关联', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag> },
                     { label: '家长姓名', value: record.guardianName || '-' },
                     { label: '学校', value: record.schoolName || '-' },
                     { label: '公众号', value: <Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '已关联' : '未关联'}</Tag> },
@@ -374,15 +389,14 @@ export default function Students({ user }: { user: CurrentUser }) {
       </Card>
 
       <FormDrawer
-        title={reviewingStudentRequest ? '审核学生申请' : editing ? '编辑学生' : '新增学生'}
+        title={editing ? '编辑学生' : '新增学生'}
         open={studentDrawerOpen}
         onCancel={() => setStudentDrawerOpen(false)}
         onSubmit={() => studentForm.submit()}
-        submitText={reviewingStudentRequest ? '提交审核' : editing ? '保存' : '确定'}
+        submitText={editing ? '保存' : '确定'}
         submitting={saveStudent.isPending}
       >
         <Form form={studentForm} layout="vertical" onFinish={(values) => saveStudent.mutate(values)}>
-          {reviewingStudentRequest && <Alert type="info" showIcon message="该学生由家长在小程序提交，审核通过后才会出现在家长的可切换列表中。" style={{ marginBottom: 16 }} />}
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入学生姓名' }]}>
             <Input placeholder="例如：小明" />
           </Form.Item>
@@ -402,7 +416,7 @@ export default function Students({ user }: { user: CurrentUser }) {
             <Input.TextArea rows={3} placeholder="可填写家长沟通、分班或交接信息" />
           </Form.Item>
           {editing && (
-            <Form.Item name="enabled" label={reviewingStudentRequest ? '审核通过并启用账号' : '启用账号'} valuePropName="checked">
+            <Form.Item name="enabled" label="启用账号" valuePropName="checked">
               <Switch />
             </Form.Item>
           )}

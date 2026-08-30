@@ -113,6 +113,14 @@ func TestFollowUpOnlyIncludesUnpurchasedMiniProgramStudents(t *testing.T) {
 	if manual.FollowUpStatus != "" {
 		t.Fatalf("manual student must not enter follow-up automatically, got %#v", manual)
 	}
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID: miniProgramStudent.StudentID, LearningSpaceIDs: []string{"space-g05-english-s1-q1"}, ContentTypeCodes: []string{"course"},
+	}); err != nil {
+		t.Fatalf("open direct learning content: %v", err)
+	}
+	if followUps = store.Students(admin, learning.StudentQuery{FollowUpState: "待跟进"}); len(followUps) != 1 || followUps[0].ID != miniProgramStudent.StudentID {
+		t.Fatalf("direct learning access is not a package purchase, got %#v", followUps)
+	}
 
 	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: miniProgramStudent.StudentID, PackageID: "pkg-g05-english-s1-full"}); err != nil {
 		t.Fatalf("open formal package: %v", err)

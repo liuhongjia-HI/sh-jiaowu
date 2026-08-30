@@ -123,7 +123,7 @@ func (s *MemoryStore) requestAdditionalStudentUnlocked(principal learning.Princi
 	student := learning.Student{
 		ID: id, Name: req.Name, EnrollmentAcademicYear: s.configuredAcademicYear(), EnrollmentGrade: req.Grade,
 		Phone: guardian.Phone, SchoolName: req.SchoolName, GuardianName: guardianName,
-		OpenedPackages: []string{}, LearningStatus: "未开始", AccountStatus: "正常", BindStatus: "已绑定",
+		OpenedPackages: []string{}, LearningStatus: "未开始", AccountStatus: "正常", RegistrationSource: "小程序", BindStatus: "已绑定",
 		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
 	}
 	s.students = append([]learning.Student{student}, s.students...)

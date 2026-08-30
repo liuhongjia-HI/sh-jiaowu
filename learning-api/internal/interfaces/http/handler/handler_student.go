@@ -19,6 +19,7 @@ func (h *LearningHandler) Students(c *gin.Context) {
 		AccountStatus:  strings.TrimSpace(c.Query("accountStatus")),
 		LearningStatus: strings.TrimSpace(c.Query("learningStatus")),
 		PackageState:   strings.TrimSpace(c.Query("packageState")),
+		FollowUpState:  strings.TrimSpace(c.Query("followUpState")),
 	}))
 }
 func (h *LearningHandler) StudentDetail(c *gin.Context) {

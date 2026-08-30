@@ -68,6 +68,10 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	}
 	student.OpenedPackages = packages
 	student.OpenedPackageRefs = packageRefs
+	student.FollowUpStatus = ""
+	if student.RegistrationSource == "小程序" && student.AccountStatus != "停用" && !s.hasFormalPackageGrant(student.ID) {
+		student.FollowUpStatus = "待跟进"
+	}
 	if hasActiveGrant && student.LearningStatus == "待开通" {
 		student.LearningStatus = "已开通"
 	}
@@ -76,6 +80,27 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 		student.LastSubmissionStatus = submission.Status
 	}
 	return student
+}
+
+// hasFormalPackageGrant 只认正式套餐授权。直接开通的单项内容和历史体验授权
+// 都不代表已购买套餐，因此仍保留在待跟进列表中。
+func (s *MemoryStore) hasFormalPackageGrant(studentID string) bool {
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || grant.Status == "revoked" || strings.HasPrefix(grant.PackageID, "direct-") {
+			continue
+		}
+		isHistoricalTrial := false
+		for _, trial := range s.trials {
+			if trial.StudentID == studentID && trial.Status == "active" && trial.PackageID == grant.PackageID && trial.StartsAt == grant.StartsAt && trial.EndsAt == grantEndsAt(grant) {
+				isHistoricalTrial = true
+				break
+			}
+		}
+		if !isHistoricalTrial {
+			return true
+		}
+	}
+	return false
 }
 
 // studentAverageScore 用学生已批改小挑战的真实得分算平均分，不是一个可以手工填写、
