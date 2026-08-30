@@ -49,7 +49,7 @@ Page({
       this.setData({
         material,
         pageTitle: material.title,
-        paperTitle: material.chapter || material.title,
+        paperTitle: (material.curriculum && material.curriculum.lesson) || material.title,
         readText: `${material.viewCount || 0} 人学过`,
         watermarkText,
         watermarkTexts: buildWatermarks(watermarkText),
@@ -222,18 +222,13 @@ Page({
 
     request("/student/tasks").then((tasks) => {
       const courseTasks = (tasks || []).filter((task) => task.courseId === courseId);
-      const chapter = normalizeChapter(material.chapter);
-      const chapterTasks = chapter
-        ? courseTasks.filter((task) => normalizeChapter(task.chapter) === chapter)
-        : [];
-      const hasConfiguredChapters = courseTasks.some((task) => normalizeChapter(task.chapter));
-      // 旧数据未配置章节时，保持同课程直达，避免学生被无意义地送回题库列表。
-      const selected = chapterTasks[0] || (!chapter || !hasConfiguredChapters ? courseTasks[0] : null);
+      const lessonId = material.lessonId || "";
+      const selected = courseTasks.find((task) => task.lessonId === lessonId);
       if (selected) {
         wx.navigateTo({ url: `/pages/answer/index?id=${selected.id}` });
         return;
       }
-      wx.showToast({ title: chapter ? "本章节暂无小挑战" : "当前课程暂无小挑战", icon: "none" });
+      wx.showToast({ title: "本课节暂无小挑战", icon: "none" });
       wx.navigateTo({ url: "/pages/tasks/index" });
     }).catch(() => {
       wx.showToast({ title: "小挑战加载失败，请稍后重试", icon: "none" });
@@ -339,9 +334,6 @@ function buildWatermarks(text) {
   return Array.from({ length: 8 }).map(() => text);
 }
 
-function normalizeChapter(value) {
-  return String(value || "").trim();
-}
 
 // downloadWithAuth 用 wx.downloadFile 带上登录态下载一份需要鉴权的文件（图片/PDF）。
 // path 是不带 /api 前缀的接口路径，例如 "/student/materials/xxx/preview"，

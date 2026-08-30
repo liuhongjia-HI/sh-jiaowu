@@ -387,20 +387,20 @@ test("recording change shows a warning without hiding the page content", async (
   assert.equal(page.data.recordingWarning, false);
 });
 
-test("small challenge prioritizes a task from the material's chapter", async () => {
+test("small challenge prioritizes a task from the material's lesson", async () => {
   const navigatedUrls = [];
   const page = loadMaterialPreviewPage((path) => {
     if (path === "/student/tasks") {
       return Promise.resolve([
-        { id: "homework-other", courseId: "course-1", chapter: "第二章" },
-        { id: "homework-matched", courseId: "course-1", chapter: "第一章" }
+        { id: "homework-other", courseId: "course-1", lessonId: "lesson-2" },
+        { id: "homework-matched", courseId: "course-1", lessonId: "lesson-1" }
       ]);
     }
     return Promise.reject(new Error("unexpected path " + path));
   }, baseWxMock({
     navigateTo({ url }) { navigatedUrls.push(url); }
   }));
-  page.setData({ material: { courseId: "course-1", chapter: "第一章" } });
+  page.setData({ material: { courseId: "course-1", lessonId: "lesson-1" } });
 
   page.goAnswer();
   await flushPromises();
@@ -408,41 +408,44 @@ test("small challenge prioritizes a task from the material's chapter", async () 
   assert.deepEqual(navigatedUrls, ["/pages/answer/index?id=homework-matched"]);
 });
 
-test("small challenge falls back to the same course when chapters are not configured", async () => {
+test("small challenge does not use a task that is missing the material's lesson", async () => {
   const navigatedUrls = [];
+  const toastTitles = [];
   const page = loadMaterialPreviewPage((path) => {
     if (path === "/student/tasks") {
       return Promise.resolve([{ id: "homework-course", courseId: "course-1" }]);
     }
     return Promise.reject(new Error("unexpected path " + path));
   }, baseWxMock({
-    navigateTo({ url }) { navigatedUrls.push(url); }
+    navigateTo({ url }) { navigatedUrls.push(url); },
+    showToast({ title }) { toastTitles.push(title); }
   }));
-  page.setData({ material: { courseId: "course-1", chapter: "第一章" } });
+  page.setData({ material: { courseId: "course-1", lessonId: "lesson-1" } });
 
   page.goAnswer();
   await flushPromises();
 
-  assert.deepEqual(navigatedUrls, ["/pages/answer/index?id=homework-course"]);
+  assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
+  assert.deepEqual(toastTitles, ["本课节暂无小挑战"]);
 });
 
-test("small challenge opens the task list when the chapter has no matching task", async () => {
+test("small challenge opens the task list when the lesson has no matching task", async () => {
   const navigatedUrls = [];
   const toastTitles = [];
   const page = loadMaterialPreviewPage((path) => {
     if (path === "/student/tasks") {
-      return Promise.resolve([{ id: "homework-other", courseId: "course-1", chapter: "第二章" }]);
+      return Promise.resolve([{ id: "homework-other", courseId: "course-1", lessonId: "lesson-2" }]);
     }
     return Promise.reject(new Error("unexpected path " + path));
   }, baseWxMock({
     navigateTo({ url }) { navigatedUrls.push(url); },
     showToast({ title }) { toastTitles.push(title); }
   }));
-  page.setData({ material: { courseId: "course-1", chapter: "第一章" } });
+  page.setData({ material: { courseId: "course-1", lessonId: "lesson-1" } });
 
   page.goAnswer();
   await flushPromises();
 
   assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
-  assert.deepEqual(toastTitles, ["本章节暂无小挑战"]);
+  assert.deepEqual(toastTitles, ["本课节暂无小挑战"]);
 });

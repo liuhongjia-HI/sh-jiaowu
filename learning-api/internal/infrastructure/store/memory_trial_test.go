@@ -17,18 +17,19 @@ func TestNewStudentCanPermanentlyReadTheFirstChapterOfEachGradeSubject(t *testin
 	for index := range store.courses {
 		course := &store.courses[index]
 		if course.ID == englishCourseID || course.ID == mathCourseID {
-			course.Chapters = []string{"第一章", "第二章"}
+			course.Curriculum = append(course.Curriculum, learning.CurriculumNode{ID: course.ID + "-lesson-2", ParentID: course.ID + "-chapter-1", Type: learning.CurriculumLesson, Name: "拓展课节", SortOrder: 2})
+			course.LessonCount = 2
 		}
 	}
 	store.materials = append(store.materials,
-		learning.Material{ID: "preview-english-first-material", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第一章讲义", Chapter: "第一章", Status: learning.StatusEnabled},
-		learning.Material{ID: "preview-english-later-material", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第二章讲义", Chapter: "第二章", Status: learning.StatusEnabled},
-		learning.Material{ID: "preview-math-first-material", CourseID: mathCourseID, LearningSpaceID: "space-g05-math-s1-q1", Title: "数学第一章讲义", Chapter: "第一章", Status: learning.StatusEnabled},
+		learning.Material{ID: "preview-english-first-material", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第一课节讲义", LessonID: englishCourseID + "-lesson-1", Status: learning.StatusEnabled},
+		learning.Material{ID: "preview-english-later-material", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第二课节讲义", LessonID: englishCourseID + "-lesson-2", Status: learning.StatusEnabled},
+		learning.Material{ID: "preview-math-first-material", CourseID: mathCourseID, LearningSpaceID: "space-g05-math-s1-q1", Title: "数学第一课节讲义", LessonID: mathCourseID + "-lesson-1", Status: learning.StatusEnabled},
 	)
 	store.homework = append(store.homework,
-		learning.Homework{ID: "preview-english-first-homework", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第一章习题", Chapter: "第一章", Status: string(learning.StatusEnabled)},
-		learning.Homework{ID: "preview-english-later-homework", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第二章习题", Chapter: "第二章", Status: string(learning.StatusEnabled)},
-		learning.Homework{ID: "preview-math-first-homework", CourseID: mathCourseID, LearningSpaceID: "space-g05-math-s1-q1", Title: "数学第一章习题", Chapter: "第一章", Status: string(learning.StatusEnabled)},
+		learning.Homework{ID: "preview-english-first-homework", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第一课节习题", LessonID: englishCourseID + "-lesson-1", Status: string(learning.StatusEnabled)},
+		learning.Homework{ID: "preview-english-later-homework", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第二课节习题", LessonID: englishCourseID + "-lesson-2", Status: string(learning.StatusEnabled)},
+		learning.Homework{ID: "preview-math-first-homework", CourseID: mathCourseID, LearningSpaceID: "space-g05-math-s1-q1", Title: "数学第一课节习题", LessonID: mathCourseID + "-lesson-1", Status: string(learning.StatusEnabled)},
 	)
 
 	student, err := store.LoginWithWechatCode(learning.WechatLoginRequest{

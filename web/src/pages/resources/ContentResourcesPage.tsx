@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, http, postData, postForm, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
-import { ContentEditDialog, HomeworkSubmissionDialog, UploadDialog } from './ResourceDialogs';
+import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog } from './ResourceDialogs';
 import { canUpload } from './resource-shared';
-import type { Course, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, QuestionBankItem, StudyPackage } from '../../types/starline';
+import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, QuestionBankItem, StudyPackage } from '../../types/starline';
 import type { UploadFile } from 'antd';
 
 type ResourceKind = 'materials' | 'homework';
@@ -48,6 +48,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const [editing, setEditing] = useState<Material | Homework | null>(null);
   const [submissionHomework, setSubmissionHomework] = useState<Homework | null>(null);
   const [contentForm] = Form.useForm<ContentValues>();
+  const [courseForm] = Form.useForm<CourseFormValues>();
+  const [courseEditor, setCourseEditor] = useState<Course | null>(null);
   const client = useQueryClient();
   const title = kind === 'materials' ? '课程讲义' : '课后练习';
   const path = kind === 'materials' ? '/materials' : '/homework';
@@ -71,6 +73,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     queryFn: () => getData<HomeworkSubmissionSummary>(`/homework/${submissionHomework?.id}/submissions`)
   });
   const canManage = canUpload(kind, user);
+  const canManageCourse = Boolean(user?.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role)));
+  const unrestrictedCourseScope = Boolean(user?.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role)));
   const create = useMutation({
     mutationFn: async (values: UploadValues) => {
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
@@ -115,6 +119,27 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       client.invalidateQueries({ queryKey: ['permissions'] });
     },
     onError: (error: Error) => message.error(error.message || '保存失败，请检查课程范围和发布状态。')
+  });
+  const saveCourse = useMutation({
+    mutationFn: (values: CourseFormValues) => {
+      if (!courseEditor) throw new Error('请选择要维护的课程');
+      const { grade: _grade, subject: _subject, curriculum = [], ...courseValues } = values;
+      const body: CourseUpsertRequest = {
+        ...courseValues,
+        curriculum: curriculum.map((node, index) => ({ ...node, id: node.id || `node-${Date.now()}-${index}`, sortOrder: index + 1 })),
+        status: values.status || '启用'
+      };
+      return putData<Course>(`/courses/${courseEditor.id}`, body);
+    },
+    onSuccess: () => {
+      message.success('课程目录已同步，当前上传可直接选择新课节。');
+      setCourseEditor(null);
+      courseForm.resetFields();
+      client.invalidateQueries({ queryKey: ['courses-for-content-resources'] });
+      client.invalidateQueries({ queryKey: ['courses'] });
+      client.invalidateQueries({ queryKey: ['content'] });
+    },
+    onError: (error: Error) => message.error(error.message || '保存课程目录失败，请检查层级关系。')
   });
   const removeContent = useMutation({
     mutationFn: (id: string) => deleteData(`${path}/${id}`),
@@ -280,7 +305,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       />
     </Card>}
     <HomeworkSubmissionDialog homework={submissionHomework} summary={submissionSummary.data} loading={submissionSummary.isLoading} error={Boolean(submissionSummary.error)} onCancel={() => setSubmissionHomework(null)} />
-    <UploadDialog kind={kind} open={open} loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setOpen(false)} onSubmit={(values) => create.mutate(values)} />
+    <UploadDialog kind={kind} open={open} loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => setOpen(false)} onSubmit={(values) => create.mutate(values)} />
     <ContentEditDialog kind={kind} form={contentForm} item={editing} loading={save.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setEditing(null)} onSubmit={(values) => save.mutate(values)} />
+    <CourseDialog form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
   </div>;
 }

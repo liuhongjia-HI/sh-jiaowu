@@ -541,7 +541,7 @@ func TestCreateCourseRespectsTeacherScope(t *testing.T) {
 	course, err := store.CreateCourse("英语老师", teacher, learning.CourseUpsertRequest{
 		Name:            "五年级英语阅读拓展课",
 		LearningSpaceID: "space-g05-english-s1-q1",
-		ChapterCount:    6,
+		Curriculum:      testCurriculum("reading-extension"),
 		Status:          learning.StatusEnabled,
 	})
 	if err != nil {
@@ -554,7 +554,7 @@ func TestCreateCourseRespectsTeacherScope(t *testing.T) {
 	if _, err := store.CreateCourse("英语老师", teacher, learning.CourseUpsertRequest{
 		Name:            "五年级数学拓展课",
 		LearningSpaceID: "space-g05-math-s1-q1",
-		ChapterCount:    6,
+		Curriculum:      testCurriculum("math-extension"),
 		Status:          learning.StatusEnabled,
 	}); err == nil {
 		t.Fatal("expected teacher to be blocked from another subject")
@@ -570,13 +570,13 @@ func TestUpdateCourseSyncsContentReferences(t *testing.T) {
 	updated, err := store.UpdateCourse("超级管理员", admin, "course-g05-english-s1-q1", learning.CourseUpsertRequest{
 		Name:            "五年级英语期中阅读精讲课",
 		LearningSpaceID: "space-g05-english-s1-q1",
-		ChapterCount:    10,
+		Curriculum:      testCurriculum("course-g05-english-s1-q1"),
 		Status:          learning.StatusEnabled,
 	})
 	if err != nil {
 		t.Fatalf("expected course update to succeed: %v", err)
 	}
-	if updated.ChapterCount != 10 || updated.MaterialNum == 0 || updated.HomeworkNum == 0 {
+	if updated.LessonCount != 1 || updated.MaterialNum == 0 || updated.HomeworkNum == 0 {
 		t.Fatalf("unexpected updated course counts: %#v", updated)
 	}
 	for _, material := range store.materials {

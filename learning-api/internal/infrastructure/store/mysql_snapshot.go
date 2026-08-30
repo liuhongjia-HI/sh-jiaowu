@@ -56,6 +56,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM package_spaces",
 		"DELETE FROM materials",
 		"DELETE FROM homework_tasks",
+		"DELETE FROM course_curriculum_nodes",
 		"DELETE FROM courses",
 		"DELETE FROM study_packages",
 		"DELETE FROM teacher_learning_space_access",
@@ -171,12 +172,20 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		); err != nil {
 			return err
 		}
+		for _, node := range course.Curriculum {
+			if _, err := tx.Exec(
+				`INSERT INTO course_curriculum_nodes (id, course_id, parent_id, node_type, name, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
+				node.ID, course.ID, node.ParentID, node.Type, node.Name, node.SortOrder,
+			); err != nil {
+				return err
+			}
+		}
 	}
 	for _, material := range s.materials {
 		if _, err := tx.Exec(
-			`INSERT INTO materials (id, learning_space_id, course_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, sort_order)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			material.ID, material.LearningSpaceID, material.CourseID, material.Title, material.Chapter, material.TagCode, material.Type, material.OwnerTeacherID,
+			`INSERT INTO materials (id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, sort_order)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			material.ID, material.LearningSpaceID, material.CourseID, material.LessonID, material.Title, material.Chapter, material.TagCode, material.Type, material.OwnerTeacherID,
 			material.OwnerTeacherName, material.PublishStatus, material.Status, material.ViewCount, material.FileID, material.FileName,
 			material.FileSize, material.FileType, material.PreviewStatus, material.PreviewURL, material.DownloadURL, material.SortOrder,
 		); err != nil {
@@ -185,9 +194,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, item := range s.homework {
 		if _, err := tx.Exec(
-			`INSERT INTO homework_tasks (id, learning_space_id, course_id, title, chapter_name, tag_code, grade, semester, subject, question_ids_json, deadline, deadline_at, assessment_type, owner_teacher_id, owner_teacher_name, publish_status, status, sort_order, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			item.ID, item.LearningSpaceID, item.CourseID, item.Title, item.Chapter, item.TagCode, item.Grade, item.Semester, item.Subject, mustJSON(item.QuestionIDs), nullableDate(item.Deadline), nullableDateTime(item.DeadlineAt), item.AssessmentType, item.OwnerTeacherID, item.OwnerTeacherName,
+			`INSERT INTO homework_tasks (id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, grade, semester, subject, question_ids_json, deadline, deadline_at, assessment_type, owner_teacher_id, owner_teacher_name, publish_status, status, sort_order, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			item.ID, item.LearningSpaceID, item.CourseID, item.LessonID, item.Title, item.Chapter, item.TagCode, item.Grade, item.Semester, item.Subject, mustJSON(item.QuestionIDs), nullableDate(item.Deadline), nullableDateTime(item.DeadlineAt), item.AssessmentType, item.OwnerTeacherID, item.OwnerTeacherName,
 			item.PublishStatus, item.Status, item.SortOrder, item.PackageName, item.QuestionNum, item.SubmittedNum, item.TotalNum, item.FileID, item.FileName,
 			item.FileSize, item.FileType, item.PreviewStatus, item.PreviewURL, item.DownloadURL,
 		); err != nil {

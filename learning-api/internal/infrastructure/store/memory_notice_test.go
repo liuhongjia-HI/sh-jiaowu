@@ -410,6 +410,7 @@ func TestCreateHomeworkPublishesOfficialAccountNotices(t *testing.T) {
 	homework, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
 		Title:    "英语阅读发布通知测试",
 		CourseID: courses[0].ID,
+		LessonID: firstLessonID(courses[0]),
 		Deadline: "2026-06-30",
 		Status:   string(learning.StatusEnabled),
 	})

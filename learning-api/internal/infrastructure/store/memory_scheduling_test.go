@@ -393,6 +393,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	created, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
 		Title:    "可编辑学习资料",
 		CourseID: courses[0].ID,
+		LessonID: firstLessonID(courses[0]),
 		File: learning.FileAsset{
 			ID:            "file-test-material",
 			FileName:      "material.pdf",
@@ -455,7 +456,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	if _, err := store.UpdateMaterial("英语老师", teacher, created.ID, learning.MaterialUpdateRequest{
 		Title:    "草稿学习资料",
 		CourseID: courses[0].ID,
-		Chapter:  "第一章",
+		LessonID: firstLessonID(courses[0]),
 		Status:   learning.StatusDraft,
 	}); err != nil {
 		t.Fatalf("expected material update to succeed: %v", err)
@@ -482,7 +483,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	if _, err := store.UpdateMaterial("英语老师", teacher, created.ID, learning.MaterialUpdateRequest{
 		Title:    "停用学习资料",
 		CourseID: courses[0].ID,
-		Chapter:  "第一章",
+		LessonID: firstLessonID(courses[0]),
 		Status:   learning.StatusDisabled,
 	}); err != nil {
 		t.Fatalf("expected material disable to succeed: %v", err)
@@ -509,7 +510,7 @@ func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	published, err := store.UpdateMaterial("英语老师", teacher, created.ID, learning.MaterialUpdateRequest{
 		Title:    "已发布学习资料",
 		CourseID: courses[0].ID,
-		Chapter:  "第一章",
+		LessonID: firstLessonID(courses[0]),
 		Status:   learning.Status("已发布"),
 	})
 	if err != nil {
@@ -551,6 +552,7 @@ func TestDeleteMaterialRemovesItFromAdminAndStudentAndCleansFavorites(t *testing
 	created, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
 		Title:    "待删除学习资料",
 		CourseID: courses[0].ID,
+		LessonID: firstLessonID(courses[0]),
 		File: learning.FileAsset{
 			ID:            "file-delete-test",
 			FileName:      "material.pdf",

@@ -1101,6 +1101,11 @@ func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Cour
 		if course.Status != learning.StatusEnabled || course.Grade != student.Grade {
 			continue
 		}
+		// 首课预览只面向尚未获得该类内容授权的学生。已存在未来或已过期
+		// 授权时，不能用永久预览绕开授权生效期或到期日。
+		if s.hasCourseGrantForSubject(studentID, course.Grade, course.Subject) {
+			continue
+		}
 		space, exists := s.findLearningSpace(course.LearningSpaceID)
 		if !exists || space.Status != learning.StatusEnabled || space.Grade != student.Grade {
 			continue
@@ -1181,6 +1186,35 @@ func (s *MemoryStore) previewLessonHasContent(courseID, lessonID string) bool {
 		}
 	}
 	return hasMaterial && hasHomework
+}
+
+// hasContentGrantForLearningSpace 判断学生是否已有过该学习空间、该内容类型的正式授权。
+// 不以当前是否生效为条件：未来授权和已过期授权都应阻止首课预览绕开其授权周期。
+func (s *MemoryStore) hasContentGrantForLearningSpace(studentID, learningSpaceID, contentType string) bool {
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || grant.Status == "revoked" {
+			continue
+		}
+		if containsString(s.contentTypesForPackage(grant.PackageID), contentType) && containsString(s.learningSpaceIDsForPackage(grant.PackageID), learningSpaceID) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasCourseGrantForSubject 按学生已经购买或获授的课程包判断。套餐覆盖的是一门
+// 学科的学习安排，而不是单个课节；因此未来/到期套餐都不应再显示同学科的永久预览。
+func (s *MemoryStore) hasCourseGrantForSubject(studentID, grade, subject string) bool {
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || grant.Status == "revoked" || !containsString(s.contentTypesForPackage(grant.PackageID), "course") {
+			continue
+		}
+		pkg, ok := s.findPackage(grant.PackageID)
+		if ok && pkg.Grade == grade && subjectsMatch(pkg.Subject, subject) {
+			return true
+		}
+	}
+	return false
 }
 
 type courseAccess struct {
@@ -1286,6 +1320,9 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(studentID) {
+		if s.hasContentGrantForLearningSpace(studentID, course.LearningSpaceID, "handout") {
+			continue
+		}
 		lessonID, ready := s.previewLessonForCourse(course)
 		if !ready {
 			continue
@@ -1324,6 +1361,9 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(studentID) {
+		if s.hasContentGrantForLearningSpace(studentID, course.LearningSpaceID, "question") {
+			continue
+		}
 		lessonID, ready := s.previewLessonForCourse(course)
 		if !ready {
 			continue

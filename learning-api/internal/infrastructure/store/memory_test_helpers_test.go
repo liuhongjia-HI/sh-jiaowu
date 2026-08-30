@@ -4,6 +4,23 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func firstLessonID(course learning.Course) string {
+	for _, node := range course.Curriculum {
+		if node.Type == learning.CurriculumLesson {
+			return node.ID
+		}
+	}
+	return ""
+}
+
+func testCurriculum(prefix string) []learning.CurriculumNode {
+	return []learning.CurriculumNode{
+		{ID: prefix + "-unit", Type: learning.CurriculumUnit, Name: "Unit 1"},
+		{ID: prefix + "-chapter", ParentID: prefix + "-unit", Type: learning.CurriculumChapter, Name: "Chapter 1"},
+		{ID: prefix + "-lesson", ParentID: prefix + "-chapter", Type: learning.CurriculumLesson, Name: "Lesson 1"},
+	}
+}
+
 func noticeListContains(notices []learning.Notice, id string) bool {
 	for _, notice := range notices {
 		if notice.ID == id {

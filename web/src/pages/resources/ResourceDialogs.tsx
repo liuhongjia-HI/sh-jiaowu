@@ -921,6 +921,7 @@ export function UploadDialog({
   courses,
   questions,
   learningSpaces,
+  onManageCurriculum,
   onCancel,
   onSubmit
 }: {
@@ -930,6 +931,7 @@ export function UploadDialog({
   courses: Course[];
   questions: QuestionBankItem[];
   learningSpaces: LearningSpace[];
+  onManageCurriculum?: (course: Course) => void;
   onCancel: () => void;
   onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
 }) {
@@ -962,6 +964,11 @@ export function UploadDialog({
             }}
           />
         </Form.Item>
+        {selectedCourse && onManageCurriculum && (
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => onManageCurriculum(selectedCourse)} style={{ marginTop: -16, marginBottom: 12, paddingInline: 0 }}>
+            维护本课程的 Unit · Chapter · Lesson
+          </Button>
+        )}
         <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
         </Form.Item>
