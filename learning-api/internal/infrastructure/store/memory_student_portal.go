@@ -93,8 +93,18 @@ func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principa
 		return []learning.StudentPackageRecommendation{}, nil
 	}
 	openedCourseIDs := map[string]bool{}
-	for _, course := range s.coursesForStudent(student.ID) {
-		openedCourseIDs[course.ID] = true
+	// Course cards remain visible when a student only has handout/question
+	// access, but recommendations must still treat the course content itself
+	// as unopened so a package that adds the course can be suggested.
+	for _, grant := range s.grants {
+		if grant.StudentID != student.ID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") {
+			continue
+		}
+		for _, course := range s.courses {
+			if containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
+				openedCourseIDs[course.ID] = true
+			}
+		}
 	}
 	openedMaterialIDs := map[string]bool{}
 	for _, material := range s.materialsForStudent(student.ID) {

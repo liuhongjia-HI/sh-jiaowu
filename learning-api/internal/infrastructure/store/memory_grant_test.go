@@ -196,10 +196,82 @@ func TestStudentStudyCountsOnlyAccessibleLearningContent(t *testing.T) {
 	}
 }
 
+func TestCourseRemainsVisibleWithoutCourseDownloadPermission(t *testing.T) {
+	store := NewMemoryStore()
+	studentID := "stu-001"
+	spaceID := "space-g05-math-s1-q1"
+
+	// Remove the permanent first-lesson preview for this scope so the test
+	// proves visibility comes from the remaining handout/question grant.
+	filteredHomework := make([]learning.Homework, 0, len(store.homework))
+	for _, item := range store.homework {
+		if item.LearningSpaceID != spaceID {
+			filteredHomework = append(filteredHomework, item)
+		}
+	}
+	store.homework = filteredHomework
+	for index := range store.materials {
+		if store.materials[index].LearningSpaceID == spaceID {
+			store.materials[index].FileID = "file-course-permission"
+			store.materials[index].FileName = "lesson.pdf"
+		}
+	}
+	store.settings["downloadPolicy"] = "允许下载带水印PDF"
+
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        studentID,
+		LearningSpaceIDs: []string{spaceID},
+		ContentTypeCodes: []string{"handout"},
+	}); err != nil {
+		t.Fatalf("expected handout-only direct grant to succeed: %v", err)
+	}
+
+	principal, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("student principal: %v", err)
+	}
+	study, err := store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("student study: %v", err)
+	}
+	if findCourseByLearningSpace(study.Courses, spaceID) == nil {
+		t.Fatalf("course should remain visible when only handouts are opened: %#v", study.Courses)
+	}
+	mathMaterial := findMaterialByLearningSpace(study.Materials, spaceID)
+	if mathMaterial == nil || mathMaterial.DownloadURL != "" {
+		t.Fatalf("handout should be previewable but not downloadable without course permission: %#v", study.Materials)
+	}
+
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        studentID,
+		LearningSpaceIDs: []string{spaceID},
+		ContentTypeCodes: []string{"course"},
+	}); err != nil {
+		t.Fatalf("expected course permission to succeed: %v", err)
+	}
+	study, err = store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("student study after course permission: %v", err)
+	}
+	mathMaterial = findMaterialByLearningSpace(study.Materials, spaceID)
+	if mathMaterial == nil || mathMaterial.DownloadURL == "" {
+		t.Fatalf("course permission should enable secure handout download: %#v", study.Materials)
+	}
+}
+
 func findCourseByLearningSpace(courses []learning.StudentCourseCard, learningSpaceID string) *learning.StudentCourseCard {
 	for index := range courses {
 		if courses[index].LearningSpaceID == learningSpaceID {
 			return &courses[index]
+		}
+	}
+	return nil
+}
+
+func findMaterialByLearningSpace(materials []learning.Material, learningSpaceID string) *learning.Material {
+	for index := range materials {
+		if materials[index].LearningSpaceID == learningSpaceID {
+			return &materials[index]
 		}
 	}
 	return nil

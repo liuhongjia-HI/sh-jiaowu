@@ -1092,7 +1092,7 @@ func (s *MemoryStore) addStudentOpenedPackage(studentID, packageName string) {
 func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 	out := make([]learning.Course, 0)
 	for _, grant := range s.grants {
-		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") {
+		if grant.StudentID != studentID || !grantActive(grant) || len(s.contentTypesForPackage(grant.PackageID)) == 0 {
 			continue
 		}
 		spaceIDs := s.learningSpaceIDsForGrant(grant.ID)
@@ -1267,7 +1267,7 @@ type courseAccess struct {
 func (s *MemoryStore) courseAccessForStudent(studentID string, course learning.Course) courseAccess {
 	selected := packageGrant{}
 	for _, grant := range s.grants {
-		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") || !containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
+		if grant.StudentID != studentID || !grantActive(grant) || len(s.contentTypesForPackage(grant.PackageID)) == 0 || !containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
 			continue
 		}
 		if selected.ID == "" || grant.StartsAt > selected.StartsAt || (grant.StartsAt == selected.StartsAt && grantOpenedAt(grant) > grantOpenedAt(selected)) {
@@ -1525,11 +1525,25 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		if s.studentMaterialDownloadEnabled() {
+		if s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "course") {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}
 	return material
+}
+
+// studentHasActiveContentGrantForLearningSpace 判断学生当前有效授权是否包含指定内容类型。
+// 课程目录可见性与内容下载权限分离：course 仅作为安全下载许可，handout 仍控制讲义是否可见。
+func (s *MemoryStore) studentHasActiveContentGrantForLearningSpace(studentID, learningSpaceID, contentType string) bool {
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), contentType) {
+			continue
+		}
+		if containsString(s.learningSpaceIDsForGrant(grant.ID), learningSpaceID) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *MemoryStore) studentMaterialDownloadEnabled() bool {
