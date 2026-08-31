@@ -133,3 +133,25 @@ func TestFollowUpIncludesEveryStudentWithoutAnOpenedPackage(t *testing.T) {
 		t.Fatalf("only the still-unopened student must remain for follow-up, got %#v", followUps)
 	}
 }
+
+func TestStudentsAreSortedByRegistrationTimeDescending(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("expected admin principal: %v", err)
+	}
+
+	store.students = []learning.Student{
+		{ID: "student-oldest", Name: "最早注册", CreatedAt: "2026-08-01 09:00:00"},
+		{ID: "student-middle", Name: "中间注册", CreatedAt: "2026-08-15 09:00:00"},
+		{ID: "student-newest", Name: "最近注册", CreatedAt: "2026-08-31 09:00:00"},
+	}
+
+	students := store.Students(admin, learning.StudentQuery{})
+	if len(students) != 3 {
+		t.Fatalf("expected 3 students, got %#v", students)
+	}
+	if students[0].ID != "student-newest" || students[1].ID != "student-middle" || students[2].ID != "student-oldest" {
+		t.Fatalf("expected students sorted by registration time descending, got %#v", students)
+	}
+}

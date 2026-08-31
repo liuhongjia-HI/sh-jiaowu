@@ -91,10 +91,16 @@ func TestStudentsExposeOnlyActiveTutoringAssignments(t *testing.T) {
 	}
 
 	students := store.Students(admin, learning.StudentQuery{})
-	if len(students) == 0 {
-		t.Fatal("expected seeded student")
+	var student *learning.Student
+	for index := range students {
+		if students[index].ID == "stu-001" {
+			student = &students[index]
+			break
+		}
 	}
-	student := students[0]
+	if student == nil {
+		t.Fatalf("expected seeded student stu-001, got %#v", students)
+	}
 	if len(student.ActiveTutoringAssignments) != 1 {
 		t.Fatalf("student list should contain exactly one active tutoring assignment, got %#v", student.ActiveTutoringAssignments)
 	}

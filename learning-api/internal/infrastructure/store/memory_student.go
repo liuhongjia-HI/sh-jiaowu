@@ -20,6 +20,9 @@ func (s *MemoryStore) studentsUnlocked(principal learning.Principal, query learn
 			students = append(students, decorated)
 		}
 	}
+	sort.SliceStable(students, func(i, j int) bool {
+		return students[i].CreatedAt > students[j].CreatedAt
+	})
 	return students
 }
 

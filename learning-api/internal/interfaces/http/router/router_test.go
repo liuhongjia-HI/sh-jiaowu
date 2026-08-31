@@ -902,6 +902,42 @@ func TestCommercialLifecycleThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodGet, "/api/commercial/orders", studentToken, nil, http.StatusForbidden, nil)
 }
 
+func TestRefundAndSuspendStudentThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	adminToken := app.loginAdmin(t, "13800000002")
+	studentToken := app.loginStudent(t)
+
+	var order learning.CommercialOrder
+	app.doJSON(t, http.MethodPost, "/api/commercial/orders", adminToken, learning.CommercialOrderCreateRequest{
+		StudentID: "stu-001", PackageID: "pkg-g05-english-s1-full", AmountCent: 128000, LessonTotal: 10,
+	}, http.StatusOK, &order)
+	app.doJSON(t, http.MethodPost, "/api/commercial/orders/"+order.ID+"/payments", adminToken, learning.PaymentCreateRequest{
+		AmountCent: 128000, Method: "线下收款",
+	}, http.StatusOK, nil)
+
+	var before learning.GrantPreview
+	app.doJSON(t, http.MethodGet, "/api/grants/preview?studentId=stu-001&packageId=pkg-g05-english-s1-full", adminToken, nil, http.StatusOK, &before)
+	if !before.AlreadyOpened {
+		t.Fatalf("expected seeded package grant to be active before refund: %#v", before)
+	}
+
+	var result learning.RefundSuspensionResult
+	app.doJSON(t, http.MethodPost, "/api/commercial/orders/"+order.ID+"/refund-and-suspend", adminToken, learning.RefundAndSuspendRequest{
+		AmountCent: 128000, Reason: "家长线下退款，停止后续服务",
+	}, http.StatusOK, &result)
+	if result.Refund.Status != "已退款" || result.Student.AccountStatus != "停用" || result.RevokedGrantCount != 1 {
+		t.Fatalf("unexpected refund suspension result: %#v", result)
+	}
+
+	var after learning.GrantPreview
+	app.doJSON(t, http.MethodGet, "/api/grants/preview?studentId=stu-001&packageId=pkg-g05-english-s1-full", adminToken, nil, http.StatusOK, &after)
+	if after.AlreadyOpened {
+		t.Fatalf("expected refunded package grant to be revoked: %#v", after)
+	}
+	app.doJSON(t, http.MethodGet, "/api/student/home", studentToken, nil, http.StatusBadRequest, nil)
+}
+
 func TestSchedulingCandidateAndCreateClassThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

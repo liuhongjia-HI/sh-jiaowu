@@ -75,6 +75,20 @@ type StudentFilters = {
   followUpState?: string;
 };
 
+const studentTextCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
+const gradeOrder = ['学前班', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级', '初一', '初二', '初三', '高一', '高二', '高三'];
+
+function compareStudentText(left?: string, right?: string) {
+  return studentTextCollator.compare(left ?? '', right ?? '');
+}
+
+function compareStudentGrades(left: string, right: string) {
+  const leftOrder = gradeOrder.indexOf(left);
+  const rightOrder = gradeOrder.indexOf(right);
+  if (leftOrder >= 0 && rightOrder >= 0) return leftOrder - rightOrder;
+  return compareStudentText(left, right);
+}
+
 function canWrite(user: CurrentUser) {
   return user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 }
@@ -87,10 +101,16 @@ function bindStatusText(status: string) {
   return status === '已绑定' ? '已关联微信' : '待关联微信';
 }
 
+function packageStatusLabel(student: Student) {
+  if (student.followUpStatus === '待跟进') return '待跟进';
+  return (student.openedPackages?.length ?? 0) > 0 ? '已开通' : '未开通';
+}
+
 function packageStatusTag(student: Student) {
-  if (student.followUpStatus === '待跟进') return <Tag color="red">待跟进</Tag>;
-  if ((student.openedPackages?.length ?? 0) > 0) return <Tag color="green">已开通</Tag>;
-  return <Tag>未开通</Tag>;
+  const status = packageStatusLabel(student);
+  if (status === '待跟进') return <Tag color="red">{status}</Tag>;
+  if (status === '已开通') return <Tag color="green">{status}</Tag>;
+  return <Tag>{status}</Tag>;
 }
 
 function packageStatusInfo(student: Student) {
@@ -286,12 +306,13 @@ export default function Students({ user }: { user: CurrentUser }) {
   }
 
   const columns: TableColumnsType<Student> = [
-    { title: '年级', dataIndex: 'grade', width: 88 },
-    { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
+    { title: '年级', dataIndex: 'grade', width: 88, sorter: (left, right) => compareStudentGrades(left.grade, right.grade) },
+    { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, sorter: (left, right) => compareStudentText(left.schoolName, right.schoolName), render: (value) => value || '-' },
     {
       title: '学生',
       dataIndex: 'name',
       width: 170,
+      sorter: (left, right) => compareStudentText(left.name, right.name),
       render: (value, record) => <Space direction="vertical" size={0}><Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f"><Typography.Text strong className="student-name">{value}</Typography.Text></Badge><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
     },
     {
@@ -306,23 +327,30 @@ export default function Students({ user }: { user: CurrentUser }) {
         </Space>
       )
     },
-    { title: '家长姓名', dataIndex: 'guardianName', width: 110, ellipsis: true, render: (value) => value || '-' },
+    { title: '家长姓名', dataIndex: 'guardianName', width: 110, ellipsis: true, sorter: (left, right) => compareStudentText(left.guardianName, right.guardianName), render: (value) => value || '-' },
     {
       title: '微信关联',
       width: 108,
       render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag></Space>
     },
-    { title: '套餐状态', width: 144, render: (_, record) => packageStatusInfo(record) },
+    {
+      title: '套餐状态',
+      width: 144,
+      sorter: (left, right) => compareStudentText(packageStatusLabel(left), packageStatusLabel(right)),
+      render: (_, record) => packageStatusInfo(record)
+    },
     {
       title: '课程',
       dataIndex: 'openedPackageRefs',
       width: 220,
+      sorter: (left, right) => compareStudentText(left.openedPackageRefs?.map((item) => item.packageName).join('、'), right.openedPackageRefs?.map((item) => item.packageName).join('、')),
       render: (values: StudentPackageRef[], record) => <PackageLinks values={values} onOpen={() => openStudentDetail(record, 'courses')} />
     },
     {
       title: '辅导老师',
       dataIndex: 'activeTutoringAssignments',
       width: 190,
+      sorter: (left, right) => compareStudentText(left.activeTutoringAssignments?.map((item) => item.teacherName).join('、'), right.activeTutoringAssignments?.map((item) => item.teacherName).join('、')),
       render: (values: TutoringAssignmentSummary[]) => <TutoringTeacherNames assignments={values} />
     }
   ];
@@ -452,7 +480,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1280 }} pagination={{ pageSize: 8 }} /></div>
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1280 }} pagination={{ pageSize: 8 }} sortDirections={['ascend', 'descend']} /></div>
           )}
         </div>
       </Card>

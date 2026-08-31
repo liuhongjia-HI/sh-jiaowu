@@ -154,6 +154,34 @@ test('学生表格将年级和学校显示在学生列之前', async ({ page }) 
   expect(studentTableHeaders.slice(0, 5).map((header) => header.trim())).toEqual(['年级', '学校', '学生', '操作', '家长姓名']);
 });
 
+test('学生表格点击列名后按该列排序', async ({ page }) => {
+  await login(page, '13800000002');
+  await page.route('**/api/students*', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          { id: 'student-zhou', name: '周同学', phone: '13900000001', grade: '五年级', schoolName: '星河小学', openedPackages: [], openedPackageRefs: [], learningStatus: '未开始', accountStatus: '正常', streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-30 20:00:00' },
+          { id: 'student-wang', name: '王同学', phone: '13900000002', grade: '四年级', schoolName: '星河小学', openedPackages: [], openedPackageRefs: [], learningStatus: '未开始', accountStatus: '正常', streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-29 20:00:00' },
+          { id: 'student-li', name: '李同学', phone: '13900000003', grade: '三年级', schoolName: '星河小学', openedPackages: [], openedPackageRefs: [], learningStatus: '未开始', accountStatus: '正常', streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-28 20:00:00' }
+        ]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+  await page.locator('.student-table thead th').filter({ hasText: '学生' }).click();
+
+  await expect.poll(() => page.locator('.student-table tbody .student-name').allTextContents()).toEqual(['李同学', '王同学', '周同学']);
+});
+
 test('学生列表直接展示辅导老师并在悬停时显示匹配详情', async ({ page }) => {
   await login(page, '13800000002');
   await page.route('**/api/students*', async (route) => {
