@@ -376,6 +376,23 @@ test('点击学生课程标签进入课程开通矩阵', async ({ page }) => {
   await expect(drawer.getByText('按课程范围开通', { exact: true })).toBeVisible();
 });
 
+test('学生详情以卡片列表展示学习记录', async ({ page }) => {
+  await login(page, '13800000002');
+  await expectPageHeading(page, '/students', '学生管理');
+
+  await page.getByRole('button', { name: '查看' }).first().click();
+  const drawer = page.locator('.ant-drawer-content').last();
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('tab', { name: '学习记录' }).click();
+  await expect(drawer.getByRole('tab', { name: '学习记录' })).toHaveAttribute('aria-selected', 'true');
+
+  const firstRecord = drawer.locator('.card-list-grid .info-card').first();
+  await expect(firstRecord).toBeVisible();
+  await expect(firstRecord.getByText('分数', { exact: true })).toBeVisible();
+  await expect(firstRecord.getByText('时间', { exact: true })).toBeVisible();
+  await expect(firstRecord.getByText('说明', { exact: true })).toBeVisible();
+});
+
 test('校区管理员可在课程开通矩阵查看明细并调整内容', async ({ page }) => {
   await login(page, '13800000002');
 
