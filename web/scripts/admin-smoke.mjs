@@ -103,8 +103,8 @@ async function run() {
     await waitForText(page, '学生管理');
     await page.getByRole('button', { name: '新增学生' }).waitFor({ state: 'visible', timeout: 10_000 });
     await page.getByRole('button', { name: '批量导入' }).waitFor({ state: 'visible', timeout: 10_000 });
-    await page.getByRole('button', { name: '开通课程' }).first().click();
-    await waitForText(page, '选择家长购买的课程方案');
+    await page.getByRole('button', { name: '开通学习内容' }).first().click();
+    await waitForText(page, '按需开通学习内容');
     await page.goto(`${baseURL}/open`, { waitUntil: 'domcontentloaded' });
     await waitForText(page, '学生管理');
     assert(page.url().includes('/students'), `expected legacy open URL to redirect, got ${page.url()}`);

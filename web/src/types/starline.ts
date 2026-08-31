@@ -187,6 +187,7 @@ export type Student = {
   lastSubmittedAt?: string;
   lastSubmissionStatus?: string;
   effectiveUntil?: string;
+  activeTutoringAssignments?: TutoringAssignmentSummary[];
   bindCode?: string;
   bindCodeExpiresAt?: string;
 };
@@ -194,6 +195,9 @@ export type Student = {
 export type StudentPackageRef = {
   packageId: string;
   packageName: string;
+  openCourses?: string[];
+  openMaterials?: string[];
+  openHomework?: string[];
 };
 
 export type StudentUpsertRequest = {
@@ -214,6 +218,13 @@ export type StudentGrant = {
   startsAt: string;
   effectiveUntil: string;
   permissionState: string;
+  isDirect: boolean;
+  learningSpaceIds: string[];
+  learningSpaces: string[];
+  contentTypes: string[];
+  openCourses: string[];
+  openMaterials: string[];
+  openHomework: string[];
 };
 
 export type TutoringAssignment = {
@@ -239,6 +250,15 @@ export type TutoringAssignment = {
   updatedAt: string;
 };
 
+export type TutoringAssignmentSummary = {
+  teacherId: string;
+  teacherName: string;
+  subjectName: string;
+  levelCode: string;
+  role: 'primary' | 'assistant';
+  startsAt: string;
+};
+
 export type TutoringAssignmentCreateRequest = {
   teacherId: string;
   subjectId: string;
@@ -251,6 +271,18 @@ export type DirectGrantCreateRequest = {
   studentId: string;
   learningSpaceIds: string[];
   contentTypeCodes: string[];
+  startsAt?: string;
+  endsAt?: string;
+};
+
+export type DirectGrantSelection = {
+  learningSpaceId: string;
+  contentTypeCodes: string[];
+};
+
+export type DirectGrantReplaceRequest = {
+  studentId: string;
+  selections: DirectGrantSelection[];
   startsAt?: string;
   endsAt?: string;
 };

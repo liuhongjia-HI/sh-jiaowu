@@ -23,3 +23,6 @@ func (s *Service) CreateGrant(operator string, req learning.GrantCreateRequest) 
 func (s *Service) CreateDirectGrant(operator string, req learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error) {
 	return s.grant.CreateDirectGrant(operator, req)
 }
+func (s *Service) ReplaceDirectGrant(operator string, req learning.DirectGrantReplaceRequest) (learning.DirectGrantResult, error) {
+	return s.grant.ReplaceDirectGrant(operator, req)
+}

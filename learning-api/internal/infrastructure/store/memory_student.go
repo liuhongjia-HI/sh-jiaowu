@@ -294,16 +294,19 @@ func (s *MemoryStore) studentGrantsUnlocked(principal learning.Principal, id str
 	}
 	grants := make([]learning.StudentGrant, 0)
 	for _, grant := range s.grants {
-		if grant.StudentID != id {
+		if grant.StudentID != id || grant.Status == "revoked" {
 			continue
 		}
 		pkg, ok := s.findPackage(grant.PackageID)
 		if !ok {
 			continue
 		}
+		openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
 		grants = append(grants, learning.StudentGrant{
 			StudentID: id, PackageID: pkg.ID, PackageName: pkg.Name, StartsAt: grant.StartsAt,
 			EffectiveUntil: grantEndsAt(grant), PermissionState: grantPermissionState(grant),
+			IsDirect: isDirectGrantPackage(pkg.ID), LearningSpaceIDs: s.learningSpaceIDsForPackage(pkg.ID), LearningSpaces: s.learningSpaceNamesForPackage(pkg.ID),
+			ContentTypes: s.contentTypeLabelsForPackage(pkg.ID), OpenCourses: openCourses, OpenMaterials: openMaterials, OpenHomework: openHomework,
 		})
 	}
 	return grants, nil

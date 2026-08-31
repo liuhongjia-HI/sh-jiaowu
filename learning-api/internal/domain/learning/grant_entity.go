@@ -81,12 +81,19 @@ type StudentPackageRecommendation struct {
 }
 
 type StudentGrant struct {
-	StudentID       string `json:"studentId"`
-	PackageID       string `json:"packageId"`
-	PackageName     string `json:"packageName"`
-	StartsAt        string `json:"startsAt"`
-	EffectiveUntil  string `json:"effectiveUntil"`
-	PermissionState string `json:"permissionState"`
+	StudentID        string   `json:"studentId"`
+	PackageID        string   `json:"packageId"`
+	PackageName      string   `json:"packageName"`
+	StartsAt         string   `json:"startsAt"`
+	EffectiveUntil   string   `json:"effectiveUntil"`
+	PermissionState  string   `json:"permissionState"`
+	IsDirect         bool     `json:"isDirect"`
+	LearningSpaceIDs []string `json:"learningSpaceIds"`
+	LearningSpaces   []string `json:"learningSpaces"`
+	ContentTypes     []string `json:"contentTypes"`
+	OpenCourses      []string `json:"openCourses"`
+	OpenMaterials    []string `json:"openMaterials"`
+	OpenHomework     []string `json:"openHomework"`
 }
 
 type GrantCreateRequest struct {
@@ -104,6 +111,22 @@ type DirectGrantCreateRequest struct {
 	ContentTypeCodes []string `json:"contentTypeCodes"`
 	StartsAt         string   `json:"startsAt"`
 	EndsAt           string   `json:"endsAt"`
+}
+
+// DirectGrantSelection describes the exact content manually opened for one learning space.
+// It is kept separate from package grants so correcting one student's selection never changes a shared package.
+type DirectGrantSelection struct {
+	LearningSpaceID  string   `json:"learningSpaceId"`
+	ContentTypeCodes []string `json:"contentTypeCodes"`
+}
+
+// DirectGrantReplaceRequest replaces one student's complete set of direct grants.
+// An empty selection list intentionally cancels all of that student's direct grants.
+type DirectGrantReplaceRequest struct {
+	StudentID  string                 `json:"studentId"`
+	Selections []DirectGrantSelection `json:"selections"`
+	StartsAt   string                 `json:"startsAt"`
+	EndsAt     string                 `json:"endsAt"`
 }
 
 type DirectGrantResult struct {

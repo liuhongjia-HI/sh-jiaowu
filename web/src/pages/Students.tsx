@@ -19,6 +19,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message
@@ -33,8 +34,9 @@ import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } fro
 import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
 import type {
   CurrentUser,
-  DirectGrantCreateRequest,
+  DirectGrantReplaceRequest,
   DirectGrantResult,
+  DirectGrantSelection,
   LearningSpace,
   Student,
   StudentDetail,
@@ -48,6 +50,7 @@ import type {
 	SubjectMetadata,
 	Teacher,
 	TutoringAssignment,
+	TutoringAssignmentSummary,
 	TutoringAssignmentCreateRequest,
 	ScheduleClass,
 	LessonFeedback
@@ -90,6 +93,38 @@ function packageStatusTag(student: Student) {
   return <Tag>未开通</Tag>;
 }
 
+function packageStatusInfo(student: Student) {
+  return (
+    <Space direction="vertical" size={2}>
+      {packageStatusTag(student)}
+      <ExpiryReminder endTime={student.effectiveUntil} />
+    </Space>
+  );
+}
+
+function TutoringTeacherNames({ assignments }: { assignments?: TutoringAssignmentSummary[] }) {
+  if (!assignments?.length) return <Typography.Text type="secondary">未分配老师</Typography.Text>;
+  const visible = assignments.slice(0, 2);
+  return (
+    <Tooltip
+      title={(
+        <Space direction="vertical" size={4}>
+          {assignments.map((item) => (
+            <Typography.Text key={`${item.teacherId}-${item.subjectName}-${item.levelCode}-${item.role}`} style={{ color: '#fff' }}>
+              {item.teacherName} · {item.role === 'primary' ? '主辅导' : '协作'} · {item.subjectName} {item.levelCode}级 · {item.startsAt} 起
+            </Typography.Text>
+          ))}
+        </Space>
+      )}
+    >
+      <Space size={[4, 4]} wrap>
+        {visible.map((item) => <Tag key={`${item.teacherId}-${item.subjectName}-${item.levelCode}-${item.role}`} color={item.role === 'primary' ? 'blue' : 'default'}>{item.teacherName}</Tag>)}
+        {assignments.length > visible.length && <Tag>+{assignments.length - visible.length}</Tag>}
+      </Space>
+    </Tooltip>
+  );
+}
+
 export default function Students({ user }: { user: CurrentUser }) {
   const [filters, setFilters] = useState<StudentFilters>({});
   const [studentForm] = Form.useForm<StudentFormValues>();
@@ -97,10 +132,11 @@ export default function Students({ user }: { user: CurrentUser }) {
   const [studentDrawerOpen, setStudentDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Student | null>(null);
   const [studentDrawerTab, setStudentDrawerTab] = useState('profile');
-  const [directLearningSpaceIds, setDirectLearningSpaceIds] = useState<string[]>([]);
-  const [directContentTypeCodes, setDirectContentTypeCodes] = useState<string[]>([]);
+  const [directSelections, setDirectSelections] = useState<DirectGrantSelection[]>([]);
+  const [initialDirectSelections, setInitialDirectSelections] = useState<DirectGrantSelection[]>([]);
   const [directStartsAt, setDirectStartsAt] = useState('');
   const [directEndsAt, setDirectEndsAt] = useState('');
+  const [directPeriodChanged, setDirectPeriodChanged] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const queryClient = useQueryClient();
@@ -120,6 +156,18 @@ export default function Students({ user }: { user: CurrentUser }) {
     enabled: Boolean(selected),
     queryFn: () => getData<StudentDetail>(`/students/${selected?.id}`)
   });
+
+  useEffect(() => {
+    if (!selected || detail.data?.student.id !== selected.id) return;
+    const selections = detail.data.grants
+      .filter((grant) => grant.isDirect && grant.permissionState !== '已到期')
+      .flatMap((grant) => grant.learningSpaceIds.map((learningSpaceId) => ({
+        learningSpaceId,
+        contentTypeCodes: grant.contentTypes.map(contentTypeCode)
+      })));
+    setDirectSelections(selections);
+    setInitialDirectSelections(selections);
+  }, [detail.data, selected]);
 
   const availableDirectLearningSpaces = useMemo(
     () => (learningSpaces.data ?? []).filter((item) => item.status === '启用' && item.grade === selected?.grade),
@@ -171,27 +219,22 @@ export default function Students({ user }: { user: CurrentUser }) {
   const createDirectGrant = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error('请先选择学生');
-      const body: DirectGrantCreateRequest = {
+      const body: DirectGrantReplaceRequest = {
         studentId: selected.id,
-        learningSpaceIds: directLearningSpaceIds,
-        contentTypeCodes: directContentTypeCodes,
-        startsAt: directStartsAt || undefined,
-        endsAt: directEndsAt || undefined
+        selections: directSelections.filter((selection) => selection.contentTypeCodes.length > 0),
+        startsAt: directPeriodChanged ? (directStartsAt || undefined) : undefined,
+        endsAt: directPeriodChanged ? (directEndsAt || undefined) : undefined
       };
-      return postData<DirectGrantResult>('/grants/direct', body);
+      return putData<DirectGrantResult>('/grants/direct', body);
     },
     onSuccess: (result) => {
-      message.success(`已为 ${result.studentName} 开通 ${result.learningSpaces.length} 个课程范围的${result.contentTypes.join('、')}。`);
-      setDirectLearningSpaceIds([]);
-      setDirectContentTypeCodes([]);
-      setDirectStartsAt(toDateTimeInput(new Date()));
-      setDirectEndsAt('');
+      message.success(result.learningSpaces.length ? `已保存 ${result.studentName} 的直接开通内容。` : `已取消 ${result.studentName} 的全部直接开通内容。`);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err: Error) => message.error(err.message || '开通失败，请检查课程范围和学习内容。')
+    onError: (err: Error) => message.error(err.message || '保存失败，请检查课程范围和学习内容。')
   });
 
   const importStudents = useMutation({
@@ -255,7 +298,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       render: (_, record) => (
         <Space size={4}>
           <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
-          {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
+          {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通学习内容" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
           {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
           {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
         </Space>
@@ -269,7 +312,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       width: 108,
       render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag></Space>
     },
-    { title: '套餐状态', width: 96, render: (_, record) => packageStatusTag(record) },
+    { title: '套餐状态', width: 144, render: (_, record) => packageStatusInfo(record) },
     {
       title: '课程',
       dataIndex: 'openedPackageRefs',
@@ -277,31 +320,49 @@ export default function Students({ user }: { user: CurrentUser }) {
       render: (values: StudentPackageRef[], record) => <PackageLinks values={values} onOpen={() => openStudentDetail(record, 'courses')} />
     },
     {
-      title: '学习情况',
-      width: 146,
-      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.learningStatus.includes('未') ? 'orange' : 'green'}>{record.learningStatus}</Tag><Typography.Text type="secondary">连续 {record.streakDays} 天 · 均分 {record.averageScore ?? '-'}</Typography.Text></Space>
-    },
-    { title: '账号', dataIndex: 'accountStatus', width: 88, render: (value) => <Tag color={value === '正常' ? 'green' : value === '停用' ? 'default' : 'orange'}>{value}</Tag> },
-    { title: '添加时间', dataIndex: 'createdAt', width: 150, ellipsis: true, render: (value) => value || '-' },
-    { title: '最近学习', dataIndex: 'lastStudyAt', width: 150, ellipsis: true, render: (value) => value || '-' }
+      title: '辅导老师',
+      dataIndex: 'activeTutoringAssignments',
+      width: 190,
+      render: (values: TutoringAssignmentSummary[]) => <TutoringTeacherNames assignments={values} />
+    }
   ];
 
   function openStudentDetail(student: Student, tab = 'profile') {
     setSelected(student);
     setStudentDrawerTab(tab);
-    setDirectLearningSpaceIds([]);
-    setDirectContentTypeCodes([]);
+    setDirectSelections([]);
+    setInitialDirectSelections([]);
     setDirectStartsAt('');
     setDirectEndsAt('');
+    setDirectPeriodChanged(false);
   }
 
   function openDirectGrant(student: Student) {
     setSelected(student);
     setStudentDrawerTab('direct-grant');
-    setDirectLearningSpaceIds([]);
-    setDirectContentTypeCodes([]);
+    setDirectSelections([]);
+    setInitialDirectSelections([]);
     setDirectStartsAt(toDateTimeInput(new Date()));
     setDirectEndsAt('');
+    setDirectPeriodChanged(false);
+  }
+
+  function submitDirectGrant() {
+    const previous = selectionKeys(initialDirectSelections);
+    const next = selectionKeys(directSelections);
+    const removed = [...previous].filter((key) => !next.has(key));
+    if (removed.length === 0) {
+      createDirectGrant.mutate();
+      return;
+    }
+    Modal.confirm({
+      title: '确认取消已开通内容？',
+      content: `将取消 ${removed.length} 项直接开通内容；这不会影响套餐或其他学生。`,
+      okText: '确认取消',
+      okButtonProps: { danger: true },
+      cancelText: '暂不取消',
+      onOk: () => createDirectGrant.mutate()
+    });
   }
 
   if (students.isLoading) return <Skeleton active />;
@@ -358,12 +419,13 @@ export default function Students({ user }: { user: CurrentUser }) {
                   className={record.followUpStatus === '待跟进' ? 'student-follow-up-card' : undefined}
                   title={<Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f">{record.name}</Badge>}
                   subtitle={`${record.grade} · ${record.phone}`}
-                  status={<Space size={4}><Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>{packageStatusTag(record)}</Space>}
+                  status={<Space direction="vertical" size={2} align="end"><Space size={4}><Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>{packageStatusTag(record)}</Space>{packageExpiryReminder(record.effectiveUntil) && <ExpiryReminder endTime={record.effectiveUntil} />}</Space>}
                   fields={[
                     { label: '微信关联', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag> },
                     { label: '家长姓名', value: record.guardianName || '-' },
                     { label: '学校', value: record.schoolName || '-' },
                     { label: '公众号', value: <Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '已关联' : '未关联'}</Tag> },
+                    { label: '辅导老师', value: <TutoringTeacherNames assignments={record.activeTutoringAssignments} /> },
                     { label: '学习状态', value: <Tag color={record.learningStatus.includes('未') ? 'orange' : 'green'}>{record.learningStatus}</Tag> },
                     { label: '连续学习', value: `${record.streakDays} 天` },
                     { label: '平均分', value: record.averageScore ?? '-' },
@@ -381,7 +443,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                   actions={(
                     <>
                       <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
-                      {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通课程" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
+                      {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通学习内容" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
                       {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
                       {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
                     </>
@@ -390,7 +452,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1536 }} pagination={{ pageSize: 8 }} /></div>
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1280 }} pagination={{ pageSize: 8 }} /></div>
           )}
         </div>
       </Card>
@@ -494,16 +556,14 @@ export default function Students({ user }: { user: CurrentUser }) {
                     learningSpaces={availableDirectLearningSpaces}
                     loadingLearningSpaces={learningSpaces.isLoading}
                     learningSpacesError={Boolean(learningSpaces.error)}
-                    selectedLearningSpaceIds={directLearningSpaceIds}
-                    selectedContentTypeCodes={directContentTypeCodes}
+                    selections={directSelections}
                     startsAt={directStartsAt}
                     endsAt={directEndsAt}
                     submitting={createDirectGrant.isPending}
-                    onLearningSpaceIdsChange={setDirectLearningSpaceIds}
-                    onContentTypeCodesChange={setDirectContentTypeCodes}
-                    onStartsAtChange={setDirectStartsAt}
-                    onEndsAtChange={setDirectEndsAt}
-                    onSubmit={() => createDirectGrant.mutate()}
+                    onSelectionsChange={setDirectSelections}
+                    onStartsAtChange={(value) => { setDirectStartsAt(value); setDirectPeriodChanged(true); }}
+                    onEndsAtChange={(value) => { setDirectEndsAt(value); setDirectPeriodChanged(true); }}
+                    onSubmit={submitDirectGrant}
                   />
                 ) : null
               }] : []),
@@ -768,6 +828,10 @@ function TutoringAssignmentPanel({
   const selectedSubject = selectableSubjects.find((subject) => subject.id === selectedSubjectId);
   const levelOptions = useMemo(() => uniqueOptions(studentSpaces.filter((space) => !selectedSubject || space.subject === selectedSubject.name).map((space) => space.level || 'S')), [studentSpaces, selectedSubject]);
   const selectableTeachers = useMemo(() => teachers.filter((teacher) => teacher.accountStatus === '正常' && studentSpaces.some((space) => (!selectedSubject || space.subject === selectedSubject.name) && (!selectedLevelCode || (space.level || 'S') === selectedLevelCode) && teacher.learningSpaceIds.includes(space.id))), [teachers, studentSpaces, selectedSubject, selectedLevelCode]);
+  const transferableTeachers = useMemo(() => {
+    if (!action || action.kind !== 'transfer') return [];
+    return teachers.filter((teacher) => teacher.accountStatus === '正常' && teacher.id !== action.assignment.teacherId && studentSpaces.some((space) => space.subject === action.assignment.subjectName && (space.level || 'S') === action.assignment.levelCode && teacher.learningSpaceIds.includes(space.id)));
+  }, [action, teachers, studentSpaces]);
   const create = useMutation({
     mutationFn: (values: TutoringAssignmentCreateRequest) => postData<TutoringAssignment>(`/students/${student.id}/tutoring-assignments`, { ...values, role: values.role || 'primary' }),
     onSuccess: () => {
@@ -829,7 +893,7 @@ function TutoringAssignmentPanel({
       </FormDrawer>
       <FormDrawer title={action?.kind === 'transfer' ? '转交辅导关系' : '结束辅导关系'} open={Boolean(action)} onCancel={() => setAction(null)} onSubmit={() => actionForm.submit()} submitting={update.isPending} submitText={action?.kind === 'transfer' ? '确认转交' : '确认结束'}>
         <Form form={actionForm} layout="vertical" onFinish={(values) => update.mutate(values)}>
-          {action?.kind === 'transfer' && <Form.Item name="teacherId" label="新的辅导老师" rules={[{ required: true, message: '请选择新的辅导老师' }]}><Select placeholder="请选择老师" options={teachers.filter((teacher) => teacher.accountStatus === '正常' && teacher.id !== action.assignment.teacherId).map((teacher) => ({ value: teacher.id, label: teacher.name }))} /></Form.Item>}
+          {action?.kind === 'transfer' && <Form.Item name="teacherId" label="新的辅导老师" rules={[{ required: true, message: '请选择新的辅导老师' }]}><Select placeholder="只显示覆盖当前学生年级、学科和等级的老师" options={transferableTeachers.map((teacher) => ({ value: teacher.id, label: teacher.name }))} /></Form.Item>}
           <Form.Item name="startsAt" label={action?.kind === 'transfer' ? '转交生效日期' : '结束日期'} rules={[{ required: true, message: '请选择日期' }]}><Input type="date" /></Form.Item>
           <Form.Item name="reason" label={action?.kind === 'transfer' ? '转交原因' : '结束原因'} rules={[{ required: true, message: '请填写原因，方便后续交接追溯' }]}><Input.TextArea rows={3} placeholder="例如：老师请假、学科调整或学生结课" /></Form.Item>
         </Form>
@@ -911,9 +975,16 @@ function StudentCourses({ detail }: { detail: StudentDetail }) {
         emptyText="暂未开通课程"
         renderCard={(record) => (
           <InfoCard
-            title={<Typography.Text strong>{record.packageName}</Typography.Text>}
+            title={<Space size={6}><Typography.Text strong>{record.packageName}</Typography.Text>{record.isDirect && <Tag color="cyan">直接开通</Tag>}</Space>}
             subtitle={`${record.startsAt || '-'} 至 ${record.effectiveUntil || '-'}`}
             status={tagStatus(record.permissionState)}
+            fields={[
+              { label: '课程范围', value: record.learningSpaces.join('、') || '暂无' },
+              { label: '开通类型', value: record.contentTypes.join('、') || '暂无' },
+              { label: '课程', value: record.openCourses.join('、') || '暂无' },
+              { label: '讲义', value: record.openMaterials.join('、') || '暂无' },
+              { label: '题目', value: record.openHomework.join('、') || '暂无' }
+            ]}
           />
         )}
       />
@@ -933,13 +1004,11 @@ function DirectGrantPanel({
   learningSpaces,
   loadingLearningSpaces,
   learningSpacesError,
-  selectedLearningSpaceIds,
-  selectedContentTypeCodes,
+  selections,
   startsAt,
   endsAt,
   submitting,
-  onLearningSpaceIdsChange,
-  onContentTypeCodesChange,
+  onSelectionsChange,
   onStartsAtChange,
   onEndsAtChange,
   onSubmit
@@ -948,13 +1017,11 @@ function DirectGrantPanel({
   learningSpaces: LearningSpace[];
   loadingLearningSpaces: boolean;
   learningSpacesError: boolean;
-  selectedLearningSpaceIds: string[];
-  selectedContentTypeCodes: string[];
+  selections: DirectGrantSelection[];
   startsAt: string;
   endsAt: string;
   submitting: boolean;
-  onLearningSpaceIdsChange: (values: string[]) => void;
-  onContentTypeCodesChange: (values: string[]) => void;
+  onSelectionsChange: (values: DirectGrantSelection[]) => void;
   onStartsAtChange: (value: string) => void;
   onEndsAtChange: (value: string) => void;
   onSubmit: () => void;
@@ -969,24 +1036,30 @@ function DirectGrantPanel({
     () => selectedSubject ? learningSpaces.filter((space) => space.subject === selectedSubject) : learningSpaces,
     [learningSpaces, selectedSubject]
   );
-  const canSubmit = selectedLearningSpaceIds.length > 0 && selectedContentTypeCodes.length > 0;
+  const selectedCount = selections.filter((selection) => selection.contentTypeCodes.length > 0).length;
+  const selectionFor = (learningSpaceId: string) => selections.find((selection) => selection.learningSpaceId === learningSpaceId)?.contentTypeCodes ?? [];
+  const changeSelection = (learningSpaceId: string, values: string[]) => {
+    const next = selections.filter((selection) => selection.learningSpaceId !== learningSpaceId);
+    if (values.length > 0) next.push({ learningSpaceId, contentTypeCodes: values });
+    onSelectionsChange(next);
+  };
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Alert
         type="info"
         showIcon
         message="按需开通学习内容"
-        description={`先选择 ${student.name} 要学习的课程范围，再勾选需要开放的课程、习题或学习资料。可设置何时对家长可见；结束时间不填时按当前校历自动计算。`}
+        description={`已开通的内容会自动勾选。取消勾选后保存，即可撤销 ${student.name} 的手动开通内容；不会影响套餐或其他学生。`}
       />
       <div>
-        <Typography.Text strong>课程范围</Typography.Text>
+        <Typography.Text strong>课程范围与学习内容</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          只展示该学生所在年级可开通的课程范围。
+          每个课程范围可单独开通课程、讲义和题目；取消该范围全部勾选会撤销该范围的直接开通。
         </Typography.Paragraph>
         <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
           <Space wrap size={[8, 8]}>
             <Tag color="blue">当前年级：{student.grade}</Tag>
-            <Typography.Text type="secondary">已选 {selectedLearningSpaceIds.length} 个课程范围</Typography.Text>
+            <Typography.Text type="secondary">已选 {selectedCount} 个课程范围</Typography.Text>
           </Space>
           <div role="group" aria-label="科目筛选">
             <Space wrap size={[8, 8]}>
@@ -1014,42 +1087,29 @@ function DirectGrantPanel({
         ) : visibleLearningSpaces.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该科目暂无可开通课程范围。" />
         ) : (
-          <Checkbox.Group
-            aria-label="课程范围"
-            value={selectedLearningSpaceIds}
-            onChange={(values) => onLearningSpaceIdsChange(values.filter((value): value is string => typeof value === 'string'))}
-          >
-            <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              {visibleLearningSpaces.map((space) => (
-                <Checkbox key={space.id} value={space.id}>
-                  {space.name}
-                </Checkbox>
-              ))}
-            </Space>
-          </Checkbox.Group>
-        )}
-      </div>
-      <div>
-        <Typography.Text strong>学习内容</Typography.Text>
-        <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          本次勾选的类型会立即开通；已经开通的内容不会因取消勾选而关闭。
-        </Typography.Paragraph>
-        <Checkbox.Group
-          aria-label="学习内容"
-          value={selectedContentTypeCodes}
-          onChange={(values) => onContentTypeCodesChange(values.filter((value): value is string => typeof value === 'string'))}
-        >
-          <Space wrap size={[20, 8]}>
-            <Checkbox value="course">课程</Checkbox>
-            <Checkbox value="question">习题</Checkbox>
-            <Checkbox value="handout">学习资料</Checkbox>
+          <Space direction="vertical" size={10} style={{ width: '100%' }}>
+            {visibleLearningSpaces.map((space) => (
+              <Card size="small" key={space.id} title={space.name}>
+                <Checkbox.Group
+                  aria-label={`${space.name}学习内容`}
+                  value={selectionFor(space.id)}
+                  onChange={(values) => changeSelection(space.id, values.filter((value): value is string => typeof value === 'string'))}
+                >
+                  <Space wrap size={[20, 8]}>
+                    <Checkbox value="course">课程</Checkbox>
+                    <Checkbox value="handout">讲义</Checkbox>
+                    <Checkbox value="question">题目</Checkbox>
+                  </Space>
+                </Checkbox.Group>
+              </Card>
+            ))}
           </Space>
-        </Checkbox.Group>
+        )}
       </div>
       <div>
         <Typography.Text strong>生效时间</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          开通时间默认现在。未到开通时间的课程不会在学生端显示；结束时间留空时按当前校历到期。
+          新开通内容默认从现在生效；不修改时间时，已开通内容会保留原有效期。手动修改时间后，会统一更新本次保留内容的有效期。
         </Typography.Paragraph>
         <Space direction="vertical" size={8} style={{ width: '100%' }}>
           <label>
@@ -1066,10 +1126,10 @@ function DirectGrantPanel({
         type="primary"
         icon={<UnlockOutlined />}
         loading={submitting}
-        disabled={!canSubmit || loadingLearningSpaces || learningSpacesError}
+        disabled={loadingLearningSpaces || learningSpacesError}
         onClick={onSubmit}
       >
-        确认开通
+        保存学习内容
       </Button>
     </Space>
   );
@@ -1080,12 +1140,45 @@ function toDateTimeInput(value: Date) {
   return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
+function contentTypeCode(value: string) {
+  if (value === '课程') return 'course';
+  if (value === '学习资料') return 'handout';
+  if (value === '题') return 'question';
+  return value;
+}
+
+function selectionKeys(selections: DirectGrantSelection[]) {
+  return new Set(selections.flatMap((selection) => selection.contentTypeCodes.map((contentTypeCode) => `${selection.learningSpaceId}:${contentTypeCode}`)));
+}
+
+function ExpiryReminder({ endTime }: { endTime?: string }) {
+  const expiry = packageExpiryReminder(endTime);
+  if (!expiry) return null;
+  return <Typography.Text className={`student-package-expiry student-package-expiry-${expiry.level}`}>{expiry.text}</Typography.Text>;
+}
+
+function packageExpiryReminder(endTime?: string) {
+  if (!endTime) return null;
+  const normalized = endTime.includes('T') ? endTime : endTime.replace(' ', 'T');
+  const parsed = new Date(normalized.length === 10 ? `${normalized}T23:59:59` : normalized);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const remainingDays = Math.ceil((parsed.getTime() - Date.now()) / 86_400_000);
+  const level = remainingDays <= 7 ? 'urgent' : remainingDays <= 14 ? 'warning' : 'normal';
+  return { level, text: `结束时间：${endTime.slice(0, 10)}` };
+}
+
 function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: () => void }) {
   if (!values?.length) return <Typography.Text type="secondary">暂未开通课程</Typography.Text>;
   return (
     <Space size={[4, 4]} wrap>
-      {values.map((item) => (
-        <Typography.Link key={item.packageId} onClick={onOpen}><Tag color="blue">{item.packageName}</Tag></Typography.Link>
+      {values.flatMap((item) => [
+        ...(item.openCourses?.map((title) => ({ key: `course-${item.packageId}-${title}`, label: `课程：${title}`, color: 'blue' })) ?? []),
+        ...(item.openMaterials?.map((title) => ({ key: `material-${item.packageId}-${title}`, label: `讲义：${title}`, color: 'green' })) ?? []),
+        ...(item.openHomework?.map((title) => ({ key: `homework-${item.packageId}-${title}`, label: `题目：${title}`, color: 'purple' })) ?? []),
+        ...(item.openCourses?.length || item.openMaterials?.length || item.openHomework?.length ? [] : [{ key: `package-${item.packageId}`, label: item.packageName, color: 'blue' }])
+      ]).map((item) => (
+        <Typography.Link key={item.key} onClick={onOpen}><Tag color={item.color}>{item.label}</Tag></Typography.Link>
       ))}
     </Space>
   );

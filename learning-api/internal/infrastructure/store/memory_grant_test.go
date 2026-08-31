@@ -104,6 +104,107 @@ func TestCreateDirectGrantOpensOnlySelectedLearningContent(t *testing.T) {
 	}
 }
 
+func TestReplaceDirectGrantRemovesOnlySelectedDirectContent(t *testing.T) {
+	store := NewMemoryStore()
+	studentID := "stu-001"
+	spaceID := "space-g05-math-s1-q1"
+	startsAt := time.Now().Add(-time.Hour).Format("2006-01-02T15:04")
+	endsAt := time.Now().Add(48 * time.Hour).Format("2006-01-02T15:04")
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID: studentID, LearningSpaceIDs: []string{spaceID}, ContentTypeCodes: []string{"course", "handout", "question"}, StartsAt: startsAt, EndsAt: endsAt,
+	}); err != nil {
+		t.Fatalf("create direct grant: %v", err)
+	}
+	grantIndex, ok := store.findGrantIndex(studentID, directGrantPackageID(studentID, spaceID))
+	if !ok {
+		t.Fatal("expected direct grant after creation")
+	}
+	initialGrant := store.grants[grantIndex]
+
+	if _, err := store.ReplaceDirectGrant("运营教务", learning.DirectGrantReplaceRequest{
+		StudentID:  studentID,
+		Selections: []learning.DirectGrantSelection{{LearningSpaceID: spaceID, ContentTypeCodes: []string{"course"}}},
+	}); err != nil {
+		t.Fatalf("replace direct grant: %v", err)
+	}
+
+	principal, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("student principal: %v", err)
+	}
+	study, err := store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("student study: %v", err)
+	}
+	if index, ok := store.findGrantIndex(studentID, directGrantPackageID(studentID, spaceID)); !ok || store.grants[index].StartsAt != initialGrant.StartsAt || store.grants[index].EndsAt != initialGrant.EndsAt {
+		t.Fatalf("content-only replacement must retain the existing period: %#v", store.grants)
+	}
+	mathCourse := findCourseByLearningSpace(study.Courses, spaceID)
+	if mathCourse == nil || mathCourse.MaterialNum != 0 || mathCourse.HomeworkNum != 0 {
+		t.Fatalf("only the retained direct course should remain accessible: %#v", mathCourse)
+	}
+	for _, material := range store.materialsForStudent(studentID) {
+		if material.LearningSpaceID == spaceID {
+			t.Fatalf("removed direct handouts must no longer be visible: %#v", material)
+		}
+	}
+	for _, homework := range store.homeworkForStudent(studentID) {
+		if homework.LearningSpaceID == spaceID {
+			t.Fatalf("removed direct questions must no longer be visible: %#v", homework)
+		}
+	}
+}
+
+func TestStudentStudyCountsOnlyAccessibleLearningContent(t *testing.T) {
+	store := NewMemoryStore()
+	request := learning.DirectGrantCreateRequest{
+		StudentID:        "stu-001",
+		LearningSpaceIDs: []string{"space-g05-math-s1-q1"},
+		ContentTypeCodes: []string{"course"},
+	}
+	if _, err := store.CreateDirectGrant("运营教务", request); err != nil {
+		t.Fatalf("expected course-only direct grant to succeed: %v", err)
+	}
+
+	principal, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+	study, err := store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("expected study board: %v", err)
+	}
+	mathCourse := findCourseByLearningSpace(study.Courses, "space-g05-math-s1-q1")
+	if mathCourse == nil {
+		t.Fatalf("expected opened math course, got %#v", study.Courses)
+	}
+	if mathCourse.MaterialNum != 0 || mathCourse.HomeworkNum != 0 {
+		t.Fatalf("course card must not count inaccessible content, got %#v", mathCourse)
+	}
+
+	request.ContentTypeCodes = []string{"handout", "question"}
+	if _, err := store.CreateDirectGrant("运营教务", request); err != nil {
+		t.Fatalf("expected content permissions to merge into the direct grant: %v", err)
+	}
+	study, err = store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("expected refreshed study board: %v", err)
+	}
+	mathCourse = findCourseByLearningSpace(study.Courses, "space-g05-math-s1-q1")
+	if mathCourse == nil || mathCourse.MaterialNum == 0 || mathCourse.HomeworkNum == 0 {
+		t.Fatalf("course card should count newly accessible content, got %#v", mathCourse)
+	}
+}
+
+func findCourseByLearningSpace(courses []learning.StudentCourseCard, learningSpaceID string) *learning.StudentCourseCard {
+	for index := range courses {
+		if courses[index].LearningSpaceID == learningSpaceID {
+			return &courses[index]
+		}
+	}
+	return nil
+}
+
 func TestDirectGrantSupportsTimedPeriodAndHighlightsNewCourse(t *testing.T) {
 	store := NewMemoryStore()
 	startsAt := time.Now().Add(-5 * time.Minute).Format("2006-01-02T15:04")

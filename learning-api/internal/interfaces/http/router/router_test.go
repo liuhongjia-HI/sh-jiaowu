@@ -571,6 +571,25 @@ func TestCreateDirectGrantThroughAPI(t *testing.T) {
 	}
 }
 
+func TestReplaceDirectGrantThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	adminToken := app.loginAdmin(t, "13800000002")
+
+	app.doJSON(t, http.MethodPost, "/api/grants/direct", adminToken, learning.DirectGrantCreateRequest{
+		StudentID: "stu-001", LearningSpaceIDs: []string{"space-g05-math-s1-q1"}, ContentTypeCodes: []string{"course", "handout"},
+	}, http.StatusOK, nil)
+
+	var updated learning.DirectGrantResult
+	app.doJSON(t, http.MethodPut, "/api/grants/direct", adminToken, learning.DirectGrantReplaceRequest{
+		StudentID:  "stu-001",
+		Selections: []learning.DirectGrantSelection{{LearningSpaceID: "space-g05-math-s1-q1", ContentTypeCodes: []string{"course"}}},
+	}, http.StatusOK, &updated)
+	if len(updated.OpenCourses) == 0 || len(updated.OpenMaterials) != 0 || len(updated.OpenHomework) != 0 {
+		t.Fatalf("unexpected replaced direct grant: %#v", updated)
+	}
+}
+
 func TestStudentLearningReviewClosedLoopThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

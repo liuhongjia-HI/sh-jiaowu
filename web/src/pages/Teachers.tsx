@@ -1,6 +1,6 @@
 import { EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Form, Input, Modal, Select, Skeleton, Space, Switch, Table, Tag, Typography, message } from 'antd';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, postData, putData, resetTeacherPassword } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
@@ -23,12 +23,20 @@ export default function Teachers() {
   const [editing, setEditing] = useState<Teacher | null>(null);
   const [open, setOpen] = useState(false);
   const [resetResult, setResetResult] = useState<PasswordResetResult | null>(null);
+  const [scopeGrade, setScopeGrade] = useState<string>();
+  const [scopeSubject, setScopeSubject] = useState<string>();
   const [viewMode, setViewMode] = useListViewMode('starline:list-view:teachers');
   const queryClient = useQueryClient();
 
   const teachers = useQuery({ queryKey: ['teachers'], queryFn: () => getData<Teacher[]>('/teachers') });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const enabledWatch = Form.useWatch('enabled', form);
+  const scopeGradeOptions = useMemo(() => Array.from(new Set((learningSpaces.data ?? []).map((item) => item.grade))).map((value) => ({ label: value, value })), [learningSpaces.data]);
+  const scopeSubjectOptions = useMemo(() => Array.from(new Set((learningSpaces.data ?? []).filter((item) => !scopeGrade || item.grade === scopeGrade).map((item) => item.subject))).map((value) => ({ label: value, value })), [learningSpaces.data, scopeGrade]);
+  const learningSpaceOptions = (learningSpaces.data ?? []).filter((item) => (!scopeGrade || item.grade === scopeGrade) && (!scopeSubject || item.subject === scopeSubject)).map((item) => ({
+    label: item.name,
+    value: item.id
+  }));
 
   const saveTeacher = useMutation({
     mutationFn: (values: TeacherFormValues) => {
@@ -68,6 +76,8 @@ export default function Teachers() {
 
   function openCreate() {
     setEditing(null);
+    setScopeGrade(undefined);
+    setScopeSubject(undefined);
     form.setFieldsValue({
       name: '',
       phone: '',
@@ -83,6 +93,8 @@ export default function Teachers() {
 
   function openEdit(teacher: Teacher) {
     setEditing(teacher);
+    setScopeGrade(undefined);
+    setScopeSubject(undefined);
     form.setFieldsValue({
       name: teacher.name,
       phone: teacher.phone,
@@ -119,10 +131,6 @@ export default function Teachers() {
   if (teachers.error || learningSpaces.error) return <Alert type="error" message="教师列表加载失败，请稍后重试。" />;
 
   const rows = teachers.data ?? [];
-  const learningSpaceOptions = (learningSpaces.data ?? []).map((item) => ({
-    label: item.name,
-    value: item.id
-  }));
 
   return (
     <div className="page-stack">
@@ -220,6 +228,27 @@ export default function Teachers() {
           <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}>
             <Input placeholder="用于首次登录和身份确认" />
           </Form.Item>
+          <Form.Item label="快捷筛选负责范围">
+            <Space.Compact block>
+              <Select
+                allowClear
+                value={scopeGrade}
+                options={scopeGradeOptions}
+                placeholder="先选年级"
+                onChange={(value) => {
+                  setScopeGrade(value);
+                  setScopeSubject(undefined);
+                }}
+              />
+              <Select
+                allowClear
+                value={scopeSubject}
+                options={scopeSubjectOptions}
+                placeholder="再选学科"
+                onChange={setScopeSubject}
+              />
+            </Space.Compact>
+          </Form.Item>
           <Form.Item name="learningSpaceIds" label="负责学习空间" rules={[{ required: true, message: '请选择负责学习空间' }]}>
             <Select
               mode="multiple"
@@ -227,7 +256,7 @@ export default function Teachers() {
               showSearch
               optionFilterProp="label"
               options={learningSpaceOptions}
-              placeholder="选择负责的年级、学科、学期和阶段"
+              placeholder="按上方筛选后选择具体学习空间"
             />
           </Form.Item>
           <Form.Item name="canUploadHandout" label="可上传学习资料" valuePropName="checked">

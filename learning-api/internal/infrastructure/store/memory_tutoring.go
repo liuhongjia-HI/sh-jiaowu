@@ -257,6 +257,22 @@ func (s *MemoryStore) teacherCoversStudentScope(teacher learning.User, student l
 	return false
 }
 
+func (s *MemoryStore) validateTeacherScopeForActiveAssignments(teacher learning.User) error {
+	for _, assignment := range s.tutoringAssignments {
+		if assignment.TeacherID != teacher.ID || assignment.Status != learning.TutoringAssignmentActive {
+			continue
+		}
+		student, ok := s.findStudent(assignment.StudentID)
+		if !ok {
+			continue
+		}
+		if !s.teacherCoversStudentScope(teacher, student, assignment.SubjectName, assignment.LevelCode) {
+			return errors.New("仍有学生的有效辅导关系不在新的负责范围内，请先转交或结束该关系")
+		}
+	}
+	return nil
+}
+
 func (s *MemoryStore) hasActivePrimaryAssignment(studentID, subjectID, levelCode, exceptID string) bool {
 	for _, item := range s.tutoringAssignments {
 		if item.ID != exceptID && item.StudentID == studentID && item.SubjectID == subjectID && item.LevelCode == levelCode && item.Role == learning.TutoringAssignmentPrimary && item.Status == learning.TutoringAssignmentActive {

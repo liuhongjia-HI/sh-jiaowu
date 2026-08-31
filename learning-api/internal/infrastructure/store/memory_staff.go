@@ -175,6 +175,11 @@ func (s *MemoryStore) updateTeacherUnlocked(operator string, principal learning.
 				return learning.Teacher{}, errors.New("手机号已存在")
 			}
 		}
+		proposed := s.users[i]
+		proposed.LearningSpaceIDs = cloneStrings(req.LearningSpaceIDs)
+		if err := s.validateTeacherScopeForActiveAssignments(proposed); err != nil {
+			return learning.Teacher{}, err
+		}
 		before := s.teacherFromUser(s.users[i])
 		s.users[i].Name = req.Name
 		s.users[i].Phone = req.Phone

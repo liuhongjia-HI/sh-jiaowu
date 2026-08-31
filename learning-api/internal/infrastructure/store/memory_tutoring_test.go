@@ -68,3 +68,57 @@ func TestTutoringAssignmentScopesTeacherStudentsAndKeepsTransferHistory(t *testi
 		t.Fatalf("transfer must preserve active and ended history, got %#v", history)
 	}
 }
+
+func TestStudentsExposeOnlyActiveTutoringAssignments(t *testing.T) {
+	store := NewMemoryStore()
+	admin := learning.Principal{UserID: "user-super", Roles: []learning.Role{learning.RoleSuperAdmin}, CampusID: "campus-main"}
+
+	assignment, err := store.CreateTutoringAssignment("教务老师", admin, "stu-001", learning.TutoringAssignmentCreateRequest{
+		TeacherID: "user-teacher", SubjectID: "english", LevelCode: "S", StartsAt: "2026-08-30",
+	})
+	if err != nil {
+		t.Fatalf("create tutoring assignment: %v", err)
+	}
+	if _, err := store.EndTutoringAssignment("教务老师", admin, assignment.ID, learning.TutoringAssignmentEndRequest{
+		EndsAt: "2026-08-31", Reason: "已结课", Version: assignment.Version,
+	}); err != nil {
+		t.Fatalf("end tutoring assignment: %v", err)
+	}
+	if _, err := store.CreateTutoringAssignment("教务老师", admin, "stu-001", learning.TutoringAssignmentCreateRequest{
+		TeacherID: "user-teacher", SubjectID: "english", LevelCode: "S", Role: learning.TutoringAssignmentAssistant, StartsAt: "2026-09-01",
+	}); err != nil {
+		t.Fatalf("create active tutoring assignment: %v", err)
+	}
+
+	students := store.Students(admin, learning.StudentQuery{})
+	if len(students) == 0 {
+		t.Fatal("expected seeded student")
+	}
+	student := students[0]
+	if len(student.ActiveTutoringAssignments) != 1 {
+		t.Fatalf("student list should contain exactly one active tutoring assignment, got %#v", student.ActiveTutoringAssignments)
+	}
+	got := student.ActiveTutoringAssignments[0]
+	if got.TeacherID != "user-teacher" || got.TeacherName != "英语老师" || got.SubjectName != "英文" || got.Role != learning.TutoringAssignmentAssistant {
+		t.Fatalf("unexpected active tutoring assignment summary: %#v", got)
+	}
+}
+
+func TestUpdateTeacherRejectsRemovingScopeUsedByActiveAssignment(t *testing.T) {
+	store := NewMemoryStore()
+	admin := learning.Principal{UserID: "user-super", Roles: []learning.Role{learning.RoleSuperAdmin}, CampusID: "campus-main"}
+	if _, err := store.CreateTutoringAssignment("教务老师", admin, "stu-001", learning.TutoringAssignmentCreateRequest{
+		TeacherID: "user-teacher", SubjectID: "english", LevelCode: "S", StartsAt: "2026-08-30",
+	}); err != nil {
+		t.Fatalf("create tutoring assignment: %v", err)
+	}
+
+	_, err := store.UpdateTeacher("教务老师", admin, "user-teacher", learning.TeacherUpsertRequest{
+		Name: "英语老师", Phone: "13900000003", CampusID: "campus-main",
+		LearningSpaceIDs: []string{"space-g05-math-s1-q1"},
+		CanUploadHandout: true, CanUploadQuestion: true, CanReview: true, AccountStatus: "正常",
+	})
+	if err == nil {
+		t.Fatal("expected scope update to reject an active tutoring assignment")
+	}
+}

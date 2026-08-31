@@ -79,6 +79,7 @@ type GrantRepository interface {
 	GrantPreview(string, string) (learning.GrantPreview, error)
 	CreateGrant(string, learning.GrantCreateRequest) (learning.GrantPreview, error)
 	CreateDirectGrant(string, learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error)
+	ReplaceDirectGrant(string, learning.DirectGrantReplaceRequest) (learning.DirectGrantResult, error)
 	CreatePackage(string, learning.PackageUpsertRequest) (learning.Package, error)
 	UpdatePackage(string, string, learning.PackageUpsertRequest) (learning.Package, error)
 }

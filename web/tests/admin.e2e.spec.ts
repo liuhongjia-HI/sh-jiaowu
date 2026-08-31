@@ -154,6 +154,54 @@ test('学生表格将操作列显示在学生列之后', async ({ page }) => {
   expect(studentTableHeaders.slice(0, 3).map((header) => header.trim())).toEqual(['学生', '操作', '家长姓名']);
 });
 
+test('学生列表直接展示辅导老师并在悬停时显示匹配详情', async ({ page }) => {
+  await login(page, '13800000002');
+  await page.route('**/api/students*', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [{
+          id: 'assigned-student', name: '已分配老师学生', phone: '13900000156', grade: '五年级', schoolName: '星河小学',
+          openedPackages: [], openedPackageRefs: [], learningStatus: '未开始', accountStatus: '正常',
+          streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-30 20:00:00',
+          activeTutoringAssignments: [{ teacherId: 'user-teacher', teacherName: '英语老师', subjectName: '英文', levelCode: 'S', role: 'primary', startsAt: '2026-08-30' }]
+        }]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+  await expect(page.locator('.student-table thead')).toContainText('辅导老师');
+  const teacherTag = page.locator('.student-table tbody tr', { hasText: '已分配老师学生' }).getByText('英语老师', { exact: true });
+  await teacherTag.hover();
+  await expect(page.getByText('英语老师 · 主辅导 · 英文 S级 · 2026-08-30 起')).toBeVisible();
+});
+
+test('新增教师时可按年级和学科筛选负责学习空间', async ({ page }) => {
+  await login(page, '13800000001');
+  await expectPageHeading(page, '/teachers', '老师管理');
+  await page.getByRole('button', { name: '新增教师' }).click();
+  const drawer = page.getByRole('dialog', { name: '新增教师' });
+  await expect(drawer.getByText('快捷筛选负责范围')).toBeVisible();
+
+  const filter = drawer.locator('.ant-form-item').filter({ hasText: '快捷筛选负责范围' });
+  await filter.locator('.ant-select-selector').first().click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('五年级', { exact: true }).last().click();
+  await filter.locator('.ant-select-selector').nth(1).click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('英文', { exact: true }).last().click();
+
+  const scope = drawer.locator('.ant-form-item').filter({ hasText: '负责学习空间' }).last();
+  await scope.locator('.ant-select-selector').click();
+  await expect(page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()).toContainText('五年级英文');
+});
+
 test('未开通课程学生在表格中高亮提示运营跟进', async ({ page }) => {
   await login(page, '13800000002');
   await page.route('**/api/students*', async (route) => {
@@ -180,6 +228,58 @@ test('未开通课程学生在表格中高亮提示运营跟进', async ({ page 
   const followUpRow = page.locator('.student-table tbody tr', { hasText: '运营待跟进高亮学生' });
   await expect(followUpRow).toBeVisible();
   await expect(followUpRow).toHaveClass(/student-follow-up-row/);
+});
+
+test('学生列表会按剩余时间提示已开通课程的结束时间', async ({ page }) => {
+  await login(page, '13800000002');
+  const formatEndTime = (daysFromNow: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day} 23:59:59`;
+  };
+  const warningEndTime = formatEndTime(10);
+  const urgentEndTime = formatEndTime(5);
+
+  await page.route('**/api/students*', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          {
+            id: 'expiry-warning', name: '两周内结束学生', phone: '13900000158', grade: '五年级', schoolName: '星河小学',
+            openedPackages: ['五年级英语'], openedPackageRefs: [{ packageId: 'pkg-warning', packageName: '五年级英语' }], effectiveUntil: warningEndTime,
+            learningStatus: '已开通', accountStatus: '正常', streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-30 20:00:00'
+          },
+          {
+            id: 'expiry-urgent', name: '一周内结束学生', phone: '13900000159', grade: '五年级', schoolName: '星河小学',
+            openedPackages: ['五年级数学'], openedPackageRefs: [{ packageId: 'pkg-urgent', packageName: '五年级数学' }], effectiveUntil: urgentEndTime,
+            learningStatus: '已开通', accountStatus: '正常', streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-30 20:00:00'
+          }
+        ]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+
+  const warningRow = page.locator('.student-table tbody tr', { hasText: '两周内结束学生' });
+  const urgentRow = page.locator('.student-table tbody tr', { hasText: '一周内结束学生' });
+  const warningReminder = warningRow.getByText(`结束时间：${warningEndTime.slice(0, 10)}`);
+  const urgentReminder = urgentRow.getByText(`结束时间：${urgentEndTime.slice(0, 10)}`);
+  await expect(warningReminder).toHaveClass(/student-package-expiry-warning/);
+  await expect(urgentReminder).toHaveClass(/student-package-expiry-urgent/);
+  await expect(warningReminder).not.toContainText('23:59:59');
+  await expect(urgentReminder).not.toContainText('23:59:59');
 });
 
 test('iPad 横屏时学生姓名完整显示且表格可横向查看', async ({ page }) => {
@@ -221,12 +321,12 @@ test('校区管理员可以在学生管理直接开通课程', async ({ page }) 
   await expectPageHeading(page, '/students', '学生管理');
   await expect(page.getByRole('button', { name: '新增学生' })).toBeVisible();
   await expect(page.getByRole('button', { name: '批量导入' })).toBeVisible();
-  await page.getByRole('button', { name: '开通课程' }).first().click();
+  await page.getByRole('button', { name: '开通学习内容' }).first().click();
   const drawer = page.locator('.ant-drawer-content').last();
   await expect(drawer).toBeVisible();
   await drawer.getByRole('tab', { name: '开通学习内容' }).click();
   await expect(drawer.getByText('按需开通学习内容')).toBeVisible();
-  await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('课程范围与学习内容', { exact: true })).toBeVisible();
   await expect(drawer.getByText(/当前年级：/)).toBeVisible();
   const subjectFilter = drawer.getByRole('group', { name: '科目筛选' });
   await expect(subjectFilter).toBeVisible();
@@ -234,17 +334,16 @@ test('校区管理员可以在学生管理直接开通课程', async ({ page }) 
   const englishFilter = subjectFilter.getByRole('button', { name: /英文（\d+）/ });
   await expect(englishFilter).toBeVisible();
 
-  const firstEnglishSpace = drawer.getByRole('checkbox', { name: /英文/ }).first();
-  await firstEnglishSpace.check();
   await englishFilter.click();
-  await expect(drawer.getByRole('checkbox', { name: /数学/ })).toHaveCount(0);
+  const firstEnglishContent = drawer.getByLabel(/^五年级英文.*学习内容$/).first();
+  const firstEnglishCourse = firstEnglishContent.getByRole('checkbox', { name: '课程', exact: true });
+  await firstEnglishCourse.check();
   await expect(drawer.getByText('已选 1 个课程范围')).toBeVisible();
-  await expect(firstEnglishSpace).toBeChecked();
+  await expect(firstEnglishCourse).toBeChecked();
 
-  await expect(drawer.getByText('学习内容', { exact: true })).toBeVisible();
-  await expect(drawer.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
-  await expect(drawer.getByRole('checkbox', { name: '习题', exact: true })).toBeVisible();
-  await expect(drawer.getByRole('checkbox', { name: '学习资料', exact: true })).toBeVisible();
+  await expect(firstEnglishContent.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
+  await expect(firstEnglishContent.getByRole('checkbox', { name: '题目', exact: true })).toBeVisible();
+  await expect(firstEnglishContent.getByRole('checkbox', { name: '讲义', exact: true })).toBeVisible();
   await expect(drawer.getByLabel('开通时间')).toBeVisible();
   await expect(drawer.getByLabel('结束时间')).toBeVisible();
   await expect(drawer.getByText('课程方案', { exact: true })).toHaveCount(0);

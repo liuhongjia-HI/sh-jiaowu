@@ -38,6 +38,7 @@ func (s *MemoryStore) visibleStudent(principal learning.Principal, id string) (l
 
 func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student {
 	applyDerivedGrade(&student, s.configuredAcademicYear())
+	student.ActiveTutoringAssignments = s.activeTutoringAssignmentsForStudent(student.ID)
 	student.AverageScore = s.studentAverageScore(student.ID)
 	if user, ok := s.findUserByStudentID(student.ID); ok && strings.TrimSpace(user.OpenID) != "" {
 		student.BindStatus = "已绑定"
@@ -49,7 +50,7 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	packageRefs := make([]learning.StudentPackageRef, 0)
 	hasActiveGrant := false
 	for _, grant := range s.grants {
-		if grant.StudentID != student.ID {
+		if grant.StudentID != student.ID || grant.Status == "revoked" {
 			continue
 		}
 		if grantActive(grant) {
@@ -59,8 +60,12 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 			effectiveUntil = grantEndsAt(grant)
 		}
 		if pkg, ok := s.findPackage(grant.PackageID); ok {
+			openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
 			packages = appendUnique(packages, pkg.Name)
-			packageRefs = append(packageRefs, learning.StudentPackageRef{PackageID: pkg.ID, PackageName: pkg.Name})
+			packageRefs = append(packageRefs, learning.StudentPackageRef{
+				PackageID: pkg.ID, PackageName: pkg.Name,
+				OpenCourses: openCourses, OpenMaterials: openMaterials, OpenHomework: openHomework,
+			})
 		}
 	}
 	if effectiveUntil != "" {
@@ -80,6 +85,33 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 		student.LastSubmissionStatus = submission.Status
 	}
 	return student
+}
+
+func (s *MemoryStore) activeTutoringAssignmentsForStudent(studentID string) []learning.TutoringAssignmentSummary {
+	assignments := make([]learning.TutoringAssignmentSummary, 0)
+	for _, assignment := range s.tutoringAssignments {
+		if assignment.StudentID != studentID || assignment.Status != learning.TutoringAssignmentActive {
+			continue
+		}
+		teacherName := assignment.TeacherName
+		if teacher, ok := s.findUser(assignment.TeacherID); ok && strings.TrimSpace(teacher.Name) != "" {
+			teacherName = teacher.Name
+		}
+		assignments = append(assignments, learning.TutoringAssignmentSummary{
+			TeacherID: assignment.TeacherID, TeacherName: teacherName, SubjectName: assignment.SubjectName,
+			LevelCode: assignment.LevelCode, Role: assignment.Role, StartsAt: assignment.StartsAt,
+		})
+	}
+	sort.SliceStable(assignments, func(i, j int) bool {
+		if assignments[i].Role != assignments[j].Role {
+			return assignments[i].Role == learning.TutoringAssignmentPrimary
+		}
+		if assignments[i].TeacherName != assignments[j].TeacherName {
+			return assignments[i].TeacherName < assignments[j].TeacherName
+		}
+		return assignments[i].SubjectName < assignments[j].SubjectName
+	})
+	return assignments
 }
 
 // studentAverageScore 用学生已批改小挑战的真实得分算平均分，不是一个可以手工填写、
@@ -1070,12 +1102,24 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 		spaceIDs := s.learningSpaceIDsForGrant(grant.ID)
 		for _, course := range s.courses {
 			if course.Status == learning.StatusEnabled && containsString(spaceIDs, course.LearningSpaceID) {
-				out = appendCourseUnique(out, s.decorateCourse(course))
+				out = appendCourseUnique(out, course)
 			}
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(studentID) {
-		out = appendCourseUnique(out, s.decorateCourse(course))
+		out = appendCourseUnique(out, course)
+	}
+	materialCounts := make(map[string]int)
+	for _, material := range s.materialsForStudent(studentID) {
+		materialCounts[material.CourseID]++
+	}
+	homeworkCounts := make(map[string]int)
+	for _, item := range s.homeworkForStudent(studentID) {
+		homeworkCounts[item.CourseID]++
+	}
+	for index := range out {
+		out[index].MaterialNum = materialCounts[out[index].ID]
+		out[index].HomeworkNum = homeworkCounts[out[index].ID]
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		left := s.courseAccessForStudent(studentID, out[i])

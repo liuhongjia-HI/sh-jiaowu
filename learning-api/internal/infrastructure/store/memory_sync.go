@@ -108,6 +108,12 @@ func (s *MemoryStore) CreateDirectGrant(operator string, req learning.DirectGran
 	return result, err
 }
 
+func (s *MemoryStore) ReplaceDirectGrant(operator string, req learning.DirectGrantReplaceRequest) (learning.DirectGrantResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.replaceDirectGrantUnlocked(operator, req)
+}
+
 func (s *MemoryStore) StudentPermissions() []learning.StudentPermissionSummary {
 	s.mu.Lock()
 	defer s.mu.Unlock()

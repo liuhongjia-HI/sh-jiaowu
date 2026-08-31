@@ -2288,6 +2288,20 @@ button.schedule-block:hover {
   white-space: nowrap;
 }
 
+.student-package-expiry {
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.student-package-expiry-warning {
+  color: #d46b08;
+}
+
+.student-package-expiry-urgent {
+  color: #cf1322;
+}
+
 .student-table .student-follow-up-row > td {
   background: #fff7e6 !important;
   border-bottom-color: #ffd591;

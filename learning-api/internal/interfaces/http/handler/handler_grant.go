@@ -92,6 +92,28 @@ func (h *LearningHandler) CreateDirectGrant(c *gin.Context) {
 	OK(c, result)
 }
 
+func (h *LearningHandler) ReplaceDirectGrant(c *gin.Context) {
+	var req learning.DirectGrantReplaceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	req.StudentID = strings.TrimSpace(req.StudentID)
+	for index := range req.Selections {
+		req.Selections[index].LearningSpaceID = strings.TrimSpace(req.Selections[index].LearningSpaceID)
+		req.Selections[index].ContentTypeCodes = trimStringSlice(req.Selections[index].ContentTypeCodes)
+	}
+	req.StartsAt = strings.TrimSpace(req.StartsAt)
+	req.EndsAt = strings.TrimSpace(req.EndsAt)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.ReplaceDirectGrant(operator.(string), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
 func bindPackage(c *gin.Context) (learning.PackageUpsertRequest, bool) {
 	var req learning.PackageUpsertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

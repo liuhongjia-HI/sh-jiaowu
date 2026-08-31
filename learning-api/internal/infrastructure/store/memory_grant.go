@@ -150,6 +150,133 @@ func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.Di
 	return result, nil
 }
 
+func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.DirectGrantReplaceRequest) (learning.DirectGrantResult, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.DirectGrantResult, error) {
+			return work.replaceDirectGrantUnlocked(operator, req)
+		})
+	}
+	student, ok := s.findStudent(req.StudentID)
+	if !ok {
+		return learning.DirectGrantResult{}, errors.New("student not found")
+	}
+	if strings.TrimSpace(student.AccountStatus) == "停用" {
+		return learning.DirectGrantResult{}, errors.New("该学生账号已停用，请先恢复账号")
+	}
+
+	selections := make(map[string][]string, len(req.Selections))
+	for _, selection := range req.Selections {
+		spaceID := strings.TrimSpace(selection.LearningSpaceID)
+		contentTypes := uniqueTrimmed(selection.ContentTypeCodes)
+		if spaceID == "" || len(contentTypes) == 0 {
+			continue
+		}
+		space, exists := s.findLearningSpace(spaceID)
+		if !exists || space.Status != learning.StatusEnabled {
+			return learning.DirectGrantResult{}, errors.New("课程范围不可用：" + spaceID)
+		}
+		if space.Grade != student.Grade {
+			return learning.DirectGrantResult{}, errors.New("不能给" + student.Grade + "学生开通" + space.Grade + "课程")
+		}
+		for _, code := range contentTypes {
+			if !validContentType(code) {
+				return learning.DirectGrantResult{}, errors.New("内容类型不正确：" + code)
+			}
+		}
+		selections[spaceID] = contentTypes
+	}
+
+	periodChanged := strings.TrimSpace(req.StartsAt) != "" || strings.TrimSpace(req.EndsAt) != ""
+	startsAt, endsAt := "", ""
+	var err error
+	if len(selections) > 0 && periodChanged {
+		startsAt, endsAt, err = s.normalizeGrantPeriod(req.StartsAt, req.EndsAt)
+		if err != nil {
+			return learning.DirectGrantResult{}, err
+		}
+	}
+
+	for _, grant := range s.grants {
+		if grant.StudentID != student.ID || !isDirectGrantPackage(grant.PackageID) {
+			continue
+		}
+		spaceIDs := s.learningSpaceIDsForPackage(grant.PackageID)
+		if len(spaceIDs) != 1 {
+			continue
+		}
+		if _, keep := selections[spaceIDs[0]]; keep {
+			continue
+		}
+		grant.Status = "revoked"
+		s.replaceSpaceAccessForGrant(grant)
+	}
+
+	result := learning.DirectGrantResult{StudentID: student.ID, StudentName: student.Name, OpenCourses: []string{}, OpenMaterials: []string{}, OpenHomework: []string{}}
+	for spaceID, contentTypes := range selections {
+		space, _ := s.findLearningSpace(spaceID)
+		packageID, err := s.ensureDirectGrantPackage(student, space, contentTypes)
+		if err != nil {
+			return learning.DirectGrantResult{}, err
+		}
+		// ensureDirectGrantPackage merges for the append-only endpoint; replacement must use the checked state exactly.
+		s.replacePackageRelations(packageID, []string{spaceID}, contentTypes)
+		s.refreshSpaceAccessForPackage(packageID)
+		selectionStartsAt, selectionEndsAt := startsAt, endsAt
+		if !periodChanged {
+			if existing, ok := s.directGrantPeriod(student.ID, packageID); ok {
+				selectionStartsAt, selectionEndsAt = existing.StartsAt, grantEndsAt(existing)
+			} else {
+				selectionStartsAt, selectionEndsAt = s.defaultGrantPeriod()
+			}
+		}
+		preview, err := s.replaceDirectGrantForPackage(operator, student, packageID, selectionStartsAt, selectionEndsAt)
+		if err != nil {
+			return learning.DirectGrantResult{}, err
+		}
+		result.LearningSpaces = appendUnique(result.LearningSpaces, s.learningSpaceName(spaceID))
+		result.ContentTypes = appendUnique(result.ContentTypes, contentTypeLabels(contentTypes)...)
+		result.OpenCourses = appendUnique(result.OpenCourses, preview.OpenCourses...)
+		result.OpenMaterials = appendUnique(result.OpenMaterials, preview.OpenMaterials...)
+		result.OpenHomework = appendUnique(result.OpenHomework, preview.OpenHomework...)
+	}
+	s.prependLog(operator, "调整直接开通内容", student.Name)
+	return result, nil
+}
+
+func (s *MemoryStore) directGrantPeriod(studentID, packageID string) (packageGrant, bool) {
+	for _, grant := range s.grants {
+		if grant.StudentID == studentID && grant.PackageID == packageID {
+			return grant, true
+		}
+	}
+	return packageGrant{}, false
+}
+
+func (s *MemoryStore) replaceDirectGrantForPackage(operator string, student learning.Student, packageID, startsAt, endsAt string) (learning.GrantPreview, error) {
+	preview, err := s.grantPreviewUnlocked(student.ID, packageID)
+	if err != nil {
+		return learning.GrantPreview{}, err
+	}
+	grant := packageGrant{ID: "grant-" + time.Now().Format("20060102150405"), StudentID: student.ID, PackageID: packageID, StartsAt: startsAt, EndsAt: endsAt, OpenedAt: time.Now().Format("2006-01-02 15:04:05"), Status: "active", EffectiveUntil: endsAt}
+	for index := range s.grants {
+		if s.grants[index].StudentID != student.ID || s.grants[index].PackageID != packageID {
+			continue
+		}
+		grant.ID = s.grants[index].ID
+		if s.grants[index].OpenedAt != "" {
+			grant.OpenedAt = s.grants[index].OpenedAt
+		}
+		s.grants[index] = grant
+		s.replaceSpaceAccessForGrant(grant)
+		s.addStudentOpenedPackage(student.ID, preview.PackageName)
+		return preview, nil
+	}
+	s.grants = append(s.grants, grant)
+	s.syncSpaceAccessForGrant(grant)
+	s.addStudentOpenedPackage(student.ID, preview.PackageName)
+	return preview, nil
+}
+
 func (s *MemoryStore) markGrantNewlyOpened(studentID, packageID string) {
 	for index := range s.grants {
 		if s.grants[index].StudentID == studentID && s.grants[index].PackageID == packageID {
