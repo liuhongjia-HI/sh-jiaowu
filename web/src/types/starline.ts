@@ -228,7 +228,7 @@ export type StudentOpeningItem = {
 };
 
 export type StudentOpeningCell = {
-  contentTypeCode: 'course' | 'handout' | 'question';
+  contentTypeCode: 'course' | 'handout' | 'question' | 'download';
   opened: boolean;
   packageOpened: boolean;
   directOpened: boolean;

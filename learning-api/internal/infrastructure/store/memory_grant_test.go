@@ -254,8 +254,24 @@ func TestCourseRemainsVisibleWithoutCourseDownloadPermission(t *testing.T) {
 		t.Fatalf("student study after course permission: %v", err)
 	}
 	mathMaterial = findMaterialByLearningSpace(study.Materials, spaceID)
+	if mathMaterial == nil || mathMaterial.DownloadURL != "" {
+		t.Fatalf("course permission alone must not enable secure handout download: %#v", study.Materials)
+	}
+
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        studentID,
+		LearningSpaceIDs: []string{spaceID},
+		ContentTypeCodes: []string{"download"},
+	}); err != nil {
+		t.Fatalf("expected download permission to succeed: %v", err)
+	}
+	study, err = store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("student study after download permission: %v", err)
+	}
+	mathMaterial = findMaterialByLearningSpace(study.Materials, spaceID)
 	if mathMaterial == nil || mathMaterial.DownloadURL == "" {
-		t.Fatalf("course permission should enable secure handout download: %#v", study.Materials)
+		t.Fatalf("download permission should enable secure handout download: %#v", study.Materials)
 	}
 }
 
@@ -275,6 +291,29 @@ func findMaterialByLearningSpace(materials []learning.Material, learningSpaceID 
 		}
 	}
 	return nil
+}
+
+func TestContentPermissionsDoNotLeakIntoOtherContentTypes(t *testing.T) {
+	store := NewMemoryStore()
+	studentID := "stu-001"
+	spaceID := "space-g05-math-s1-q1"
+	principal, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("student principal: %v", err)
+	}
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID: studentID, LearningSpaceIDs: []string{spaceID}, ContentTypeCodes: []string{"question"},
+	}); err != nil {
+		t.Fatalf("question-only grant: %v", err)
+	}
+	study, err := store.StudentStudy(principal)
+	if err != nil {
+		t.Fatalf("student study: %v", err)
+	}
+	mathCourse := findCourseByLearningSpace(study.Courses, spaceID)
+	if mathCourse == nil || mathCourse.MaterialNum != 0 || mathCourse.HomeworkNum == 0 {
+		t.Fatalf("question-only grant should keep course and questions, not handouts: %#v", mathCourse)
+	}
 }
 
 func TestDirectGrantSupportsTimedPeriodAndHighlightsNewCourse(t *testing.T) {

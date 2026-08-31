@@ -20,6 +20,7 @@ func TestStudentMaterialDownloadURLOnlyExistsDuringActiveGrant(t *testing.T) {
 			break
 		}
 	}
+	store.contentTypes = append(store.contentTypes, packageContentType{PackageID: packageID(4, "英文", 0, "full"), ContentType: "download"})
 	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "允许下载带水印PDF"}); err != nil {
 		t.Fatalf("enable watermarked download: %v", err)
 	}

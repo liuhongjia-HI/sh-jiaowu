@@ -1069,7 +1069,8 @@ function CourseOpeningPanel({
 const openingContentLabels: Record<StudentOpeningCell['contentTypeCode'], string> = {
   course: '课程',
   handout: '讲义',
-  question: '习题'
+  question: '习题',
+  download: '下载讲义'
 };
 
 function CourseOpeningMatrix({
@@ -1277,6 +1278,7 @@ function contentTypeCode(value: string) {
   if (value === '课程') return 'course';
   if (value === '学习资料') return 'handout';
   if (value === '题') return 'question';
+  if (value === '下载讲义') return 'download';
   return value;
 }
 

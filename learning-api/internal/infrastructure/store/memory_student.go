@@ -55,6 +55,7 @@ func (s *MemoryStore) openingMatrixForStudent(student learning.Student) []learni
 			{ContentTypeCode: "course", Items: s.openingItemsForSpace(space.ID, "course")},
 			{ContentTypeCode: "handout", Items: s.openingItemsForSpace(space.ID, "handout")},
 			{ContentTypeCode: "question", Items: s.openingItemsForSpace(space.ID, "question")},
+			{ContentTypeCode: "download", Items: s.openingItemsForSpace(space.ID, "download")},
 		}
 		for _, grant := range s.grants {
 			if grant.StudentID != student.ID || !grantActive(grant) {
@@ -99,6 +100,12 @@ func (s *MemoryStore) openingItemsForSpace(learningSpaceID, contentTypeCode stri
 			}
 		}
 	case "handout":
+		for _, material := range s.materials {
+			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) {
+				items = append(items, learning.StudentOpeningItem{ID: material.ID, Title: material.Title})
+			}
+		}
+	case "download":
 		for _, material := range s.materials {
 			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) {
 				items = append(items, learning.StudentOpeningItem{ID: material.ID, Title: material.Title})

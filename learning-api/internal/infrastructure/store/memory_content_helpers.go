@@ -328,18 +328,20 @@ func contentTypeLabel(value string) string {
 		return "题"
 	case "handout":
 		return "学习资料"
+	case "download":
+		return "下载讲义"
 	default:
 		return value
 	}
 }
 
 func validContentType(value string) bool {
-	return value == "course" || value == "question" || value == "handout"
+	return value == "course" || value == "question" || value == "handout" || value == "download"
 }
 
 func packageTypeLabel(values []string) string {
 	labels := make([]string, 0, len(values))
-	for _, value := range []string{"course", "question", "handout"} {
+	for _, value := range []string{"course", "question", "handout", "download"} {
 		if containsString(values, value) {
 			labels = append(labels, contentTypeLabel(value))
 		}

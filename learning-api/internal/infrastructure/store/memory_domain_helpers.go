@@ -1242,6 +1242,15 @@ func (s *MemoryStore) hasContentGrantForLearningSpace(studentID, learningSpaceID
 	return false
 }
 
+func (s *MemoryStore) hasAnyContentGrantForLearningSpace(studentID, learningSpaceID string) bool {
+	for _, grant := range s.grants {
+		if grant.StudentID == studentID && grant.Status != "revoked" && containsString(s.learningSpaceIDsForPackage(grant.PackageID), learningSpaceID) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasCourseGrantForSubject 按学生已经购买或获授的课程包判断。套餐覆盖的是一门
 // 学科的学习安排，而不是单个课节；因此未来/到期套餐都不应再显示同学科的永久预览。
 func (s *MemoryStore) hasCourseGrantForSubject(studentID, grade, subject string) bool {
@@ -1360,7 +1369,7 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(studentID) {
-		if s.hasContentGrantForLearningSpace(studentID, course.LearningSpaceID, "handout") {
+		if s.hasAnyContentGrantForLearningSpace(studentID, course.LearningSpaceID) {
 			continue
 		}
 		lessonID, ready := s.previewLessonForCourse(course)
@@ -1401,7 +1410,7 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(studentID) {
-		if s.hasContentGrantForLearningSpace(studentID, course.LearningSpaceID, "question") {
+		if s.hasAnyContentGrantForLearningSpace(studentID, course.LearningSpaceID) {
 			continue
 		}
 		lessonID, ready := s.previewLessonForCourse(course)
@@ -1525,7 +1534,7 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		if s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "course") {
+		if s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}
@@ -1533,7 +1542,7 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 }
 
 // studentHasActiveContentGrantForLearningSpace 判断学生当前有效授权是否包含指定内容类型。
-// 课程目录可见性与内容下载权限分离：course 仅作为安全下载许可，handout 仍控制讲义是否可见。
+// 课程目录可见性与内容下载权限分离：download 仅作为安全下载许可，handout 仍控制讲义是否可见。
 func (s *MemoryStore) studentHasActiveContentGrantForLearningSpace(studentID, learningSpaceID, contentType string) bool {
 	for _, grant := range s.grants {
 		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), contentType) {

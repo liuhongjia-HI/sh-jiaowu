@@ -46,7 +46,7 @@ const contentTagOptions = [
 ];
 
 function packageContentLabel(codes?: string[]) {
-  const order = ['course', 'question', 'handout'];
+  const order = ['course', 'question', 'handout', 'download'];
   return order.filter((code) => codes?.includes(code)).map((code) => CONTENT_TYPE_NAME[code]).join('+');
 }
 
@@ -598,7 +598,8 @@ export function PackageDialog({
             options={[
               { label: '课程', value: 'course' },
               { label: '题', value: 'question' },
-              { label: '课程讲义', value: 'handout' }
+              { label: '课程讲义', value: 'handout' },
+              { label: '下载讲义', value: 'download' }
             ]}
           />
         </Form.Item>
