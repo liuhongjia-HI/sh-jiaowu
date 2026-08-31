@@ -144,16 +144,50 @@ test('教师账号不能进入运营和系统高权限功能', async ({ page }) 
   await expect(page.getByText('当前账号不能访问这个功能')).toBeVisible();
 });
 
-test('学生表格将操作按钮放在学生手机号下方', async ({ page }) => {
+test('学生表格将操作按钮放在学生手机号下方且不展示微信关联列', async ({ page }) => {
   await login(page, '13800000002');
+  await page.route('**/api/students*', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [{
+          id: 'student-table-columns', name: '表格列学生', phone: '13900000155', grade: '五年级', schoolName: '星河小学', guardianName: '王女士',
+          openedPackages: ['五年级英文'], openedPackageRefs: [{ packageId: 'pkg-columns', packageName: '五年级英文' }], learningStatus: '已开通', accountStatus: '正常',
+          streakDays: 0, averageScore: 0, badgeCount: 0, bindStatus: '待绑定', createdAt: '2026-08-30 20:00:00'
+        }]
+      })
+    });
+  });
 
   await expectPageHeading(page, '/students', '学生管理');
   await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
   const studentTableHeaders = await page.locator('.student-table thead th').allTextContents();
-  expect(studentTableHeaders.slice(0, 5).map((header) => header.trim())).toEqual(['年级', '学校', '学生', '家长姓名', '微信关联']);
+  expect(studentTableHeaders.slice(0, 5).map((header) => header.trim())).toEqual(['年级', '学校', '学生', '家长姓名', '套餐状态']);
+  expect(studentTableHeaders.map((header) => header.trim())).not.toContain('微信关联');
 
-  const studentCell = page.locator('.student-table tbody tr').first().locator('td').nth(2);
+  const studentCell = page.locator('.student-table tbody tr', { hasText: '表格列学生' }).locator('td').nth(2);
   await expect(studentCell.getByRole('button', { name: '查看' })).toBeVisible();
+});
+
+test('学生统计卡可快捷筛选已开通课程并恢复全部学生', async ({ page }) => {
+  await login(page, '13800000002');
+  await expectPageHeading(page, '/students', '学生管理');
+
+  const toolbar = page.locator('.list-toolbar');
+  const packageState = toolbar.locator('.ant-select-selector').nth(3);
+  await expect(packageState).toContainText('套餐开通状态');
+
+  await page.getByText('已开通课程（点击筛选）', { exact: true }).click();
+  await expect(packageState).toContainText('已开通');
+
+  await page.getByText('学生总数（点击查看全部）', { exact: true }).click();
+  await expect(packageState).toContainText('套餐开通状态');
 });
 
 test('学生表格点击列名后按该列排序', async ({ page }) => {
@@ -374,6 +408,70 @@ test('点击学生课程标签进入课程开通矩阵', async ({ page }) => {
   await expect(drawer.getByRole('tab', { name: '课程开通' })).toHaveAttribute('aria-selected', 'true');
   await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
   await expect(drawer.getByText('按课程范围开通', { exact: true })).toBeVisible();
+});
+
+test('学生详情以卡片列表展示学习记录', async ({ page }) => {
+  await login(page, '13800000002');
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.route('**/api/students/*', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() !== 'GET' || !/^\/api\/students\/[^/]+$/.test(path)) {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.data.learningRecords = [{ id: 'learning-list', type: '资料', title: '地理练习资料', course: '五年级地理', status: '已学习', occurredAt: '2026-08-31 00:09:00', description: '查看课件资料' }];
+    payload.data.notices = [];
+    payload.data.logs = [];
+    await route.fulfill({ response, json: payload });
+  });
+
+  await page.locator('.action-button[aria-label="查看"]').first().click();
+  const drawer = page.locator('.ant-drawer-content').last();
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('tab', { name: '学习记录' }).click();
+  await expect(drawer.getByRole('tab', { name: '学习记录' })).toHaveAttribute('aria-selected', 'true');
+
+  const firstRecord = drawer.locator('.card-list-grid .info-card').first();
+  await expect(firstRecord).toBeVisible();
+  await expect(firstRecord.getByText('分数', { exact: true })).toBeVisible();
+  await expect(firstRecord.getByText('时间', { exact: true })).toBeVisible();
+  await expect(firstRecord.getByText('说明', { exact: true })).toBeVisible();
+});
+
+test('学生详情以连续卡片列表展示操作记录', async ({ page }) => {
+  await login(page, '13800000002');
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.route('**/api/students/*', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() !== 'GET' || !/^\/api\/students\/[^/]+$/.test(path)) {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.data.learningRecords = [];
+    payload.data.notices = [{ id: 'notice-log-list', title: '练习已发布', summary: '请按时完成练习。', status: '已发送' }];
+    payload.data.logs = [{ id: 'log-list', action: '开通学习内容', target: '列表学生 / 五年级英文', operator: '超级管理员', time: '2026-08-31 00:09:00' }];
+    await route.fulfill({ response, json: payload });
+  });
+
+  await page.locator('.action-button[aria-label="查看"]').first().click();
+  const drawer = page.locator('.ant-drawer-content').last();
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('tab', { name: '操作记录' }).click();
+  await expect(drawer.getByRole('tab', { name: '操作记录' })).toHaveAttribute('aria-selected', 'true');
+  await expect(drawer.locator('.card-list-grid')).toHaveCount(1);
+
+  const records = drawer.locator('.card-list-grid .info-card');
+  await expect(records).toHaveCount(2);
+  await expect(records.first()).toContainText('练习已发布');
+  await expect(records.last()).toContainText('开通学习内容');
+  await expect(records.last().getByText('操作人', { exact: true })).toBeVisible();
+  await expect(records.last().getByText('时间', { exact: true })).toBeVisible();
 });
 
 test('校区管理员可在课程开通矩阵查看明细并调整内容', async ({ page }) => {

@@ -361,8 +361,6 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"students", "effective_until", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "enrollment_academic_year", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"students", "enrollment_grade", "VARCHAR(32) NOT NULL DEFAULT ''"},
-		{"students", "bind_code", "VARCHAR(16) NOT NULL DEFAULT ''"},
-		{"students", "bind_code_expires_at", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"study_packages", "summary", "TEXT NOT NULL"},
 		{"learning_spaces", "level", "VARCHAR(16) NOT NULL DEFAULT 'S'"},
 		{"study_packages", "level", "VARCHAR(16) NOT NULL DEFAULT 'S'"},

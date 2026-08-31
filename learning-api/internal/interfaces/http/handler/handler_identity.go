@@ -22,7 +22,6 @@ func (h *LearningHandler) WechatLogin(c *gin.Context) {
 	req.StudentName = strings.TrimSpace(req.StudentName)
 	req.SchoolName = strings.TrimSpace(req.SchoolName)
 	req.Grade = strings.TrimSpace(req.Grade)
-	req.BindCode = strings.ToUpper(strings.TrimSpace(req.BindCode))
 	key := loginKey(c, "wechat", req.Code)
 	if err := h.loginProtector.Allow(key); err != nil {
 		if auditErr := h.recordSecurityEvent(c, "登录拦截", req.Code, err.Error()); auditErr != nil {
@@ -31,21 +30,6 @@ func (h *LearningHandler) WechatLogin(c *gin.Context) {
 		}
 		Unauthorized(c, err.Error())
 		return
-	}
-	// 绑定码是猜的成本很低的短字符串（相对密码而言），wx.login 的 code 每次都不一样，
-	// 靠上面那个 key 限流拦不住"换个 code 接着猜"——这里单独按 IP 限一道，
-	// key 里不带具体猜的是哪个码，才能让"换码重试"也计进同一个限流窗口。
-	var bindCodeKey string
-	if req.BindCode != "" {
-		bindCodeKey = loginKey(c, "bindcode", "")
-		if err := h.loginProtector.Allow(bindCodeKey); err != nil {
-			if auditErr := h.recordSecurityEvent(c, "绑定码登录拦截", req.BindCode, err.Error()); auditErr != nil {
-				BadRequest(c, auditErr.Error())
-				return
-			}
-			Unauthorized(c, err.Error())
-			return
-		}
 	}
 	principal, err := h.service.LoginWithWechatCode(req)
 	if err != nil {
@@ -58,9 +42,6 @@ func (h *LearningHandler) WechatLogin(c *gin.Context) {
 			return
 		}
 		h.loginProtector.RegisterFailure(key)
-		if bindCodeKey != "" {
-			h.loginProtector.RegisterFailure(bindCodeKey)
-		}
 		if auditErr := h.recordSecurityEvent(c, "微信登录失败", req.Code, err.Error()); auditErr != nil {
 			BadRequest(c, auditErr.Error())
 			return
@@ -69,9 +50,6 @@ func (h *LearningHandler) WechatLogin(c *gin.Context) {
 		return
 	}
 	h.loginProtector.RegisterSuccess(key)
-	if bindCodeKey != "" {
-		h.loginProtector.RegisterSuccess(bindCodeKey)
-	}
 	principal.AuthMethod = "wechat"
 	token, err := h.tokens.Issue(principal)
 	if err != nil {

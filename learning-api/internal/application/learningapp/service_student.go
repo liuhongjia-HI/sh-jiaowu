@@ -17,9 +17,6 @@ func (s *Service) UpdateStudent(operator string, principal learning.Principal, i
 func (s *Service) RemindStudent(operator string, principal learning.Principal, id string) (learning.StudentRemindResult, error) {
 	return s.student.RemindStudent(operator, principal, id)
 }
-func (s *Service) GenerateStudentBindCode(operator string, principal learning.Principal, id string) (learning.Student, error) {
-	return s.student.GenerateStudentBindCode(operator, principal, id)
-}
 func (s *Service) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) (learning.StudentImportResult, error) {
 	return s.student.ImportStudents(operator, principal, rows)
 }

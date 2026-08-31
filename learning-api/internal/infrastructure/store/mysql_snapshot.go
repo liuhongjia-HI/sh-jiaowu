@@ -102,10 +102,10 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, student := range s.students {
 		if _, err := tx.Exec(
-			`INSERT INTO students (id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, registration_source, remark, learning_status, streak_days, average_score, badge_count, bind_status, created_at, last_study_at, effective_until, enrollment_academic_year, enrollment_grade, bind_code, bind_code_expires_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO students (id, name, nickname, avatar_url, grade, phone, school_name, guardian_name, official_account_open_id, account_status, registration_source, remark, learning_status, streak_days, average_score, badge_count, bind_status, created_at, last_study_at, effective_until, enrollment_academic_year, enrollment_grade)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			student.ID, student.Name, student.Nickname, student.AvatarURL, student.Grade, student.Phone, student.SchoolName, student.GuardianName, student.OfficialAccountOpenID, student.AccountStatus, student.RegistrationSource, student.Remark, student.LearningStatus,
-			student.StreakDays, student.AverageScore, student.BadgeCount, student.BindStatus, nullableDateTime(student.CreatedAt), student.LastStudyAt, student.EffectiveUntil, student.EnrollmentAcademicYear, student.EnrollmentGrade, student.BindCode, student.BindCodeExpiresAt,
+			student.StreakDays, student.AverageScore, student.BadgeCount, student.BindStatus, nullableDateTime(student.CreatedAt), student.LastStudyAt, student.EffectiveUntil, student.EnrollmentAcademicYear, student.EnrollmentGrade,
 		); err != nil {
 			return err
 		}
