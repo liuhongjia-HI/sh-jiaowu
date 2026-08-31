@@ -44,11 +44,8 @@ type Student struct {
 }
 
 type StudentPackageRef struct {
-	PackageID     string   `json:"packageId"`
-	PackageName   string   `json:"packageName"`
-	OpenCourses   []string `json:"openCourses,omitempty"`
-	OpenMaterials []string `json:"openMaterials,omitempty"`
-	OpenHomework  []string `json:"openHomework,omitempty"`
+	PackageID   string `json:"packageId"`
+	PackageName string `json:"packageName"`
 }
 
 type TutoringAssignmentSummary struct {

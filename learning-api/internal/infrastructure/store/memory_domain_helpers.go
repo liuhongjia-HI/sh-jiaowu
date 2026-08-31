@@ -60,12 +60,8 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 			effectiveUntil = grantEndsAt(grant)
 		}
 		if pkg, ok := s.findPackage(grant.PackageID); ok {
-			openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
 			packages = appendUnique(packages, pkg.Name)
-			packageRefs = append(packageRefs, learning.StudentPackageRef{
-				PackageID: pkg.ID, PackageName: pkg.Name,
-				OpenCourses: openCourses, OpenMaterials: openMaterials, OpenHomework: openHomework,
-			})
+			packageRefs = append(packageRefs, learning.StudentPackageRef{PackageID: pkg.ID, PackageName: pkg.Name})
 		}
 	}
 	if effectiveUntil != "" {

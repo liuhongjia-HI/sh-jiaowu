@@ -195,9 +195,6 @@ export type Student = {
 export type StudentPackageRef = {
   packageId: string;
   packageName: string;
-  openCourses?: string[];
-  openMaterials?: string[];
-  openHomework?: string[];
 };
 
 export type StudentUpsertRequest = {

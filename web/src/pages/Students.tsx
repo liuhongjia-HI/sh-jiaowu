@@ -1172,13 +1172,8 @@ function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen
   if (!values?.length) return <Typography.Text type="secondary">暂未开通课程</Typography.Text>;
   return (
     <Space size={[4, 4]} wrap>
-      {values.flatMap((item) => [
-        ...(item.openCourses?.map((title) => ({ key: `course-${item.packageId}-${title}`, label: `课程：${title}`, color: 'blue' })) ?? []),
-        ...(item.openMaterials?.map((title) => ({ key: `material-${item.packageId}-${title}`, label: `讲义：${title}`, color: 'green' })) ?? []),
-        ...(item.openHomework?.map((title) => ({ key: `homework-${item.packageId}-${title}`, label: `题目：${title}`, color: 'purple' })) ?? []),
-        ...(item.openCourses?.length || item.openMaterials?.length || item.openHomework?.length ? [] : [{ key: `package-${item.packageId}`, label: item.packageName, color: 'blue' }])
-      ]).map((item) => (
-        <Typography.Link key={item.key} onClick={onOpen}><Tag color={item.color}>{item.label}</Tag></Typography.Link>
+      {values.map((item) => (
+        <Typography.Link key={item.packageId} onClick={onOpen}><Tag color="blue">{item.packageName}</Tag></Typography.Link>
       ))}
     </Space>
   );

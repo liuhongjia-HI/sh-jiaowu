@@ -133,31 +133,3 @@ func TestFollowUpIncludesEveryStudentWithoutAnOpenedPackage(t *testing.T) {
 		t.Fatalf("only the still-unopened student must remain for follow-up, got %#v", followUps)
 	}
 }
-
-func TestStudentListIncludesConcreteDirectLearningContent(t *testing.T) {
-	store := NewMemoryStore()
-	admin, err := store.PrincipalByUserID("user-super")
-	if err != nil {
-		t.Fatalf("admin principal: %v", err)
-	}
-	student, err := store.CreateStudent("超级管理员", admin, learning.StudentUpsertRequest{
-		Name: "内容展示学生", Phone: "13600007777", Grade: "五年级", SchoolName: "星河小学", AccountStatus: "正常",
-	})
-	if err != nil {
-		t.Fatalf("create student: %v", err)
-	}
-	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
-		StudentID: student.ID, LearningSpaceIDs: []string{"space-g05-math-s1-q1"}, ContentTypeCodes: []string{"course", "handout", "question"},
-	}); err != nil {
-		t.Fatalf("create direct grant: %v", err)
-	}
-
-	students := store.Students(admin, learning.StudentQuery{Keyword: student.Name})
-	if len(students) != 1 || len(students[0].OpenedPackageRefs) != 1 {
-		t.Fatalf("expected a direct grant in the student list: %#v", students)
-	}
-	ref := students[0].OpenedPackageRefs[0]
-	if len(ref.OpenCourses) == 0 || len(ref.OpenMaterials) == 0 || len(ref.OpenHomework) == 0 {
-		t.Fatalf("student list must show the concrete opened content: %#v", ref)
-	}
-}
