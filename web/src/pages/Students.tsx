@@ -589,7 +589,13 @@ export default function Students({ user }: { user: CurrentUser }) {
         )}
       </Modal>
 
-      <Drawer title={selected?.name ?? '学生详情'} width={720} open={Boolean(selected)} onClose={() => setSelected(null)}>
+      <Drawer
+        className="student-detail-drawer"
+        title={selected ? <StudentDrawerTitle student={selected} /> : '学生详情'}
+        width="min(760px, 100vw)"
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+      >
         {detail.isLoading && <Skeleton active />}
         {detail.error && <Alert type="error" message="学生详情加载失败，请稍后重试。" />}
         {detail.data && (
@@ -997,6 +1003,19 @@ function StudentProfile({
   );
 }
 
+function StudentDrawerTitle({ student }: { student: Student }) {
+  return (
+    <div className="student-drawer-title">
+      <span className="student-drawer-title-name">{student.name}</span>
+      <Space size={6} wrap>
+        <Tag color="blue">{student.grade}</Tag>
+        <Typography.Text type="secondary">{student.phone}</Typography.Text>
+        <Tag color={student.accountStatus === '正常' ? 'green' : 'default'}>{student.accountStatus}</Tag>
+      </Space>
+    </div>
+  );
+}
+
 function CourseOpeningPanel({
   detail,
   student,
@@ -1161,14 +1180,17 @@ function DirectGrantPanel({
     () => selectedSubject ? matrix.filter((space) => space.subject === selectedSubject) : matrix,
     [matrix, selectedSubject]
   );
-  const selectedCount = matrix.filter((scope) => scope.content.some((cell) => cell.opened || selections.find((selection) => selection.learningSpaceId === scope.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode))).length;
+  const selectedContentCount = matrix.reduce((count, scope) => count + scope.content.filter((cell) => {
+    const directSelected = selections.find((selection) => selection.learningSpaceId === scope.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode);
+    return cell.opened || directSelected;
+  }).length, 0);
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <div className="student-opening-panel">
       <Alert
         type="info"
         showIcon
-        message="按课程范围开通"
-        description={`已开通的内容会自动勾选。带锁内容由课程方案开通，不能在这里关闭；${student.name} 的单独开通内容可直接勾选调整。`}
+        message="选择要开通的内容"
+        description="套餐已开通的内容会自动勾选并锁定；你可以勾选或取消学生的单独开通内容。"
       />
       <div>
         <Typography.Text strong>课程范围</Typography.Text>
@@ -1178,7 +1200,7 @@ function DirectGrantPanel({
         <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
           <Space wrap size={[8, 8]}>
             <Tag color="blue">当前年级：{student.grade}</Tag>
-            <Typography.Text type="secondary">已选 {selectedCount} 个课程范围</Typography.Text>
+            <Typography.Text type="secondary" aria-live="polite">已选 {selectedContentCount} 项内容</Typography.Text>
           </Space>
           <div role="group" aria-label="科目筛选">
             <Space wrap size={[8, 8]}>
@@ -1211,32 +1233,38 @@ function DirectGrantPanel({
           </Space>
         )}
       </div>
-      <div>
+      <section className="student-opening-period">
         <Typography.Text strong>生效时间</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          新开通内容默认从现在生效；不修改时间时，已开通内容会保留原有效期。手动修改时间后，会统一更新本次保留内容的有效期。
+          新开通内容默认从现在生效；修改时间后，会统一更新本次保留内容的有效期。
         </Typography.Paragraph>
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          <label>
+        <div className="student-opening-period-grid">
+          <label className="student-opening-field">
             <Typography.Text>开通时间</Typography.Text>
-            <input aria-label="开通时间" className="ant-input" type="datetime-local" value={startsAt} onChange={(event) => onStartsAtChange(event.target.value)} style={{ marginTop: 4 }} />
+            <input aria-label="开通时间" className="ant-input" type="datetime-local" value={startsAt} onChange={(event) => onStartsAtChange(event.target.value)} />
           </label>
-          <label>
+          <label className="student-opening-field">
             <Typography.Text>结束时间（选填）</Typography.Text>
-            <input aria-label="结束时间" className="ant-input" type="datetime-local" min={startsAt} value={endsAt} onChange={(event) => onEndsAtChange(event.target.value)} style={{ marginTop: 4 }} />
+            <input aria-label="结束时间" className="ant-input" type="datetime-local" min={startsAt} value={endsAt} onChange={(event) => onEndsAtChange(event.target.value)} />
           </label>
-        </Space>
+        </div>
+      </section>
+      <div className="student-opening-actions">
+        <div className="student-opening-actions-summary">
+          <Typography.Text strong aria-live="polite">{selectedContentCount} 项内容将生效</Typography.Text>
+          <Typography.Text type="secondary">确认后立即更新学生权限</Typography.Text>
+        </div>
+        <Button
+          type="primary"
+          icon={<UnlockOutlined />}
+          loading={submitting}
+          disabled={loadingLearningSpaces || learningSpacesError}
+          onClick={onSubmit}
+        >
+          保存变更
+        </Button>
       </div>
-      <Button
-        type="primary"
-        icon={<UnlockOutlined />}
-        loading={submitting}
-        disabled={loadingLearningSpaces || learningSpacesError}
-        onClick={onSubmit}
-      >
-        保存变更
-      </Button>
-    </Space>
+    </div>
   );
 }
 

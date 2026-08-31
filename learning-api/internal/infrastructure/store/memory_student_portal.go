@@ -23,6 +23,18 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 		return learning.StudentHome{}, errors.New("账号已停用，请联系老师或管理员")
 	}
 	courses := s.coursesForStudent(student.ID)
+	courseCards := make([]learning.StudentCourseCard, 0, len(courses))
+	for _, course := range courses {
+		access := s.courseAccessForStudent(student.ID, course)
+		courseCards = append(courseCards, learning.StudentCourseCard{
+			Course:         course,
+			Progress:       s.courseProgress(student.ID, course.ID),
+			OpenedAt:       access.OpenedAt,
+			AvailableAt:    access.AvailableAt,
+			HighlightUntil: access.HighlightUntil,
+			IsNew:          access.IsNew,
+		})
+	}
 	materials := s.studentMaterialsForPrincipal(principal)
 	pendingHomework := s.pendingHomeworkForPrincipal(principal)
 	continueCourse := learning.Course{}
@@ -41,6 +53,7 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 	trial := s.studentTrialUnlocked(student)
 	return learning.StudentHome{
 		Student:              student,
+		Courses:              courseCards,
 		ContinueCourse:       continueCourse,
 		ContinueProgress:     s.courseProgress(student.ID, continueCourse.ID),
 		PendingHomework:      pendingHomework,

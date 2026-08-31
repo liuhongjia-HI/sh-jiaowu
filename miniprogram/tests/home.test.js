@@ -122,6 +122,35 @@ test("home page renders today todos and classroom feedback from student home", a
   assert.equal(page.data.subscriptionReminder.actionText, "开启提醒");
 });
 
+test("home page exposes every course for swipeable banner cards", async () => {
+  const calls = [];
+  const page = loadHomePage((path) => Promise.resolve(path === "/student/home" ? {
+    student: { id: "stu-001", openedPackages: ["英语套餐"] },
+    courses: [
+      { id: "course-001", name: "五年级英语", grade: "五年级", subject: "英语", lessonCount: 8, progress: 25 },
+      { id: "course-002", name: "五年级地理", grade: "五年级", subject: "地理", lessonCount: 6, progress: 60 }
+    ],
+    continueCourse: { id: "course-001", name: "五年级英语" },
+    continueProgress: 25,
+    pendingHomework: [], materials: [], notices: []
+  } : []), {
+    getStorageSync() { return ""; },
+    navigateTo(args) { calls.push(args.url); }
+  });
+
+  page.loadHome();
+  await flushPromises();
+
+  assert.equal(page.data.courses.length, 2);
+  assert.equal(page.data.courseSlides.length, 2);
+  assert.equal(page.data.courseSlides[1].progress, 60);
+  page.changeCourse({ detail: { current: 1 } });
+  assert.equal(page.data.continueCourse.id, "course-002");
+  assert.equal(page.data.progressPercent, 60);
+  page.goStudyDetail({ currentTarget: { dataset: { courseId: "course-002" } } });
+  assert.equal(calls[0], "/pages/study-detail/index?id=course-002");
+});
+
 test("home page shortcut labels use commercial learning actions", () => {
   const page = loadHomePage(() => Promise.resolve({}), {
     getStorageSync() {

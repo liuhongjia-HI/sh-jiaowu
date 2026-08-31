@@ -389,6 +389,9 @@ func TestWechatStudentBindingUsesExistingMaskedPhoneStudent(t *testing.T) {
 	if home.Student.ID != "stu-acceptance" || home.ContinueCourse.Name != "验收五年级英语课程-07110752" {
 		t.Fatalf("expected original opened package course on home, got %#v", home)
 	}
+	if len(home.Courses) != 1 || home.Courses[0].ID != home.ContinueCourse.ID {
+		t.Fatalf("expected home to expose the opened course cards, got %#v", home.Courses)
+	}
 	if len(home.Materials) != 1 || home.Materials[0].Title != "验收英语资料-07110806" {
 		t.Fatalf("expected original opened material on home, got %#v", home.Materials)
 	}

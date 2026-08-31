@@ -760,8 +760,11 @@
 }
 
 .student-switch-button.active {
-  background: #7e5b45;
-  color: #fff;
+  border: 1rpx solid #b8e8ca;
+  background: #eef8f2;
+  color: #45a978;
+  font-weight: 800;
+  opacity: 1;
 }
 
 .student-switch-button.pending {

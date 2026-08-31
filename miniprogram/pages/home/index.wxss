@@ -666,6 +666,14 @@
   padding-top: 20rpx;
 }
 
+.home-course-swiper {
+  height: 360rpx;
+}
+
+.home-course-swiper swiper-item {
+  overflow: visible;
+}
+
 .home-banner {
   min-height: 326rpx;
   border-radius: 24rpx;

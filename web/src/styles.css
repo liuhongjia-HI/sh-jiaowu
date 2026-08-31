@@ -2293,6 +2293,96 @@ button.schedule-block:hover {
   white-space: nowrap;
 }
 
+.student-detail-drawer .ant-drawer-header {
+  padding: 18px 24px;
+  border-bottom-color: #e8eef3;
+}
+
+.student-detail-drawer .ant-drawer-body {
+  padding: 20px 24px 0;
+}
+
+.student-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.student-drawer-title-name {
+  flex: 0 0 auto;
+  color: #152331;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.student-drawer-title .ant-space {
+  min-width: 0;
+}
+
+.student-opening-period {
+  width: 100%;
+  margin-top: 4px;
+  padding: 14px 16px 16px;
+  border: 1px solid #e3eaf0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.student-opening-panel {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+}
+
+.student-opening-period-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.student-opening-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.student-opening-field .ant-input {
+  width: 100%;
+  min-height: 36px;
+  background: #fff;
+}
+
+.student-opening-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid #e5ebf0;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 -8px 18px rgba(15, 23, 42, .05);
+  backdrop-filter: blur(10px);
+}
+
+.student-opening-actions-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.student-opening-actions-summary .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .student-package-expiry {
   font-size: 12px;
   line-height: 20px;
@@ -2523,6 +2613,34 @@ button.schedule-block:hover {
 }
 
 @media (max-width: 560px) {
+  .student-detail-drawer .ant-drawer-body {
+    padding: 16px 16px 0;
+  }
+
+  .student-detail-drawer .ant-drawer-header {
+    padding: 14px 16px;
+  }
+
+  .student-drawer-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .student-opening-period-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-opening-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .student-opening-actions .ant-btn {
+    width: 100%;
+  }
+
   .app-content {
     padding: 16px;
   }

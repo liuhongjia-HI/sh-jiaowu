@@ -14,6 +14,9 @@ Page({
     pendingTask: null,
     firstMaterial: null,
     continueCourse: null,
+    courses: [],
+    courseSlides: [],
+    currentCourseIndex: 0,
     progressPercent: 0,
     pendingCount: 0,
     materialCount: 0,
@@ -72,16 +75,22 @@ Page({
         const openedPackages = Array.isArray(student.openedPackages) ? student.openedPackages : [];
         const pendingTask = pendingHomework[0] || null;
         const firstMaterial = materials[0] || null;
-        const hasContent = !!continueCourse.id || pendingHomework.length > 0 || materials.length > 0;
+        const courses = normalizeHomeCourses(home, continueCourse);
+        const selectedCourse = courses[0] || {};
+        const courseSlides = buildCourseSlides(courses, pendingTask);
+        const hasContent = courses.length > 0 || pendingHomework.length > 0 || materials.length > 0;
         const hasOpenedPackage = openedPackages.length > 0;
-        const progressPercent = Number(home.continueProgress) || 0;
+        const progressPercent = clampProgress(selectedCourse.progress);
         this.setData({
           home,
           greetingName: preferredGreetingName(student),
+          courses,
+          courseSlides,
+          currentCourseIndex: 0,
           hasContent,
           hasOpenedPackage,
           emptyMessage: homeEmptyMessage(hasOpenedPackage),
-          continueCourse,
+          continueCourse: selectedCourse,
           pendingTask,
           firstMaterial,
           progressPercent,
@@ -92,8 +101,8 @@ Page({
           feedbackItems,
           subscriptionReminder: decorateSubscription(home.subscriptionReminder, subscribeEnabled),
           subscribeEnabled,
-          courseTitle: continueCourse.name || "待解锁学习星球",
-          courseMeta: `${continueCourse.grade || ""} · ${continueCourse.subject || ""} · ${continueCourse.chapterCount || 0} 个章节`,
+          courseTitle: selectedCourse.name || "待解锁学习星球",
+          courseMeta: formatCourseMeta(selectedCourse),
           bannerTag: pendingTask ? "今日题目" : "继续学习",
           loading: false
         }, () => this.loadRecommendations());
@@ -110,6 +119,18 @@ Page({
         feedbackItems: [],
         loading: false
       }));
+  },
+  changeCourse(event) {
+    const index = Number(event.detail.current) || 0;
+    const selectedCourse = this.data.courses[index] || {};
+    this.setData({
+      currentCourseIndex: index,
+      continueCourse: selectedCourse,
+      progressPercent: Number(selectedCourse.progress) || 0,
+      courseTitle: selectedCourse.name || "待解锁学习星球",
+      courseMeta: formatCourseMeta(selectedCourse),
+      bannerTag: index === 0 && this.data.pendingTask ? "今日题目" : "继续学习"
+    });
   },
   changeKeyword(event) {
     this.setData({ keyword: event.detail.value }, () => this.applySearch());
@@ -182,12 +203,14 @@ Page({
       });
     }
   },
-  goStudyDetail() {
-    if (!this.data.continueCourse || !this.data.continueCourse.id) {
+  goStudyDetail(event) {
+    const dataset = event && event.currentTarget && event.currentTarget.dataset;
+    const courseId = (dataset && dataset.courseId) || (this.data.continueCourse && this.data.continueCourse.id);
+    if (!courseId) {
       wx.switchTab({ url: "/pages/study/index" });
       return;
     }
-    wx.navigateTo({ url: `/pages/study-detail/index?id=${this.data.continueCourse.id}` });
+    wx.navigateTo({ url: `/pages/study-detail/index?id=${courseId}` });
   },
   goAnswer() {
     if (!this.data.pendingTask) {
@@ -353,6 +376,56 @@ function decorateTodos(todos) {
     icon: todoIcon(item.type),
     className: `todo-${item.type || "default"}`
   }));
+}
+
+function normalizeHomeCourses(home, continueCourse) {
+  const courses = Array.isArray(home.courses) ? home.courses : [];
+  if (courses.length > 0) {
+    return courses.map((course) => ({
+      ...course,
+      progress: clampProgress(course.progress)
+    }));
+  }
+  if (continueCourse && continueCourse.id) {
+    return [{ ...continueCourse, progress: clampProgress(home.continueProgress) }];
+  }
+  return [];
+}
+
+function buildCourseSlides(courses, pendingTask) {
+  if (!courses.length) {
+    return [{
+      id: "empty-course",
+      name: "待解锁学习星球",
+      progress: 0,
+      hasCourse: false,
+      meta: "",
+      bannerTag: "继续学习",
+      actionText: "查看学习中心"
+    }];
+  }
+  return courses.map((course, index) => ({
+    ...course,
+    hasCourse: true,
+    meta: formatCourseMeta(course),
+    bannerTag: index === 0 && pendingTask ? "今日题目" : "继续学习",
+    actionText: "继续学习"
+  }));
+}
+
+function formatCourseMeta(course = {}) {
+  const chapterCount = Number(course.chapterCount) || countChapters(course.curriculum) || Number(course.lessonCount) || 0;
+  return [course.grade, course.subject, `${chapterCount} 个章节`].filter(Boolean).join(" · ");
+}
+
+function countChapters(curriculum) {
+  if (!Array.isArray(curriculum)) return 0;
+  return curriculum.filter((node) => node && node.type === "chapter").length;
+}
+
+function clampProgress(value) {
+  const progress = Number(value) || 0;
+  return Math.max(0, Math.min(100, progress));
 }
 
 function normalizeTodayTodos(home, context) {

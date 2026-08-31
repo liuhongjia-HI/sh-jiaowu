@@ -560,6 +560,7 @@
 `GET /api/student/tasks` 返回任务数组，`studentStatus`（待完成/已完成）、`score`、`submissionId` 由提交记录派生。
 `GET /api/student/home` 返回学生首页聚合数据，包含：
 
+- `courses`：当前学生可学习的课程卡片（含每门课程的真实 `progress`），首页有多门课程时可用于轮播展示。
 - `continueProgress`：当前推荐课程学习进度。
 - `todayTodos`：今日待办，聚合作业、下一节课、课堂反馈和学习提醒授权入口。
 - `classroomFeedback`：课后课堂反馈，由已批改提交沉淀，展示课程、练习、老师、分数、表现、重点和下一步。

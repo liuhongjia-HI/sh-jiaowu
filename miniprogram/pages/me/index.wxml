@@ -35,7 +35,7 @@
     <view wx:if="{{studentAccounts.length}}" class="student-switcher">
       <view class="student-switcher-label">当前查看：{{studentProfile.name}}</view>
       <view class="student-switcher-list">
-        <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}} {{!item.canSwitch ? 'pending' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{item.active || !item.canSwitch || switchingStudentId}}">
+        <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}} {{!item.canSwitch && !item.active ? 'pending' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{!item.canSwitch && !item.active || switchingStudentId}}">
           <text>{{item.name}} · {{item.grade}}</text>
           <text wx:if="{{!item.canSwitch}}" class="student-switch-status">暂不可切换</text>
         </button>

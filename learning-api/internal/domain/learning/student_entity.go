@@ -311,6 +311,7 @@ type FavoriteRequest struct {
 
 type StudentHome struct {
 	Student              Student              `json:"student"`
+	Courses              []StudentCourseCard  `json:"courses"`
 	ContinueCourse       Course               `json:"continueCourse"`
 	ContinueProgress     int                  `json:"continueProgress"`
 	PendingHomework      []Homework           `json:"pendingHomework"`

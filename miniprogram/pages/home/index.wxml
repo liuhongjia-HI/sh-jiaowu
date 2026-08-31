@@ -31,21 +31,25 @@
       </swiper>
     </view>
     <view class="section">
-      <view class="home-banner" bindtap="goStudyDetail">
-        <view class="banner-copy">
-          <view class="banner-year">{{bannerTag}}</view>
-          <view class="banner-title">{{courseTitle}}</view>
-          <view class="banner-sub">{{hasContent ? courseMeta : emptyMessage}}</view>
-          <view class="banner-progress-row"><text>已学 {{progressPercent}}%</text><text>{{progressPercent >= 100 ? "已完成" : "继续保持"}}</text></view>
-          <view class="progress banner-progress"><view class="progress-bar" style="width: {{progressPercent}}%;"></view></view>
-          <view class="banner-action">{{hasContent ? "继续学习" : "查看学习中心"}}</view>
-        </view>
-        <view class="banner-visual">
-          <view class="paper-card"></view>
-          <view class="score-card">{{progressPercent}}%</view>
-          <view class="phone-card"></view>
-        </view>
-      </view>
+      <swiper class="home-course-swiper" current="{{currentCourseIndex}}" indicator-dots="{{courses.length > 1}}" indicator-color="rgba(255,90,31,.22)" indicator-active-color="#ff5a1f" circular="{{courses.length > 1}}" autoplay="{{courses.length > 1}}" interval="5200" bindchange="changeCourse">
+        <swiper-item wx:for="{{courseSlides}}" wx:key="id">
+          <view class="home-banner" data-course-id="{{item.id}}" bindtap="goStudyDetail">
+            <view class="banner-copy">
+              <view class="banner-year">{{item.bannerTag}}</view>
+              <view class="banner-title">{{item.name}}</view>
+              <view class="banner-sub">{{item.hasCourse ? item.meta : emptyMessage}}</view>
+              <view class="banner-progress-row"><text>已学 {{item.progress}}%</text><text>{{item.progress >= 100 ? "已完成" : "继续保持"}}</text></view>
+              <view class="progress banner-progress"><view class="progress-bar" style="width: {{item.progress}}%;"></view></view>
+              <view class="banner-action">{{item.actionText}}</view>
+            </view>
+            <view class="banner-visual">
+              <view class="paper-card"></view>
+              <view class="score-card">{{item.progress}}%</view>
+              <view class="phone-card"></view>
+            </view>
+          </view>
+        </swiper-item>
+      </swiper>
     </view>
 
     <view class="section shortcut-wrap">
