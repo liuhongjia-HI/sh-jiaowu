@@ -188,8 +188,6 @@ export type Student = {
   lastSubmissionStatus?: string;
   effectiveUntil?: string;
   activeTutoringAssignments?: TutoringAssignmentSummary[];
-  bindCode?: string;
-  bindCodeExpiresAt?: string;
 };
 
 export type StudentPackageRef = {

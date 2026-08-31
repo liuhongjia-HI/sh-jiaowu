@@ -12,12 +12,6 @@ import (
 )
 
 func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRequest, openID string, realWechatLogin bool) (learning.Principal, error) {
-	if strings.TrimSpace(req.BindCode) != "" {
-		// 凭码关联走完全独立的一条路：不看手机号是否命中已有档案，只认这个码
-		// 对应哪个学生。第二个家长的手机号大概率跟任何已有档案都不一样，走
-		// 下面手机号匹配的逻辑只会得到"未找到学生档案"，所以必须在最前面分流。
-		return s.claimGuardianByBindCodeUnlocked(openID, req)
-	}
 	// 多子女的候选选择分支下面会直接 return 一个 error（StudentSelectionRequiredError），
 	// 而 persistentMutation 一看到非 nil error 就整个丢弃这次调用里的所有写入——
 	// 所以"把手机号命中的几个学生都关联到同一个家长"必须在那之前，作为一次独立

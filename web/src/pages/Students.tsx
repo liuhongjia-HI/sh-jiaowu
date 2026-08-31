@@ -29,6 +29,7 @@ import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, LockOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { getData, postData, postForm, putData } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
@@ -150,6 +151,7 @@ function TutoringTeacherNames({ assignments }: { assignments?: TutoringAssignmen
 
 export default function Students({ user }: { user: CurrentUser }) {
   const [filters, setFilters] = useState<StudentFilters>({});
+  const [keywordInput, setKeywordInput] = useState('');
   const [studentForm] = Form.useForm<StudentFormValues>();
   const [editing, setEditing] = useState<Student | null>(null);
   const [studentDrawerOpen, setStudentDrawerOpen] = useState(false);
@@ -224,16 +226,6 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: () => message.error('提醒失败，请稍后重试。')
   });
 
-  const generateBindCode = useMutation({
-    mutationFn: (studentId: string) => postData<Student>(`/students/${studentId}/bind-code`, {}),
-    onSuccess: (result) => {
-      message.success('绑定码已生成，7 天内有效');
-      queryClient.invalidateQueries({ queryKey: ['students', result.id, 'detail'] });
-      queryClient.invalidateQueries({ queryKey: ['students'] });
-    },
-    onError: () => message.error('绑定码生成失败，请稍后重试。')
-  });
-
   const createDirectGrant = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error('请先选择学生');
@@ -282,6 +274,18 @@ export default function Students({ user }: { user: CurrentUser }) {
     waiting: allRows.filter((item) => item.followUpStatus === '待跟进').length,
     disabled: allRows.filter((item) => item.accountStatus === '停用').length
   }), [allRows]);
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+
+  function applyQuickFilter(nextFilters: StudentFilters) {
+    setKeywordInput('');
+    setFilters(nextFilters);
+  }
+
+  function activateQuickFilter(event: KeyboardEvent<HTMLElement>, onActivate: () => void) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onActivate();
+  }
 
   function openCreate() {
     setEditing(null);
@@ -325,11 +329,6 @@ export default function Students({ user }: { user: CurrentUser }) {
       render: (value, record) => <Space direction="vertical" size={0}><Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f"><Typography.Text strong className="student-name">{value}</Typography.Text></Badge><Typography.Text type="secondary">{record.phone}</Typography.Text>{studentActions(record)}</Space>
     },
     { title: '家长姓名', dataIndex: 'guardianName', width: 110, ellipsis: true, sorter: (left, right) => compareStudentText(left.guardianName, right.guardianName), render: (value) => value || '-' },
-    {
-      title: '微信关联',
-      width: 108,
-      render: (_, record) => <Space direction="vertical" size={2}><Tag color={record.officialAccountOpenId ? 'green' : 'orange'}>{record.officialAccountOpenId ? '公众号已关联' : '公众号未关联'}</Tag><Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag></Space>
-    },
     {
       title: '套餐状态',
       width: 144,
@@ -409,9 +408,42 @@ export default function Students({ user }: { user: CurrentUser }) {
       </div>
 
       <div className="student-stat-grid">
-        <Card><Statistic title="学生总数" value={stats.total} /></Card>
-        <Card><Statistic title="已开通课程" value={stats.opened} /></Card>
-        <Card hoverable onClick={() => setFilters((prev) => prev.followUpState === '待跟进' ? {} : { followUpState: '待跟进' })}><Statistic title="待跟进（点击筛选）" value={stats.waiting} valueStyle={{ color: stats.waiting ? '#cf1322' : undefined }} /></Card>
+        <Card
+          hoverable
+          className={!hasActiveFilters ? 'student-stat-card-active' : undefined}
+          role="button"
+          tabIndex={0}
+          aria-label="查看全部学生"
+          aria-pressed={!hasActiveFilters}
+          onClick={() => applyQuickFilter({})}
+          onKeyDown={(event) => activateQuickFilter(event, () => applyQuickFilter({}))}
+        >
+          <Statistic title="学生总数（点击查看全部）" value={stats.total} />
+        </Card>
+        <Card
+          hoverable
+          className={filters.packageState === '已开通' ? 'student-stat-card-active' : undefined}
+          role="button"
+          tabIndex={0}
+          aria-label="筛选已开通课程的学生"
+          aria-pressed={filters.packageState === '已开通'}
+          onClick={() => applyQuickFilter(filters.packageState === '已开通' ? {} : { packageState: '已开通' })}
+          onKeyDown={(event) => activateQuickFilter(event, () => applyQuickFilter(filters.packageState === '已开通' ? {} : { packageState: '已开通' }))}
+        >
+          <Statistic title="已开通课程（点击筛选）" value={stats.opened} />
+        </Card>
+        <Card
+          hoverable
+          className={filters.followUpState === '待跟进' ? 'student-stat-card-active' : undefined}
+          role="button"
+          tabIndex={0}
+          aria-label="筛选待跟进学生"
+          aria-pressed={filters.followUpState === '待跟进'}
+          onClick={() => applyQuickFilter(filters.followUpState === '待跟进' ? {} : { followUpState: '待跟进' })}
+          onKeyDown={(event) => activateQuickFilter(event, () => applyQuickFilter(filters.followUpState === '待跟进' ? {} : { followUpState: '待跟进' }))}
+        >
+          <Statistic title="待跟进（点击筛选）" value={stats.waiting} valueStyle={{ color: stats.waiting ? '#cf1322' : undefined }} />
+        </Card>
         <Card><Statistic title="已停用" value={stats.disabled} /></Card>
       </div>
 
@@ -419,12 +451,24 @@ export default function Students({ user }: { user: CurrentUser }) {
         <div className="list-panel">
           <div className="list-toolbar">
             <Space wrap>
-              <Input.Search placeholder="搜索姓名或手机号" allowClear onSearch={(keyword) => setFilters((prev) => ({ ...prev, keyword }))} style={{ width: 240 }} />
-              <Select allowClear placeholder="年级" options={gradeOptions} style={{ width: 140 }} onChange={(grade) => setFilters((prev) => ({ ...prev, grade }))} />
-              <Select allowClear placeholder="账号状态" options={accountOptions} style={{ width: 140 }} onChange={(accountStatus) => setFilters((prev) => ({ ...prev, accountStatus }))} />
-              <Select allowClear placeholder="学习状态" options={learningOptions} style={{ width: 150 }} onChange={(learningStatus) => setFilters((prev) => ({ ...prev, learningStatus }))} />
+              <Input.Search
+                value={keywordInput}
+                placeholder="搜索姓名或手机号"
+                allowClear
+                onChange={(event) => {
+                  const keyword = event.target.value;
+                  setKeywordInput(keyword);
+                  if (!keyword) setFilters((prev) => ({ ...prev, keyword: undefined }));
+                }}
+                onSearch={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
+                style={{ width: 240 }}
+              />
+              <Select allowClear value={filters.grade} placeholder="年级" options={gradeOptions} style={{ width: 140 }} onChange={(grade) => setFilters((prev) => ({ ...prev, grade }))} />
+              <Select allowClear value={filters.accountStatus} placeholder="账号状态" options={accountOptions} style={{ width: 140 }} onChange={(accountStatus) => setFilters((prev) => ({ ...prev, accountStatus }))} />
+              <Select allowClear value={filters.learningStatus} placeholder="学习状态" options={learningOptions} style={{ width: 150 }} onChange={(learningStatus) => setFilters((prev) => ({ ...prev, learningStatus }))} />
               <Select
                 allowClear
+                value={filters.packageState}
                 placeholder="套餐开通状态"
                 options={[{ label: '已开通', value: '已开通' }, { label: '未开通', value: '未开通' }]}
                 style={{ width: 140 }}
@@ -477,7 +521,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1280 }} pagination={{ pageSize: 8 }} sortDirections={['ascend', 'descend']} /></div>
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1160 }} pagination={{ pageSize: 8 }} sortDirections={['ascend', 'descend']} /></div>
           )}
         </div>
       </Card>
@@ -559,9 +603,6 @@ export default function Students({ user }: { user: CurrentUser }) {
                 children: (
                   <StudentProfile
                     detail={detail.data}
-                    writable={writable}
-                    generatingBindCode={generateBindCode.isPending}
-                    onGenerateBindCode={() => generateBindCode.mutate(detail.data!.student.id)}
                   />
                 )
               },
@@ -928,17 +969,10 @@ function TutoringAssignmentPanel({
 }
 
 function StudentProfile({
-  detail,
-  writable,
-  generatingBindCode,
-  onGenerateBindCode
+  detail
 }: {
   detail: StudentDetail;
-  writable: boolean;
-  generatingBindCode: boolean;
-  onGenerateBindCode: () => void;
 }) {
-  const codeExpired = Boolean(detail.student.bindCodeExpiresAt && detail.student.bindCodeExpiresAt < new Date().toISOString().slice(0, 10));
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Descriptions column={2} bordered size="small">
@@ -959,33 +993,6 @@ function StudentProfile({
         </Descriptions.Item>
         <Descriptions.Item label="备注" span={2}>{detail.student.remark || '-'}</Descriptions.Item>
       </Descriptions>
-      <Card size="small" title="关联其他家长">
-        <Space direction="vertical" size={6} style={{ width: '100%' }}>
-          {detail.student.bindCode ? (
-            <>
-              <Typography.Text
-                copyable={{ text: detail.student.bindCode, tooltips: ['复制绑定码', '已复制'] }}
-                style={{ fontSize: 22, fontWeight: 600, letterSpacing: 4, fontFamily: 'monospace' }}
-              >
-                {detail.student.bindCode}
-              </Typography.Text>
-              <Typography.Text type={codeExpired ? 'danger' : 'secondary'}>
-                {codeExpired ? '已过期，需要重新生成。' : `有效期至 ${detail.student.bindCodeExpiresAt}`}
-              </Typography.Text>
-              <Typography.Text type="secondary">
-                分享给其他家长（比如妈妈也想用自己的手机号关联），对方在小程序"我的 - 关联其他孩子"里输入这个码即可，不需要占用您已绑定的微信。
-              </Typography.Text>
-            </>
-          ) : (
-            <Typography.Text type="secondary">还没有生成过绑定码，生成后可以分享给其他家长关联这个学生。</Typography.Text>
-          )}
-          {writable && (
-            <Button size="small" loading={generatingBindCode} onClick={onGenerateBindCode}>
-              {detail.student.bindCode ? '重新生成（旧码立即失效）' : '生成绑定码'}
-            </Button>
-          )}
-        </Space>
-      </Card>
     </Space>
   );
 }
@@ -1302,40 +1309,33 @@ function RecordTable({ detail }: { detail: StudentDetail }) {
 
 function LogTable({ detail }: { detail: StudentDetail }) {
   if (detail.logs.length === 0 && detail.notices.length === 0) return <Empty description="还没有操作记录。" />;
+  const rows = [
+    ...detail.notices.map((record) => ({ kind: 'notice' as const, record })),
+    ...detail.logs.map((record) => ({ kind: 'log' as const, record }))
+  ];
+
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      {detail.notices.length > 0 && (
-        <CardList
-          rows={detail.notices}
-          rowKey={(record) => record.id}
-          emptyText="还没有提醒记录。"
-          renderCard={(record) => (
-            <InfoCard
-              title={record.title}
-              subtitle={record.summary}
-              status={<Tag>{record.status}</Tag>}
-            />
-          )}
+    <CardList
+      rows={rows}
+      rowKey={(item) => `${item.kind}-${item.record.id}`}
+      emptyText="还没有操作记录。"
+      renderCard={(item) => item.kind === 'notice' ? (
+        <InfoCard
+          title={item.record.title}
+          subtitle={item.record.summary}
+          status={<Tag>{item.record.status}</Tag>}
+        />
+      ) : (
+        <InfoCard
+          title={item.record.action}
+          subtitle={item.record.target}
+          fields={[
+            { label: '操作人', value: item.record.operator },
+            { label: '时间', value: item.record.time }
+          ]}
         />
       )}
-      {detail.logs.length > 0 && (
-        <CardList
-          rows={detail.logs}
-          rowKey={(record) => record.id}
-          emptyText="还没有操作记录。"
-          renderCard={(record) => (
-            <InfoCard
-              title={record.action}
-              subtitle={record.target}
-              fields={[
-                { label: '操作人', value: record.operator },
-                { label: '时间', value: record.time }
-              ]}
-            />
-          )}
-        />
-      )}
-    </Space>
+    />
   );
 }
 
