@@ -94,6 +94,31 @@ func TestSevenDayTrialIsNoLongerAvailable(t *testing.T) {
 	}
 }
 
+func TestTrialPermissionUsesTheFirstLessonBySortOrder(t *testing.T) {
+	store := NewMemoryStore()
+	studentID := "stu-001"
+	packageID := "trial-package"
+	courseID := "course-g05-english-s1-q1"
+	for index := range store.courses {
+		if store.courses[index].ID == courseID {
+			store.courses[index].Curriculum = []learning.CurriculumNode{
+				{ID: courseID + "-lesson-2", Type: learning.CurriculumLesson, Name: "第二节", SortOrder: 2},
+				{ID: courseID + "-lesson-1", Type: learning.CurriculumLesson, Name: "第一节", SortOrder: 1},
+			}
+		}
+	}
+	store.trials = append(store.trials, studentTrialRecord{
+		StudentID: studentID, AcademicYear: store.configuredAcademicYear(), PackageID: packageID,
+		StartsAt: "2026-01-01", EndsAt: "2027-01-01", Status: "active",
+	})
+	lessonID, limited := store.trialFirstLessonForGrant(packageGrant{
+		StudentID: studentID, PackageID: packageID, StartsAt: "2026-01-01", EndsAt: "2027-01-01",
+	}, courseID)
+	if !limited || lessonID != courseID+"-lesson-1" {
+		t.Fatalf("expected trial to use first lesson, got lesson=%q limited=%v", lessonID, limited)
+	}
+}
+
 func containsCourseID(values []learning.StudentCourseCard, id string) bool {
 	for _, value := range values {
 		if value.ID == id {
