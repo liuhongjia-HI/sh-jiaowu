@@ -110,8 +110,8 @@ func watermarkPageScript(watermarkText string) string {
 	return `/StarlineWatermark {
   gsave
   initgraphics
-  0.72 setgray
-  /Helvetica-Bold findfont 17 scalefont setfont
+  0.88 setgray
+  /Helvetica-Bold findfont 15 scalefont setfont
   /WatermarkText (` + escaped + `) def
   clippath pathbbox
   /pageTop exch def
@@ -123,10 +123,8 @@ func watermarkPageScript(watermarkText string) string {
   translate
   42 rotate
   /watermarkWidth WatermarkText stringwidth pop def
-  watermarkWidth -2 div -210 moveto WatermarkText show
-  watermarkWidth -2 div -70 moveto WatermarkText show
-  watermarkWidth -2 div 70 moveto WatermarkText show
-  watermarkWidth -2 div 210 moveto WatermarkText show
+  watermarkWidth -2 div -130 moveto WatermarkText show
+  watermarkWidth -2 div 130 moveto WatermarkText show
   grestore
 } bind def
 << /EndPage {

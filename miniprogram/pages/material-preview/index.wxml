@@ -1,31 +1,3 @@
-<block wx:if="{{readerOpen}}">
-  <view class="inline-reader">
-    <view class="inline-reader-toolbar">
-      <button class="reader-back" bindtap="closeReader">← 返回资料信息</button>
-      <view class="reader-count">共 {{pageCount}} 页</view>
-    </view>
-    <view class="reader-tip">向下滑动继续阅读，点击页面可放大查看</view>
-    <view wx:for="{{readerPages}}" wx:key="page" class="reader-page-card">
-      <image
-        class="reader-page-image"
-        src="{{item.path}}"
-        mode="widthFix"
-        data-index="{{index}}"
-        bindtap="previewReaderPage"
-        show-menu-by-longpress="{{false}}"
-      ></image>
-      <view class="reader-page-number">第 {{item.page}} / {{pageCount}} 页</view>
-    </view>
-    <view wx:if="{{readerLoading}}" class="reader-footer">正在加载后续页面…</view>
-    <view wx:elif="{{readerMessage}}" class="reader-footer reader-error">
-      <view>{{readerMessage}}</view>
-      <button class="reader-retry" bindtap="retryReader">重试</button>
-    </view>
-    <view wx:elif="{{!readerHasMore && readerPages.length}}" class="reader-footer">课件已全部加载</view>
-  </view>
-</block>
-
-<block wx:else>
 <view class="hero">
   <view class="eyebrow">资料预览</view>
   <view class="hero-title">{{pageTitle}}</view>
@@ -51,16 +23,10 @@
     <view wx:if="{{previewMode === 'image'}}" class="material-preview-card" hover-class="material-preview-card-active" bindtap="openSecurePreview">
       <view wx:if="{{pagesLoading || !previewImagePath}}" class="preview-loading">正在加载课件预览…</view>
       <image wx:else class="preview-cover" src="{{previewImagePath}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
-      <view wx:if="{{previewImagePath}}" class="watermark-layer">
-        <view wx:for="{{watermarkTexts}}" wx:for-item="mark" wx:key="mark" class="watermark">{{mark}}</view>
-      </view>
       <view wx:if="{{previewImagePath}}" class="preview-page-count">共 {{pageCount}} 页</view>
     </view>
 
     <view wx:elif="{{previewMode === 'pdf'}}" class="material-preview-card preview-fallback" hover-class="material-preview-card-active" bindtap="openSecurePreview">
-      <view class="watermark-layer">
-        <view wx:for="{{watermarkTexts}}" wx:key="index" class="watermark">{{item}}</view>
-      </view>
       <view class="preview-file-icon">📄</view>
       <view class="preview-fallback-title">{{paperTitle}}</view>
       <view class="preview-fallback-message">{{previewMessage}}</view>
@@ -97,4 +63,3 @@
     </view>
   </view>
 </view>
-</block>

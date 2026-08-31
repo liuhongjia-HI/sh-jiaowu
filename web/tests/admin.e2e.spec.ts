@@ -145,13 +145,13 @@ test('教师账号不能进入运营和系统高权限功能', async ({ page }) 
   await expect(page.getByText('当前账号不能访问这个功能')).toBeVisible();
 });
 
-test('学生表格将操作列显示在学生列之后', async ({ page }) => {
+test('学生表格将年级和学校显示在学生列之前', async ({ page }) => {
   await login(page, '13800000002');
 
   await expectPageHeading(page, '/students', '学生管理');
   await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
   const studentTableHeaders = await page.locator('.student-table thead th').allTextContents();
-  expect(studentTableHeaders.slice(0, 3).map((header) => header.trim())).toEqual(['学生', '操作', '家长姓名']);
+  expect(studentTableHeaders.slice(0, 5).map((header) => header.trim())).toEqual(['年级', '学校', '学生', '操作', '家长姓名']);
 });
 
 test('学生列表直接展示辅导老师并在悬停时显示匹配详情', async ({ page }) => {

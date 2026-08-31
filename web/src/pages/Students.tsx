@@ -286,6 +286,8 @@ export default function Students({ user }: { user: CurrentUser }) {
   }
 
   const columns: TableColumnsType<Student> = [
+    { title: '年级', dataIndex: 'grade', width: 88 },
+    { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
     {
       title: '学生',
       dataIndex: 'name',
@@ -305,8 +307,6 @@ export default function Students({ user }: { user: CurrentUser }) {
       )
     },
     { title: '家长姓名', dataIndex: 'guardianName', width: 110, ellipsis: true, render: (value) => value || '-' },
-    { title: '年级', dataIndex: 'grade', width: 88 },
-    { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, render: (value) => value || '-' },
     {
       title: '微信关联',
       width: 108,

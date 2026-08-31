@@ -30,6 +30,12 @@ func TestWatermarkEndPageScriptStampsOnlyContentPages(t *testing.T) {
 	if strings.Contains(script, "/showpage") {
 		t.Fatalf("watermark script must not override showpage because PDF rendering does not call it: %s", script)
 	}
+	if !strings.Contains(script, "0.88 setgray") {
+		t.Fatalf("watermark should use the lighter 12%% black shade, got %s", script)
+	}
+	if count := strings.Count(script, "WatermarkText show"); count != 2 {
+		t.Fatalf("watermark count = %d, want 2 to avoid obstructing courseware text", count)
+	}
 }
 
 func TestCountPDFPagesPermitsGhostscriptToReadSourcePDF(t *testing.T) {

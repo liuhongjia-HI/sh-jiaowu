@@ -1,16 +1,12 @@
 const { request } = require("../../utils/request");
 const { activateContentSecurity } = require("../../utils/content-security");
 
-const READER_BATCH_SIZE = 3;
-
 Page({
   data: {
     material: {},
     pageTitle: "资料预览",
     paperTitle: "",
     readText: "",
-    watermarkText: "专属水印加载中",
-    watermarkTexts: ["专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中"],
     securityNotice: "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。",
     favorited: false,
     favoriteId: "",
@@ -21,12 +17,6 @@ Page({
     pagesLoading: false,
     previewMessage: "",
     openingPreview: false,
-    readerOpen: false,
-    readerPages: [],
-    readerNextPage: 1,
-    readerHasMore: false,
-    readerLoading: false,
-    readerMessage: "",
     recordingWarning: false
   },
   onLoad(options) {
@@ -45,14 +35,11 @@ Page({
       onRecordingChange: (isRecording) => this.setData({ recordingWarning: isRecording })
     });
     request(`/student/materials/${id}`).then((material) => {
-      const watermarkText = material.watermarkText || "专属水印加载中";
       this.setData({
         material,
         pageTitle: material.title,
         paperTitle: (material.curriculum && material.curriculum.lesson) || material.title,
         readText: `${material.viewCount || 0} 人学过`,
-        watermarkText,
-        watermarkTexts: buildWatermarks(watermarkText),
         securityNotice: material.securityNotice || "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。"
       });
       this.loadPagedPreview(id);
@@ -74,7 +61,6 @@ Page({
   },
   onUnload() {
     this.pageLoadToken += 1;
-    this.readerLoadToken = (this.readerLoadToken || 0) + 1;
     if (this.previewRetryTimer) {
       clearTimeout(this.previewRetryTimer);
       this.previewRetryTimer = null;
@@ -242,10 +228,6 @@ Page({
       wx.showToast({ title: "完整课件还在准备，请稍后再试", icon: "none" });
       return;
     }
-    if (this.materialId && this.data.previewMode === "image" && this.data.pageCount > 0) {
-      this.openImageReader();
-      return;
-    }
     this.setData({ openingPreview: true });
     wx.showLoading({ title: "正在打开课件" });
     downloadWithAuth(stripApiPrefix(previewUrl))
@@ -257,82 +239,8 @@ Page({
         this.setData({ openingPreview: false });
         wx.hideLoading();
       });
-  },
-  openImageReader() {
-    const firstPage = this.data.previewImagePath
-      ? [{ page: 1, path: this.data.previewImagePath }]
-      : [];
-    const nextPage = firstPage.length ? 2 : 1;
-    this.readerLoadToken = (this.readerLoadToken || 0) + 1;
-    this.setData({
-      readerOpen: true,
-      readerPages: firstPage,
-      readerNextPage: nextPage,
-      readerHasMore: nextPage <= this.data.pageCount,
-      readerLoading: false,
-      readerMessage: ""
-    });
-    if (wx.setNavigationBarTitle) wx.setNavigationBarTitle({ title: this.data.pageTitle || "课件阅读" });
-    this.loadReaderBatch();
-  },
-  loadReaderBatch() {
-    if (this.data.readerLoading || !this.data.readerHasMore || !this.materialId) return Promise.resolve();
-    const token = this.readerLoadToken;
-    const start = this.data.readerNextPage;
-    const end = Math.min(this.data.pageCount, start + READER_BATCH_SIZE - 1);
-    const pageNumbers = [];
-    for (let page = start; page <= end; page += 1) pageNumbers.push(page);
-    this.setData({ readerLoading: true, readerMessage: "" });
-    return Promise.all(pageNumbers.map((page) => (
-      downloadWithAuth(`/student/materials/${this.materialId}/preview/pages/${page}`)
-        .then((path) => ({ page, path }))
-    ))).then((loadedPages) => {
-      if (token !== this.readerLoadToken) return;
-      const readerNextPage = end + 1;
-      this.setData({
-        readerPages: this.data.readerPages.concat(loadedPages),
-        readerNextPage,
-        readerHasMore: readerNextPage <= this.data.pageCount,
-        readerLoading: false
-      });
-    }).catch((error) => {
-      if (token !== this.readerLoadToken) return;
-      this.setData({
-        readerLoading: false,
-        readerMessage: (error && error.message) || "部分课件页面加载失败，请重试"
-      });
-    });
-  },
-  onReachBottom() {
-    if (this.data.readerOpen) this.loadReaderBatch();
-  },
-  retryReader() {
-    this.loadReaderBatch();
-  },
-  closeReader() {
-    this.readerLoadToken = (this.readerLoadToken || 0) + 1;
-    this.setData({
-      readerOpen: false,
-      readerPages: [],
-      readerNextPage: 1,
-      readerHasMore: false,
-      readerLoading: false,
-      readerMessage: ""
-    });
-    if (wx.setNavigationBarTitle) wx.setNavigationBarTitle({ title: "资料预览" });
-  },
-  previewReaderPage(event) {
-    if (!wx.previewImage) return;
-    const index = Number(event.currentTarget.dataset.index || 0);
-    const urls = this.data.readerPages.map((item) => item.path);
-    if (!urls.length) return;
-    wx.previewImage({ current: urls[index] || urls[0], urls });
   }
 });
-
-function buildWatermarks(text) {
-  return Array.from({ length: 8 }).map(() => text);
-}
 
 
 // downloadWithAuth 用 wx.downloadFile 带上登录态下载一份需要鉴权的文件（图片/PDF）。

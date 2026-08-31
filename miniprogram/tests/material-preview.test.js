@@ -8,6 +8,7 @@ test("material preview keeps only the preview card as the full-courseware entry"
 
   assert.doesNotMatch(template, />打开完整课件<\/button>/);
   assert.doesNotMatch(template, /class="preview-action"/);
+  assert.doesNotMatch(template, /class="watermark-layer"/);
   assert.match(template, /class="button challenge-button" bindtap="goAnswer"/);
 });
 
@@ -233,13 +234,17 @@ test("openSecurePreview ignores repeated taps while the document is opening", as
   assert.equal(page.data.openingPreview, false);
 });
 
-test("openSecurePreview expands the paged reader inside the current page", async () => {
+test("openSecurePreview opens the watermarked PDF even when a page cover is available", async () => {
   const downloadedUrls = [];
+  let openedPath = "";
   const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock({
-    setNavigationBarTitle() {},
     downloadFile(opts) {
       downloadedUrls.push(opts.url);
-      opts.success({ statusCode: 200, tempFilePath: `${opts.url}#local` });
+      opts.success({ statusCode: 200, tempFilePath: "secure-preview.pdf#local" });
+    },
+    openDocument(opts) {
+      openedPath = opts.filePath;
+      opts.success && opts.success();
     }
   }));
   page.materialId = "mat-1";
@@ -254,11 +259,10 @@ test("openSecurePreview expands the paged reader inside the current page", async
   await flushPromises();
   await flushPromises();
 
-  assert.equal(page.data.readerOpen, true);
-  assert.deepEqual(page.data.readerPages.map((item) => item.page), [1, 2, 3]);
+  assert.equal("readerOpen" in page.data, false);
+  assert.equal(openedPath, "secure-preview.pdf#local");
   assert.deepEqual(downloadedUrls, [
-    "https://gate.example.com/api/student/materials/mat-1/preview/pages/2",
-    "https://gate.example.com/api/student/materials/mat-1/preview/pages/3"
+    "https://gate.example.com/api/student/materials/mat-1/preview"
   ]);
 });
 

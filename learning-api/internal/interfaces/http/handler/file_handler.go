@@ -296,7 +296,7 @@ func studentPreviewPageCount(ctx context.Context, asset learning.FileAsset) (int
 	return countPDFPages(ctx, previewPath)
 }
 
-// StudentMaterialPreviewPage 返回单页栅格化图片，学生水印由小程序覆盖显示。
+// StudentMaterialPreviewPage 返回带服务端专属水印的单页栅格化图片。
 func (h *LearningHandler) StudentMaterialPreviewPage(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	page, err := strconv.Atoi(c.Param("page"))
