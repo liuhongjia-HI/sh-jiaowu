@@ -224,6 +224,27 @@ export type StudentGrant = {
   openHomework: string[];
 };
 
+export type StudentOpeningItem = {
+  id: string;
+  title: string;
+};
+
+export type StudentOpeningCell = {
+  contentTypeCode: 'course' | 'handout' | 'question';
+  opened: boolean;
+  packageOpened: boolean;
+  directOpened: boolean;
+  packageNames: string[];
+  items: StudentOpeningItem[];
+};
+
+export type StudentOpeningScope = {
+  learningSpaceId: string;
+  name: string;
+  subject: string;
+  content: StudentOpeningCell[];
+};
+
 export type TutoringAssignment = {
   id: string;
   studentId: string;
@@ -348,6 +369,7 @@ export type StudentScoreUpsertRequest = {
 export type StudentDetail = {
   student: Student;
   grants: StudentGrant[];
+  openingMatrix: StudentOpeningScope[];
   permissions: StudentPermissionSummary;
   learningRecords: StudentLearningRecord[];
   notices: Notice[];
@@ -705,6 +727,20 @@ export type PaymentCreateRequest = {
 export type RefundCreateRequest = {
   amountCent: number;
   reason: string;
+};
+
+export type RefundSuspensionResult = {
+  refund: {
+    id: string;
+    orderId: string;
+    amountCent: number;
+    reason: string;
+    refundedAt: string;
+    status: string;
+  };
+  student: Student;
+  revokedGrantCount: number;
+  removedFutureClassCount: number;
 };
 
 export type ContractCreateRequest = {

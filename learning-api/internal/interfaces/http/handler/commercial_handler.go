@@ -65,6 +65,22 @@ func (h *LearningHandler) CreateRefund(c *gin.Context) {
 	OK(c, refund)
 }
 
+func (h *LearningHandler) RefundAndSuspendStudent(c *gin.Context) {
+	var req learning.RefundAndSuspendRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.RefundAndSuspendStudent(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
 func (h *LearningHandler) CreateContract(c *gin.Context) {
 	var req learning.ContractCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -124,6 +124,7 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.POST("/commercial/orders", h.CreateCommercialOrder)
 	g.POST("/commercial/orders/:id/payments", h.CreatePayment)
 	g.POST("/commercial/orders/:id/refunds", h.CreateRefund)
+	g.POST("/commercial/orders/:id/refund-and-suspend", h.RefundAndSuspendStudent)
 	g.POST("/commercial/orders/:id/contracts", h.CreateContract)
 	g.POST("/commercial/orders/:id/invoices", h.CreateInvoice)
 	g.POST("/commercial/lesson-consumptions", h.CreateLessonConsumption)

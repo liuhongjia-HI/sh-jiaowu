@@ -56,6 +56,20 @@ type RefundCreateRequest struct {
 	Reason     string `json:"reason"`
 }
 
+// RefundAndSuspendRequest 只用于全额退费并停止该学生后续服务。
+// 部分退款仍使用 RefundCreateRequest，避免误停仍有其他服务的学生。
+type RefundAndSuspendRequest struct {
+	AmountCent int    `json:"amountCent"`
+	Reason     string `json:"reason"`
+}
+
+type RefundSuspensionResult struct {
+	Refund                  RefundRecord `json:"refund"`
+	Student                 Student      `json:"student"`
+	RevokedGrantCount       int          `json:"revokedGrantCount"`
+	RemovedFutureClassCount int          `json:"removedFutureClassCount"`
+}
+
 type ContractRecord struct {
 	ID       string `json:"id"`
 	OrderID  string `json:"orderId"`

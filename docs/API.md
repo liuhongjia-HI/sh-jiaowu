@@ -507,6 +507,15 @@
 }
 ```
 
+`POST /api/commercial/orders/{id}/refund-and-suspend` 用于**全额退费并停止学生后续服务**：退款金额必须恰好等于该订单尚未退还的实收金额，且学生不能仍有其他有效套餐。成功后系统会在同一事务内登记退款、停用该学生账号、撤销该订单套餐的有效权限，并从未来课次中移除该学生；历史订单、课消、成绩和学习记录均保留。部分退款或仍有其他套餐时，请继续使用普通退款接口，不能停用整个账号。
+
+```json
+{
+  "amountCent": 128000,
+  "reason": "家长线下退款，停止后续服务"
+}
+```
+
 `POST /api/commercial/orders/{id}/contracts` 记录合同签署；`POST /api/commercial/orders/{id}/invoices` 记录开票；`POST /api/commercial/lesson-consumptions` 登记课消，超过订单剩余课时会被拒绝；`POST /api/commercial/renewal-reminders` 创建续费跟进；`POST /api/commercial/parent-notices` 给家长发送订单相关通知，并同步生成可追踪通知记录，`relatedType=commercial_order`，缺少公众号配置或学生 openid 时会返回 `待配置`，可通过通知页补发。
 
 ## 学生端

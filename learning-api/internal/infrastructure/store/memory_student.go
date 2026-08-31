@@ -37,11 +37,82 @@ func (s *MemoryStore) studentDetailUnlocked(principal learning.Principal, id str
 	return learning.StudentDetail{
 		Student:         student,
 		Grants:          grants,
+		OpeningMatrix:   s.openingMatrixForStudent(student),
 		Permissions:     permissions,
 		LearningRecords: records,
 		Notices:         s.noticesForStudent(student),
 		Logs:            s.logsForStudent(student),
 	}, nil
+}
+
+func (s *MemoryStore) openingMatrixForStudent(student learning.Student) []learning.StudentOpeningScope {
+	result := make([]learning.StudentOpeningScope, 0)
+	for _, space := range s.learningSpaces {
+		if space.Status != learning.StatusEnabled || space.Grade != student.Grade {
+			continue
+		}
+		content := []learning.StudentOpeningCell{
+			{ContentTypeCode: "course", Items: s.openingItemsForSpace(space.ID, "course")},
+			{ContentTypeCode: "handout", Items: s.openingItemsForSpace(space.ID, "handout")},
+			{ContentTypeCode: "question", Items: s.openingItemsForSpace(space.ID, "question")},
+		}
+		for _, grant := range s.grants {
+			if grant.StudentID != student.ID || !grantActive(grant) {
+				continue
+			}
+			pkg, exists := s.findPackage(grant.PackageID)
+			if !exists {
+				continue
+			}
+			for index := range content {
+				cell := &content[index]
+				if !s.packageOpensContent(pkg, space.ID, cell.ContentTypeCode) {
+					continue
+				}
+				cell.Opened = true
+				if isDirectGrantPackage(pkg.ID) {
+					cell.DirectOpened = true
+				} else {
+					cell.PackageOpened = true
+					cell.PackageNames = appendUnique(cell.PackageNames, pkg.Name)
+				}
+			}
+		}
+		result = append(result, learning.StudentOpeningScope{
+			LearningSpaceID: space.ID,
+			Name:            space.Name,
+			Subject:         space.Subject,
+			Content:         content,
+		})
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	return result
+}
+
+func (s *MemoryStore) openingItemsForSpace(learningSpaceID, contentTypeCode string) []learning.StudentOpeningItem {
+	items := make([]learning.StudentOpeningItem, 0)
+	switch contentTypeCode {
+	case "course":
+		for _, course := range s.courses {
+			if course.LearningSpaceID == learningSpaceID && course.Status == learning.StatusEnabled {
+				items = append(items, learning.StudentOpeningItem{ID: course.ID, Title: course.Name})
+			}
+		}
+	case "handout":
+		for _, material := range s.materials {
+			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) {
+				items = append(items, learning.StudentOpeningItem{ID: material.ID, Title: material.Title})
+			}
+		}
+	case "question":
+		for _, homework := range s.homework {
+			if homework.LearningSpaceID == learningSpaceID && homeworkVisible(homework.Status) {
+				items = append(items, learning.StudentOpeningItem{ID: homework.ID, Title: homework.Title})
+			}
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].Title < items[j].Title })
+	return items
 }
 
 func (s *MemoryStore) createStudentUnlocked(operator string, principal learning.Principal, req learning.StudentUpsertRequest) (learning.Student, error) {

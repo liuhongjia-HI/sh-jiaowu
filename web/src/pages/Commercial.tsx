@@ -26,7 +26,8 @@ import {
   PayCircleOutlined,
   PlusOutlined,
   RedoOutlined,
-  RollbackOutlined
+  RollbackOutlined,
+  StopOutlined
 } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -43,16 +44,18 @@ import type {
   ParentNoticeCreateRequest,
   PaymentCreateRequest,
   RefundCreateRequest,
+  RefundSuspensionResult,
   RenewalReminderCreateRequest,
   Student,
   StudyPackage
 } from '../types/starline';
 
-type ActionKind = 'payment' | 'refund' | 'contract' | 'invoice' | 'lesson' | 'renewal' | 'notice';
+type ActionKind = 'payment' | 'refund' | 'refundAndSuspend' | 'contract' | 'invoice' | 'lesson' | 'renewal' | 'notice';
 
 const actionTitle: Record<ActionKind, string> = {
   payment: '登记线下收款',
   refund: '登记退款',
+  refundAndSuspend: '退款并停学',
   contract: '签署合同',
   invoice: '开具发票',
   lesson: '登记课消',
@@ -79,6 +82,11 @@ export default function Commercial() {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   };
 
+  const studentStatusByID = useMemo(
+    () => new Map((students.data ?? []).map((student) => [student.id, student.accountStatus])),
+    [students.data]
+  );
+
   const createOrder = useMutation({
     mutationFn: (values: CommercialOrderCreateRequest) => postData<CommercialOrder>('/commercial/orders', values),
     onSuccess: () => {
@@ -99,6 +107,8 @@ export default function Commercial() {
           return postData(`/commercial/orders/${orderID}/payments`, values as PaymentCreateRequest);
         case 'refund':
           return postData(`/commercial/orders/${orderID}/refunds`, values as RefundCreateRequest);
+        case 'refundAndSuspend':
+          return postData<RefundSuspensionResult>(`/commercial/orders/${orderID}/refund-and-suspend`, values as RefundCreateRequest);
         case 'contract':
           return postData(`/commercial/orders/${orderID}/contracts`, values as ContractCreateRequest);
         case 'invoice':
@@ -113,8 +123,13 @@ export default function Commercial() {
           return null;
       }
     },
-    onSuccess: () => {
-      message.success(`${activeAction ? actionTitle[activeAction.kind] : '操作'}已完成。`);
+    onSuccess: (result) => {
+      if (activeAction?.kind === 'refundAndSuspend' && result) {
+        const suspension = result as RefundSuspensionResult;
+        message.success(`已退款并停用账号，已收回 ${suspension.revokedGrantCount} 项套餐权限，移除 ${suspension.removedFutureClassCount} 节后续课程。`);
+      } else {
+        message.success(`${activeAction ? actionTitle[activeAction.kind] : '操作'}已完成。`);
+      }
       setActiveAction(null);
       actionForm.resetFields();
       refreshCommercial();
@@ -166,6 +181,7 @@ export default function Commercial() {
         <Space size={6} wrap>
           <ActionButton tooltip="线下收款" icon={<PayCircleOutlined />} onClick={() => openAction('payment', record)} />
           <ActionButton tooltip="退款" icon={<RollbackOutlined />} onClick={() => openAction('refund', record)} />
+          {canRefundAndSuspend(record, studentStatusByID) && <ActionButton danger tooltip="退款并停学" icon={<StopOutlined />} onClick={() => openAction('refundAndSuspend', record)} />}
           <ActionButton tooltip="合同" icon={<FileProtectOutlined />} onClick={() => openAction('contract', record)} />
           <ActionButton tooltip="发票" icon={<FileDoneOutlined />} onClick={() => openAction('invoice', record)} />
           <ActionButton tooltip="课消" icon={<RedoOutlined />} onClick={() => openAction('lesson', record)} />
@@ -174,13 +190,16 @@ export default function Commercial() {
         </Space>
       )
     }
-  ], []);
+  ], [studentStatusByID]);
 
   function openAction(kind: ActionKind, order: CommercialOrder) {
     setActiveAction({ kind, order });
     actionForm.resetFields();
     if (kind === 'payment') {
       actionForm.setFieldsValue({ amountCent: Math.max(0, order.amountCent - order.paidAmountCent), method: '线下收款' });
+    }
+    if (kind === 'refund' || kind === 'refundAndSuspend') {
+      actionForm.setFieldsValue({ amountCent: Math.max(0, order.paidAmountCent - order.refundedAmountCent) });
     }
     if (kind === 'invoice') {
       actionForm.setFieldsValue({ amountCent: Math.max(0, order.paidAmountCent - order.refundedAmountCent), title: order.studentName });
@@ -264,6 +283,7 @@ export default function Commercial() {
         onCancel={() => setActiveAction(null)}
         onOk={() => actionForm.submit()}
         confirmLoading={submitAction.isPending}
+        okButtonProps={{ danger: activeAction?.kind === 'refundAndSuspend' }}
         destroyOnClose
       >
         <Form form={actionForm} layout="vertical" onFinish={(values) => submitAction.mutate(normalizeAction(values))}>
@@ -292,9 +312,10 @@ function ActionFields({ kind }: { kind: ActionKind }) {
       </>
     );
   }
-  if (kind === 'refund') {
+  if (kind === 'refund' || kind === 'refundAndSuspend') {
     return (
       <>
+        {kind === 'refundAndSuspend' && <Alert type="warning" showIcon message="此操作不可自动恢复" description="将退清该订单的剩余实收金额，停用学生账号，收回该套餐权限，并从后续课次中移除该学生。部分退款请使用普通退款。" />}
         <Form.Item name="amountCent" label="退款金额" rules={[{ required: true, message: '请输入退款金额' }]}><InputNumber min={1} precision={0} addonAfter="分" style={{ width: '100%' }} /></Form.Item>
         <Form.Item name="reason" label="退款原因" rules={[{ required: true, message: '请填写退款原因' }]}><Input.TextArea rows={3} maxLength={120} showCount /></Form.Item>
       </>
@@ -369,4 +390,8 @@ function statusColor(status: string) {
   if (status === '待续费') return 'orange';
   if (status === '已退款') return 'red';
   return 'blue';
+}
+
+function canRefundAndSuspend(order: CommercialOrder, studentStatusByID: Map<string, string>) {
+  return order.paidAmountCent > order.refundedAmountCent && order.status !== '已退款' && studentStatusByID.get(order.studentId) === '正常';
 }

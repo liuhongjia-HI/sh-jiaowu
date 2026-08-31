@@ -11,6 +11,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popover,
   Select,
   Skeleton,
   Space,
@@ -25,7 +26,7 @@ import {
   message
 } from 'antd';
 import type { TableColumnsType, UploadFile } from 'antd';
-import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
+import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, LockOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { getData, postData, postForm, putData } from '../services/http';
@@ -41,6 +42,8 @@ import type {
   Student,
   StudentDetail,
   StudentImportResult,
+  StudentOpeningCell,
+  StudentOpeningScope,
   StudentPackageRef,
   StudentRemindResult,
   StudentScoreRecord,
@@ -189,11 +192,6 @@ export default function Students({ user }: { user: CurrentUser }) {
     setInitialDirectSelections(selections);
   }, [detail.data, selected]);
 
-  const availableDirectLearningSpaces = useMemo(
-    () => (learningSpaces.data ?? []).filter((item) => item.status === '启用' && item.grade === selected?.grade),
-    [learningSpaces.data, selected?.grade]
-  );
-
   const saveStudent = useMutation({
     mutationFn: (values: StudentFormValues) => {
       const body: StudentUpsertRequest = {
@@ -305,27 +303,26 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerOpen(true);
   }
 
+  function studentActions(record: Student) {
+    return (
+      <Space size={4}>
+        <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
+        {writable && record.accountStatus === '正常' && <ActionButton tooltip="课程开通" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
+        {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
+        {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
+      </Space>
+    );
+  }
+
   const columns: TableColumnsType<Student> = [
     { title: '年级', dataIndex: 'grade', width: 88, sorter: (left, right) => compareStudentGrades(left.grade, right.grade) },
     { title: '学校', dataIndex: 'schoolName', width: 130, ellipsis: true, sorter: (left, right) => compareStudentText(left.schoolName, right.schoolName), render: (value) => value || '-' },
     {
       title: '学生',
       dataIndex: 'name',
-      width: 170,
+      width: writable ? 184 : 170,
       sorter: (left, right) => compareStudentText(left.name, right.name),
-      render: (value, record) => <Space direction="vertical" size={0}><Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f"><Typography.Text strong className="student-name">{value}</Typography.Text></Badge><Typography.Text type="secondary">{record.phone}</Typography.Text></Space>
-    },
-    {
-      title: '操作',
-      width: writable ? 176 : 64,
-      render: (_, record) => (
-        <Space size={4}>
-          <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
-          {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通学习内容" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
-          {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
-          {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
-        </Space>
-      )
+      render: (value, record) => <Space direction="vertical" size={0}><Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f"><Typography.Text strong className="student-name">{value}</Typography.Text></Badge><Typography.Text type="secondary">{record.phone}</Typography.Text>{studentActions(record)}</Space>
     },
     { title: '家长姓名', dataIndex: 'guardianName', width: 110, ellipsis: true, sorter: (left, right) => compareStudentText(left.guardianName, right.guardianName), render: (value) => value || '-' },
     {
@@ -367,7 +364,7 @@ export default function Students({ user }: { user: CurrentUser }) {
 
   function openDirectGrant(student: Student) {
     setSelected(student);
-    setStudentDrawerTab('direct-grant');
+    setStudentDrawerTab('courses');
     setDirectSelections([]);
     setInitialDirectSelections([]);
     setDirectStartsAt(toDateTimeInput(new Date()));
@@ -471,7 +468,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                   actions={(
                     <>
                       <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
-                      {writable && record.accountStatus === '正常' && <ActionButton tooltip="开通学习内容" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
+                      {writable && record.accountStatus === '正常' && <ActionButton tooltip="课程开通" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
                       {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
                       {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
                     </>
@@ -568,20 +565,14 @@ export default function Students({ user }: { user: CurrentUser }) {
                   />
                 )
               },
-			  { key: 'courses', label: '开通课程', children: <StudentCourses detail={detail.data} /> },
 			  {
-				key: 'tutoring',
-				label: writable ? '辅导老师' : '我的辅导关系',
-				children: selected ? <TutoringAssignmentPanel student={selected} writable={writable} teachers={teachers.data ?? []} subjects={subjects.data ?? []} learningSpaces={learningSpaces.data ?? []} /> : null
-			  },
-			  { key: 'lesson-feedback', label: '课后反馈', children: selected ? <LessonFeedbackPanel student={selected} user={user} /> : null },
-			  ...(writable ? [{
-                key: 'direct-grant',
-                label: '开通学习内容',
+                key: 'courses',
+                label: '课程开通',
                 children: selected ? (
-                  <DirectGrantPanel
+                  <CourseOpeningPanel
+                    detail={detail.data}
                     student={selected}
-                    learningSpaces={availableDirectLearningSpaces}
+                    writable={writable}
                     loadingLearningSpaces={learningSpaces.isLoading}
                     learningSpacesError={Boolean(learningSpaces.error)}
                     selections={directSelections}
@@ -594,7 +585,13 @@ export default function Students({ user }: { user: CurrentUser }) {
                     onSubmit={submitDirectGrant}
                   />
                 ) : null
-              }] : []),
+              },
+			  {
+				key: 'tutoring',
+				label: writable ? '辅导老师' : '我的辅导关系',
+				children: selected ? <TutoringAssignmentPanel student={selected} writable={writable} teachers={teachers.data ?? []} subjects={subjects.data ?? []} learningSpaces={learningSpaces.data ?? []} /> : null
+			  },
+			  { key: 'lesson-feedback', label: '课后反馈', children: selected ? <LessonFeedbackPanel student={selected} user={user} /> : null },
               { key: 'records', label: '学习记录', children: <RecordTable detail={detail.data} /> },
               { key: 'scores', label: '成绩对比', children: selected ? <ScorePanel student={selected} canEdit={canManageScores(user)} /> : null },
               { key: 'logs', label: '操作记录', children: <LogTable detail={detail.data} /> }
@@ -993,43 +990,136 @@ function StudentProfile({
   );
 }
 
-function StudentCourses({ detail }: { detail: StudentDetail }) {
+function CourseOpeningPanel({
+  detail,
+  student,
+  writable,
+  loadingLearningSpaces,
+  learningSpacesError,
+  selections,
+  startsAt,
+  endsAt,
+  submitting,
+  onSelectionsChange,
+  onStartsAtChange,
+  onEndsAtChange,
+  onSubmit
+}: {
+  detail: StudentDetail;
+  student: Student;
+  writable: boolean;
+  loadingLearningSpaces: boolean;
+  learningSpacesError: boolean;
+  selections: DirectGrantSelection[];
+  startsAt: string;
+  endsAt: string;
+  submitting: boolean;
+  onSelectionsChange: (values: DirectGrantSelection[]) => void;
+  onStartsAtChange: (value: string) => void;
+  onEndsAtChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  if (!writable) {
+    return <CourseOpeningMatrix matrix={detail.openingMatrix} selections={selections} onSelectionsChange={onSelectionsChange} readOnly />;
+  }
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      <Typography.Text type="secondary">以下内容仅代表当前学生实际已开通的学习权限。</Typography.Text>
-      <CardList
-        rows={detail.grants}
-        rowKey={(record) => record.packageId}
-        emptyText="暂未开通课程"
-        renderCard={(record) => (
-          <InfoCard
-            title={<Space size={6}><Typography.Text strong>{record.packageName}</Typography.Text>{record.isDirect && <Tag color="cyan">直接开通</Tag>}</Space>}
-            subtitle={`${record.startsAt || '-'} 至 ${record.effectiveUntil || '-'}`}
-            status={tagStatus(record.permissionState)}
-            fields={[
-              { label: '课程范围', value: record.learningSpaces.join('、') || '暂无' },
-              { label: '开通类型', value: record.contentTypes.join('、') || '暂无' },
-              { label: '课程', value: record.openCourses.join('、') || '暂无' },
-              { label: '讲义', value: record.openMaterials.join('、') || '暂无' },
-              { label: '题目', value: record.openHomework.join('、') || '暂无' }
-            ]}
-          />
-        )}
-      />
-      <Descriptions column={1} bordered size="small">
-        <Descriptions.Item label="适用课程范围">{detail.permissions.learningSpaces.join('、') || '暂无'}</Descriptions.Item>
-        <Descriptions.Item label="包含学习内容">{detail.permissions.contentTypes.join('、') || '暂无'}</Descriptions.Item>
-        <Descriptions.Item label="开放课程">{detail.permissions.openCourses.join('、') || '暂无'}</Descriptions.Item>
-        <Descriptions.Item label="开放资料">{detail.permissions.openMaterials.join('、') || '暂无'}</Descriptions.Item>
-        <Descriptions.Item label="开放练习">{detail.permissions.openHomework.join('、') || '暂无'}</Descriptions.Item>
-      </Descriptions>
+    <DirectGrantPanel
+      student={student}
+      matrix={detail.openingMatrix}
+      loadingLearningSpaces={loadingLearningSpaces}
+      learningSpacesError={learningSpacesError}
+      selections={selections}
+      startsAt={startsAt}
+      endsAt={endsAt}
+      submitting={submitting}
+      onSelectionsChange={onSelectionsChange}
+      onStartsAtChange={onStartsAtChange}
+      onEndsAtChange={onEndsAtChange}
+      onSubmit={onSubmit}
+    />
+  );
+}
+
+const openingContentLabels: Record<StudentOpeningCell['contentTypeCode'], string> = {
+  course: '课程',
+  handout: '讲义',
+  question: '习题'
+};
+
+function CourseOpeningMatrix({
+  matrix,
+  selections,
+  onSelectionsChange,
+  readOnly = false
+}: {
+  matrix: StudentOpeningScope[];
+  selections: DirectGrantSelection[];
+  onSelectionsChange: (values: DirectGrantSelection[]) => void;
+  readOnly?: boolean;
+}) {
+  const selectionFor = (learningSpaceId: string) => selections.find((selection) => selection.learningSpaceId === learningSpaceId)?.contentTypeCodes ?? [];
+  const changeSelection = (learningSpaceId: string, contentTypeCode: StudentOpeningCell['contentTypeCode'], checked: boolean) => {
+    const current = selectionFor(learningSpaceId);
+    const nextValues = checked ? [...new Set([...current, contentTypeCode])] : current.filter((item) => item !== contentTypeCode);
+    const next = selections.filter((selection) => selection.learningSpaceId !== learningSpaceId);
+    if (nextValues.length > 0) next.push({ learningSpaceId, contentTypeCodes: nextValues });
+    onSelectionsChange(next);
+  };
+
+  return (
+    <Space direction="vertical" size={10} style={{ width: '100%' }}>
+      {matrix.map((scope) => (
+        <Card size="small" key={scope.learningSpaceId} title={scope.name}>
+          <Space wrap size={[20, 8]} aria-label={`${scope.name}课程开通`}>
+            {scope.content.map((cell) => {
+              const directSelected = selectionFor(scope.learningSpaceId).includes(cell.contentTypeCode);
+              const checked = cell.packageOpened ? cell.opened : directSelected;
+              const locked = cell.packageOpened;
+              const label = openingContentLabels[cell.contentTypeCode];
+              const previewItems = cell.items.slice(0, 5);
+              const sourceText = cell.packageOpened
+                ? `由 ${cell.packageNames.join('、')} 开通`
+                : directSelected ? '单独开通' : '尚未开通';
+              return (
+                <Popover
+                  key={cell.contentTypeCode}
+                  trigger={['hover', 'click', 'focus']}
+                  title={`${label}明细`}
+                  content={(
+                    <Space direction="vertical" size={6} style={{ maxWidth: 300 }}>
+                      <Typography.Text type="secondary">{sourceText}</Typography.Text>
+                      <Typography.Text strong>{checked ? `已开通内容（${cell.items.length}）` : `可开通内容（${cell.items.length}）`}</Typography.Text>
+                      {previewItems.length > 0 ? previewItems.map((item) => <Typography.Text key={item.id}>· {item.title}</Typography.Text>) : <Typography.Text type="secondary">暂未配置具体内容</Typography.Text>}
+                      {cell.items.length > previewItems.length && <Typography.Text type="secondary">还有 {cell.items.length - previewItems.length} 项内容</Typography.Text>}
+                      {!readOnly && locked && directSelected && (
+                        <Button type="link" size="small" danger onClick={() => changeSelection(scope.learningSpaceId, cell.contentTypeCode, false)}>撤销单独开通</Button>
+                      )}
+                    </Space>
+                  )}
+                >
+                  <span aria-label={`${scope.name}${label}明细`} tabIndex={0}>
+                    <Checkbox
+                      checked={checked}
+                      disabled={readOnly || locked}
+                      onChange={(event) => changeSelection(scope.learningSpaceId, cell.contentTypeCode, event.target.checked)}
+                    >
+                      {label}
+                    </Checkbox>
+                    {locked && <Tooltip title={sourceText}><LockOutlined aria-label={`${label}由课程方案开通`} style={{ marginLeft: 4, color: '#8c8c8c' }} /></Tooltip>}
+                  </span>
+                </Popover>
+              );
+            })}
+          </Space>
+        </Card>
+      ))}
     </Space>
   );
 }
 
 function DirectGrantPanel({
   student,
-  learningSpaces,
+  matrix,
   loadingLearningSpaces,
   learningSpacesError,
   selections,
@@ -1042,7 +1132,7 @@ function DirectGrantPanel({
   onSubmit
 }: {
   student: Student;
-  learningSpaces: LearningSpace[];
+  matrix: StudentOpeningScope[];
   loadingLearningSpaces: boolean;
   learningSpacesError: boolean;
   selections: DirectGrantSelection[];
@@ -1057,32 +1147,26 @@ function DirectGrantPanel({
   const [selectedSubject, setSelectedSubject] = useState<string>();
   const subjectFilters = useMemo(() => {
     const counts = new Map<string, number>();
-    learningSpaces.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
+    matrix.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
     return Array.from(counts, ([subject, count]) => ({ subject, count }));
-  }, [learningSpaces]);
-  const visibleLearningSpaces = useMemo(
-    () => selectedSubject ? learningSpaces.filter((space) => space.subject === selectedSubject) : learningSpaces,
-    [learningSpaces, selectedSubject]
+  }, [matrix]);
+  const visibleMatrix = useMemo(
+    () => selectedSubject ? matrix.filter((space) => space.subject === selectedSubject) : matrix,
+    [matrix, selectedSubject]
   );
-  const selectedCount = selections.filter((selection) => selection.contentTypeCodes.length > 0).length;
-  const selectionFor = (learningSpaceId: string) => selections.find((selection) => selection.learningSpaceId === learningSpaceId)?.contentTypeCodes ?? [];
-  const changeSelection = (learningSpaceId: string, values: string[]) => {
-    const next = selections.filter((selection) => selection.learningSpaceId !== learningSpaceId);
-    if (values.length > 0) next.push({ learningSpaceId, contentTypeCodes: values });
-    onSelectionsChange(next);
-  };
+  const selectedCount = matrix.filter((scope) => scope.content.some((cell) => cell.opened || selections.find((selection) => selection.learningSpaceId === scope.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode))).length;
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Alert
         type="info"
         showIcon
-        message="按需开通学习内容"
-        description={`已开通的内容会自动勾选。取消勾选后保存，即可撤销 ${student.name} 的手动开通内容；不会影响套餐或其他学生。`}
+        message="按课程范围开通"
+        description={`已开通的内容会自动勾选。带锁内容由课程方案开通，不能在这里关闭；${student.name} 的单独开通内容可直接勾选调整。`}
       />
       <div>
-        <Typography.Text strong>课程范围与学习内容</Typography.Text>
+        <Typography.Text strong>课程范围</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          每个课程范围可单独开通课程、讲义和题目；取消该范围全部勾选会撤销该范围的直接开通。
+          勾选课程、讲义或习题即可开通；经过或点击名称可查看具体内容。
         </Typography.Paragraph>
         <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
           <Space wrap size={[8, 8]}>
@@ -1093,7 +1177,7 @@ function DirectGrantPanel({
             <Space wrap size={[8, 8]}>
               <Typography.Text>科目</Typography.Text>
               <Button size="small" type={!selectedSubject ? 'primary' : 'default'} onClick={() => setSelectedSubject(undefined)}>
-                全部（{learningSpaces.length}）
+                全部（{matrix.length}）
               </Button>
               {subjectFilters.map(({ subject, count }) => (
                 <Button
@@ -1110,27 +1194,13 @@ function DirectGrantPanel({
         </Space>
         {loadingLearningSpaces ? <Skeleton active paragraph={{ rows: 3 }} /> : learningSpacesError ? (
           <Alert type="error" showIcon message="课程范围加载失败，请关闭抽屉后重试。" />
-        ) : learningSpaces.length === 0 ? (
+        ) : matrix.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该年级还没有可开通的课程范围。" />
-        ) : visibleLearningSpaces.length === 0 ? (
+        ) : visibleMatrix.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该科目暂无可开通课程范围。" />
         ) : (
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
-            {visibleLearningSpaces.map((space) => (
-              <Card size="small" key={space.id} title={space.name}>
-                <Checkbox.Group
-                  aria-label={`${space.name}学习内容`}
-                  value={selectionFor(space.id)}
-                  onChange={(values) => changeSelection(space.id, values.filter((value): value is string => typeof value === 'string'))}
-                >
-                  <Space wrap size={[20, 8]}>
-                    <Checkbox value="course">课程</Checkbox>
-                    <Checkbox value="handout">讲义</Checkbox>
-                    <Checkbox value="question">题目</Checkbox>
-                  </Space>
-                </Checkbox.Group>
-              </Card>
-            ))}
+            <CourseOpeningMatrix matrix={visibleMatrix} selections={selections} onSelectionsChange={onSelectionsChange} />
           </Space>
         )}
       </div>
@@ -1157,7 +1227,7 @@ function DirectGrantPanel({
         disabled={loadingLearningSpaces || learningSpacesError}
         onClick={onSubmit}
       >
-        保存学习内容
+        保存变更
       </Button>
     </Space>
   );

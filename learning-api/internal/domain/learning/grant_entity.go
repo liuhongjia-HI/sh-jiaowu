@@ -96,6 +96,31 @@ type StudentGrant struct {
 	OpenHomework     []string `json:"openHomework"`
 }
 
+// StudentOpeningItem 是课程开通矩阵中可展开查看的一项具体内容。
+type StudentOpeningItem struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+// StudentOpeningCell 表示某个课程范围内一种内容的实际开通状态。
+// PackageOpened 和 DirectOpened 分别保留来源，避免运营人员误以为可以关闭课程方案内容。
+type StudentOpeningCell struct {
+	ContentTypeCode string               `json:"contentTypeCode"`
+	Opened          bool                 `json:"opened"`
+	PackageOpened   bool                 `json:"packageOpened"`
+	DirectOpened    bool                 `json:"directOpened"`
+	PackageNames    []string             `json:"packageNames"`
+	Items           []StudentOpeningItem `json:"items"`
+}
+
+// StudentOpeningScope 是学生课程开通页的一行课程范围。
+type StudentOpeningScope struct {
+	LearningSpaceID string               `json:"learningSpaceId"`
+	Name            string               `json:"name"`
+	Subject         string               `json:"subject"`
+	Content         []StudentOpeningCell `json:"content"`
+}
+
 type GrantCreateRequest struct {
 	StudentID string `json:"studentId"`
 	PackageID string `json:"packageId"`

@@ -921,6 +921,9 @@ func TestRefundAndSuspendStudentThroughAPI(t *testing.T) {
 	if !before.AlreadyOpened {
 		t.Fatalf("expected seeded package grant to be active before refund: %#v", before)
 	}
+	app.doJSON(t, http.MethodPost, "/api/commercial/orders/"+order.ID+"/refund-and-suspend", adminToken, learning.RefundAndSuspendRequest{
+		AmountCent: 100, Reason: "只退部分课时",
+	}, http.StatusBadRequest, nil)
 
 	var result learning.RefundSuspensionResult
 	app.doJSON(t, http.MethodPost, "/api/commercial/orders/"+order.ID+"/refund-and-suspend", adminToken, learning.RefundAndSuspendRequest{
@@ -930,12 +933,12 @@ func TestRefundAndSuspendStudentThroughAPI(t *testing.T) {
 		t.Fatalf("unexpected refund suspension result: %#v", result)
 	}
 
-	var after learning.GrantPreview
-	app.doJSON(t, http.MethodGet, "/api/grants/preview?studentId=stu-001&packageId=pkg-g05-english-s1-full", adminToken, nil, http.StatusOK, &after)
-	if after.AlreadyOpened {
-		t.Fatalf("expected refunded package grant to be revoked: %#v", after)
+	var grants []learning.StudentGrant
+	app.doJSON(t, http.MethodGet, "/api/students/stu-001/grants", adminToken, nil, http.StatusOK, &grants)
+	if len(grants) != 0 {
+		t.Fatalf("expected refunded package grant to be revoked: %#v", grants)
 	}
-	app.doJSON(t, http.MethodGet, "/api/student/home", studentToken, nil, http.StatusBadRequest, nil)
+	app.doJSON(t, http.MethodGet, "/api/student/home", studentToken, nil, http.StatusUnauthorized, nil)
 }
 
 func TestSchedulingCandidateAndCreateClassThroughAPI(t *testing.T) {

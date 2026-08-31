@@ -134,6 +134,58 @@ func TestFollowUpIncludesEveryStudentWithoutAnOpenedPackage(t *testing.T) {
 	}
 }
 
+func TestStudentDetailOpeningMatrixSeparatesDirectAndPackageSources(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("expected admin principal: %v", err)
+	}
+	studentID := "stu-001"
+	spaceID := "space-g05-math-s1-q1"
+
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID: studentID, LearningSpaceIDs: []string{spaceID}, ContentTypeCodes: []string{"course"},
+	}); err != nil {
+		t.Fatalf("create direct grant: %v", err)
+	}
+	pkg, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
+		Name: "五年级数学讲义包", AcademicYear: "2026.2027学年", Grade: "五年级", Semester: "S1", Subject: "数学",
+		LearningSpaceIDs: []string{spaceID}, ContentTypeCodes: []string{"course", "handout"}, Status: learning.StatusEnabled,
+	})
+	if err != nil {
+		t.Fatalf("create package: %v", err)
+	}
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: studentID, PackageID: pkg.ID}); err != nil {
+		t.Fatalf("create package grant: %v", err)
+	}
+
+	detail, err := store.StudentDetail(admin, studentID)
+	if err != nil {
+		t.Fatalf("student detail: %v", err)
+	}
+	var courseCell *learning.StudentOpeningCell
+	for index := range detail.OpeningMatrix {
+		if detail.OpeningMatrix[index].LearningSpaceID != spaceID {
+			continue
+		}
+		for cellIndex := range detail.OpeningMatrix[index].Content {
+			cell := &detail.OpeningMatrix[index].Content[cellIndex]
+			if cell.ContentTypeCode == "course" {
+				courseCell = cell
+			}
+		}
+	}
+	if courseCell == nil {
+		t.Fatalf("expected course cell for %s, got %#v", spaceID, detail.OpeningMatrix)
+	}
+	if !courseCell.Opened || !courseCell.DirectOpened || !courseCell.PackageOpened {
+		t.Fatalf("expected effective course access with both sources, got %#v", courseCell)
+	}
+	if !containsString(courseCell.PackageNames, pkg.Name) || len(courseCell.Items) == 0 {
+		t.Fatalf("expected source package and opened course details, got %#v", courseCell)
+	}
+}
+
 func TestStudentsAreSortedByRegistrationTimeDescending(t *testing.T) {
 	store := NewMemoryStore()
 	admin, err := store.PrincipalByUserID("user-super")

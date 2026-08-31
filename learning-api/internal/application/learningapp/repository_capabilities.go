@@ -106,6 +106,7 @@ type CommercialRepository interface {
 	CreateCommercialOrder(string, learning.Principal, learning.CommercialOrderCreateRequest) (learning.CommercialOrder, error)
 	CreatePayment(string, learning.Principal, string, learning.PaymentCreateRequest) (learning.PaymentRecord, error)
 	CreateRefund(string, learning.Principal, string, learning.RefundCreateRequest) (learning.RefundRecord, error)
+	RefundAndSuspendStudent(string, learning.Principal, string, learning.RefundAndSuspendRequest) (learning.RefundSuspensionResult, error)
 	CreateContract(string, learning.Principal, string, learning.ContractCreateRequest) (learning.ContractRecord, error)
 	CreateInvoice(string, learning.Principal, string, learning.InvoiceCreateRequest) (learning.InvoiceRecord, error)
 	CreateLessonConsumption(string, learning.Principal, learning.LessonConsumptionCreateRequest) (learning.LessonConsumption, error)

@@ -17,6 +17,9 @@ func (s *Service) CreatePayment(o string, p learning.Principal, id string, r lea
 func (s *Service) CreateRefund(o string, p learning.Principal, id string, r learning.RefundCreateRequest) (learning.RefundRecord, error) {
 	return s.commercial.CreateRefund(o, p, id, r)
 }
+func (s *Service) RefundAndSuspendStudent(o string, p learning.Principal, id string, r learning.RefundAndSuspendRequest) (learning.RefundSuspensionResult, error) {
+	return s.commercial.RefundAndSuspendStudent(o, p, id, r)
+}
 func (s *Service) CreateContract(o string, p learning.Principal, id string, r learning.ContractCreateRequest) (learning.ContractRecord, error) {
 	return s.commercial.CreateContract(o, p, id, r)
 }

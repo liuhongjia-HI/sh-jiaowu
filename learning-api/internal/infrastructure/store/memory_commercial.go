@@ -156,6 +156,112 @@ func (s *MemoryStore) createRefundUnlocked(operator string, principal learning.P
 	return refund, nil
 }
 
+func (s *MemoryStore) refundAndSuspendStudentUnlocked(operator string, principal learning.Principal, orderID string, req learning.RefundAndSuspendRequest) (learning.RefundSuspensionResult, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.RefundSuspensionResult, error) {
+			return work.refundAndSuspendStudentUnlocked(operator, principal, orderID, req)
+		})
+	}
+	if !canManageCommercial(principal) {
+		return learning.RefundSuspensionResult{}, errors.New("没有权限办理退款停学")
+	}
+	_, order, err := s.commercialOrderForWrite(principal, orderID)
+	if err != nil {
+		return learning.RefundSuspensionResult{}, err
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.Reason == "" {
+		return learning.RefundSuspensionResult{}, errors.New("请填写退款停学原因")
+	}
+	if req.AmountCent <= 0 || order.RefundedAmountCent+req.AmountCent != order.PaidAmountCent {
+		return learning.RefundSuspensionResult{}, errors.New("退款停学必须退清该订单的剩余实收金额；部分退款请使用普通退款")
+	}
+	student, err := s.visibleStudent(principal, order.StudentID)
+	if err != nil {
+		return learning.RefundSuspensionResult{}, err
+	}
+	if student.AccountStatus == "停用" {
+		return learning.RefundSuspensionResult{}, errors.New("该学生账号已停用")
+	}
+	if s.studentHasOtherActivePackageGrant(student.ID, order.PackageID) {
+		return learning.RefundSuspensionResult{}, errors.New("该学生还有其他有效套餐，不能随单停用账号；请使用普通退款或先确认全部服务已结束")
+	}
+
+	refund, err := s.createRefundUnlocked(operator, principal, orderID, learning.RefundCreateRequest{AmountCent: req.AmountCent, Reason: req.Reason})
+	if err != nil {
+		return learning.RefundSuspensionResult{}, err
+	}
+	revoked := s.revokePackageGrantsForRefund(student.ID, order.PackageID)
+	removedClasses := s.removeStudentFromFutureScheduleClasses(student.ID)
+	for index := range s.students {
+		if s.students[index].ID == student.ID {
+			s.students[index].AccountStatus = "停用"
+			s.syncStudentUser(s.students[index])
+			student = s.decorateStudent(s.students[index])
+			break
+		}
+	}
+	s.prependLogDetail(operator, "退款停学", student.Name+" / "+order.PackageName, "退款单: "+refund.ID+"；原因: "+req.Reason+"；收回套餐权限: "+itoa(revoked)+"；移除后续课次: "+itoa(removedClasses))
+	return learning.RefundSuspensionResult{Refund: refund, Student: student, RevokedGrantCount: revoked, RemovedFutureClassCount: removedClasses}, nil
+}
+
+func (s *MemoryStore) studentHasOtherActivePackageGrant(studentID, excludedPackageID string) bool {
+	for _, grant := range s.grants {
+		if grant.StudentID == studentID && grant.PackageID != excludedPackageID && grantActive(grant) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *MemoryStore) revokePackageGrantsForRefund(studentID, packageID string) int {
+	revokedGrantIDs := make(map[string]bool)
+	for index := range s.grants {
+		grant := &s.grants[index]
+		if grant.StudentID != studentID || grant.PackageID != packageID || grant.Status == "revoked" {
+			continue
+		}
+		grant.Status = "revoked"
+		revokedGrantIDs[grant.ID] = true
+	}
+	if len(revokedGrantIDs) == 0 {
+		return 0
+	}
+	remainingAccess := make([]learningSpaceAccess, 0, len(s.spaceAccess))
+	for _, access := range s.spaceAccess {
+		if !revokedGrantIDs[access.PackageGrantID] {
+			remainingAccess = append(remainingAccess, access)
+		}
+	}
+	s.spaceAccess = remainingAccess
+	return len(revokedGrantIDs)
+}
+
+func (s *MemoryStore) removeStudentFromFutureScheduleClasses(studentID string) int {
+	today := time.Now().Format("2006-01-02")
+	removed := 0
+	for index := range s.scheduleClasses {
+		item := &s.scheduleClasses[index]
+		lessonDate := item.LessonDate
+		if lessonDate == "" {
+			lessonDate = item.StartDate
+		}
+		if lessonDate <= today || item.Status == "已取消" {
+			continue
+		}
+		students := make([]learning.CandidateStudent, 0, len(item.Students))
+		for _, candidate := range item.Students {
+			if candidate.ID == studentID {
+				removed++
+				continue
+			}
+			students = append(students, candidate)
+		}
+		item.Students = students
+	}
+	return removed
+}
+
 func (s *MemoryStore) createContractUnlocked(operator string, principal learning.Principal, orderID string, req learning.ContractCreateRequest) (learning.ContractRecord, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.ContractRecord, error) {

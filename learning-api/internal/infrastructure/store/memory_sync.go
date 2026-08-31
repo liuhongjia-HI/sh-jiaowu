@@ -47,6 +47,12 @@ func (s *MemoryStore) CreateRefund(operator string, principal learning.Principal
 	return result1, err
 }
 
+func (s *MemoryStore) RefundAndSuspendStudent(operator string, principal learning.Principal, orderID string, req learning.RefundAndSuspendRequest) (learning.RefundSuspensionResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.refundAndSuspendStudentUnlocked(operator, principal, orderID, req)
+}
+
 func (s *MemoryStore) CreateContract(operator string, principal learning.Principal, orderID string, req learning.ContractCreateRequest) (learning.ContractRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -195,6 +195,7 @@ type StudentScoreSummary struct {
 type StudentDetail struct {
 	Student         Student                  `json:"student"`
 	Grants          []StudentGrant           `json:"grants"`
+	OpeningMatrix   []StudentOpeningScope    `json:"openingMatrix"`
 	Permissions     StudentPermissionSummary `json:"permissions"`
 	LearningRecords []StudentLearningRecord  `json:"learningRecords"`
 	Notices         []Notice                 `json:"notices"`
