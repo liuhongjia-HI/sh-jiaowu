@@ -489,7 +489,7 @@ func (s *MemoryStore) studentStudyUnlocked(principal learning.Principal) (learni
 	if len(materials) == 0 {
 		materials = []learning.Material{}
 	}
-	return learning.StudentStudyBoard{Student: student, Courses: cards, Materials: materials, Trial: s.studentTrialUnlocked(student)}, nil
+	return learning.StudentStudyBoard{Student: student, Courses: cards, Materials: materials, Trial: s.studentTrialUnlocked(student), Subjects: s.studentSubjectCards(student)}, nil
 }
 
 // StudentTasks 返回任务列表，studentStatus 由提交记录派生（已完成/待完成）。

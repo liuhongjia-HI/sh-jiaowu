@@ -50,6 +50,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/dashboard/overview", h.Dashboard)
 	g.GET("/settings", h.Settings)
 	g.GET("/subjects", h.Subjects)
+	g.GET("/grade-subjects", h.GradeSubjects)
 	g.GET("/packages", h.Packages)
 	g.GET("/learning-spaces", h.LearningSpaces)
 	g.GET("/students", h.Students)
@@ -152,6 +153,7 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g.GET("/system/readiness", h.SystemReadiness)
 	g.PUT("/settings", h.UpdateSetting)
 	g.PUT("/subjects/:id", h.UpdateSubjectMetadata)
+	g.PUT("/grade-subjects", h.UpdateGradeSubjects)
 }
 
 func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {

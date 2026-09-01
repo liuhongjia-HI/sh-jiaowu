@@ -248,6 +248,7 @@ func defaultSettings() map[string]string {
 		// 可以提前把下一学年的校历也配好。套餐默认有效期跟着当前学年对应的
 		// 学期起止走，见 defaultGrantPeriod。
 		"academicCalendar":             string(calendar),
+		"gradeSubjectCatalog":          "",
 		"grades":                       "G1-G12",
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "学生专属：姓名/昵称、手机尾号、时间、追溯码（服务端写入）",

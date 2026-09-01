@@ -27,3 +27,7 @@ func (s *Service) Subjects() []learning.SubjectMetadata { return s.system.Subjec
 func (s *Service) UpdateSubjectMetadata(o, id string, r learning.SubjectMetadataUpdateRequest) (learning.SubjectMetadata, error) {
 	return s.system.UpdateSubjectMetadata(o, id, r)
 }
+func (s *Service) GradeSubjects() []learning.GradeSubjectMetadata { return s.system.GradeSubjects() }
+func (s *Service) UpdateGradeSubjects(o string, r learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error) {
+	return s.system.UpdateGradeSubjects(o, r)
+}

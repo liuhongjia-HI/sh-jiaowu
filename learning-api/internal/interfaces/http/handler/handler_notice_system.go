@@ -85,6 +85,23 @@ func (h *LearningHandler) UpdateSubjectMetadata(c *gin.Context) {
 	OK(c, subject)
 }
 
+func (h *LearningHandler) GradeSubjects(c *gin.Context) { OK(c, h.service.GradeSubjects()) }
+
+func (h *LearningHandler) UpdateGradeSubjects(c *gin.Context) {
+	var req learning.GradeSubjectCatalogUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	items, err := h.service.UpdateGradeSubjects(operator.(string), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, items)
+}
+
 func (h *LearningHandler) StudentNotices(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	home, err := h.service.StudentHome(principal)

@@ -82,6 +82,34 @@ func TestNewStudentCanPermanentlyReadTheFirstChapterOfEachGradeSubject(t *testin
 	}
 }
 
+func TestStudentStudyListsConfiguredGradeSubjectsAndMarksPreview(t *testing.T) {
+	store := NewMemoryStore()
+	store.grants = nil
+	store.spaceAccess = nil
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	study, err := store.StudentStudy(student)
+	if err != nil {
+		t.Fatalf("load study: %v", err)
+	}
+	if len(study.Subjects) != 5 {
+		t.Fatalf("five-grade subject catalog = %d, want 5", len(study.Subjects))
+	}
+	var english learning.StudentSubjectCard
+	for _, item := range study.Subjects {
+		if item.Subject == "英文" {
+			english = item
+			break
+		}
+	}
+	if english.ID == "" || english.AccessState != "preview" || english.AccessLabel != "首节可体验" {
+		t.Fatalf("english preview card = %#v", english)
+	}
+}
+
 func TestSevenDayTrialIsNoLongerAvailable(t *testing.T) {
 	store := NewMemoryStore()
 	principal, err := store.PrincipalByUserID("user-student-001")

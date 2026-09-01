@@ -222,12 +222,43 @@ type StudentCourseCard struct {
 	IsNew          bool   `json:"isNew"`
 }
 
+// GradeSubjectMetadata 是学习中心的课程目录项。它描述“某年级开设什么学科”，
+// 与按学期/阶段拆分的具体 Course 分开，避免学生端出现同一学科多张卡片。
+type GradeSubjectMetadata struct {
+	ID              string `json:"id"`
+	GradeCode       string `json:"gradeCode"`
+	Grade           string `json:"grade"`
+	Subject         string `json:"subject"`
+	DisplayName     string `json:"displayName"`
+	ImageURL        string `json:"imageUrl,omitempty"`
+	Summary         string `json:"summary,omitempty"`
+	SortOrder       int    `json:"sortOrder"`
+	Status          string `json:"status"`
+	PreviewCourseID string `json:"previewCourseId,omitempty"`
+}
+
+type GradeSubjectCatalogUpdateRequest struct {
+	Items []GradeSubjectMetadata `json:"items"`
+}
+
+// StudentSubjectCard 是学生可见的一门学科。accessState 只能由服务端根据当前
+// 授权计算，客户端不得据此自行放行讲义或题目。
+type StudentSubjectCard struct {
+	GradeSubjectMetadata
+	AccessState string `json:"accessState"` // full | preview | partial | locked | pending
+	AccessLabel string `json:"accessLabel"`
+	CanOpen     bool   `json:"canOpen"`
+	MaterialNum int    `json:"materialNum"`
+	HomeworkNum int    `json:"homeworkNum"`
+}
+
 // StudentStudyBoard 是学习页的聚合数据：课程卡（带进度）+ 资料。
 type StudentStudyBoard struct {
-	Student   Student             `json:"student"`
-	Courses   []StudentCourseCard `json:"courses"`
-	Materials []Material          `json:"materials"`
-	Trial     StudentTrial        `json:"trial"`
+	Student   Student              `json:"student"`
+	Courses   []StudentCourseCard  `json:"courses"`
+	Materials []Material           `json:"materials"`
+	Trial     StudentTrial         `json:"trial"`
+	Subjects  []StudentSubjectCard `json:"subjects"`
 }
 
 // StudentTask 是任务列表中的一项，studentStatus 由提交记录派生。

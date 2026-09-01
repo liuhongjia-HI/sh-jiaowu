@@ -473,6 +473,18 @@ func (s *MemoryStore) UpdateSubjectMetadata(operator, id string, req learning.Su
 	return s.updateSubjectMetadataUnlocked(operator, id, req)
 }
 
+func (s *MemoryStore) GradeSubjects() []learning.GradeSubjectMetadata {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.gradeSubjectsUnlocked()
+}
+
+func (s *MemoryStore) UpdateGradeSubjects(operator string, req learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.updateGradeSubjectsUnlocked(operator, req)
+}
+
 func (s *MemoryStore) Availability(principal learning.Principal, ownerType, ownerID string) ([]learning.AvailabilitySlot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
