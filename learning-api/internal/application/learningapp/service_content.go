@@ -33,6 +33,9 @@ func (s *Service) UpdateMaterial(o string, p learning.Principal, id string, r le
 func (s *Service) ReorderMaterials(o string, p learning.Principal, r learning.MaterialReorderRequest) error {
 	return s.content.ReorderMaterials(o, p, r)
 }
+func (s *Service) ReorderHomework(o string, p learning.Principal, r learning.HomeworkReorderRequest) error {
+	return s.content.ReorderHomework(o, p, r)
+}
 func (s *Service) DeleteMaterial(o string, p learning.Principal, id string) error {
 	return s.content.DeleteMaterial(o, p, id)
 }

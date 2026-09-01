@@ -84,6 +84,20 @@ func (h *LearningHandler) ReorderMaterials(c *gin.Context) {
 	}
 	OK(c, gin.H{"reordered": true})
 }
+func (h *LearningHandler) ReorderHomework(c *gin.Context) {
+	var req learning.HomeworkReorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	p, _ := middleware.CurrentPrincipal(c)
+	o, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.ReorderHomework(o.(string), p, req); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"reordered": true})
+}
 
 func (h *LearningHandler) DeleteMaterial(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)

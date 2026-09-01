@@ -104,6 +104,10 @@ type MaterialReorderRequest struct {
 	CourseID    string   `json:"courseId"`
 	MaterialIDs []string `json:"materialIds"`
 }
+type HomeworkReorderRequest struct {
+	CourseID    string   `json:"courseId"`
+	HomeworkIDs []string `json:"homeworkIds"`
+}
 
 type Homework struct {
 	ID               string         `json:"id"`

@@ -194,6 +194,21 @@ func (s *MemoryStore) ReorderMaterials(operator string, principal learning.Princ
 	defer s.mu.Unlock()
 	return s.reorderMaterialsUnlocked(operator, principal, req)
 }
+func (s *MemoryStore) ReorderHomework(operator string, principal learning.Principal, req learning.HomeworkReorderRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if req.CourseID == "" || len(req.HomeworkIDs) == 0 {
+		return errors.New("请选择需要排序的练习")
+	}
+	for i, id := range req.HomeworkIDs {
+		for j := range s.homework {
+			if s.homework[j].ID == id && s.homework[j].CourseID == req.CourseID {
+				s.homework[j].SortOrder = i + 1
+			}
+		}
+	}
+	return nil
+}
 
 func (s *MemoryStore) DeleteMaterial(operator string, principal learning.Principal, id string) error {
 	s.mu.Lock()

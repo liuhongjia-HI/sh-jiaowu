@@ -62,6 +62,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const [uploadedFrom, setUploadedFrom] = useState('');
   const [uploadedTo, setUploadedTo] = useState('');
   const [draggingMaterialId, setDraggingMaterialId] = useState('');
+  const [draggingHomeworkId, setDraggingHomeworkId] = useState('');
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const materialParams = Object.fromEntries(Object.entries({ keyword, subject, tagCode, uploaderId, uploadedFrom, uploadedTo }).filter(([, value]) => Boolean(value))) as Record<string, string>;
   const resources = useQuery({ queryKey: [kind, materialParams], queryFn: () => getData<(Material | Homework)[]>(path, kind === 'materials' ? materialParams : undefined) });
   const allMaterials = useQuery({ queryKey: ['materials', 'all-for-reorder'], enabled: kind === 'materials', queryFn: () => getData<Material[]>('/materials') });
@@ -168,6 +170,16 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     },
     onError: (error: Error) => message.error(error.message || '排序保存失败，请刷新后重试。')
   });
+  const reorderHomework = useMutation({
+    mutationFn: (values: { courseId: string; homeworkIds: string[] }) => postData('/homework/reorder', values),
+    onSuccess: () => { message.success('练习展示顺序已保存，小程序会同步更新。'); client.invalidateQueries({ queryKey: ['homework'] }); },
+    onError: (error: Error) => message.error(error.message || '排序保存失败，请刷新后重试。')
+  });
+  const removeSelected = useMutation({
+    mutationFn: async (ids: string[]) => { for (const id of ids) await deleteData(`${path}/${id}`); },
+    onSuccess: (_data, ids) => { message.success(`已删除 ${ids.length} 项内容。`); setSelectedRowKeys([]); client.invalidateQueries({ queryKey: [kind] }); },
+    onError: (error: Error) => message.error(error.message || '批量删除失败，请稍后重试。')
+  });
   const openFile = async (url: unknown, download = false, name?: unknown) => {
     if (!url) return message.warning('这个文件还不能查看');
     try {
@@ -261,6 +273,14 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     if (reordered === courseMaterials) return;
     reorderMaterials.mutate({ courseId: target.courseId || '', materialIds: reordered.map((item) => item.id) });
   };
+  const handleHomeworkDrop = (target: Homework) => {
+    const source = (resources.data ?? []).find((item) => item.id === draggingHomeworkId) as Homework | undefined;
+    setDraggingHomeworkId('');
+    if (!source || source.id === target.id || source.courseId !== target.courseId) return;
+    const items = (resources.data ?? []).filter((item): item is Homework => 'assessmentType' in item && item.courseId === target.courseId);
+    const reordered = moveMaterial(items as unknown as Material[], source.id, target.id);
+    reorderHomework.mutate({ courseId: target.courseId || '', homeworkIds: reordered.map((item) => item.id) });
+  };
 
   const subjectOptions = Array.from(new Set((resources.data ?? []).map((row) => row.subject).filter(Boolean))).map((value) => ({ label: value, value }));
   const tagOptions = [{ label: 'HD · 课程讲义', value: 'HD' }, { label: 'Blank · 空白练习', value: 'Blank' }, { label: 'HW · 课后作业', value: 'HW' }, { label: 'Exam · 测试卷', value: 'Exam' }, { label: 'Special · 专题资料', value: 'Special' }];
@@ -277,23 +297,25 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     </div>
     {kind === 'materials' && <Card><Space wrap><Input.Search allowClear placeholder="搜索讲义标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="学科" value={subject} onChange={setSubject} options={subjectOptions} style={{ width: 130 }} /><Select allowClear showSearch placeholder="上传人" value={uploaderId} onChange={setUploaderId} options={uploaderOptions} style={{ width: 150 }} /><Input type="date" value={uploadedFrom} onChange={(event) => setUploadedFrom(event.target.value)} /><Input type="date" value={uploadedTo} onChange={(event) => setUploadedTo(event.target.value)} /><Button onClick={() => { setKeyword(''); setSubject(undefined); setTagCode(undefined); setUploaderId(undefined); setUploadedFrom(''); setUploadedTo(''); }}>重置</Button>{tagQuickFilters}</Space></Card>}
     {kind === 'homework' && <Card><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button>{tagQuickFilters}</Space></Card>}
+    {canManage && selectedRowKeys.length > 0 && <div style={{ marginBottom: 12 }}><Popconfirm title={`确定删除选中的 ${selectedRowKeys.length} 项内容吗？`} description="删除后学生将无法再查看这些内容。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: removeSelected.isPending }} onConfirm={() => removeSelected.mutate(selectedRowKeys.map(String))}><Button danger icon={<DeleteOutlined />}>批量删除（{selectedRowKeys.length}）</Button></Popconfirm></div>}
     {!canManage && <Alert type="info" showIcon message="当前账号没有上传权限，请联系管理员开通。" />}
     {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">拖动左侧图标即可调整同一课程内的讲义顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
       <Table<Material | Homework>
         rowKey="id"
+        rowSelection={canManage ? { selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) } : undefined}
         dataSource={tableRows}
         pagination={{ pageSize: 10 }}
         onRow={(row) => {
-          if (kind !== 'materials' || !canManage) return {};
+          if (!canManage) return {};
           const target = row as Material;
           return {
             onDragOver: (event) => event.preventDefault(),
-            onDrop: (event) => { event.preventDefault(); handleMaterialDrop(target); },
-            onDragEnd: () => setDraggingMaterialId('')
+            onDrop: (event) => { event.preventDefault(); kind === 'materials' ? handleMaterialDrop(target) : handleHomeworkDrop(row as Homework); },
+            onDragEnd: () => { setDraggingMaterialId(''); setDraggingHomeworkId(''); }
           };
         }}
         columns={[
-          ...(kind === 'materials' && canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: Material | Homework) => <button type="button" className="material-sort-handle" title="拖动调整顺序；键盘可用上下方向键" aria-label={`拖动 ${String((row as Material).title)} 调整顺序`} draggable={!allMaterials.isLoading} onDragStart={(event) => { setDraggingMaterialId((row as Material).id); event.dataTransfer.effectAllowed = 'move'; }} onKeyDown={(event) => { const offset = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0; if (offset) { event.preventDefault(); moveMaterialByOffset(row as Material, offset); } }}><HolderOutlined /></button> }] : []),
+          ...(canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: Material | Homework) => <button type="button" className="material-sort-handle" title="拖动调整同一课程内顺序" draggable onDragStart={(event) => { kind === 'materials' ? setDraggingMaterialId((row as Material).id) : setDraggingHomeworkId((row as Homework).id); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button> }] : []),
           { title: '标题', dataIndex: 'title' },
 		  { title: '目录', render: (_: unknown, row: Material | Homework) => { const path = row.curriculum; return path ? `${path.unit} · ${path.chapter} · ${path.lesson}` : '—'; } },
 		  ...(kind === 'materials' ? [{ title: '学科', dataIndex: 'subject' }, { title: '上传人', dataIndex: 'ownerTeacherName' }, { title: '上传时间', dataIndex: 'createdAt' }] : [{ title: '类型', render: (_: unknown, row: Material | Homework) => (row as Homework).assessmentType === 'mock_exam' ? '模拟考试' : '常规练习' }, { title: '截止时间', render: (_: unknown, row: Material | Homework) => (row as Homework).deadlineAt ? new Date((row as Homework).deadlineAt as string).toLocaleString() : '不设截止' }]),

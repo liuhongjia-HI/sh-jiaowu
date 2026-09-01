@@ -60,6 +60,7 @@ type ContentRepository interface {
 	CreateMaterial(string, learning.Principal, learning.MaterialUploadRequest) (learning.Material, error)
 	UpdateMaterial(string, learning.Principal, string, learning.MaterialUpdateRequest) (learning.Material, error)
 	ReorderMaterials(string, learning.Principal, learning.MaterialReorderRequest) error
+	ReorderHomework(string, learning.Principal, learning.HomeworkReorderRequest) error
 	DeleteMaterial(string, learning.Principal, string) error
 	HomeworkSubmissions(learning.Principal, string) (learning.HomeworkSubmissionSummary, error)
 	CreateHomework(string, learning.Principal, learning.HomeworkUploadRequest) (learning.Homework, error)
