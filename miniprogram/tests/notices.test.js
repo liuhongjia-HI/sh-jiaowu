@@ -90,6 +90,33 @@ test("notice cards identify the current student by name and grade", async () => 
   assert.equal(page.data.visibleNotices[0].studentDisplay, "小星（五年级）");
 });
 
+test("notice tab reloads messages for the student selected in personal center", async () => {
+  let selectedStudent = "student-1";
+  const page = loadNoticesPage((path) => {
+    if (path === "/student/accounts") {
+      return Promise.resolve([
+        { studentId: "student-1", name: "小星", grade: "五年级", active: selectedStudent === "student-1" },
+        { studentId: "student-2", name: "小月", grade: "三年级", active: selectedStudent === "student-2" }
+      ]);
+    }
+    return Promise.resolve(selectedStudent === "student-1"
+      ? [{ id: "notice-for-student-1", title: "小星的作业提醒" }]
+      : [{ id: "notice-for-student-2", title: "小月的课程提醒" }]);
+  });
+
+  page.onLoad();
+  await flushPromises();
+  assert.deepEqual(page.data.visibleNotices.map((item) => item.id), ["notice-for-student-1"]);
+  page.onShow();
+
+  selectedStudent = "student-2";
+  page.onShow();
+  await flushPromises();
+
+  assert.equal(page.data.currentStudentName, "小月");
+  assert.deepEqual(page.data.visibleNotices.map((item) => item.id), ["notice-for-student-2"]);
+});
+
 test("notice cards navigate directly to their related learning detail", async () => {
   const navigations = [];
   const tabNavigations = [];

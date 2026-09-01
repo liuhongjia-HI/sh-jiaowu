@@ -20,6 +20,17 @@ Page({
     studentCount: 0
   },
   onLoad() {
+    this._skipInitialShowRefresh = true;
+    this.loadNotices();
+  },
+  onShow() {
+    if (this._skipInitialShowRefresh) {
+      this._skipInitialShowRefresh = false;
+      return;
+    }
+    this.loadNotices();
+  },
+  loadNotices() {
     this.setData({ loading: true, error: "" });
     Promise.all([
       request("/student/notices"),
