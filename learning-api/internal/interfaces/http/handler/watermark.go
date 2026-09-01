@@ -101,16 +101,16 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 	return nil
 }
 
-// watermarkPageScript 通过 EndPage 钩子在内容页落盘前绘制可追溯文字。
-// PDF 解释器会产生 reason=2 的设备切换事件；该事件不能输出页面，
-// 否则会生成只有水印的空白页。只有 reason=0 才是实际内容页。
+// watermarkPageScript 通过 BeginPage 钩子先绘制可追溯文字，再由 PDF 内容覆盖，
+// 避免水印压住正文。Ghostscript 的 PDF 解释器支持 BeginPage / EndPage 钩子：
+// https://ghostscript.com/blog/pdfi.html
 // 学生交付水印只使用 ASCII 追溯信息，避免服务器缺少中文字体时出现空白或乱码。
 func watermarkPageScript(watermarkText string) string {
 	escaped := escapePostScriptString(watermarkText)
 	return `/StarlineWatermark {
   gsave
   initgraphics
-  0.88 setgray
+  0.93 setgray
   /Helvetica-Bold findfont 15 scalefont setfont
   /WatermarkText (` + escaped + `) def
   clippath pathbbox
@@ -127,13 +127,9 @@ func watermarkPageScript(watermarkText string) string {
   watermarkWidth -2 div 130 moveto WatermarkText show
   grestore
 } bind def
-<< /EndPage {
-  dup 0 eq {
-    StarlineWatermark
-    pop pop true
-  } {
-    pop pop false
-  } ifelse
+<< /BeginPage {
+  pop
+  StarlineWatermark
 } bind >> setpagedevice`
 }
 

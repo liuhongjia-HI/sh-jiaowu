@@ -14,7 +14,7 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	for _, expected := range []string{
 		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
 		"<< /BeginPage {",
-		"pop\n    StarlineWatermark",
+		"pop\n  StarlineWatermark",
 		"initgraphics",
 		"clippath pathbbox",
 		"stringwidth",
