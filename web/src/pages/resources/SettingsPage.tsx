@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select, Skeleton, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd';
 import { CalendarOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, putData } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
@@ -327,6 +328,7 @@ function SubjectMetadataCard() {
 }
 
 export default function SettingsPage() {
+  const location = useLocation();
   const [form] = Form.useForm<SettingUpdateRequest>();
   const [editing, setEditing] = useState<Record<string, string> | null>(null);
   const queryClient = useQueryClient();
@@ -376,7 +378,7 @@ export default function SettingsPage() {
       ) : (
         <>
           <Tabs
-            defaultActiveKey="calendar"
+            defaultActiveKey={location.pathname === '/launch-campaign' ? 'content' : 'calendar'}
             items={[
               {
                 key: 'calendar',
