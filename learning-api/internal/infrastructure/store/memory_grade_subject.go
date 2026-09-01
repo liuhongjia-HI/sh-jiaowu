@@ -146,9 +146,11 @@ func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.S
 		if s.hasActiveSubjectLearningAccess(student.ID, meta.Grade, meta.Subject) {
 			card.AccessState, card.AccessLabel, card.CanOpen = "full", "可学习", true
 			card.MaterialNum, card.HomeworkNum = fullMaterials, fullHomework
+			card.EntryCourseID = s.firstAccessibleCourseID(student.ID, meta.Grade, meta.Subject)
 		} else if previewCourse, ok := s.previewCourseForGradeSubject(student.ID, meta); ok {
 			card.AccessState, card.AccessLabel, card.CanOpen = "preview", "首节可体验", true
 			card.PreviewCourseID = previewCourse.ID
+			card.EntryCourseID = previewCourse.ID
 			card.MaterialNum, card.HomeworkNum = s.previewContentCounts(previewCourse)
 		} else if len(courseIDs) == 0 {
 			card.AccessState, card.AccessLabel = "pending", "内容准备中"
@@ -156,6 +158,15 @@ func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.S
 		cards = append(cards, card)
 	}
 	return cards
+}
+
+func (s *MemoryStore) firstAccessibleCourseID(studentID, grade, subject string) string {
+	for _, course := range s.coursesForStudent(studentID) {
+		if course.Grade == grade && subjectsMatch(course.Subject, subject) {
+			return course.ID
+		}
+	}
+	return ""
 }
 
 func (s *MemoryStore) courseIDsForGradeSubject(grade, subject string) []string {

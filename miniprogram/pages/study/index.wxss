@@ -148,6 +148,13 @@
   background: rgba(255, 255, 255, .32);
 }
 
+.course-cover-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .course-cover-emoji {
   position: absolute;
   right: 18rpx;
@@ -196,6 +203,16 @@
 .course-status-new {
   background: #e8f8df;
   color: #389e0d;
+}
+
+.course-status-locked {
+  background: #f1f2f5;
+  color: #7d818b;
+}
+
+.course-card.course-locked {
+  background: #fbfbfc;
+  opacity: .82;
 }
 
 .course-meta,

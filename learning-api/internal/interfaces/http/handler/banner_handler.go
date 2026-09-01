@@ -106,6 +106,22 @@ func (h *LearningHandler) UploadBannerImage(c *gin.Context) {
 	OK(c, gin.H{"imageUrl": asset.URL})
 }
 
+// UploadGradeSubjectImage 复用受校验的图片存储，供年级课程目录上传学科封面。
+// 返回的公开只读地址可被小程序 image 组件直接加载。
+func (h *LearningHandler) UploadGradeSubjectImage(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		BadRequest(c, "请选择学科图片")
+		return
+	}
+	asset, err := saveBannerImage(file, h.fileStorageRoot)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"imageUrl": asset.URL})
+}
+
 // BannerImage 是公开的只读图片地址：微信小程序 image 组件不会为图片请求自动追加
 // Authorization header，轮播图又必须在登录前（首页刚打开）就能显示。
 func (h *LearningHandler) BannerImage(c *gin.Context) {

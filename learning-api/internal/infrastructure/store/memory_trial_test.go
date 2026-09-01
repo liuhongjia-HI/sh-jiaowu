@@ -147,6 +147,52 @@ func TestTrialPermissionUsesTheFirstLessonBySortOrder(t *testing.T) {
 	}
 }
 
+func TestPreviewLessonUsesFirstUnitFirstLesson(t *testing.T) {
+	store := NewMemoryStore()
+	course := learning.Course{ID: "course-preview-order", Curriculum: []learning.CurriculumNode{
+		{ID: "unit-later", Type: learning.CurriculumUnit, Name: "第二单元", SortOrder: 2},
+		{ID: "lesson-later", ParentID: "unit-later", Type: learning.CurriculumLesson, Name: "第二单元第一节", SortOrder: 1},
+		{ID: "unit-first", Type: learning.CurriculumUnit, Name: "第一单元", SortOrder: 1},
+		{ID: "chapter-first", ParentID: "unit-first", Type: learning.CurriculumChapter, Name: "第一章", SortOrder: 1},
+		{ID: "lesson-first", ParentID: "chapter-first", Type: learning.CurriculumLesson, Name: "第一单元第一节", SortOrder: 9},
+	}}
+	store.materials = append(store.materials, learning.Material{ID: "preview-first-material", CourseID: course.ID, LessonID: "lesson-first", Status: learning.StatusEnabled})
+	store.homework = append(store.homework, learning.Homework{ID: "preview-first-homework", CourseID: course.ID, LessonID: "lesson-first", Status: string(learning.StatusEnabled)})
+	lessonID, ok := store.previewLessonForCourse(course)
+	if !ok || lessonID != "lesson-first" {
+		t.Fatalf("preview lesson = %q, %v; want first unit first lesson", lessonID, ok)
+	}
+}
+
+func TestPreviewDetailShowsLaterLessonsAsLockedWithoutContentIDs(t *testing.T) {
+	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.grants = nil
+	store.spaceAccess = nil
+	for index := range store.courses {
+		if store.courses[index].ID == "course-g05-english-s1-q1" {
+			store.courses[index].Curriculum = append(store.courses[index].Curriculum, learning.CurriculumNode{ID: "preview-locked-lesson", ParentID: "course-g05-english-s1-q1-chapter-1", Type: learning.CurriculumLesson, Name: "第二节", SortOrder: 2})
+		}
+	}
+	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
+	if err != nil {
+		t.Fatalf("preview detail: %v", err)
+	}
+	var locked learning.Station
+	for _, station := range detail.Stations {
+		if station.Title == "第二节" {
+			locked = station
+			break
+		}
+	}
+	if locked.Status != "未开通" || locked.MaterialID != "" || locked.HomeworkID != "" {
+		t.Fatalf("locked station must not expose content IDs: %#v", locked)
+	}
+}
+
 func containsCourseID(values []learning.StudentCourseCard, id string) bool {
 	for _, value := range values {
 		if value.ID == id {

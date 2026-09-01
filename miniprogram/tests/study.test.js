@@ -82,3 +82,31 @@ test("study page puts a newly opened course first and keeps its new marker", asy
   assert.equal(page.data.visibleCourses[0].isNew, true);
   assert.equal(page.data.visibleCourses[0].cardClass, "new-course");
 });
+
+test("study page shows the grade subject catalog and blocks unopened subjects", async () => {
+  const toasts = [];
+  const navigations = [];
+  const page = loadStudyPage((path) => {
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.resolve({
+      student: { id: "stu-001", grade: "五年级", openedPackages: [] },
+      subjects: [
+        { id: "g5-math", displayName: "数学", subject: "数学", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-math-first" },
+        { id: "g5-chinese", displayName: "语文", subject: "语文", grade: "五年级", accessState: "locked", accessLabel: "暂未开通", canOpen: false }
+      ],
+      courses: [], materials: []
+    });
+  });
+  global.wx.showToast = (value) => toasts.push(value);
+  global.wx.navigateTo = (value) => navigations.push(value);
+
+  page.loadStudy();
+  await flushPromises();
+  assert.equal(page.data.visibleCourses.length, 2);
+  assert.equal(page.data.visibleCourses[0].displayName, "数学");
+  assert.equal(page.data.visibleCourses[0].accessLabel, "首节可体验");
+  page.goDetail({ currentTarget: { dataset: { id: "", canOpen: false } } });
+  assert.equal(toasts[0].title, "开通后即可学习全部内容");
+  page.goDetail({ currentTarget: { dataset: { id: "course-math-first", canOpen: true } } });
+  assert.equal(navigations[0].url, "/pages/study-detail/index?id=course-math-first");
+});

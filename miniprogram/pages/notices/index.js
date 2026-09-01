@@ -16,6 +16,7 @@ Page({
     visibleNotices: [],
     currentStudentName: "",
     currentStudentGrade: "",
+    linkedStudentText: "",
     studentCount: 0
   },
   onLoad() {
@@ -30,6 +31,7 @@ Page({
           notices: decorateNotices(notices || [], active),
           currentStudentName: active.name || "",
           currentStudentGrade: active.grade || "",
+          linkedStudentText: (accounts || []).map(studentDisplay).filter(Boolean).join("、"),
           studentCount: (accounts || []).length,
           loading: false
         }, () => this.applyFilters());

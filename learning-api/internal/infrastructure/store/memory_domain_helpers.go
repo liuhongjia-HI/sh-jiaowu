@@ -1203,17 +1203,49 @@ func (s *MemoryStore) previewCourseOrder(course learning.Course) string {
 
 // previewLessonForCourse 仅在首个 Lesson 同时具备已发布讲义和习题时返回。
 func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bool) {
-	lessons := make([]learning.CurriculumNode, 0)
+	children := map[string][]learning.CurriculumNode{}
 	for _, node := range course.Curriculum {
-		if node.Type == learning.CurriculumLesson {
-			lessons = append(lessons, node)
+		children[node.ParentID] = append(children[node.ParentID], node)
+	}
+	for parentID := range children {
+		sort.SliceStable(children[parentID], func(i, j int) bool {
+			if children[parentID][i].SortOrder != children[parentID][j].SortOrder {
+				return children[parentID][i].SortOrder < children[parentID][j].SortOrder
+			}
+			return children[parentID][i].Name < children[parentID][j].Name
+		})
+	}
+	// 体验必须从第一单元开始，而不是把所有 Lesson 拍平后按编号挑一个；
+	// 这样后续即使不同单元里的课节编号重复，也不会跳到第二单元。
+	var firstUnit *learning.CurriculumNode
+	for index := range children[""] {
+		if children[""][index].Type == learning.CurriculumUnit {
+			firstUnit = &children[""][index]
+			break
 		}
 	}
-	sort.Slice(lessons, func(i, j int) bool { return lessons[i].SortOrder < lessons[j].SortOrder })
-	if len(lessons) == 0 {
+	var firstLesson func(string) string
+	firstLesson = func(parentID string) string {
+		for _, node := range children[parentID] {
+			if node.Type == learning.CurriculumLesson {
+				return node.ID
+			}
+			if lessonID := firstLesson(node.ID); lessonID != "" {
+				return lessonID
+			}
+		}
+		return ""
+	}
+	lessonID := ""
+	if firstUnit != nil {
+		lessonID = firstLesson(firstUnit.ID)
+	} else {
+		lessonID = firstLesson("") // 兼容旧数据没有 Unit 的扁平目录。
+	}
+	if lessonID == "" {
 		return "", false
 	}
-	return lessons[0].ID, s.previewLessonHasContent(course.ID, lessons[0].ID)
+	return lessonID, s.previewLessonHasContent(course.ID, lessonID)
 }
 
 func (s *MemoryStore) previewLessonHasContent(courseID, lessonID string) bool {

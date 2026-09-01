@@ -14,6 +14,7 @@ Page({
       { label: "已完成", className: "" }
     ],
     courses: [],
+    subjects: [],
     visibleCourses: [],
     materials: [],
     hasOpenedPackage: false
@@ -37,11 +38,13 @@ Page({
     Promise.all([request("/student/study"), request("/student/favorites").catch(() => [])])
       .then(([data, favorites]) => {
         const courses = Array.isArray(data) ? data : (data.courses || []);
+        const subjects = Array.isArray(data) ? [] : (data.subjects || []);
         const materials = Array.isArray(data) ? [] : (data.materials || []);
         const student = Array.isArray(data) ? {} : (data.student || {});
         const hasOpenedPackage = Array.isArray(student.openedPackages) && student.openedPackages.length > 0;
         this.setData({
-          courses: decorateCourses(courses, favorites || []),
+          courses: decorateCourses(subjects.length ? subjects : courses, favorites || []),
+          subjects,
           materials,
           hasOpenedPackage,
           emptyMessage: studyEmptyMessage(hasOpenedPackage),
@@ -77,8 +80,13 @@ Page({
   },
   goDetail(event) {
     const id = event.currentTarget.dataset.id || "";
+    const canOpen = event.currentTarget.dataset.canOpen;
+    if (!canOpen) {
+      wx.showToast({ title: event.currentTarget.dataset.message || "开通后即可学习全部内容", icon: "none" });
+      return;
+    }
     if (!id) {
-      wx.showToast({ title: "课程信息缺失", icon: "none" });
+      wx.showToast({ title: "课程内容正在准备", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/study-detail/index?id=${id}` });
@@ -95,12 +103,21 @@ function decorateCourses(courses, favorites) {
       ...course,
       progress,
       favorited: favoriteCourseNames.includes(course.name),
-      badgeText: progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新课程",
+      badgeText: course.accessLabel || (progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新课程"),
       cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : "",
       newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
-      coverIcon: index % 2 === 0 ? "📖" : "💡"
+      coverIcon: subjectEmoji(course.subject || course.displayName, index),
+      entryCourseId: course.entryCourseId || course.id,
+      canOpen: Boolean(course.canOpen || course.id),
+      isLocked: course.accessState === "locked" || course.accessState === "pending",
+      imageUrl: course.imageUrl || ""
     };
   });
+}
+
+function subjectEmoji(subject, index) {
+  const icons = { 数学: "➗", 英文: "🔤", 语文: "📖", 科学: "🔬", 地理: "🌍", 物理: "⚙️", 化学: "🧪" };
+  return icons[subject] || (index % 2 === 0 ? "📚" : "✨");
 }
 
 function courseAvailableAt(course) {

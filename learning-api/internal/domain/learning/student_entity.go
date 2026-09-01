@@ -245,11 +245,12 @@ type GradeSubjectCatalogUpdateRequest struct {
 // 授权计算，客户端不得据此自行放行讲义或题目。
 type StudentSubjectCard struct {
 	GradeSubjectMetadata
-	AccessState string `json:"accessState"` // full | preview | partial | locked | pending
-	AccessLabel string `json:"accessLabel"`
-	CanOpen     bool   `json:"canOpen"`
-	MaterialNum int    `json:"materialNum"`
-	HomeworkNum int    `json:"homeworkNum"`
+	AccessState   string `json:"accessState"` // full | preview | partial | locked | pending
+	AccessLabel   string `json:"accessLabel"`
+	CanOpen       bool   `json:"canOpen"`
+	EntryCourseID string `json:"entryCourseId,omitempty"`
+	MaterialNum   int    `json:"materialNum"`
+	HomeworkNum   int    `json:"homeworkNum"`
 }
 
 // StudentStudyBoard 是学习页的聚合数据：课程卡（带进度）+ 资料。

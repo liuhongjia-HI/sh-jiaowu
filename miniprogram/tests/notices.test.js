@@ -90,10 +90,68 @@ test("notice cards identify the current student by name and grade", async () => 
   assert.equal(page.data.visibleNotices[0].studentDisplay, "小星（五年级）");
 });
 
+test("notice cards navigate directly to their related learning detail", async () => {
+  const navigations = [];
+  const tabNavigations = [];
+  const page = loadNoticesPage(() => Promise.resolve([
+    { id: "homework-1", relatedType: "homework", relatedId: "hw-001" },
+    { id: "review-1", relatedType: "review", relatedId: "sub-001" },
+    { id: "course-1", relatedType: "course", relatedId: "course-001" },
+    { id: "material-1", relatedType: "material", relatedId: "material-001" },
+    { id: "schedule-1", relatedType: "schedule", relatedId: "schedule-001" }
+  ]));
+  global.wx.navigateTo = (value) => navigations.push(value);
+  global.wx.switchTab = (value) => tabNavigations.push(value);
+
+  page.onLoad();
+  await flushPromises();
+
+  page.goNotice({ currentTarget: { dataset: { id: "homework-1" } } });
+  page.goNotice({ currentTarget: { dataset: { id: "review-1" } } });
+  page.goNotice({ currentTarget: { dataset: { id: "course-1" } } });
+  page.goNotice({ currentTarget: { dataset: { id: "material-1" } } });
+  page.goNotice({ currentTarget: { dataset: { id: "schedule-1" } } });
+
+  assert.deepEqual(navigations.map((item) => item.url), [
+    "/pages/answer/index?id=hw-001",
+    "/pages/result/index?id=sub-001",
+    "/pages/study-detail/index?id=course-001",
+    "/pages/material-preview/index?id=material-001"
+  ]);
+  assert.deepEqual(tabNavigations.map((item) => item.url), []);
+  assert.equal(navigations[4].url, "/pages/schedule/index");
+});
+
+test("notice header lists every linked student by name and grade", async () => {
+  const page = loadNoticesPage((path) => {
+    if (path === "/student/accounts") {
+      return Promise.resolve([
+        { studentId: "student-1", name: "小星", grade: "五年级", active: true },
+        { studentId: "student-2", name: "小月", grade: "三年级", active: false }
+      ]);
+    }
+    return Promise.resolve([]);
+  });
+
+  page.onLoad();
+  await flushPromises();
+
+  assert.equal(page.data.linkedStudentText, "小星（五年级）、小月（三年级）");
+});
+
 test("notice summary wraps so the complete message remains visible", () => {
   const styles = fs.readFileSync(path.join(__dirname, "../pages/notices/index.wxss"), "utf8");
   const summaryRules = [...styles.matchAll(/\.notice-summary\s*\{([^}]*)\}/g)].map((match) => match[1]).join("\n");
 
   assert.match(summaryRules, /white-space:\s*normal/);
   assert.match(summaryRules, /overflow-wrap:\s*anywhere/);
+});
+
+test("linked student names can wrap without hiding the switch action", () => {
+  const styles = fs.readFileSync(path.join(__dirname, "../pages/notices/index.wxss"), "utf8");
+  const contextMainRules = [...styles.matchAll(/\.notice-student-context-main\s*\{([^}]*)\}/g)].map((match) => match[1]).join("\n");
+  const nameRules = [...styles.matchAll(/\.notice-student-name\s*\{([^}]*)\}/g)].map((match) => match[1]).join("\n");
+
+  assert.match(contextMainRules, /min-width:\s*0/);
+  assert.match(nameRules, /overflow-wrap:\s*anywhere/);
 });

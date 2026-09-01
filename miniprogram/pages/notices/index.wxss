@@ -41,6 +41,11 @@
   background: linear-gradient(135deg, #fff7f2, #fff);
 }
 
+.notice-student-context-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .notice-student-label {
   color: #a06f5b;
   font-size: 19rpx;
@@ -51,6 +56,8 @@
   color: #292a2e;
   font-size: 25rpx;
   font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .notice-student-name text {
@@ -61,6 +68,7 @@
 
 .notice-student-action {
   flex: none;
+  margin-left: 16rpx;
   color: #ff5a1f;
   font-size: 20rpx;
 }

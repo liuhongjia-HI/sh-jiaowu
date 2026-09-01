@@ -435,6 +435,21 @@ export type SubjectMetadata = {
 
 export type SubjectMetadataUpdateRequest = Pick<SubjectMetadata, 'shortLabel' | 'color' | 'sortOrder' | 'status'>;
 
+export type GradeSubjectMetadata = {
+  id: string;
+  gradeCode: string;
+  grade: string;
+  subject: string;
+  displayName: string;
+  imageUrl?: string;
+  summary?: string;
+  sortOrder: number;
+  status: string;
+  previewCourseId?: string;
+};
+
+export type GradeSubjectCatalogUpdateRequest = { items: GradeSubjectMetadata[] };
+
 export type Material = {
   id: string;
   title: string;

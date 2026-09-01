@@ -29,25 +29,26 @@
     </view>
   </view>
   <view wx:else class="study-section course-list">
-    <view wx:for="{{visibleCourses}}" wx:key="id" class="course-card {{item.cardClass}}" bindtap="goDetail" data-id="{{item.id}}">
+    <view wx:for="{{visibleCourses}}" wx:key="id" class="course-card {{item.cardClass}} {{item.isLocked ? 'course-locked' : ''}}" bindtap="goDetail" data-id="{{item.entryCourseId}}" data-can-open="{{item.canOpen}}" data-message="{{item.accessLabel === '内容准备中' ? '课程内容正在准备' : '开通后即可学习全部内容'}}">
       <view class="course-cover course-cover-{{index}}">
+        <image wx:if="{{item.imageUrl}}" class="course-cover-image" src="{{item.imageUrl}}" mode="aspectFill" />
         <view class="course-cover-glow"></view>
         <view class="course-cover-emoji">{{item.coverIcon}}</view>
       </view>
       <view class="course-content">
         <view class="course-title-row">
-          <view class="course-title">{{item.name}}</view>
-          <view class="course-status {{item.isNew ? 'course-status-new' : ''}}">{{item.isNew ? '新开通' : item.status}}</view>
+          <view class="course-title">{{item.displayName || item.name}}</view>
+          <view class="course-status {{item.isLocked ? 'course-status-locked' : 'course-status-new'}}">{{item.accessLabel || (item.isNew ? '新开通' : item.status)}}</view>
         </view>
         <view class="course-meta">{{item.grade || "学习课程"}} · {{item.subject || "综合学习"}}</view>
         <view wx:if="{{item.newCourseText}}" class="course-new-time">{{item.newCourseText}}</view>
-        <view class="course-code">{{item.chapterCount}} 节课程 · {{item.materialNum}} 份资料</view>
-        <view class="course-progress-row">
+        <view class="course-code">{{item.materialNum || 0}} 份讲义 · {{item.homeworkNum || 0}} 个练习</view>
+        <view wx:if="{{!item.isLocked}}" class="course-progress-row">
           <text>已学 {{item.progress}}%</text>
           <text>{{item.progress >= 100 ? "已完成" : "继续学习"}}</text>
         </view>
-        <view class="course-progress"><view class="course-progress-bar" style="width: {{item.progress}}%;"></view></view>
-        <view class="course-action">继续学习 <text class="course-action-arrow">›</text></view>
+        <view wx:if="{{!item.isLocked}}" class="course-progress"><view class="course-progress-bar" style="width: {{item.progress}}%;"></view></view>
+        <view class="course-action">{{item.isLocked ? '开通后学习' : (item.accessLabel === '首节可体验' ? '体验第一节' : '进入学习')}} <text class="course-action-arrow">{{item.isLocked ? '🔒' : '›'}}</text></view>
       </view>
     </view>
   </view>

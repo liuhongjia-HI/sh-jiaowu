@@ -154,6 +154,7 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g.PUT("/settings", h.UpdateSetting)
 	g.PUT("/subjects/:id", h.UpdateSubjectMetadata)
 	g.PUT("/grade-subjects", h.UpdateGradeSubjects)
+	g.POST("/grade-subjects/upload", h.UploadGradeSubjectImage)
 }
 
 func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {

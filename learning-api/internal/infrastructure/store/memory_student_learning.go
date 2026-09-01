@@ -68,6 +68,9 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 		}
 	}
 	stations := s.buildStations(principal.StudentID, materials, homework)
+	if !s.hasActiveSubjectContent(principal.StudentID, course.Grade, course.Subject) {
+		stations = append(stations, s.lockedPreviewStations(course)...)
+	}
 	return learning.StudentCourseDetail{
 		Course:    course,
 		Materials: materials,
@@ -75,6 +78,27 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 		Stations:  stations,
 		Progress:  stationProgress(stations),
 	}, nil
+}
+
+// lockedPreviewStations 只返回目录标题和锁定状态，不返回任何资料或习题 ID，
+// 让学生知道后续内容存在，同时避免客户端通过拼接 ID 绕过后端权限。
+func (s *MemoryStore) lockedPreviewStations(course learning.Course) []learning.Station {
+	previewLessonID, ready := s.previewLessonForCourse(course)
+	if !ready {
+		return nil
+	}
+	lessons := make([]learning.CurriculumNode, 0)
+	for _, node := range course.Curriculum {
+		if node.Type == learning.CurriculumLesson && node.ID != previewLessonID {
+			lessons = append(lessons, node)
+		}
+	}
+	sort.SliceStable(lessons, func(i, j int) bool { return lessons[i].SortOrder < lessons[j].SortOrder })
+	out := make([]learning.Station, 0, len(lessons))
+	for _, lesson := range lessons {
+		out = append(out, learning.Station{Icon: "🔒", Title: lesson.Name, Desc: "开通后可查看讲义和练习", Status: "未开通"})
+	}
+	return out
 }
 
 // StudentGrowth 返回成长轨迹：提交记录 + 已学资料，按时间倒序。
