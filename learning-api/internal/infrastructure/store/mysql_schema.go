@@ -303,6 +303,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			enabled TINYINT(1) NOT NULL DEFAULT 1,
 			created_at VARCHAR(32) NOT NULL DEFAULT ''
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS class_reservation_intents (
+			id VARCHAR(64) PRIMARY KEY, student_id VARCHAR(64) NOT NULL, student_name VARCHAR(64) NOT NULL DEFAULT '', grade VARCHAR(32) NOT NULL DEFAULT '', campaign_id VARCHAR(64) NOT NULL DEFAULT '', time_option VARCHAR(128) NOT NULL DEFAULT '', status VARCHAR(16) NOT NULL DEFAULT 'pending', remark VARCHAR(255) NOT NULL DEFAULT '', created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, KEY idx_reservation_status (status, created_at), KEY idx_reservation_student (student_id, campaign_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		// guardians / guardian_students 是多子女/多家长改造的关系表：登录主体从
 		// "学生"换成"家长"，谁能看哪个孩子由这张关系表决定，不再靠 students.phone
 		// 撞出来。这一步只建表和打通存取，登录逻辑本身还没切过来（阶段2再改），

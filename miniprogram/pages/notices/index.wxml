@@ -4,6 +4,14 @@
     <view class="notice-heading-search">⌕</view>
   </view>
 
+  <view wx:if="{{currentStudentName}}" class="notice-student-context" bindtap="goMe">
+    <view class="notice-student-context-main">
+      <view class="notice-student-label">当前查看学生</view>
+      <view class="notice-student-name">{{currentStudentName}}<text wx:if="{{currentStudentGrade}}"> · {{currentStudentGrade}}</text></view>
+    </view>
+    <view class="notice-student-action">{{studentCount > 1 ? "切换学生" : "查看个人中心"}} ›</view>
+  </view>
+
   <view class="notice-tabs">
     <view wx:for="{{filters}}" wx:key="label" class="notice-tab {{item.className}}" data-filter="{{item.label}}" bindtap="changeFilter">{{item.label}}</view>
   </view>
@@ -27,7 +35,7 @@
           <view class="notice-status">{{item.status}}</view>
         </view>
         <view class="notice-summary">{{item.summary}}</view>
-        <view class="notice-target">{{item.target}}</view>
+        <view class="notice-target">{{item.scopeText}}</view>
       </view>
       <view class="notice-arrow">›</view>
     </view>

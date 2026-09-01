@@ -257,7 +257,7 @@ func defaultSettings() map[string]string {
 		"templateMessageStatus":        "待确认",
 		"miniProgramSubscribeStatus":   "待配置",
 		"productionApiDomain":          "待配置",
-		"launchCampaign":               `{"enabled":false,"templateType":"generic","title":"","message":"","primaryActionText":"立即了解","frequency":"once"}`,
+		"launchCampaign":               `{"enabled":false,"templateType":"generic","actionType":"close","title":"","message":"","primaryActionText":"立即了解","frequency":"once"}`,
 	}
 }
 

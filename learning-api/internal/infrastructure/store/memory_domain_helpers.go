@@ -510,6 +510,11 @@ func studentNoticeVisible(notice learning.Notice) bool {
 }
 
 func noticeMatchesStudent(notice learning.Notice, student learning.Student, subjects []string) bool {
+	// 只要通知带有明确的学生关联，就以关联关系为准，不能再回退到
+	// 姓名/年级/课程文本匹配，避免多孩子家庭或同名学生串收通知。
+	if strings.EqualFold(strings.TrimSpace(notice.RelatedType), "student") && strings.TrimSpace(notice.RelatedID) != "" {
+		return strings.TrimSpace(notice.RelatedID) == student.ID
+	}
 	target := notice.Target + " " + notice.Title + " " + notice.Summary
 	if strings.Contains(notice.Target, "全部") || strings.Contains(target, student.Name) || strings.Contains(target, student.Grade) {
 		return true

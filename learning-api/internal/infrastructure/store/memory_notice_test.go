@@ -56,6 +56,24 @@ func TestCreateNoticeAndStudentNoticeFiltering(t *testing.T) {
 	}
 }
 
+func TestNoticeWithExplicitStudentRelationDoesNotLeakToAnotherStudent(t *testing.T) {
+	store := NewMemoryStore()
+	notice := learning.Notice{
+		ID: "notice-student-only", Type: "提醒", Title: "小明专属提醒",
+		Target: "五年级", Summary: "请完成今日任务", Status: "已发送",
+		RelatedType: "student", RelatedID: "stu-001",
+	}
+	student := learning.Student{ID: "stu-001", Name: "小明", Grade: "五年级", AccountStatus: "正常"}
+	other := learning.Student{ID: "stu-002", Name: "小红", Grade: "五年级", AccountStatus: "正常"}
+	store.notices = []learning.Notice{notice}
+	if got := store.noticesForStudent(student); len(got) != 1 {
+		t.Fatalf("expected explicitly targeted student to receive notice, got %#v", got)
+	}
+	if got := store.noticesForStudent(other); len(got) != 0 {
+		t.Fatalf("explicitly targeted notice leaked to another student: %#v", got)
+	}
+}
+
 func TestStudentHomeExposesMiniProgramSubscribeTemplates(t *testing.T) {
 	store := NewMemoryStore()
 	store.UseMiniProgramSubscribeTemplates([]string{"vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0", " ", "tpl-review"})

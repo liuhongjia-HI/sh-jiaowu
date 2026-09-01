@@ -133,7 +133,7 @@ Page({
   },
   closeLaunchCampaign() { const id=(this.data.home&&this.data.home.student&&this.data.home.student.id)||"current"; const frequency=(this.data.launchCampaign&&this.data.launchCampaign.frequency)||"once"; wx.setStorageSync(`starline_launch_seen_${id}_meta`, frequency === "daily" ? `daily:${new Date().toISOString().slice(0,10)}` : frequency === "every_entry" ? "" : "once"); this.setData({ launchVisible:false }); },
   chooseLaunchTime(e) { this.setData({ launchTimeOption: e.detail.value }); },
-  submitLaunchCampaign() { const c=this.data.launchCampaign||{}; request("/student/class-reservations",{method:"POST",data:{campaignId:c.id,timeOption:this.data.launchTimeOption}}).then(()=>{wx.showToast({title:"已提交预约",icon:"success"});this.closeLaunchCampaign();}).catch(e=>wx.showToast({title:e.message||"提交失败",icon:"none"})); },
+  submitLaunchCampaign() { const c=this.data.launchCampaign||{}; if (c.actionType !== "submit_reservation") { this.closeLaunchCampaign(); return; } request("/student/class-reservations",{method:"POST",data:{campaignId:c.id,timeOption:this.data.launchTimeOption}}).then(()=>{wx.showToast({title:"已提交预约",icon:"success"});this.closeLaunchCampaign();}).catch(e=>wx.showToast({title:e.message||"提交失败",icon:"none"})); },
   changeCourse(event) {
     const index = Number(event.detail.current) || 0;
     const selectedCourse = this.data.courses[index] || {};

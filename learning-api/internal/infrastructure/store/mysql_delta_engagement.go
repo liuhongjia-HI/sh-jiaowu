@@ -1,7 +1,10 @@
 package store
 
 func engagementRows(s *MemoryStore) []persistenceRow {
-	rows := make([]persistenceRow, 0, len(s.notices)+len(s.logs)+len(s.settings)+len(s.subjects)+len(s.favorites)+len(s.subscriptionPreferences))
+	rows := make([]persistenceRow, 0, len(s.notices)+len(s.logs)+len(s.settings)+len(s.subjects)+len(s.favorites)+len(s.subscriptionPreferences)+len(s.classReservations))
+	for _, item := range s.classReservations {
+		rows = append(rows, simpleRow("class_reservation_intents", "id", item.ID, `INSERT INTO class_reservation_intents (id, student_id, student_name, grade, campaign_id, time_option, status, remark, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE student_name=VALUES(student_name), grade=VALUES(grade), time_option=VALUES(time_option), status=VALUES(status), remark=VALUES(remark), updated_at=VALUES(updated_at)`, item.ID, item.StudentID, item.StudentName, item.Grade, item.CampaignID, item.TimeOption, item.Status, item.Remark, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt)))
+	}
 	for _, item := range s.notices {
 		rows = append(rows, simpleRow("notices", "external_id", item.ID, `INSERT INTO notices (external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, retry_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE notice_type=VALUES(notice_type), title=VALUES(title), target=VALUES(target), content=VALUES(content), channel=VALUES(channel), recipient_open_id=VALUES(recipient_open_id), status=VALUES(status), failure_reason=VALUES(failure_reason), related_type=VALUES(related_type), related_id=VALUES(related_id), retry_count=VALUES(retry_count)`, item.ID, item.Type, item.Title, item.Target, item.Summary, item.Channel, item.RecipientOpenID, item.Status, item.FailureReason, item.RelatedType, item.RelatedID, item.RetryCount))
 	}

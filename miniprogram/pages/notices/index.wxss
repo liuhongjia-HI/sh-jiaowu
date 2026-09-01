@@ -30,6 +30,41 @@
   font-size: 40rpx;
 }
 
+.notice-student-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 22rpx;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid #ffe0d2;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #fff7f2, #fff);
+}
+
+.notice-student-label {
+  color: #a06f5b;
+  font-size: 19rpx;
+}
+
+.notice-student-name {
+  margin-top: 5rpx;
+  color: #292a2e;
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.notice-student-name text {
+  color: #777a83;
+  font-size: 21rpx;
+  font-weight: 500;
+}
+
+.notice-student-action {
+  flex: none;
+  color: #ff5a1f;
+  font-size: 20rpx;
+}
+
 .notice-tabs {
   display: flex;
   align-items: center;

@@ -13,12 +13,27 @@ Page({
       { label: "系统", className: "" }
     ],
     notices: [],
-    visibleNotices: []
+    visibleNotices: [],
+    currentStudentName: "",
+    currentStudentGrade: "",
+    studentCount: 0
   },
   onLoad() {
     this.setData({ loading: true, error: "" });
-    request("/student/notices")
-      .then((notices) => this.setData({ notices: decorateNotices(notices || []), loading: false }, () => this.applyFilters()))
+    Promise.all([
+      request("/student/notices"),
+      request("/student/accounts", { silent: true }).catch(() => [])
+    ])
+      .then(([notices, accounts]) => {
+        const active = (accounts || []).find((item) => item.active) || {};
+        this.setData({
+          notices: decorateNotices(notices || []),
+          currentStudentName: active.name || "当前学生",
+          currentStudentGrade: active.grade || "",
+          studentCount: (accounts || []).length,
+          loading: false
+        }, () => this.applyFilters());
+      })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
         emptyMessage: error.message || "有新小挑战、批改结果或资料更新时，会提醒你。",
@@ -33,6 +48,9 @@ Page({
   },
   goStudy() {
     wx.switchTab({ url: "/pages/study/index" });
+  },
+  goMe() {
+    wx.switchTab({ url: "/pages/me/index" });
   },
   changeFilter(event) {
     const activeFilter = event.currentTarget.dataset.filter;
@@ -55,8 +73,16 @@ function decorateNotices(notices) {
     ...notice,
     icon: notice.type || "新",
     iconClass: notice.type === "评" ? "review" : "default",
-    category: noticeCategory(notice)
+    category: noticeCategory(notice),
+    scopeText: noticeScopeText(notice)
   }));
+}
+
+function noticeScopeText(notice) {
+  if (String(notice.relatedType || "").toLowerCase() === "student") return "仅发给指定学生";
+  const target = String(notice.target || "").trim();
+  if (!target || /全部|全体/.test(target)) return "面向全部学生";
+  return `通知范围：${target}`;
 }
 
 function noticeCategory(notice) {

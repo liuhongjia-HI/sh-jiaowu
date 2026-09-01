@@ -8,15 +8,13 @@ import (
 	"testing"
 )
 
-func TestWatermarkEndPageScriptStampsOnlyContentPages(t *testing.T) {
+func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	script := watermarkPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
 
 	for _, expected := range []string{
 		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
-		"<< /EndPage {",
-		"dup 0 eq",
-		"pop pop true",
-		"pop pop false",
+		"<< /BeginPage {",
+		"pop\n    StarlineWatermark",
 		"initgraphics",
 		"clippath pathbbox",
 		"stringwidth",
@@ -27,11 +25,11 @@ func TestWatermarkEndPageScriptStampsOnlyContentPages(t *testing.T) {
 			t.Fatalf("watermark script should contain %q, got %s", expected, script)
 		}
 	}
-	if strings.Contains(script, "/showpage") {
-		t.Fatalf("watermark script must not override showpage because PDF rendering does not call it: %s", script)
+	if strings.Contains(script, "/EndPage") || strings.Contains(script, "/showpage") {
+		t.Fatalf("watermark must draw before the PDF content instead of overriding page output: %s", script)
 	}
-	if !strings.Contains(script, "0.88 setgray") {
-		t.Fatalf("watermark should use the lighter 12%% black shade, got %s", script)
+	if !strings.Contains(script, "0.93 setgray") {
+		t.Fatalf("watermark should use the lighter 7%% black shade, got %s", script)
 	}
 	if count := strings.Count(script, "WatermarkText show"); count != 2 {
 		t.Fatalf("watermark count = %d, want 2 to avoid obstructing courseware text", count)

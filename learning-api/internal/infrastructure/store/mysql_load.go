@@ -38,6 +38,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadSubscriptionPreferencesFromDB,
 		s.loadCommercialFromDB,
 		s.loadBannersFromDB,
+		s.loadClassReservationsFromDB,
 	}
 	for _, loader := range loaders {
 		if err := loader(); err != nil {
@@ -58,6 +59,27 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		return err
 	}
 	return nil
+}
+
+func (s *MemoryStore) loadClassReservationsFromDB() error {
+	rows, err := s.db.Query(`SELECT id, student_id, student_name, grade, campaign_id, time_option, status, remark, created_at, updated_at FROM class_reservation_intents ORDER BY created_at DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.ClassReservationIntent{}
+	for rows.Next() {
+		var item learning.ClassReservationIntent
+		var created, updated sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.Grade, &item.CampaignID, &item.TimeOption, &item.Status, &item.Remark, &created, &updated); err != nil {
+			return err
+		}
+		item.CreatedAt = dateTimeString(created)
+		item.UpdatedAt = dateTimeString(updated)
+		out = append(out, item)
+	}
+	s.classReservations = out
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadLessonFeedbacksFromDB() error {

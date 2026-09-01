@@ -648,6 +648,21 @@ SET @seed_academic_year = CONCAT(
   '学年'
 );
 
+CREATE TABLE IF NOT EXISTS class_reservation_intents (
+  id VARCHAR(64) PRIMARY KEY,
+  student_id VARCHAR(64) NOT NULL,
+  student_name VARCHAR(64) NOT NULL DEFAULT '',
+  grade VARCHAR(32) NOT NULL DEFAULT '',
+  campaign_id VARCHAR(64) NOT NULL DEFAULT '',
+  time_option VARCHAR(128) NOT NULL DEFAULT '',
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  remark VARCHAR(255) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  KEY idx_reservation_status (status, created_at),
+  KEY idx_reservation_student (student_id, campaign_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('grades', 'G1-G12'),
   ('semesters', 'S1 / S2'),

@@ -333,6 +333,7 @@ type LaunchCampaign struct {
 	SubMessage        string   `json:"subMessage,omitempty"`
 	ImageURL          string   `json:"imageUrl,omitempty"`
 	PrimaryActionText string   `json:"primaryActionText"`
+	ActionType        string   `json:"actionType"`
 	Frequency         string   `json:"frequency"`
 	TimeOptions       []string `json:"timeOptions,omitempty"`
 }
@@ -345,6 +346,7 @@ type LaunchCampaignConfig struct {
 	ImageURL          string   `json:"imageUrl"`
 	TemplateType      string   `json:"templateType"`
 	PrimaryActionText string   `json:"primaryActionText"`
+	ActionType        string   `json:"actionType"`
 	TimeOptions       []string `json:"timeOptions"`
 	Frequency         string   `json:"frequency"`
 	Priority          int      `json:"priority"`

@@ -30,10 +30,22 @@ func (s *MemoryStore) LaunchCampaign(p learning.Principal) (*learning.LaunchCamp
 	if cfg.PrimaryActionText == "" {
 		cfg.PrimaryActionText = "立即了解"
 	}
-	return &learning.LaunchCampaign{ID: "launch-default", TemplateType: cfg.TemplateType, Title: cfg.Title, Message: cfg.Message, SubMessage: cfg.SubMessage, ImageURL: cfg.ImageURL, PrimaryActionText: cfg.PrimaryActionText, Frequency: cfg.Frequency, TimeOptions: cfg.TimeOptions}, nil
+	if cfg.ActionType == "" {
+		if cfg.TemplateType == "small_class_reservation" {
+			cfg.ActionType = "submit_reservation"
+		} else {
+			cfg.ActionType = "close"
+		}
+	}
+	return &learning.LaunchCampaign{ID: "launch-default", TemplateType: cfg.TemplateType, Title: cfg.Title, Message: cfg.Message, SubMessage: cfg.SubMessage, ImageURL: cfg.ImageURL, PrimaryActionText: cfg.PrimaryActionText, ActionType: cfg.ActionType, Frequency: cfg.Frequency, TimeOptions: cfg.TimeOptions}, nil
 }
 
 func (s *MemoryStore) CreateClassReservation(operator string, p learning.Principal, req learning.ClassReservationRequest) (learning.ClassReservationIntent, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.ClassReservationIntent, error) {
+			return work.createClassReservationUnlocked(operator, p, req)
+		})
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.createClassReservationUnlocked(operator, p, req)
@@ -63,8 +75,16 @@ func (s *MemoryStore) ClassReservations(p learning.Principal) []learning.ClassRe
 	return append([]learning.ClassReservationIntent(nil), s.classReservations...)
 }
 func (s *MemoryStore) UpdateClassReservation(operator string, p learning.Principal, id string, req learning.ClassReservationUpdateRequest) (learning.ClassReservationIntent, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.ClassReservationIntent, error) {
+			return work.updateClassReservationUnlocked(operator, p, id, req)
+		})
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.updateClassReservationUnlocked(operator, p, id, req)
+}
+func (s *MemoryStore) updateClassReservationUnlocked(operator string, p learning.Principal, id string, req learning.ClassReservationUpdateRequest) (learning.ClassReservationIntent, error) {
 	for i := range s.classReservations {
 		if s.classReservations[i].ID == id {
 			if req.Status != "pending" && req.Status != "contacted" && req.Status != "completed" && req.Status != "closed" {
