@@ -27,8 +27,8 @@ Page({
       .then(([notices, accounts]) => {
         const active = (accounts || []).find((item) => item.active) || {};
         this.setData({
-          notices: decorateNotices(notices || []),
-          currentStudentName: active.name || "当前学生",
+          notices: decorateNotices(notices || [], active),
+          currentStudentName: active.name || "",
           currentStudentGrade: active.grade || "",
           studentCount: (accounts || []).length,
           loading: false
@@ -68,14 +68,22 @@ Page({
   }
 });
 
-function decorateNotices(notices) {
+function decorateNotices(notices, student) {
   return notices.map((notice) => ({
     ...notice,
     icon: notice.type || "新",
     iconClass: notice.type === "评" ? "review" : "default",
     category: noticeCategory(notice),
-    scopeText: noticeScopeText(notice)
+    scopeText: noticeScopeText(notice),
+    studentDisplay: studentDisplay(student)
   }));
+}
+
+function studentDisplay(student) {
+  const name = String(student && student.name || "").trim();
+  const grade = String(student && student.grade || "").trim();
+  if (!name) return "";
+  return grade ? `${name}（${grade}）` : name;
 }
 
 function noticeScopeText(notice) {

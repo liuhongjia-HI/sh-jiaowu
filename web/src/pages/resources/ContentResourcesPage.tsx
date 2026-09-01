@@ -56,6 +56,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const [keyword, setKeyword] = useState('');
   const [subject, setSubject] = useState<string>();
   const [tagCode, setTagCode] = useState<string>();
+  const [assessmentType, setAssessmentType] = useState<string>();
+  const [homeworkCourseId, setHomeworkCourseId] = useState<string>();
   const [uploaderId, setUploaderId] = useState<string>();
   const [uploadedFrom, setUploadedFrom] = useState('');
   const [uploadedTo, setUploadedTo] = useState('');
@@ -206,6 +208,12 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const packageSpaceIds = new Set(selectedPackage?.learningSpaceIds ?? []);
   const packageCourseIds = new Set((courses.data ?? []).filter((item) => packageSpaceIds.has(item.learningSpaceId || '')).map((item) => item.id));
   const tableRows = ((resources.data ?? []) as Array<Material | Homework>).filter((item) => {
+    if (kind === 'homework') {
+      if (keyword.trim() && !item.title.toLowerCase().includes(keyword.trim().toLowerCase())) return false;
+      if (tagCode && item.tagCode !== tagCode) return false;
+      if (assessmentType && (item as Homework).assessmentType !== assessmentType) return false;
+      if (homeworkCourseId && item.courseId !== homeworkCourseId) return false;
+    }
     if (courseId) return item.courseId === courseId || (selectedCourse && item.course === selectedCourse.name);
     if (packageId) return Boolean(packageIncludesMaterials && (packageSpaceIds.has(item.learningSpaceId || '') || packageCourseIds.has(item.courseId || '')));
     return true;
@@ -256,6 +264,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
 
   const subjectOptions = Array.from(new Set((resources.data ?? []).map((row) => row.subject).filter(Boolean))).map((value) => ({ label: value, value }));
   const tagOptions = [{ label: 'HD · 课程讲义', value: 'HD' }, { label: 'Blank · 空白练习', value: 'Blank' }, { label: 'HW · 课后作业', value: 'HW' }, { label: 'Exam · 测试卷', value: 'Exam' }, { label: 'Special · 专题资料', value: 'Special' }];
+  const courseOptions = (courses.data ?? []).map((course) => ({ label: course.name, value: course.id }));
   const uploaderOptions = Array.from(new Map((resources.data ?? []).filter((row): row is Material => 'ownerTeacherId' in row && Boolean(row.ownerTeacherId)).map((row) => [row.ownerTeacherId as string, { label: row.ownerTeacherName || row.ownerTeacherId as string, value: row.ownerTeacherId as string }])).values());
   return <div className="page-stack">
     <div className="page-heading">
@@ -266,6 +275,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       {canManage && <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => setOpen(true)}>{kind === 'materials' ? '上传讲义' : '手动组卷'}</Button>}
     </div>
     {kind === 'materials' && <Card><Space wrap><Input.Search allowClear placeholder="搜索讲义标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="学科" value={subject} onChange={setSubject} options={subjectOptions} style={{ width: 130 }} /><Select allowClear placeholder="主标签" value={tagCode} onChange={setTagCode} options={tagOptions} style={{ width: 150 }} /><Select allowClear showSearch placeholder="上传人" value={uploaderId} onChange={setUploaderId} options={uploaderOptions} style={{ width: 150 }} /><Input type="date" value={uploadedFrom} onChange={(event) => setUploadedFrom(event.target.value)} /><Input type="date" value={uploadedTo} onChange={(event) => setUploadedTo(event.target.value)} /><Button onClick={() => { setKeyword(''); setSubject(undefined); setTagCode(undefined); setUploaderId(undefined); setUploadedFrom(''); setUploadedTo(''); }}>重置</Button></Space></Card>}
+    {kind === 'homework' && <Card><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="主标签" value={tagCode} onChange={setTagCode} options={tagOptions} style={{ width: 150 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button></Space></Card>}
     {!canManage && <Alert type="info" showIcon message="当前账号没有上传权限，请联系管理员开通。" />}
     {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">拖动左侧图标即可调整同一课程内的讲义顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
       <Table<Material | Homework>

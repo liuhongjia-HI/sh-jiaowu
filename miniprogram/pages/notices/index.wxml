@@ -35,7 +35,7 @@
           <view class="notice-status">{{item.status}}</view>
         </view>
         <view class="notice-summary">{{item.summary}}</view>
-        <view class="notice-target">{{item.scopeText}}</view>
+        <view class="notice-target">{{item.studentDisplay || item.scopeText}}</view>
       </view>
       <view class="notice-arrow">›</view>
     </view>

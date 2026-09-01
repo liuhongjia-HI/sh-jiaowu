@@ -74,6 +74,22 @@ test("notice tab keeps an empty filtered result when that category has no messag
   assert.deepEqual(page.data.visibleNotices, []);
 });
 
+test("notice cards identify the current student by name and grade", async () => {
+  const page = loadNoticesPage((path) => {
+    if (path === "/student/accounts") {
+      return Promise.resolve([{ name: "小星", grade: "五年级", active: true }]);
+    }
+    return Promise.resolve([
+      { id: "homework-1", type: "练", title: "英语阅读挑战已发布", relatedType: "homework" }
+    ]);
+  });
+
+  page.onLoad();
+  await flushPromises();
+
+  assert.equal(page.data.visibleNotices[0].studentDisplay, "小星（五年级）");
+});
+
 test("notice summary wraps so the complete message remains visible", () => {
   const styles = fs.readFileSync(path.join(__dirname, "../pages/notices/index.wxss"), "utf8");
   const summaryRules = [...styles.matchAll(/\.notice-summary\s*\{([^}]*)\}/g)].map((match) => match[1]).join("\n");
