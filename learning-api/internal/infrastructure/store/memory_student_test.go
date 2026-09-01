@@ -55,6 +55,39 @@ func TestStudentAverageScoreIsDerivedFromGradedSubmissions(t *testing.T) {
 	}
 }
 
+func TestCompletedReviewNoticeLinksToStudentSubmission(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("expected teacher principal: %v", err)
+	}
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatalf("expected student principal: %v", err)
+	}
+
+	submission, err := store.CompleteReview("英语老师", teacher, "rev-001", learning.ReviewCompleteRequest{
+		Score:          90,
+		TeacherComment: "阅读依据找得很准，继续保持。",
+	})
+	if err != nil {
+		t.Fatalf("complete review: %v", err)
+	}
+	home, err := store.StudentHome(student)
+	if err != nil {
+		t.Fatalf("load student home: %v", err)
+	}
+	for _, notice := range home.Notices {
+		if notice.RelatedType == "review" {
+			if notice.RelatedID != submission.ID {
+				t.Fatalf("review notice should link to submission %q, got %#v", submission.ID, notice)
+			}
+			return
+		}
+	}
+	t.Fatal("expected a review notice after completing the review")
+}
+
 // TestUpdateStudentRebasesEnrollmentWhenAdminCorrectsGrade 确认管理端修改年级
 // 是一次订正：以订正时点为新的入学基准，而不是直接写死一个以后再也不会滚动的值。
 func TestUpdateStudentRebasesEnrollmentWhenAdminCorrectsGrade(t *testing.T) {

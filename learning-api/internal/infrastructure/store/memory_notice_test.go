@@ -313,7 +313,7 @@ func TestCompleteReviewAutoNoticeUsesOfficialAccountDelivery(t *testing.T) {
 		sent = notice
 		return nil
 	}
-	_, err = store.CompleteReview("英语老师", teacher, "rev-001", learning.ReviewCompleteRequest{
+	submission, err := store.CompleteReview("英语老师", teacher, "rev-001", learning.ReviewCompleteRequest{
 		Score:          95,
 		TeacherComment: "阅读依据找得很准，继续保持。",
 		Reward:         "阅读小星星",
@@ -326,8 +326,8 @@ func TestCompleteReviewAutoNoticeUsesOfficialAccountDelivery(t *testing.T) {
 	if notice.Channel != "公众号模板消息" || notice.Status != "已发送" || notice.RecipientOpenID != "oa-review-openid" {
 		t.Fatalf("expected auto review notice to use official account delivery, got %#v", notice)
 	}
-	if notice.RelatedType != "review" || notice.RelatedID != "rev-001" {
-		t.Fatalf("expected review notice to keep related object, got %#v", notice)
+	if notice.RelatedType != "review" || notice.RelatedID != submission.ID {
+		t.Fatalf("expected review notice to link to the student submission, got %#v", notice)
 	}
 	if sent.ID != notice.ID || sent.RecipientOpenID != "oa-review-openid" {
 		t.Fatalf("expected sender to receive review notice, sent=%#v notice=%#v", sent, notice)

@@ -54,6 +54,16 @@ Page({
   goMe() {
     wx.switchTab({ url: "/pages/me/index" });
   },
+  goNotice(event) {
+    const id = event.currentTarget.dataset.id || "";
+    const notice = this.data.notices.find((item) => item.id === id);
+    const path = notice && notice.destinationPath;
+    if (!path) {
+      wx.showToast({ title: "这条通知暂无可查看的详情", icon: "none" });
+      return;
+    }
+    wx.navigateTo({ url: path });
+  },
   changeFilter(event) {
     const activeFilter = event.currentTarget.dataset.filter;
     this.setData({
@@ -77,8 +87,23 @@ function decorateNotices(notices, student) {
     iconClass: notice.type === "评" ? "review" : "default",
     category: noticeCategory(notice),
     scopeText: noticeScopeText(notice),
-    studentDisplay: studentDisplay(student)
+    studentDisplay: studentDisplay(student),
+    destinationPath: noticeDestination(notice)
   }));
+}
+
+function noticeDestination(notice) {
+  const type = String(notice.relatedType || "").toLowerCase();
+  const id = String(notice.relatedId || "").trim();
+  if (type === "schedule") return "/pages/schedule/index";
+  if (!id) return "";
+  if (type === "homework") return `/pages/answer/index?id=${encodeURIComponent(id)}`;
+  if (["review", "submission", "feedback"].includes(type)) {
+    return id.indexOf("sub-") === 0 ? `/pages/result/index?id=${encodeURIComponent(id)}` : "/pages/tasks/index";
+  }
+  if (type === "course") return `/pages/study-detail/index?id=${encodeURIComponent(id)}`;
+  if (["material", "handout"].includes(type)) return `/pages/material-preview/index?id=${encodeURIComponent(id)}`;
+  return "";
 }
 
 function studentDisplay(student) {

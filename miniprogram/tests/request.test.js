@@ -110,6 +110,71 @@ test("request redirects to login before student API when token is missing", asyn
   assert.deepEqual(calls.find((item) => item[0] === "navigateTo"), ["navigateTo", "/pages/login/index"]);
 });
 
+test("request remembers the protected page before redirecting an unbound visitor", async () => {
+  const calls = [];
+  const originalSetTimeout = global.setTimeout;
+  global.setTimeout = (fn) => {
+    fn();
+    return 0;
+  };
+  const wxMock = {
+    getStorageSync() {
+      return "";
+    },
+    setStorageSync(key, value) {
+      calls.push(["setStorageSync", key, value]);
+    },
+    removeStorageSync() {},
+    showToast() {},
+    navigateTo(args) {
+      calls.push(["navigateTo", args.url]);
+    }
+  };
+  const request = loadRequestWithWx(wxMock, [{
+    route: "pages/material-preview/index",
+    options: { id: "material-001" }
+  }]);
+
+  await assert.rejects(() => request("/student/materials/material-001"), /请先完成登录绑定/);
+  global.setTimeout = originalSetTimeout;
+
+  assert.deepEqual(calls.find((item) => item[0] === "setStorageSync"), [
+    "setStorageSync",
+    "starline_after_login",
+    "/pages/material-preview/index?id=material-001"
+  ]);
+  assert.deepEqual(calls.find((item) => item[0] === "navigateTo"), ["navigateTo", "/pages/login/index"]);
+});
+
+test("concurrent protected requests send an unbound visitor to binding only once", async () => {
+  const calls = [];
+  const originalSetTimeout = global.setTimeout;
+  global.setTimeout = (fn) => {
+    fn();
+    return 0;
+  };
+  const wxMock = {
+    getStorageSync() {
+      return "";
+    },
+    setStorageSync() {},
+    removeStorageSync() {},
+    showToast() {},
+    navigateTo(args) {
+      calls.push(args.url);
+    }
+  };
+  const request = loadRequestWithWx(wxMock, [{ route: "pages/study/index" }]);
+
+  await Promise.allSettled([
+    request("/student/study"),
+    request("/student/favorites", { silent: true })
+  ]);
+  global.setTimeout = originalSetTimeout;
+
+  assert.deepEqual(calls, ["/pages/login/index"]);
+});
+
 test("request clears token and redirects when student session expires", async () => {
   const calls = [];
   const originalSetTimeout = global.setTimeout;

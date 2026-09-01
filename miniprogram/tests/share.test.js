@@ -86,8 +86,25 @@ test("study detail keeps lecture list collapsed until expanded", () => {
 
   assert.equal(page.data.materialsExpanded, false);
   assert.match(wxml, /全部讲义下载/);
-  assert.match(wxml, /wx:if="\{\{materialsExpanded && materials\.length\}\}"/);
+  assert.match(wxml, /wx:if="\{\{visibleMaterials\.length\}\}"/);
 
   page.toggleMaterials();
   assert.equal(page.data.materialsExpanded, true);
+});
+
+test("study detail shows only the first two lectures before expanding", async () => {
+  const materials = [
+    { id: "mat-1", title: "第一份讲义" },
+    { id: "mat-2", title: "第二份讲义" },
+    { id: "mat-3", title: "第三份讲义" }
+  ];
+  const page = loadStudyDetailPage(() => Promise.resolve({ materials }), { showToast() {} });
+  page.courseId = "course-1";
+
+  page.loadDetail();
+  await flushPromises();
+
+  assert.deepEqual(page.data.visibleMaterials.map((item) => item.id), ["mat-1", "mat-2"]);
+  page.toggleMaterials();
+  assert.deepEqual(page.data.visibleMaterials.map((item) => item.id), ["mat-1", "mat-2", "mat-3"]);
 });

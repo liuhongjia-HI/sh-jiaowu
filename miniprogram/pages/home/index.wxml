@@ -15,11 +15,19 @@
   </view>
 
   <view wx:if="{{loading}}" class="empty">正在准备今天的学习内容...</view>
+  <view wx:elif="{{visitorMode}}" class="section">
+    <view class="empty-card home-empty">
+      <view class="title">欢迎来到 Starline 学习</view>
+      <view class="sub">课程讲义、题库练习和老师反馈都会在这里。选择想看的内容后，再完成身份绑定即可。</view>
+      <button class="button" bindtap="goStudy">进入学习中心</button>
+      <button class="button light" bindtap="goTasks">查看题库练习</button>
+    </view>
+  </view>
   <view wx:elif="{{!home}}" class="section">
     <view class="empty-card home-empty">
-      <view class="title">先完成登录绑定</view>
-      <view class="sub">{{emptyMessage}}</view>
-      <button class="button" bindtap="goLogin">去登录绑定</button>
+      <view class="title">学习内容加载失败</view>
+      <view class="sub">{{error || '请检查网络后重试。'}}</view>
+      <button class="button" bindtap="loadHome">重新加载</button>
     </view>
   </view>
   <view wx:else>

@@ -1101,7 +1101,7 @@ func (s *MemoryStore) completeReviewUnlocked(operator string, principal learning
 		Channel:         "公众号模板消息",
 		RecipientOpenID: s.officialAccountOpenIDForTarget(review.StudentName),
 		RelatedType:     "review",
-		RelatedID:       review.ID,
+		RelatedID:       submission.ID,
 	}
 	notice = s.deliverNotice(notice)
 	s.prependNoticeRecord(notice)

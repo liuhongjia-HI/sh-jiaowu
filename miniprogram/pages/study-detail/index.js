@@ -4,6 +4,7 @@ Page({
   data: {
     course: {},
     materials: [],
+    visibleMaterials: [],
     materialsExpanded: false,
     homework: [],
     stations: [],
@@ -50,6 +51,7 @@ Page({
       this.setData({
         course,
         materials,
+        visibleMaterials: this.data.materialsExpanded ? materials : materials.slice(0, 2),
         canDownloadMaterials: materials.some((item) => Boolean(item.downloadUrl)),
         homework,
 		stations,
@@ -71,7 +73,11 @@ Page({
 		this.setData({ activeTag: code, visibleStations: filterStations(this.data.stations, code) });
 	},
   toggleMaterials() {
-    this.setData({ materialsExpanded: !this.data.materialsExpanded });
+    const materialsExpanded = !this.data.materialsExpanded;
+    this.setData({
+      materialsExpanded,
+      visibleMaterials: materialsExpanded ? this.data.materials : this.data.materials.slice(0, 2)
+    });
   },
   goPreview() {
     const material = this.data.materials[0];

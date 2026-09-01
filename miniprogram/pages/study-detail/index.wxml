@@ -41,12 +41,12 @@
   <view class="detail-section-head material-head">
     <view class="detail-section-title material-title-toggle" bindtap="toggleMaterials">
       课程讲义 <text>（{{materials.length}} 份）</text>
-      <text class="material-toggle-hint">{{materialsExpanded ? "收起" : "展开"}}</text>
+      <text wx:if="{{materials.length > 2}}" class="material-toggle-hint">{{materialsExpanded ? "收起" : "展开全部"}}</text>
     </view>
     <view class="detail-section-link" bindtap="goPreview">{{canDownloadMaterials ? "全部讲义下载" : "查看全部讲义"}} ›</view>
   </view>
-  <view wx:if="{{materialsExpanded && materials.length}}" class="material-list">
-    <view wx:for="{{materials}}" wx:key="id" class="material-row" data-id="{{item.id}}" bindtap="previewMaterial">
+  <view wx:if="{{visibleMaterials.length}}" class="material-list">
+    <view wx:for="{{visibleMaterials}}" wx:key="id" class="material-row" data-id="{{item.id}}" bindtap="previewMaterial">
       <view class="material-icon">{{item.fileType || "PDF"}}</view>
       <view class="material-copy">
         <view class="material-title">{{item.title}}</view>

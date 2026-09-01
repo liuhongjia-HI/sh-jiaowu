@@ -1,4 +1,8 @@
-const { request } = require("../../utils/request");
+const {
+  request,
+  LOGIN_RETURN_KEY = "starline_after_login",
+  completeLoginRedirect = () => {}
+} = require("../../utils/request");
 const {
   showPhoneAuthFailed,
   isCancel
@@ -17,6 +21,9 @@ Page({
   },
   onLoad() {
     this.silentLogin();
+  },
+  onUnload() {
+    completeLoginRedirect();
   },
   onShareAppMessage() {
     return {
@@ -73,7 +80,7 @@ Page({
         request("/auth/wechat-login", { method: "POST", data: { code } })
           .then((result) => {
             wx.setStorageSync("starline_token", result.token);
-            wx.switchTab({ url: "/pages/home/index" });
+            resumeAfterLogin();
           })
           .catch((error) => {
             const message = error && error.message ? error.message : "";
@@ -153,7 +160,7 @@ Page({
         }
         wx.setStorageSync("starline_token", result.token);
         wx.showToast({ title: "绑定成功", icon: "success" });
-        wx.switchTab({ url: "/pages/home/index" });
+        resumeAfterLogin();
         this.setData({ binding: false });
       })
       .catch((error) => {
@@ -179,3 +186,26 @@ Page({
     });
   }
 });
+
+function resumeAfterLogin() {
+  completeLoginRedirect();
+  const destination = wx.getStorageSync ? wx.getStorageSync(LOGIN_RETURN_KEY) : "";
+  if (destination && wx.removeStorageSync) {
+    wx.removeStorageSync(LOGIN_RETURN_KEY);
+  }
+  const pagePath = String(destination || "").split("?")[0];
+  if (!pagePath.startsWith("/pages/") || pagePath === "/pages/login/index") {
+    wx.switchTab({ url: "/pages/home/index" });
+    return;
+  }
+  const tabPages = ["/pages/home/index", "/pages/study/index", "/pages/notices/index", "/pages/me/index"];
+  if (tabPages.includes(pagePath)) {
+    wx.switchTab({ url: pagePath });
+    return;
+  }
+  if (wx.redirectTo) {
+    wx.redirectTo({ url: destination });
+    return;
+  }
+  wx.switchTab({ url: "/pages/home/index" });
+}

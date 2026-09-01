@@ -81,6 +81,35 @@ test("login page silently restores bound wechat session on load", async () => {
   assert.equal(calls.some((item) => item[0] === "removeStorageSync"), false);
 });
 
+test("login page returns to the protected material that triggered binding", async () => {
+  const calls = [];
+  const page = loadLoginPage(() => Promise.resolve({ token: "restored-token" }), {
+    login(args) {
+      args.success({ code: "wx-login-code" });
+    },
+    getStorageSync(key) {
+      return key === "starline_after_login" ? "/pages/material-preview/index?id=material-001" : "";
+    },
+    removeStorageSync(key) {
+      calls.push(["removeStorageSync", key]);
+    },
+    setStorageSync() {},
+    redirectTo(args) {
+      calls.push(["redirectTo", args.url]);
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    }
+  });
+
+  page.onLoad();
+  await flushPromises();
+
+  assert.deepEqual(calls.find((item) => item[0] === "removeStorageSync"), ["removeStorageSync", "starline_after_login"]);
+  assert.deepEqual(calls.find((item) => item[0] === "redirectTo"), ["redirectTo", "/pages/material-preview/index?id=material-001"]);
+  assert.equal(calls.some((item) => item[0] === "switchTab"), false);
+});
+
 test("login page keeps profile binding form when wechat is not bound", async () => {
   const calls = [];
   const page = loadLoginPage((path, options) => {

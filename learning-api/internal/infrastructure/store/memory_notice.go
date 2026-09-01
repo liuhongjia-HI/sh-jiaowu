@@ -295,6 +295,24 @@ func (s *MemoryStore) validateSettingValue(key, value string) error {
 			if startErr != nil || endErr != nil || end.Before(start) {
 				return errors.New("校历日期无效或结束日期早于开始日期")
 			}
+			for _, exam := range []struct {
+				name string
+				date string
+			}{
+				{name: "期中", date: term.MidtermDate},
+				{name: "期末", date: term.FinalDate},
+			} {
+				if strings.TrimSpace(exam.date) == "" {
+					continue
+				}
+				examDate, examErr := time.Parse("2006-01-02", exam.date)
+				if examErr != nil || examDate.Before(start) || examDate.After(end) {
+					return fmt.Errorf("校历%s日期必须在对应学期内", exam.name)
+				}
+			}
+			if term.MidtermDate != "" && term.FinalDate != "" && term.MidtermDate > term.FinalDate {
+				return errors.New("校历期中日期不能晚于期末日期")
+			}
 		}
 	}
 	return nil

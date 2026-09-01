@@ -222,13 +222,15 @@ func defaultSubjectMetadata() []learning.SubjectMetadata {
 	}
 }
 
-// academicCalendarTerm 是校历上的一个学期条目：某学年某学期的起止日期。
+// academicCalendarTerm 是校历上的一个学期条目：某学年某学期的起止日期及考试节点。
 // 真实的教育局校历是按学年、按学期公布的，不是一个学年只有一对笼统的起止日期——
 // 所以校历存成列表，每学年每学期一条，而不是拍扁成两个日期字段。
 type academicCalendarTerm struct {
 	AcademicYear string `json:"academicYear"`
 	Semester     string `json:"semester"`
 	StartDate    string `json:"startDate"`
+	MidtermDate  string `json:"midtermDate,omitempty"`
+	FinalDate    string `json:"finalDate,omitempty"`
 	EndDate      string `json:"endDate"`
 }
 
@@ -240,8 +242,8 @@ func defaultSettings() map[string]string {
 	}
 	academicYear := currentAcademicYear()
 	calendar, _ := json.Marshal([]academicCalendarTerm{
-		{AcademicYear: academicYear, Semester: "S1 第一学期", StartDate: fmt.Sprintf("%d-09-01", startYear), EndDate: fmt.Sprintf("%d-01-15", startYear+1)},
-		{AcademicYear: academicYear, Semester: "S2 第二学期", StartDate: fmt.Sprintf("%d-02-01", startYear+1), EndDate: fmt.Sprintf("%d-07-15", startYear+1)},
+		{AcademicYear: academicYear, Semester: "S1 第一学期", StartDate: fmt.Sprintf("%d-09-01", startYear), MidtermDate: fmt.Sprintf("%d-11-01", startYear), FinalDate: fmt.Sprintf("%d-01-10", startYear+1), EndDate: fmt.Sprintf("%d-01-15", startYear+1)},
+		{AcademicYear: academicYear, Semester: "S2 第二学期", StartDate: fmt.Sprintf("%d-02-01", startYear+1), MidtermDate: fmt.Sprintf("%d-04-30", startYear+1), FinalDate: fmt.Sprintf("%d-07-10", startYear+1), EndDate: fmt.Sprintf("%d-07-15", startYear+1)},
 	})
 	return map[string]string{
 		// 校历：每学年每学期一条起止日期，管理端在系统设置里按列表维护，

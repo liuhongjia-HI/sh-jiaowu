@@ -1,3 +1,6 @@
+const LOGIN_RETURN_KEY = "starline_after_login";
+let loginRedirectInFlight = false;
+
 function request(path, options = {}) {
   const app = getApp();
   return ensureRequestAuth(app, path, options)
@@ -87,13 +90,15 @@ function shouldEnsureAuth(path, options = {}) {
 }
 
 function handleUnauthorized(message) {
-  wx.removeStorageSync("starline_token");
-  wx.showToast({ title: message, icon: "none" });
   const pages = getCurrentPages();
   const current = pages[pages.length - 1];
-  if (current && current.route === "pages/login/index") {
+  if ((current && current.route === "pages/login/index") || loginRedirectInFlight) {
     return;
   }
+  loginRedirectInFlight = true;
+  wx.removeStorageSync("starline_token");
+  rememberLoginDestination();
+  wx.showToast({ title: message, icon: "none" });
   setTimeout(() => {
     wx.navigateTo({
       url: "/pages/login/index",
@@ -104,4 +109,33 @@ function handleUnauthorized(message) {
   }, 600);
 }
 
-module.exports = { request };
+function completeLoginRedirect() {
+  loginRedirectInFlight = false;
+}
+
+function rememberLoginDestination() {
+  const pages = getCurrentPages();
+  const current = pages[pages.length - 1];
+  if (!current || current.route === "pages/login/index") {
+    return;
+  }
+  const destination = buildPagePath(current);
+  if (destination && wx.setStorageSync) {
+    wx.setStorageSync(LOGIN_RETURN_KEY, destination);
+  }
+}
+
+function buildPagePath(page) {
+  const route = String((page && page.route) || "").replace(/^\/+/, "");
+  if (!route.startsWith("pages/") || route === "pages/login/index") {
+    return "";
+  }
+  const options = (page && page.options) || {};
+  const query = Object.keys(options)
+    .filter((key) => ["string", "number", "boolean"].includes(typeof options[key]))
+    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(options[key]))}`)
+    .join("&");
+  return `/${route}${query ? `?${query}` : ""}`;
+}
+
+module.exports = { request, LOGIN_RETURN_KEY, completeLoginRedirect };

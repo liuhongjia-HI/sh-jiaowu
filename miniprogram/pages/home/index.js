@@ -4,6 +4,7 @@ Page({
   data: {
     loading: true,
     error: "",
+    visitorMode: false,
     emptyMessage: "请先登录绑定，或联系老师开通学习套餐。",
     greeting: "你好",
     greetingName: "同学",
@@ -38,6 +39,10 @@ Page({
   },
   onLoad() {
     this.refreshGreeting();
+    if (!hasStudentToken()) {
+      this.showVisitorHome();
+      return;
+    }
     this.loadHome();
     this.loadPromoBanners();
   },
@@ -50,9 +55,39 @@ Page({
   },
   onShow() {
     this.refreshGreeting();
+    if (!hasStudentToken()) {
+      if (!this.data.visitorMode || this.data.home) {
+        this.showVisitorHome();
+      }
+      return;
+    }
+    if (this.data.visitorMode) {
+      this.setData({ visitorMode: false });
+      this.loadHome();
+      this.loadPromoBanners();
+      return;
+    }
     if (!this.data.loading && !this.data.home) {
       this.loadHome();
     }
+  },
+  showVisitorHome() {
+    this.setData({
+      loading: false,
+      error: "",
+      visitorMode: true,
+      home: null,
+      hasContent: false,
+      hasOpenedPackage: false,
+      courses: [],
+      courseSlides: [],
+      todoItems: [],
+      feedbackItems: [],
+      recommendations: [],
+      visibleRecommendations: [],
+      recommendationsLoading: false,
+      promoBanners: []
+    });
   },
   refreshGreeting(now = new Date()) {
     this.setData({ greeting: greetingForHour(now.getHours()) });
@@ -84,6 +119,7 @@ Page({
         const progressPercent = clampProgress(selectedCourse.progress);
         this.setData({
           home,
+          visitorMode: false,
           greetingName: preferredGreetingName(student),
           courses,
           courseSlides,
@@ -370,6 +406,10 @@ Page({
     });
   }
 });
+
+function hasStudentToken() {
+  return Boolean(wx.getStorageSync && wx.getStorageSync("starline_token"));
+}
 
 function greetingForHour(hour) {
   if (hour >= 5 && hour < 11) return "早上好";

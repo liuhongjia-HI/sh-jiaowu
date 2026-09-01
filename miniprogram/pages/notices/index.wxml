@@ -27,7 +27,7 @@
     <button class="notice-empty-button" bindtap="goStudy">去学习中心</button>
   </view>
   <view wx:else class="notice-list">
-    <view wx:for="{{visibleNotices}}" wx:key="id" class="notice-item">
+    <view wx:for="{{visibleNotices}}" wx:key="id" class="notice-item" data-id="{{item.id}}" bindtap="goNotice">
       <view class="notice-icon notice-icon-{{item.iconClass}}">{{item.icon}}</view>
       <view class="notice-body">
         <view class="notice-title-row">
@@ -37,7 +37,7 @@
         <view class="notice-summary">{{item.summary}}</view>
         <view class="notice-target">{{item.studentDisplay || item.scopeText}}</view>
       </view>
-      <view class="notice-arrow">›</view>
+      <view class="notice-arrow">{{item.destinationPath ? '›' : ''}}</view>
     </view>
   </view>
 </view>

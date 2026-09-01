@@ -52,6 +52,24 @@ test("home page greeting follows the current local hour", () => {
   assert.equal(page.data.greeting, "晚上好");
 });
 
+test("home page stays public for a visitor before they choose a learning entry", () => {
+  const calls = [];
+  const page = loadHomePage((path) => {
+    calls.push(path);
+    return Promise.resolve({});
+  }, {
+    getStorageSync() {
+      return "";
+    }
+  });
+
+  page.onLoad();
+
+  assert.equal(page.data.visitorMode, true);
+  assert.equal(page.data.loading, false);
+  assert.deepEqual(calls, []);
+});
+
 test("home page greeting uses the student's nickname, name, then a friendly fallback", async () => {
   const students = [
     { nickname: "小星", name: "王同学" },

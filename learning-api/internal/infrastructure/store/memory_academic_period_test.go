@@ -46,6 +46,41 @@ func TestConfiguredAcademicYearAlwaysFollowsDate(t *testing.T) {
 	}
 }
 
+func TestAcademicCalendarStoresExamDatesWithinEachSemester(t *testing.T) {
+	store := NewMemoryStore()
+	calendar, err := json.Marshal([]academicCalendarTerm{
+		{
+			AcademicYear: "2026.2027学年",
+			Semester:     "S1 第一学期",
+			StartDate:    "2026-09-01",
+			MidtermDate:  "2026-11-01",
+			FinalDate:    "2027-01-10",
+			EndDate:      "2027-01-15",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode calendar term: %v", err)
+	}
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(calendar)}); err != nil {
+		t.Fatalf("expected calendar with exam dates to be saved: %v", err)
+	}
+
+	invalidTerms := []academicCalendarTerm{
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2026-08-31", FinalDate: "2027-01-10", EndDate: "2027-01-15"},
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2026-11-01", FinalDate: "2027-01-16", EndDate: "2027-01-15"},
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2027-01-12", FinalDate: "2027-01-10", EndDate: "2027-01-15"},
+	}
+	for _, term := range invalidTerms {
+		invalidCalendar, err := json.Marshal([]academicCalendarTerm{term})
+		if err != nil {
+			t.Fatalf("failed to encode invalid calendar term: %v", err)
+		}
+		if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(invalidCalendar)}); err == nil {
+			t.Fatalf("expected invalid exam dates to be rejected: %#v", term)
+		}
+	}
+}
+
 // TestConfiguredAcademicYearPrefersCalendarOverDateRule 校历是学年判定的唯一权威口径：
 // 今天落在校历配置的哪个学期区间里，就是哪个学年——即便这和「7 月 1 日切学年」的
 // 兜底规则算出来的结果不一样。这个口径要和 resolveScheduleTerm（排课学年判定）

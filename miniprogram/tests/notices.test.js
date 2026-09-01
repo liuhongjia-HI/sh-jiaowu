@@ -116,10 +116,25 @@ test("notice cards navigate directly to their related learning detail", async ()
     "/pages/answer/index?id=hw-001",
     "/pages/result/index?id=sub-001",
     "/pages/study-detail/index?id=course-001",
-    "/pages/material-preview/index?id=material-001"
+    "/pages/material-preview/index?id=material-001",
+    "/pages/schedule/index"
   ]);
   assert.deepEqual(tabNavigations.map((item) => item.url), []);
-  assert.equal(navigations[4].url, "/pages/schedule/index");
+});
+
+test("notice without a related detail stays on the list and explains why", async () => {
+  const toasts = [];
+  const page = loadNoticesPage(() => Promise.resolve([
+    { id: "system-1", type: "通知", title: "服务提醒" }
+  ]));
+  global.wx.showToast = (value) => toasts.push(value);
+  global.wx.navigateTo = () => assert.fail("a system notice without a related object must not navigate");
+
+  page.onLoad();
+  await flushPromises();
+  page.goNotice({ currentTarget: { dataset: { id: "system-1" } } });
+
+  assert.deepEqual(toasts, [{ title: "这条通知暂无可查看的详情", icon: "none" }]);
 });
 
 test("notice header lists every linked student by name and grade", async () => {
