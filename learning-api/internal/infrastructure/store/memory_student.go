@@ -12,6 +12,20 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+func materialTagIn(tag string, allowed ...string) bool {
+	if strings.TrimSpace(tag) == "" {
+		return true
+	}
+	for _, value := range allowed {
+		if strings.EqualFold(strings.TrimSpace(tag), value) {
+			return true
+		}
+	}
+	return false
+}
+
+func homeworkTagIn(tag string, allowed ...string) bool { return materialTagIn(tag, allowed...) }
+
 func (s *MemoryStore) studentsUnlocked(principal learning.Principal, query learning.StudentQuery) []learning.Student {
 	students := make([]learning.Student, 0, len(s.students))
 	for _, student := range s.students {
@@ -101,19 +115,19 @@ func (s *MemoryStore) openingItemsForSpace(learningSpaceID, contentTypeCode stri
 		}
 	case "handout":
 		for _, material := range s.materials {
-			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) {
+			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") {
 				items = append(items, learning.StudentOpeningItem{ID: material.ID, Title: material.Title})
 			}
 		}
 	case "download":
 		for _, material := range s.materials {
-			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) {
+			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") {
 				items = append(items, learning.StudentOpeningItem{ID: material.ID, Title: material.Title})
 			}
 		}
 	case "question":
 		for _, homework := range s.homework {
-			if homework.LearningSpaceID == learningSpaceID && homeworkVisible(homework.Status) {
+			if homework.LearningSpaceID == learningSpaceID && homeworkVisible(homework.Status) && homeworkTagIn(homework.TagCode, "HW", "EXAM", "Exam", "Special") {
 				items = append(items, learning.StudentOpeningItem{ID: homework.ID, Title: homework.Title})
 			}
 		}

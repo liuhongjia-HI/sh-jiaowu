@@ -322,3 +322,54 @@ type StudentHome struct {
 	SubscriptionReminder SubscriptionReminder `json:"subscriptionReminder"`
 	Trial                StudentTrial         `json:"trial"`
 }
+
+// LaunchCampaign is a generic launch-screen campaign. Template-specific fields
+// are intentionally optional so the shell is not coupled to course inventory.
+type LaunchCampaign struct {
+	ID                string   `json:"id"`
+	TemplateType      string   `json:"templateType"`
+	Title             string   `json:"title"`
+	Message           string   `json:"message"`
+	SubMessage        string   `json:"subMessage,omitempty"`
+	ImageURL          string   `json:"imageUrl,omitempty"`
+	PrimaryActionText string   `json:"primaryActionText"`
+	Frequency         string   `json:"frequency"`
+	TimeOptions       []string `json:"timeOptions,omitempty"`
+}
+
+type LaunchCampaignConfig struct {
+	Enabled           bool     `json:"enabled"`
+	Title             string   `json:"title"`
+	Message           string   `json:"message"`
+	SubMessage        string   `json:"subMessage"`
+	ImageURL          string   `json:"imageUrl"`
+	TemplateType      string   `json:"templateType"`
+	PrimaryActionText string   `json:"primaryActionText"`
+	TimeOptions       []string `json:"timeOptions"`
+	Frequency         string   `json:"frequency"`
+	Priority          int      `json:"priority"`
+	StartsAt          string   `json:"startsAt"`
+	EndsAt            string   `json:"endsAt"`
+}
+
+type ClassReservationIntent struct {
+	ID          string `json:"id"`
+	StudentID   string `json:"studentId"`
+	StudentName string `json:"studentName"`
+	Grade       string `json:"grade"`
+	CampaignID  string `json:"campaignId"`
+	TimeOption  string `json:"timeOption"`
+	Status      string `json:"status"`
+	Remark      string `json:"remark"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+type ClassReservationRequest struct {
+	CampaignID string `json:"campaignId"`
+	TimeOption string `json:"timeOption"`
+}
+type ClassReservationUpdateRequest struct {
+	Status string `json:"status"`
+	Remark string `json:"remark"`
+}

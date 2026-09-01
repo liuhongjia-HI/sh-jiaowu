@@ -1087,7 +1087,9 @@ function CourseOpeningMatrix({
   const selectionFor = (learningSpaceId: string) => selections.find((selection) => selection.learningSpaceId === learningSpaceId)?.contentTypeCodes ?? [];
   const changeSelection = (learningSpaceId: string, contentTypeCode: StudentOpeningCell['contentTypeCode'], checked: boolean) => {
     const current = selectionFor(learningSpaceId);
-    const nextValues = checked ? [...new Set([...current, contentTypeCode])] : current.filter((item) => item !== contentTypeCode);
+    const nextValues = checked
+      ? [...new Set(contentTypeCode === 'course' ? [...current, 'course', 'handout', 'question', 'download'] : [...current, contentTypeCode])]
+      : current.filter((item) => item !== contentTypeCode && !(contentTypeCode === 'course' && ['handout', 'question', 'download'].includes(item)));
     const next = selections.filter((selection) => selection.learningSpaceId !== learningSpaceId);
     if (nextValues.length > 0) next.push({ learningSpaceId, contentTypeCodes: nextValues });
     onSelectionsChange(next);
@@ -1098,7 +1100,7 @@ function CourseOpeningMatrix({
       {matrix.map((scope) => (
         <Card size="small" key={scope.learningSpaceId} title={scope.name}>
           <Space wrap size={[20, 8]} aria-label={`${scope.name}课程开通`}>
-            {scope.content.map((cell) => {
+            {scope.content.filter((cell) => cell.contentTypeCode !== 'download').map((cell) => {
               const directSelected = selectionFor(scope.learningSpaceId).includes(cell.contentTypeCode);
               const checked = cell.packageOpened ? cell.opened : directSelected;
               const locked = cell.packageOpened;
@@ -1172,15 +1174,17 @@ function DirectGrantPanel({
   onSubmit: () => void;
 }) {
   const [selectedSubject, setSelectedSubject] = useState<string>();
+  const [selectedOnly, setSelectedOnly] = useState(false);
   const subjectFilters = useMemo(() => {
     const counts = new Map<string, number>();
     matrix.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
     return Array.from(counts, ([subject, count]) => ({ subject, count }));
   }, [matrix]);
-  const visibleMatrix = useMemo(
-    () => selectedSubject ? matrix.filter((space) => space.subject === selectedSubject) : matrix,
-    [matrix, selectedSubject]
-  );
+  const selectedSpaceIds = useMemo(() => new Set(selections.filter((item) => item.contentTypeCodes.length > 0).map((item) => item.learningSpaceId)), [selections]);
+  const visibleMatrix = useMemo(() => {
+    const filtered = matrix.filter((space) => (!selectedSubject || space.subject === selectedSubject) && (!selectedOnly || selectedSpaceIds.has(space.learningSpaceId)));
+    return [...filtered].sort((a, b) => Number(selectedSpaceIds.has(b.learningSpaceId)) - Number(selectedSpaceIds.has(a.learningSpaceId)));
+  }, [matrix, selectedSubject, selectedOnly, selectedSpaceIds]);
   const selectedContentCount = matrix.reduce((count, scope) => count + scope.content.filter((cell) => {
     const directSelected = selections.find((selection) => selection.learningSpaceId === scope.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode);
     return cell.opened || directSelected;
@@ -1219,8 +1223,21 @@ function DirectGrantPanel({
                   {subject}（{count}）
                 </Button>
               ))}
+              <Button size="small" type={selectedOnly ? 'primary' : 'default'} onClick={() => setSelectedOnly((value) => !value)}>
+                已选优先（{selectedSpaceIds.size}）
+              </Button>
             </Space>
           </div>
+          {selectedSpaceIds.size > 0 && (
+            <Space wrap size={[6, 6]} aria-label="已选项目快捷筛选">
+              <Typography.Text type="secondary">已选项目：</Typography.Text>
+              {matrix.filter((space) => selectedSpaceIds.has(space.learningSpaceId)).map((space) => (
+                <Button key={space.learningSpaceId} size="small" type={selectedSubject === space.subject && selectedOnly ? 'primary' : 'default'} onClick={() => { setSelectedSubject(space.subject); setSelectedOnly(true); }}>
+                  {space.name}
+                </Button>
+              ))}
+            </Space>
+          )}
         </Space>
         {loadingLearningSpaces ? <Skeleton active paragraph={{ rows: 3 }} /> : learningSpacesError ? (
           <Alert type="error" showIcon message="课程范围加载失败，请关闭抽屉后重试。" />
@@ -1237,18 +1254,9 @@ function DirectGrantPanel({
       <section className="student-opening-period">
         <Typography.Text strong>生效时间</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          新开通内容默认从现在生效；修改时间后，会统一更新本次保留内容的有效期。
+          有效期按当前校历的期中、期末节点自动计算，开通后立即生效，无需手动填写日期。
         </Typography.Paragraph>
-        <div className="student-opening-period-grid">
-          <label className="student-opening-field">
-            <Typography.Text>开通时间</Typography.Text>
-            <input aria-label="开通时间" className="ant-input" type="datetime-local" value={startsAt} onChange={(event) => onStartsAtChange(event.target.value)} />
-          </label>
-          <label className="student-opening-field">
-            <Typography.Text>结束时间（选填）</Typography.Text>
-            <input aria-label="结束时间" className="ant-input" type="datetime-local" min={startsAt} value={endsAt} onChange={(event) => onEndsAtChange(event.target.value)} />
-          </label>
-        </div>
+        <Alert type="success" showIcon message="系统将自动使用当前校历节点" description="如需调整校历，请前往系统设置中的校历维护。" />
       </section>
       <div className="student-opening-actions">
         <div className="student-opening-actions-summary">

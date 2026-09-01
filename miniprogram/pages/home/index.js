@@ -34,6 +34,7 @@ Page({
     recommendationsLoading: true,
     recommendationError: "",
     promoBanners: []
+    ,launchCampaign: null, launchVisible: false, launchTimeOption: ""
   },
   onLoad() {
     this.refreshGreeting();
@@ -106,6 +107,7 @@ Page({
           bannerTag: pendingTask ? "今日题目" : "继续学习",
           loading: false
         }, () => this.loadRecommendations());
+        this.loadLaunchCampaign(student);
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
@@ -120,6 +122,18 @@ Page({
         loading: false
       }));
   },
+  loadLaunchCampaign(student) {
+    const campaignKeyBase = `starline_launch_seen_${student.id || "current"}`;
+    const seenKey = wx.getStorageSync(`${campaignKeyBase}_meta`);
+    const today = new Date().toISOString().slice(0, 10);
+    if (seenKey === "once" || seenKey === `daily:${today}`) return;
+    request("/student/launch-campaign", { silent: true }).then((campaign) => {
+      if (campaign) this.setData({ launchCampaign: campaign, launchVisible: true });
+    }).catch(() => {});
+  },
+  closeLaunchCampaign() { const id=(this.data.home&&this.data.home.student&&this.data.home.student.id)||"current"; const frequency=(this.data.launchCampaign&&this.data.launchCampaign.frequency)||"once"; wx.setStorageSync(`starline_launch_seen_${id}_meta`, frequency === "daily" ? `daily:${new Date().toISOString().slice(0,10)}` : frequency === "every_entry" ? "" : "once"); this.setData({ launchVisible:false }); },
+  chooseLaunchTime(e) { this.setData({ launchTimeOption: e.detail.value }); },
+  submitLaunchCampaign() { const c=this.data.launchCampaign||{}; request("/student/class-reservations",{method:"POST",data:{campaignId:c.id,timeOption:this.data.launchTimeOption}}).then(()=>{wx.showToast({title:"已提交预约",icon:"success"});this.closeLaunchCampaign();}).catch(e=>wx.showToast({title:e.message||"提交失败",icon:"none"})); },
   changeCourse(event) {
     const index = Number(event.detail.current) || 0;
     const selectedCourse = this.data.courses[index] || {};

@@ -252,6 +252,15 @@ func (s *MemoryStore) updateSettingUnlocked(operator string, req learning.Settin
 }
 
 func (s *MemoryStore) validateSettingValue(key, value string) error {
+	if key == "launchCampaign" {
+		var cfg learning.LaunchCampaignConfig
+		if err := json.Unmarshal([]byte(value), &cfg); err != nil {
+			return errors.New("开屏活动配置需为有效 JSON")
+		}
+		if cfg.TemplateType != "generic" && cfg.TemplateType != "small_class_reservation" {
+			return errors.New("开屏活动模板不正确")
+		}
+	}
 	if key == "downloadPolicy" && value != "仅在线预览" && value != "允许下载带水印PDF" {
 		return errors.New("下载规则只能选择“仅在线预览”或“允许下载带水印PDF”")
 	}

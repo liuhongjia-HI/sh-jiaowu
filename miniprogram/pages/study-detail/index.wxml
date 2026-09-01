@@ -38,6 +38,25 @@
   </view>
 	<view wx:if="{{!visibleStations.length}}" class="detail-empty-line">这个标签下暂时没有内容</view>
 
+  <view class="detail-section-head material-head">
+    <view class="detail-section-title material-title-toggle" bindtap="toggleMaterials">
+      课程讲义 <text>（{{materials.length}} 份）</text>
+      <text class="material-toggle-hint">{{materialsExpanded ? "收起" : "展开"}}</text>
+    </view>
+    <view class="detail-section-link" bindtap="goPreview">{{canDownloadMaterials ? "全部讲义下载" : "查看全部讲义"}} ›</view>
+  </view>
+  <view wx:if="{{materialsExpanded && materials.length}}" class="material-list">
+    <view wx:for="{{materials}}" wx:key="id" class="material-row" data-id="{{item.id}}" bindtap="previewMaterial">
+      <view class="material-icon">{{item.fileType || "PDF"}}</view>
+      <view class="material-copy">
+        <view class="material-title">{{item.title}}</view>
+        <view class="material-meta">{{item.fileType || item.type || "课程讲义"}} · {{item.fileSize || "讲义"}}</view>
+      </view>
+      <view class="material-arrow">{{item.downloadUrl ? "↓" : "›"}}</view>
+    </view>
+  </view>
+  <view wx:elif="{{materialsExpanded}}" class="detail-empty-line">老师发布讲义后会显示在这里</view>
+
   <view class="detail-feedback">
     <view class="detail-section-head">
       <view class="detail-section-title">课堂反馈</view>

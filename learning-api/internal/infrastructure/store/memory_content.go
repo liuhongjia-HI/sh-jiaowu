@@ -68,6 +68,50 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 	return learning.Course{}, errors.New("课程不存在")
 }
 
+func (s *MemoryStore) deleteCourseUnlocked(operator string, principal learning.Principal, id string) error {
+	if s.db != nil {
+		return persistentMutationError(s, func(work *MemoryStore) error { return work.deleteCourseUnlocked(operator, principal, id) })
+	}
+	id = strings.TrimSpace(id)
+	if !(hasRole(principal.Roles, learning.RoleTeacher) || hasRole(principal.Roles, learning.RoleOpsStaff) || hasRole(principal.Roles, learning.RoleCampusAdmin) || hasRole(principal.Roles, learning.RoleSuperAdmin)) {
+		return errors.New("当前账号没有维护课程权限，请联系管理员开通")
+	}
+	for i, course := range s.courses {
+		if course.ID != id {
+			continue
+		}
+		if !canSeeCourse(principal, course) {
+			return errors.New("不能删除未负责的课程")
+		}
+		name := course.Name
+		s.courses = append(s.courses[:i:i], s.courses[i+1:]...)
+		s.materials = filterMaterialsByCourse(s.materials, id)
+		s.homework = filterHomeworkByCourse(s.homework, id)
+		s.prependLogDetail(operator, "删除课程", name, "")
+		return nil
+	}
+	return errors.New("课程不存在")
+}
+
+func filterMaterialsByCourse(items []learning.Material, courseID string) []learning.Material {
+	out := items[:0]
+	for _, item := range items {
+		if item.CourseID != courseID {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+func filterHomeworkByCourse(items []learning.Homework, courseID string) []learning.Homework {
+	out := items[:0]
+	for _, item := range items {
+		if item.CourseID != courseID {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
 func (s *MemoryStore) materialsUnlocked(principal learning.Principal) []learning.Material {
 	courses := courseNames(s.coursesUnlocked(principal))
 	return orderMaterialsByCourse(s.materialsForCourses(courses))
@@ -315,9 +359,17 @@ func orderMaterialsByCourse(rows []learning.Material) []learning.Material {
 		sort.SliceStable(items, func(i, j int) bool {
 			left, right := items[i].SortOrder, items[j].SortOrder
 			if left == 0 || right == 0 {
-				return left != 0 && right == 0
+				if left != right {
+					return left != 0 && right == 0
+				}
 			}
-			return left < right
+			if left != right {
+				return left < right
+			}
+			if items[i].CreatedAt != items[j].CreatedAt {
+				return items[i].CreatedAt < items[j].CreatedAt
+			}
+			return items[i].ID < items[j].ID
 		})
 		out = append(out, items...)
 	}

@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select, Skeleton, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd';
 import { CalendarOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +13,7 @@ const SPRING_LABEL = 'S2 第二学期';
 
 // 三个 Tab 分组：系统设置项一多，摊平成一张大表格谁都懒得找。分组按“运营会想在什么场景下打开这一项”来划，
 // 不按数据类型分——校历天天要看，接入状态一年调一次，放在一起只会互相淹没。
-const contentKeys = ['grades', 'semesters', 'watermarkRule', 'downloadPolicy'];
+const contentKeys = ['grades', 'semesters', 'watermarkRule', 'downloadPolicy', 'launchCampaign'];
 const integrationKeys = ['miniProgramDomainStatus', 'officialAccountBindingStatus', 'templateMessageStatus', 'miniProgramSubscribeStatus', 'productionApiDomain'];
 
 const labels: Record<string, string> = {
@@ -26,7 +26,12 @@ const labels: Record<string, string> = {
   productionApiDomain: '生产接口域名',
   officialAccountBindingStatus: '公众号绑定状态',
   templateMessageStatus: '模板消息状态'
+  ,launchCampaign: '开屏营销活动配置'
 };
+
+function launchFields(raw: string) {
+  try { const v = JSON.parse(raw || '{}'); return { key: 'launchCampaign', enabled: !!v.enabled, templateType: v.templateType || 'generic', title: v.title || '', message: v.message || '', subMessage: v.subMessage || '', imageUrl: v.imageUrl || '', primaryActionText: v.primaryActionText || '立即了解', timeOptionsText: Array.isArray(v.timeOptions) ? v.timeOptions.join('\n') : '', frequency: v.frequency || 'once', priority: Number(v.priority) || 0, startsAt: v.startsAt || '', endsAt: v.endsAt || '' }; } catch { return { key: 'launchCampaign', enabled: false, templateType: 'generic', title: '', message: '', subMessage: '', imageUrl: '', primaryActionText: '立即了解', timeOptionsText: '', frequency: 'once', priority: 0, startsAt: '', endsAt: '' }; }
+}
 
 type AcademicTerm = {
   academicYear: string;
@@ -345,7 +350,7 @@ export default function SettingsPage() {
 
   function openEdit(row: { key: string; value: string }) {
     setEditing(row);
-    form.setFieldsValue(row);
+    form.setFieldsValue(row.key === 'launchCampaign' ? launchFields(row.value) : row);
   }
 
   const allEntries = Object.entries(settings.data ?? {}).filter(([key]) => key !== CALENDAR_KEY && key !== 'academicYear' && key !== 'academicPeriods');
@@ -404,9 +409,25 @@ export default function SettingsPage() {
             onSubmit={() => form.submit()}
             submitting={save.isPending}
           >
-            <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
+            <Form form={form} layout="vertical" onFinish={(values) => {
+              if (editing?.key === 'launchCampaign') {
+                const v = values as any;
+                save.mutate({ key: 'launchCampaign', value: JSON.stringify({ enabled: !!v.enabled, templateType: v.templateType || 'generic', title: v.title || '', message: v.message || '', subMessage: v.subMessage || '', imageUrl: v.imageUrl || '', primaryActionText: v.primaryActionText || '立即了解', timeOptions: String(v.timeOptionsText || '').split('\n').map((x) => x.trim()).filter(Boolean), frequency: v.frequency || 'once', priority: Number(v.priority) || 0, startsAt: v.startsAt || '', endsAt: v.endsAt || '' }) });
+              } else save.mutate(values);
+            }}>
               <Form.Item name="key" hidden><Input /></Form.Item>
-              <Form.Item name="value" label="当前值" rules={[{ required: true, message: '请输入设置值' }]}>
+              {editing?.key === 'launchCampaign' ? <>
+                <Form.Item name="enabled" label="启用开屏活动" valuePropName="checked"><Switch /></Form.Item>
+                <Form.Item name="templateType" label="活动模板"><Select options={[{ value: 'generic', label: '通用图文' }, { value: 'small_class_reservation', label: '小班课预约' }]} /></Form.Item>
+                <Form.Item name="title" label="标题"><Input maxLength={40} showCount /></Form.Item>
+                <Form.Item name="message" label="正文"><Input.TextArea rows={3} maxLength={120} showCount /></Form.Item>
+                <Form.Item name="subMessage" label="辅助说明"><Input.TextArea rows={2} maxLength={80} showCount /></Form.Item>
+                <Form.Item name="imageUrl" label="图片地址"><Input placeholder="可选" /></Form.Item>
+                <Form.Item name="primaryActionText" label="按钮文案"><Input maxLength={12} /></Form.Item>
+                <Form.Item name="timeOptionsText" label="可选上课时间（每行一个）"><Input.TextArea rows={3} placeholder="工作日晚上\n周六上午" /></Form.Item>
+                <Space align="start"><Form.Item name="frequency" label="展示频次"><Select style={{ width: 160 }} options={[{ value: 'once', label: '活动期间一次' }, { value: 'daily', label: '每天一次' }, { value: 'every_entry', label: '每次进入首页' }]} /></Form.Item><Form.Item name="priority" label="优先级"><InputNumber min={0} max={99} /></Form.Item></Space>
+                <Space align="start"><Form.Item name="startsAt" label="开始时间"><Input placeholder="YYYY-MM-DD HH:mm:ss" /></Form.Item><Form.Item name="endsAt" label="结束时间"><Input placeholder="YYYY-MM-DD HH:mm:ss" /></Form.Item></Space>
+              </> : <Form.Item name="value" label="当前值" rules={[{ required: true, message: '请输入设置值' }]}> 
                 {editing?.key === 'downloadPolicy' ? (
                   <Select
                     options={[
@@ -415,7 +436,7 @@ export default function SettingsPage() {
                     ]}
                   />
                 ) : <Input.TextArea rows={4} />}
-              </Form.Item>
+              </Form.Item>}
             </Form>
           </FormDrawer>
         </>

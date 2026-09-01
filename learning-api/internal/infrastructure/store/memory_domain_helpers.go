@@ -979,12 +979,12 @@ func (s *MemoryStore) openContentForPackage(pkg learning.Package) ([]string, []s
 		courses = appendUnique(courses, course.Name)
 	}
 	for _, material := range s.materials {
-		if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
+		if materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
 			materials = appendUnique(materials, material.Title)
 		}
 	}
 	for _, item := range s.homework {
-		if homeworkVisible(item.Status) && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
+		if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, "HW", "EXAM", "Exam", "Special") && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
 			homework = appendUnique(homework, item.Title)
 		}
 	}
@@ -1003,12 +1003,12 @@ func (s *MemoryStore) openContentForStudentGrant(grant packageGrant) ([]string, 
 		}
 	}
 	for _, material := range s.materials {
-		if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
+		if materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
 			materials = appendUnique(materials, material.Title)
 		}
 	}
 	for _, item := range s.homework {
-		if homeworkVisible(item.Status) && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
+		if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, "HW", "EXAM", "Exam", "Special") && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
 			homework = appendUnique(homework, item.Title)
 		}
 	}
@@ -1363,7 +1363,7 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			if firstLesson, limited := s.trialFirstLessonForGrant(grant, material.CourseID); limited && material.LessonID != firstLesson {
 				continue
 			}
-			if materialPublished(material.Status) && containsString(spaceIDs, material.LearningSpaceID) {
+			if materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") && containsString(spaceIDs, material.LearningSpaceID) {
 				out = appendMaterialUnique(out, s.decorateMaterial(material))
 			}
 		}
@@ -1404,7 +1404,7 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 			if firstLesson, limited := s.trialFirstLessonForGrant(grant, item.CourseID); limited && item.LessonID != firstLesson {
 				continue
 			}
-			if homeworkVisible(item.Status) && containsString(spaceIDs, item.LearningSpaceID) {
+			if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, "HW", "EXAM", "Exam", "Special") && containsString(spaceIDs, item.LearningSpaceID) {
 				out = appendHomeworkUnique(out, item)
 			}
 		}

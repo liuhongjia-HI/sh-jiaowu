@@ -162,6 +162,12 @@ func (s *MemoryStore) UpdateCourse(operator string, principal learning.Principal
 	return result1, err
 }
 
+func (s *MemoryStore) DeleteCourse(operator string, principal learning.Principal, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deleteCourseUnlocked(operator, principal, id)
+}
+
 func (s *MemoryStore) Materials(principal learning.Principal, query learning.MaterialQuery) []learning.Material {
 	s.mu.Lock()
 	defer s.mu.Unlock()

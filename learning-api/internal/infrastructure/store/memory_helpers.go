@@ -63,6 +63,9 @@ func (s *MemoryStore) contentTypesForPackage(packageID string) []string {
 			out = appendUnique(out, item.ContentType)
 		}
 	}
+	if containsString(out, "course") {
+		out = appendUnique(out, "handout", "question", "download")
+	}
 	return out
 }
 
@@ -804,6 +807,8 @@ func settingLabel(key string) string {
 		return "小程序订阅消息"
 	case "productionApiDomain":
 		return "生产接口域名"
+	case "launchCampaign":
+		return "开屏营销活动配置"
 	default:
 		return key
 	}

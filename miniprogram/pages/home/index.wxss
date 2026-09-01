@@ -911,3 +911,4 @@
 .recommendation-action {
   background: #ff5a1f;
 }
+.launch-mask{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99;display:flex;align-items:center;justify-content:center;padding:32rpx}.launch-dialog{position:relative;background:#fff;border-radius:24rpx;padding:40rpx 32rpx;width:620rpx;box-sizing:border-box;text-align:center}.launch-close{position:absolute;right:24rpx;top:12rpx;font-size:48rpx;color:#94a3b8}.launch-image{width:100%;height:180rpx;border-radius:16rpx;margin-bottom:20rpx}.launch-title{font-size:38rpx;font-weight:700;color:#172033;margin:12rpx 0}.launch-message{font-size:28rpx;color:#334155;line-height:1.6}.launch-sub{font-size:24rpx;color:#64748b;margin-top:12rpx}.launch-picker{margin:24rpx 0;padding:20rpx;border:1rpx solid #e2e8f0;border-radius:12rpx;color:#475569}.launch-action{margin-top:20rpx}

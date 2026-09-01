@@ -104,6 +104,7 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	}
 	work.scoreRecords = append([]learning.StudentScoreRecord(nil), s.scoreRecords...)
 	work.banners = append([]learning.Banner(nil), s.banners...)
+	work.classReservations = append([]learning.ClassReservationIntent(nil), s.classReservations...)
 	work.miniProgramSubscribeTemplateIDs = cloneStrings(s.miniProgramSubscribeTemplateIDs)
 	work.pendingNoticeDeliveries = append([]learning.Notice(nil), s.pendingNoticeDeliveries...)
 	return work
@@ -190,6 +191,7 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.subscriptionPreferences = work.subscriptionPreferences
 	s.scoreRecords = work.scoreRecords
 	s.banners = work.banners
+	s.classReservations = work.classReservations
 	s.miniProgramSubscribeTemplateIDs = work.miniProgramSubscribeTemplateIDs
 	s.pendingNoticeDeliveries = work.pendingNoticeDeliveries
 }

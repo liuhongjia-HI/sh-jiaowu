@@ -62,6 +62,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/courses", h.Courses)
 	g.POST("/courses", h.CreateCourse)
 	g.PUT("/courses/:id", h.UpdateCourse)
+	g.DELETE("/courses/:id", h.DeleteCourse)
 	g.GET("/questions", h.Questions)
 	g.POST("/questions", h.CreateQuestion)
 	g.PUT("/questions/:id", h.UpdateQuestion)
@@ -138,6 +139,8 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.PUT("/banners/:id", h.UpdateBanner)
 	g.DELETE("/banners/:id", h.DeleteBanner)
 	g.POST("/banners/upload", h.UploadBannerImage)
+	g.GET("/class-reservations", h.ClassReservations)
+	g.PUT("/class-reservations/:id", h.UpdateClassReservation)
 }
 
 func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
@@ -164,6 +167,8 @@ func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, t
 	g.GET("/home", h.StudentHome)
 	g.GET("/banners", h.StudentBanners)
 	g.GET("/recommendations", h.StudentRecommendations)
+	g.GET("/launch-campaign", h.StudentLaunchCampaign)
+	g.POST("/class-reservations", h.CreateClassReservation)
 	g.POST("/subscription", h.ConfirmStudentSubscription)
 	g.GET("/study", h.StudentStudy)
 	g.GET("/study/:id", h.StudentCourseDetail)

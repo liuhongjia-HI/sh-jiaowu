@@ -9,6 +9,9 @@ func (s *Service) CreateCourse(o string, p learning.Principal, r learning.Course
 func (s *Service) UpdateCourse(o string, p learning.Principal, id string, r learning.CourseUpsertRequest) (learning.Course, error) {
 	return s.content.UpdateCourse(o, p, id, r)
 }
+func (s *Service) DeleteCourse(o string, p learning.Principal, id string) error {
+	return s.content.DeleteCourse(o, p, id)
+}
 func (s *Service) Questions(p learning.Principal, q learning.QuestionBankQuery) []learning.QuestionBankItem {
 	return s.content.Questions(p, q)
 }

@@ -22,6 +22,10 @@ type StudentRepository interface {
 	UpdateStudentScore(string, learning.Principal, string, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	StudentHome(learning.Principal) (learning.StudentHome, error)
 	StudentRecommendations(learning.Principal) ([]learning.StudentPackageRecommendation, error)
+	LaunchCampaign(learning.Principal) (*learning.LaunchCampaign, error)
+	CreateClassReservation(string, learning.Principal, learning.ClassReservationRequest) (learning.ClassReservationIntent, error)
+	ClassReservations(learning.Principal) []learning.ClassReservationIntent
+	UpdateClassReservation(string, learning.Principal, string, learning.ClassReservationUpdateRequest) (learning.ClassReservationIntent, error)
 	ConfirmStudentSubscription(string, learning.Principal, learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error)
 	UpdateStudentProfile(string, learning.Principal, learning.StudentProfileUpdateRequest) (learning.Student, error)
 	StudentCourseDetail(learning.Principal, string) (learning.StudentCourseDetail, error)
@@ -45,6 +49,7 @@ type ContentRepository interface {
 	Courses(learning.Principal) []learning.Course
 	CreateCourse(string, learning.Principal, learning.CourseUpsertRequest) (learning.Course, error)
 	UpdateCourse(string, learning.Principal, string, learning.CourseUpsertRequest) (learning.Course, error)
+	DeleteCourse(string, learning.Principal, string) error
 	Questions(learning.Principal, learning.QuestionBankQuery) []learning.QuestionBankItem
 	Materials(learning.Principal, learning.MaterialQuery) []learning.Material
 	Homework(learning.Principal) []learning.Homework

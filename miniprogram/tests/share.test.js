@@ -79,3 +79,15 @@ test("study detail filters its ordered directory by the selected content tag", a
   assert.equal(page.data.activeTag, "Exam");
   assert.deepEqual(page.data.visibleStations.map((station) => station.homeworkId), ["hw-exam"]);
 });
+
+test("study detail keeps lecture list collapsed until expanded", () => {
+  const page = loadStudyDetailPage(() => Promise.resolve({}), { showToast() {} });
+  const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
+
+  assert.equal(page.data.materialsExpanded, false);
+  assert.match(wxml, /全部讲义下载/);
+  assert.match(wxml, /wx:if="\{\{materialsExpanded && materials\.length\}\}"/);
+
+  page.toggleMaterials();
+  assert.equal(page.data.materialsExpanded, true);
+});

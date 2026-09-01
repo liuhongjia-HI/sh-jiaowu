@@ -11,6 +11,14 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func expandedDirectContentTypes(values []string) []string {
+	result := append([]string(nil), values...)
+	if containsString(result, "course") {
+		result = appendUnique(result, "handout", "question", "download")
+	}
+	return result
+}
+
 func (s *MemoryStore) grantPreviewUnlocked(studentID, packageID string) (learning.GrantPreview, error) {
 	student, pkg, err := s.validateGrantTarget(studentID, packageID)
 	if err != nil {
@@ -107,6 +115,11 @@ func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.Di
 			return learning.DirectGrantResult{}, errors.New("内容类型不正确：" + code)
 		}
 	}
+	if containsString(contentTypes, "download") && !containsString(contentTypes, "course") {
+		return learning.DirectGrantResult{}, errors.New("下载权限需随课程开通")
+	}
+	// 购买/开通课程即代表在机构上课，自动拥有讲义、习题及讲义下载的最大权限。
+	contentTypes = expandedDirectContentTypes(contentTypes)
 
 	spaces := make([]learningSpace, 0, len(spaceIDs))
 	for _, id := range spaceIDs {
@@ -183,6 +196,11 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 				return learning.DirectGrantResult{}, errors.New("内容类型不正确：" + code)
 			}
 		}
+		if containsString(contentTypes, "download") && !containsString(contentTypes, "course") {
+			return learning.DirectGrantResult{}, errors.New("下载权限需随课程开通")
+		}
+		// 课程是最大权限入口，不能被客户端遗漏的子选项削弱。
+		contentTypes = expandedDirectContentTypes(contentTypes)
 		selections[spaceID] = contentTypes
 	}
 

@@ -43,6 +43,7 @@ const Students = lazy(() => import('./pages/Students'));
 const Scheduling = lazy(() => import('./pages/scheduling/SchedulingPage'));
 const Commercial = lazy(() => import('./pages/Commercial'));
 const Banners = lazy(() => import('./pages/Banners'));
+const ClassReservations = lazy(() => import('./pages/ClassReservations'));
 const Login = lazy(() => import('./pages/Login'));
 
 type NavItem = {
@@ -96,6 +97,7 @@ const navItems: NavNode[] = [
       { key: '/commercial', icon: <DollarOutlined />, label: '商业运营', roles: ['ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/notices', icon: <NotificationOutlined />, label: '通知提醒', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/banners', icon: <PictureOutlined />, label: '轮播图管理', roles: ['ops_staff', 'campus_admin', 'super_admin'] }
+      ,{ key: '/class-reservations', icon: <NotificationOutlined />, label: '开屏预约', roles: ['ops_staff', 'campus_admin', 'super_admin'] }
     ]
   },
   {
@@ -426,6 +428,7 @@ function Shell({ user }: { user: CurrentUser }) {
               <Route path="/review" element={<Navigate to="/content?tab=review" replace />} />
               <Route path="/notices" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><NoticesPage /></GuardedRoute>} />
               <Route path="/banners" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><Banners /></GuardedRoute>} />
+              <Route path="/class-reservations" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><ClassReservations /></GuardedRoute>} />
               <Route path="/logs" element={<GuardedRoute user={user} roles={['campus_admin', 'super_admin']}><LogsPage /></GuardedRoute>} />
               <Route path="/settings" element={<GuardedRoute user={user} roles={['campus_admin', 'super_admin']}><SettingsPage /></GuardedRoute>} />
               <Route path="*" element={<Navigate to="/dashboard" />} />

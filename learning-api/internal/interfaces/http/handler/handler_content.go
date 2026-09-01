@@ -41,6 +41,15 @@ func (h *LearningHandler) UpdateCourse(c *gin.Context) {
 	}
 	OK(c, updated)
 }
+func (h *LearningHandler) DeleteCourse(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.DeleteCourse(operator.(string), principal, c.Param("id")); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"deleted": true})
+}
 func (h *LearningHandler) Questions(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	var query learning.QuestionBankQuery

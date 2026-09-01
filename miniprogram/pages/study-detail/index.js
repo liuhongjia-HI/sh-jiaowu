@@ -4,6 +4,7 @@ Page({
   data: {
     course: {},
     materials: [],
+    materialsExpanded: false,
     homework: [],
     stations: [],
 	visibleStations: [],
@@ -49,6 +50,7 @@ Page({
       this.setData({
         course,
         materials,
+        canDownloadMaterials: materials.some((item) => Boolean(item.downloadUrl)),
         homework,
 		stations,
 		tags,
@@ -64,10 +66,13 @@ Page({
       });
     });
   },
-	selectTag(event) {
+  selectTag(event) {
 		const code = event.currentTarget.dataset.code || 'all';
 		this.setData({ activeTag: code, visibleStations: filterStations(this.data.stations, code) });
 	},
+  toggleMaterials() {
+    this.setData({ materialsExpanded: !this.data.materialsExpanded });
+  },
   goPreview() {
     const material = this.data.materials[0];
     if (!material) {

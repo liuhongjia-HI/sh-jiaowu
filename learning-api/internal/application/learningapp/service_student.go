@@ -53,6 +53,18 @@ func (s *Service) StudentHome(principal learning.Principal) (learning.StudentHom
 func (s *Service) StudentRecommendations(principal learning.Principal) ([]learning.StudentPackageRecommendation, error) {
 	return s.student.StudentRecommendations(principal)
 }
+func (s *Service) LaunchCampaign(principal learning.Principal) (*learning.LaunchCampaign, error) {
+	return s.student.LaunchCampaign(principal)
+}
+func (s *Service) CreateClassReservation(operator string, principal learning.Principal, req learning.ClassReservationRequest) (learning.ClassReservationIntent, error) {
+	return s.student.CreateClassReservation(operator, principal, req)
+}
+func (s *Service) ClassReservations(principal learning.Principal) []learning.ClassReservationIntent {
+	return s.student.ClassReservations(principal)
+}
+func (s *Service) UpdateClassReservation(operator string, principal learning.Principal, id string, req learning.ClassReservationUpdateRequest) (learning.ClassReservationIntent, error) {
+	return s.student.UpdateClassReservation(operator, principal, id, req)
+}
 func (s *Service) ConfirmStudentSubscription(operator string, principal learning.Principal, req learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error) {
 	return s.student.ConfirmStudentSubscription(operator, principal, req)
 }

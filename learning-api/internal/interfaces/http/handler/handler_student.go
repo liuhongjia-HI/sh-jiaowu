@@ -228,6 +228,50 @@ func (h *LearningHandler) StudentRecommendations(c *gin.Context) {
 	OK(c, recommendations)
 }
 
+func (h *LearningHandler) StudentLaunchCampaign(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	item, err := h.service.LaunchCampaign(p)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
+func (h *LearningHandler) CreateClassReservation(c *gin.Context) {
+	var req learning.ClassReservationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "预约参数不正确")
+		return
+	}
+	p, _ := middleware.CurrentPrincipal(c)
+	op, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.CreateClassReservation(op.(string), p, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
+func (h *LearningHandler) ClassReservations(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	OK(c, h.service.ClassReservations(p))
+}
+func (h *LearningHandler) UpdateClassReservation(c *gin.Context) {
+	var req learning.ClassReservationUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "参数不正确")
+		return
+	}
+	p, _ := middleware.CurrentPrincipal(c)
+	op, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.UpdateClassReservation(op.(string), p, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
+
 func (h *LearningHandler) ConfirmStudentSubscription(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)

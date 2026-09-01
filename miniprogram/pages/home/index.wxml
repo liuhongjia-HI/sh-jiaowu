@@ -173,3 +173,14 @@
     </view>
   </view>
 </view>
+<view wx:if="{{launchVisible && launchCampaign}}" class="launch-mask">
+  <view class="launch-dialog" catchtap="noop">
+    <view class="launch-close" bindtap="closeLaunchCampaign">×</view>
+    <image wx:if="{{launchCampaign.imageUrl}}" class="launch-image" src="{{launchCampaign.imageUrl}}" mode="aspectFill" />
+    <view class="launch-title">{{launchCampaign.title}}</view>
+    <view class="launch-message">{{launchCampaign.message}}</view>
+    <view wx:if="{{launchCampaign.subMessage}}" class="launch-sub">{{launchCampaign.subMessage}}</view>
+    <picker wx:if="{{launchCampaign.timeOptions.length}}" mode="selector" range="{{launchCampaign.timeOptions}}" bindchange="chooseLaunchTime"><view class="launch-picker">{{launchTimeOption || '请选择上课时间'}}</view></picker>
+    <button class="button launch-action" bindtap="submitLaunchCampaign">{{launchCampaign.primaryActionText}}</button>
+  </view>
+</view>
