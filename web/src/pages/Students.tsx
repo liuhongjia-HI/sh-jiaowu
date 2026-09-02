@@ -26,7 +26,7 @@ import {
   message
 } from 'antd';
 import type { TableColumnsType, UploadFile } from 'antd';
-import { BellOutlined, DeleteOutlined, EditOutlined, EyeOutlined, ImportOutlined, LockOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
+import { BellOutlined, CheckCircleOutlined, DeleteOutlined, EditOutlined, EyeOutlined, ImportOutlined, LockOutlined, PlusOutlined, StopOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
@@ -227,6 +227,24 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: () => message.error('提醒失败，请稍后重试。')
   });
 
+  const toggleStudentStatus = useMutation({
+    mutationFn: (student: Student) => putData<Student>(`/students/${student.id}`, {
+      name: student.name,
+      phone: student.phone,
+      grade: student.grade,
+      schoolName: student.schoolName ?? '',
+      guardianName: student.guardianName ?? '',
+      remark: student.remark ?? '',
+      accountStatus: student.accountStatus === '停用' ? '正常' : '停用'
+    }),
+    onSuccess: (_, student) => {
+      message.success(student.accountStatus === '停用' ? '学生账号已恢复' : '学生账号已停用');
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      if (selected?.id === student.id) queryClient.invalidateQueries({ queryKey: ['students', student.id, 'detail'] });
+    },
+    onError: (err: Error) => message.error(err.message || '状态更新失败，请稍后重试。')
+  });
+
   const cleanupTestStudents = useMutation({
     mutationFn: () => postData<{ deletedCount: number }>('/students/cleanup-test-data', {}),
     onSuccess: (result) => {
@@ -330,12 +348,14 @@ export default function Students({ user }: { user: CurrentUser }) {
   }
 
   function studentActions(record: Student) {
+    const disabled = record.accountStatus === '停用';
     return (
       <Space size={4}>
         <ActionButton tooltip="查看" icon={<EyeOutlined />} onClick={() => openStudentDetail(record)} />
         {writable && record.accountStatus === '正常' && <ActionButton tooltip="课程开通" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
         {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
         {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
+        {writable && <ActionButton tooltip={disabled ? '恢复' : '停用'} icon={disabled ? <CheckCircleOutlined /> : <StopOutlined />} loading={toggleStudentStatus.isPending} onClick={() => Modal.confirm({ title: `${disabled ? '恢复' : '停用'}学生账号`, content: `确定${disabled ? '恢复' : '停用'}“${record.name}”的账号吗？`, okText: '确定', cancelText: '取消', okButtonProps: disabled ? undefined : { danger: true }, onOk: () => toggleStudentStatus.mutateAsync(record) })} />}
       </Space>
     );
   }
@@ -550,6 +570,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                       {writable && record.accountStatus === '正常' && <ActionButton tooltip="课程开通" icon={<UnlockOutlined />} onClick={() => openDirectGrant(record)} />}
                       {writable && <ActionButton tooltip="提醒" icon={<BellOutlined />} loading={remindStudent.isPending} onClick={() => remindStudent.mutate(record)} />}
                       {writable && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />}
+                      {writable && <ActionButton tooltip={record.accountStatus === '停用' ? '恢复' : '停用'} icon={record.accountStatus === '停用' ? <CheckCircleOutlined /> : <StopOutlined />} loading={toggleStudentStatus.isPending} onClick={() => Modal.confirm({ title: `${record.accountStatus === '停用' ? '恢复' : '停用'}学生账号`, content: `确定${record.accountStatus === '停用' ? '恢复' : '停用'}“${record.name}”的账号吗？`, okText: '确定', cancelText: '取消', okButtonProps: record.accountStatus === '停用' ? undefined : { danger: true }, onOk: () => toggleStudentStatus.mutateAsync(record) })} />}
                     </>
                   )}
                 />
