@@ -30,7 +30,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "我的 Starline 学习课程",
+      title: "我的 Starline 学习内容",
       path: "/pages/study/index"
     };
   },
@@ -127,7 +127,7 @@ Page({
       return;
     }
     if (!id) {
-      wx.showToast({ title: "课程内容正在准备", icon: "none" });
+      wx.showToast({ title: "学习内容正在准备", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/study-detail/index?id=${id}` });
@@ -148,7 +148,7 @@ function decorateCourses(courses, favorites) {
       ...course,
       progress,
       favorited: favoriteCourseNames.includes(course.name),
-      badgeText: course.accessLabel || (progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新课程"),
+      badgeText: course.accessLabel || (progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新内容"),
       cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : "",
       newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
@@ -178,7 +178,7 @@ function formatCourseTime(value) {
 
 function studyEmptyMessage(hasOpenedPackage) {
   if (hasOpenedPackage) {
-    return "学习套餐已开通，老师发布课程后会显示在这里。你也可以先回首页查看课程讲义和小挑战。";
+    return "学习套餐已开通，老师发布学习内容后会显示在这里。你也可以先回首页查看资料和小挑战。";
   }
   return "你的身份已绑定，暂时还没有开通学习套餐，请联系老师或教务确认。";
 }

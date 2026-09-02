@@ -9,7 +9,7 @@
     </view>
     <view class="search-panel">
       <view class="search-icon">⌕</view>
-      <input class="search-input" value="{{keyword}}" placeholder="搜索推荐套餐、课程、资料" confirm-type="search" bindinput="changeKeyword" />
+      <input class="search-input" value="{{keyword}}" placeholder="搜索推荐套餐、资料" confirm-type="search" bindinput="changeKeyword" />
       <view wx:if="{{keyword}}" class="search-clear" bindtap="clearKeyword">清除</view>
     </view>
   </view>
@@ -18,7 +18,7 @@
   <view wx:elif="{{visitorMode}}" class="section">
     <view class="empty-card home-empty">
       <view class="title">欢迎来到 Starline 学习</view>
-      <view class="sub">课程讲义、题库练习和老师反馈都会在这里。选择想看的内容后，再完成身份绑定即可。</view>
+      <view class="sub">学习资料、练习和老师反馈都会在这里。选择想看的内容后，再完成身份绑定即可。</view>
       <button class="button" bindtap="goStudy">进入学习中心</button>
       <button class="button light" bindtap="goTasks">查看题库练习</button>
     </view>
@@ -75,7 +75,7 @@
         </view>
         <view class="status-item" data-action="materials" bindtap="handleShortcut">
           <view class="status-value">{{materialCount}}</view>
-          <view class="status-label">课程讲义</view>
+          <view class="status-label">学习资料</view>
         </view>
         <view class="status-item" data-action="notices" bindtap="handleShortcut">
           <view class="status-value">{{noticeCount}}</view>
@@ -93,7 +93,7 @@
       </view>
       <view wx:if="{{todoItems.length === 0}}" class="empty-card home-empty">
         <view class="title">今天没有待处理事项</view>
-        <view class="sub">课程、作业、批改反馈和提醒授权会集中显示在这里。</view>
+        <view class="sub">学习安排、作业、批改反馈和提醒授权会集中显示在这里。</view>
       </view>
       <view wx:else class="todo-list">
         <view wx:for="{{todoItems}}" wx:key="id" class="todo-card {{item.className}}" data-type="{{item.type}}" data-path="{{item.path}}" bindtap="handleTodo">
@@ -142,7 +142,7 @@
       <view class="section-head">
         <view>
           <view class="section-title tight">推荐套餐</view>
-          <view class="section-sub">{{keyword ? "按搜索结果展示" : "发现还未开通的课程和学习资料"}}</view>
+          <view class="section-sub">{{keyword ? "按搜索结果展示" : "发现还未开通的学习内容和资料"}}</view>
         </view>
       </view>
 
@@ -156,7 +156,7 @@
       </view>
       <view wx:elif="{{recommendations.length === 0}}" class="empty-card home-empty">
         <view class="title">暂时没有合适的推荐套餐</view>
-        <view class="sub">老师发布同年级、同学期的课程或讲义套餐后，会显示在这里。</view>
+        <view class="sub">老师发布同年级、同学期的学习内容或资料套餐后，会显示在这里。</view>
       </view>
       <view wx:elif="{{visibleRecommendations.length === 0}}" class="empty-card home-empty">
         <view class="title">没有找到相关套餐</view>
@@ -171,7 +171,7 @@
               <view class="content-tag">{{item.subject}}</view>
             </view>
             <view class="content-title">{{item.packageName}}</view>
-            <view class="content-meta">{{item.grade}} · {{item.semester}} · {{item.courseCount}} 门课程 · {{item.materialCount}} 份资料</view>
+            <view class="content-meta">{{item.grade}} · {{item.semester}} · {{item.courseCount}} 项内容 · {{item.materialCount}} 份资料</view>
             <view wx:if="{{item.contentSamples.length}}" class="recommendation-samples">{{item.contentSampleText}}</view>
             <view wx:if="{{item.summary}}" class="recommendation-summary">{{item.summary}}</view>
             <button class="recommendation-action" data-name="{{item.packageName}}" catchtap="contactTeacher">联系老师开通</button>

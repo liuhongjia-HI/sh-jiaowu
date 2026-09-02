@@ -6,7 +6,7 @@
   <view class="card login-card">
     <view class="mascot">🐣</view>
     <view class="title">开启今天的学习</view>
-    <view class="sub">手机号用于匹配学生账号；绑定后即可查看老师开通的课程。</view>
+    <view class="sub">手机号用于匹配学生账号；绑定后即可查看老师为你准备的学习内容。</view>
     <view class="form-line">
       <input value="{{form.studentName}}" data-field="studentName" bindinput="onInput" placeholder="学生姓名" />
     </view>
@@ -19,7 +19,7 @@
       </view>
     </picker>
     <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">授权手机号并绑定</button>
-    <view class="login-tip">账号会立即绑定，不需要审核；课程权限由老师开通后自动生效。</view>
+    <view class="login-tip">账号会立即绑定，不需要审核；学习内容由老师开通后自动显示。</view>
   </view>
 </view>
 <view class="section">
