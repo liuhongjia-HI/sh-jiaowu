@@ -41,12 +41,12 @@ function flushPromises() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-test("准备中的课程没有学习入口，也不会绑定点击事件", () => {
+test("课程卡片整体可点击，学习入口只负责展示状态", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/study/index.wxml"), "utf8");
 
-  assert.match(template, /wx:if="{{item\.canOpen}}" class="course-action" bindtap="goDetail"/);
+  assert.match(template, /class="course-card[^\n]*" bindtap="goDetail" data-id="{{item\.entryCourseId}}"/);
+  assert.match(template, /wx:if="{{item\.canOpen}}" class="course-action">/);
   assert.match(template, /wx:else class="course-action course-action-disabled">{{item\.accessLabel \|\| '内容准备中'}}<\/view>/);
-  assert.doesNotMatch(template, /class="course-card[^\n]*bindtap="goDetail"/);
 });
 
 test("study page refreshes opened courses when tab is shown again", async () => {
@@ -70,6 +70,20 @@ test("study page refreshes opened courses when tab is shown again", async () => 
   assert.deepEqual(calls, ["/student/study", "/student/favorites"]);
   assert.equal(page.data.visibleCourses.length, 1);
   assert.equal(page.data.visibleCourses[0].name, "四年级地理S1Q1课程");
+});
+
+test("未登录点击学习导航只提示一次，取消登录后可以停留在学习页", () => {
+  const navigations = [];
+  const page = loadStudyPage(() => Promise.resolve({}));
+  global.wx.getStorageSync = () => "";
+  global.wx.navigateTo = (options) => navigations.push(options.url);
+
+  page.onLoad();
+  page.onShow();
+
+  assert.deepEqual(navigations, ["/pages/login/index"]);
+  assert.equal(page.data.authRequired, true);
+  assert.equal(page.data.loginPrompted, true);
 });
 
 test("study page puts a newly opened course first and keeps its new marker", async () => {
@@ -119,6 +133,26 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
   assert.equal(toasts[0].title, "开通后即可学习全部内容");
   page.goDetail({ currentTarget: { dataset: { id: "course-math-first", canOpen: true } } });
   assert.equal(navigations[0].url, "/pages/study-detail/index?id=course-math-first");
+});
+
+test("点击可学习课程卡片时，即使事件未携带权限字段也能进入课程", async () => {
+  const navigations = [];
+  const page = loadStudyPage((path) => {
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.resolve({
+      subjects: [
+        { id: "g5-math", displayName: "数学", subject: "数学", grade: "五年级", accessState: "full", canOpen: true, entryCourseId: "course-math-first" }
+      ],
+      courses: [], materials: []
+    });
+  });
+  global.wx.navigateTo = (value) => navigations.push(value);
+
+  page.loadStudy();
+  await flushPromises();
+  page.goDetail({ currentTarget: { dataset: { id: "course-math-first" } } });
+
+  assert.deepEqual(navigations, [{ url: "/pages/study-detail/index?id=course-math-first" }]);
 });
 
 test("内容准备中的课程即使存在课程编号也不可进入", async () => {

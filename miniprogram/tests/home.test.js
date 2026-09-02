@@ -193,6 +193,14 @@ test("home page shortcut labels use commercial learning actions", () => {
   assert.equal(labels.includes("快捷开通"), false);
 });
 
+test("home summary cards expose direct actions for todos, materials, and notices", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
+
+  assert.match(template, /class="status-item"\s+data-action="tasks"\s+bindtap="handleShortcut"/);
+  assert.match(template, /class="status-item"\s+data-action="materials"\s+bindtap="handleShortcut"/);
+  assert.match(template, /class="status-item"\s+data-action="notices"\s+bindtap="handleShortcut"/);
+});
+
 test("home page displays unopened package recommendations", async () => {
   const page = loadHomePage((path) => {
     if (path === "/student/recommendations") {

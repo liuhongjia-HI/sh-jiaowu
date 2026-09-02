@@ -17,9 +17,15 @@ Page({
     subjects: [],
     visibleCourses: [],
     materials: [],
-    hasOpenedPackage: false
+    hasOpenedPackage: false,
+    authRequired: false,
+    loginPrompted: false
   },
   onLoad() {
+    if (!hasStudentToken()) {
+      this.promptLogin();
+      return;
+    }
     this.loadStudy();
   },
   onShareAppMessage() {
@@ -29,9 +35,41 @@ Page({
     };
   },
   onShow() {
+    if (!hasStudentToken()) {
+      if (!this.data.loginPrompted) {
+        this.promptLogin();
+      }
+      return;
+    }
+    if (this.data.authRequired || this.data.loginPrompted) {
+      this.setData({ authRequired: false, loginPrompted: false });
+    }
     if (!this.data.loading) {
       this.loadStudy();
     }
+  },
+  promptLogin() {
+    this.setData({
+      loading: false,
+      authRequired: true,
+      loginPrompted: true,
+      error: "",
+      courses: [],
+      subjects: [],
+      visibleCourses: [],
+      materials: []
+    });
+    wx.navigateTo({
+      url: "/pages/login/index",
+      fail() {
+        if (wx.redirectTo) {
+          wx.redirectTo({ url: "/pages/login/index" });
+        }
+      }
+    });
+  },
+  goLogin() {
+    this.promptLogin();
   },
   loadStudy() {
     this.setData({ loading: true, error: "" });
@@ -55,6 +93,8 @@ Page({
         error: error.message || "加载失败",
         emptyMessage: error.message || "老师开通学习套餐后，你会在这里看到学习星球。",
         hasOpenedPackage: false,
+        authRequired: !hasStudentToken(),
+        loginPrompted: !hasStudentToken(),
         loading: false
       }));
   },
@@ -79,10 +119,12 @@ Page({
     this.setData({ visibleCourses });
   },
   goDetail(event) {
-    const id = event.currentTarget.dataset.id || "";
-    const canOpen = event.currentTarget.dataset.canOpen;
+    const dataset = event.currentTarget.dataset || {};
+    const id = dataset.id || "";
+    const course = this.data.courses.find((item) => item.entryCourseId === id || item.id === id);
+    const canOpen = course ? course.canOpen : dataset.canOpen;
     if (!canOpen) {
-      wx.showToast({ title: event.currentTarget.dataset.message || "开通后即可学习全部内容", icon: "none" });
+      wx.showToast({ title: dataset.message || "开通后即可学习全部内容", icon: "none" });
       return;
     }
     if (!id) {
@@ -92,6 +134,10 @@ Page({
     wx.navigateTo({ url: `/pages/study-detail/index?id=${id}` });
   }
 });
+
+function hasStudentToken() {
+  return Boolean(wx.getStorageSync && wx.getStorageSync("starline_token"));
+}
 
 // decorateCourses 使用接口返回的真实进度，仅补充图标等展示字段。
 function decorateCourses(courses, favorites) {
