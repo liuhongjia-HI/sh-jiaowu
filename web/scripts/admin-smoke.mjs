@@ -16,6 +16,7 @@ const pages = [
   ['/review', '批改反馈'],
   ['/commercial', '商业运营'],
   ['/notices', '通知提醒'],
+  ['/launch-campaign', '开屏活动'],
   ['/admin-staff', '管理人员'],
   ['/teachers', '老师管理'],
   ['/logs', '操作记录'],

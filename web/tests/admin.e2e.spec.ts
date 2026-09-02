@@ -78,6 +78,7 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
     ['/review', '批改反馈'],
     ['/commercial', '商业运营'],
     ['/notices', '通知提醒'],
+    ['/launch-campaign', '开屏活动'],
     ['/admin-staff', '管理人员'],
     ['/teachers', '老师管理'],
     ['/logs', '操作记录'],
@@ -87,6 +88,18 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
   for (const [path, heading] of pages) {
     await expectPageHeading(page, path, heading);
   }
+});
+
+test('开屏活动在运营管理中独立维护，不出现在系统设置', async ({ page }) => {
+  await login(page, '13800000001');
+
+  await page.goto('/launch-campaign');
+  await expect(page.getByRole('heading', { name: '开屏活动' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /新建开屏活动|编辑活动/ })).toBeVisible();
+
+  await page.goto('/settings');
+  await expect(page.getByText('开屏营销活动配置', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('gradeSubjectCatalog', { exact: true })).toHaveCount(0);
 });
 
 test('题库和课程内容可以切换卡片与表格视图', async ({ page }) => {
