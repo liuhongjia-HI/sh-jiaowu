@@ -116,6 +116,26 @@ test('新增课程方案默认带出当前学年', async ({ page }) => {
   await expect(drawer.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
 
+test('新增课程按目录层级引导添加内容', async ({ page }) => {
+  await login(page, '13800000001');
+  await expectPageHeading(page, '/content', '课程内容');
+
+  await page.getByRole('button', { name: '新增课程' }).click();
+  const drawer = page.getByRole('dialog', { name: '新增课程' });
+  await expect(drawer.getByRole('button', { name: '新增 Unit' })).toBeVisible();
+  await expect(drawer.getByText('选择上级', { exact: true })).toHaveCount(0);
+
+  await drawer.getByRole('button', { name: '新增 Unit' }).click();
+  const unit = drawer.getByTestId('curriculum-unit').first();
+  await expect(unit.getByText('顶层目录', { exact: true })).toBeVisible();
+  await expect(unit.getByRole('button', { name: '新增 Chapter' })).toBeVisible();
+
+  await unit.getByRole('button', { name: '新增 Chapter' }).click();
+  const chapter = unit.getByTestId('curriculum-chapter').first();
+  await expect(chapter.getByText('归属当前 Unit', { exact: true })).toBeVisible();
+  await expect(chapter.getByRole('button', { name: '新增 Lesson' })).toBeVisible();
+});
+
 test('课程方案可在二次确认后删除', async ({ page }) => {
   await login(page, '13800000001');
   let exists = true;
