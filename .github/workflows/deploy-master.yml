@@ -23,7 +23,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Detect changed areas compares github.event.before with github.sha.
+          # A shallow checkout can omit the before commit when several pushes
+          # arrive close together, causing git diff to fail with "bad object".
+          fetch-depth: 0
 
       - name: Detect changed areas
         id: changes
