@@ -35,6 +35,42 @@ func TestCleanupTestStudentsRemovesOnlyMarkedStudents(t *testing.T) {
 	}
 }
 
+func TestBatchDeleteStudentsRemovesSelectedStudentsAndReferences(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false, SkipBaseData: true})
+	admin := learning.Principal{UserID: "admin", CampusID: "campus-main", Roles: []learning.Role{learning.RoleSuperAdmin}}
+	first, err := store.CreateStudent("管理员", admin, learning.StudentUpsertRequest{Name: "批量删除学生一", Phone: "13900000011", Grade: "五年级"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.CreateStudent("管理员", admin, learning.StudentUpsertRequest{Name: "批量删除学生二", Phone: "13900000012", Grade: "五年级"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept, err := store.CreateStudent("管理员", admin, learning.StudentUpsertRequest{Name: "保留学生", Phone: "13900000013", Grade: "五年级"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := store.BatchDeleteStudents("管理员", admin, []string{first.ID, second.ID, first.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DeletedCount != 2 || len(result.DeletedIDs) != 2 {
+		t.Fatalf("unexpected batch delete result: %#v", result)
+	}
+	for _, id := range []string{first.ID, second.ID} {
+		if _, ok := store.findStudent(id); ok {
+			t.Fatalf("student %s should be removed", id)
+		}
+		if _, ok := store.findUserByStudentID(id); ok {
+			t.Fatalf("student user %s should be removed", id)
+		}
+	}
+	if _, ok := store.findStudent(kept.ID); !ok {
+		t.Fatal("unselected student should be kept")
+	}
+}
+
 func TestStudentAverageScoreIsDerivedFromGradedSubmissions(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")

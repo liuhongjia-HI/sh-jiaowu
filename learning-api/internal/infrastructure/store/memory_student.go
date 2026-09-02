@@ -106,6 +106,44 @@ func (s *MemoryStore) cleanupTestStudentsUnlocked(operator string, principal lea
 	return learning.StudentCleanupResult{DeletedCount: len(deleted), DeletedIDs: deleted}, nil
 }
 
+func (s *MemoryStore) batchDeleteStudentsUnlocked(operator string, principal learning.Principal, studentIDs []string) (learning.StudentCleanupResult, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.StudentCleanupResult, error) {
+			return work.batchDeleteStudentsUnlocked(operator, principal, studentIDs)
+		})
+	}
+	if !canManageCommercial(principal) {
+		return learning.StudentCleanupResult{}, errors.New("没有权限删除学生")
+	}
+
+	selected := make(map[string]struct{}, len(studentIDs))
+	for _, id := range studentIDs {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			selected[id] = struct{}{}
+		}
+	}
+	if len(selected) == 0 {
+		return learning.StudentCleanupResult{}, errors.New("请选择要删除的学生")
+	}
+
+	deleted := make([]string, 0, len(selected))
+	kept := make([]learning.Student, 0, len(s.students))
+	for _, student := range s.students {
+		if _, ok := selected[student.ID]; !ok {
+			kept = append(kept, student)
+			continue
+		}
+		deleted = append(deleted, student.ID)
+		s.cleanupStudentReferences(student.ID)
+	}
+	s.students = kept
+	for _, id := range deleted {
+		s.prependLog(operator, "批量删除学生", id)
+	}
+	return learning.StudentCleanupResult{DeletedCount: len(deleted), DeletedIDs: deleted}, nil
+}
+
 func materialTagIn(tag string, allowed ...string) bool {
 	if strings.TrimSpace(tag) == "" {
 		return true

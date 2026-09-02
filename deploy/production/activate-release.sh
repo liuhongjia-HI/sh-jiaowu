@@ -88,8 +88,9 @@ for SOURCE_ASSETS in "$APP_ROOT"/releases/*/web/dist/assets; do
 done
 shopt -u nullglob
 
-# 再验证合并后的 current 目录，确保 Nginx 切换后所有资源引用都可用。
-bash "$WEB_ASSET_VALIDATOR" "$WEB_DIST"
+# 合并历史 chunk 后不要扫描历史文件内部的旧依赖；这些文件可能来自已被清理的
+# 更早 release。新 release 已在上一步完整校验，这里只确认当前入口仍然可用。
+bash "$WEB_ASSET_VALIDATOR" "$WEB_DIST" --entry-only
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 

@@ -81,6 +81,23 @@ func (h *LearningHandler) CleanupTestStudents(c *gin.Context) {
 	}
 	OK(c, result)
 }
+
+func (h *LearningHandler) BatchDeleteStudents(c *gin.Context) {
+	var req learning.StudentBatchDeleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.BatchDeleteStudents(operator.(string), principal, req.StudentIDs)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
 func (h *LearningHandler) ImportStudents(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {

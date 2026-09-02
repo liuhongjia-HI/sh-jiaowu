@@ -11,6 +11,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Popover,
   Select,
   Skeleton,
@@ -165,6 +166,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   const [directPeriodChanged, setDirectPeriodChanged] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [selectedStudentIDs, setSelectedStudentIDs] = useState<string[]>([]);
   const queryClient = useQueryClient();
   const writable = canWrite(user);
   const [viewMode, setViewMode] = useListViewMode('starline:list-view:students');
@@ -252,6 +254,17 @@ export default function Students({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['students'] });
     },
     onError: (err: Error) => message.error(err.message || '清理失败，请稍后重试。')
+  });
+
+  const batchDeleteStudents = useMutation({
+    mutationFn: (studentIDs: string[]) => postData<{ deletedCount: number }>('/students/batch-delete', { studentIds: studentIDs }),
+    onSuccess: (result) => {
+      message.success(`已删除 ${result.deletedCount} 名学生`);
+      setSelectedStudentIDs([]);
+      if (selected && selectedStudentIDs.includes(selected.id)) setSelected(null);
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: (err: Error) => message.error(err.message || '删除失败，请稍后重试。')
   });
 
   const createDirectGrant = useMutation({
@@ -393,6 +406,11 @@ export default function Students({ user }: { user: CurrentUser }) {
     }
   ];
 
+  const studentRowSelection = writable ? {
+    selectedRowKeys: selectedStudentIDs,
+    onChange: (keys: React.Key[]) => setSelectedStudentIDs(keys.map(String))
+  } : undefined;
+
   function openStudentDetail(student: Student, tab = 'profile') {
     setSelected(student);
     setStudentDrawerTab(tab);
@@ -530,6 +548,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                 onChange={(packageState) => setFilters((prev) => ({ ...prev, packageState }))}
               />
               <Select allowClear value={filters.followUpState} placeholder="跟进状态" options={[{ label: '待跟进', value: '待跟进' }]} style={{ width: 140 }} onChange={(followUpState) => setFilters((prev) => ({ ...prev, followUpState }))} />
+              {writable && selectedStudentIDs.length > 0 && <Popconfirm title={`确定删除选中的 ${selectedStudentIDs.length} 名学生吗？`} description="学生账号及其学习、授权和关联数据将一并删除，操作不可恢复。" okText="确认删除" cancelText="取消" okButtonProps={{ danger: true, loading: batchDeleteStudents.isPending }} onConfirm={() => batchDeleteStudents.mutate(selectedStudentIDs)}><Button danger icon={<DeleteOutlined />}>批量删除（{selectedStudentIDs.length}）</Button></Popconfirm>}
             </Space>
             <ListViewToggle storageKey="starline:list-view:students" value={viewMode} onChange={setViewMode} />
           </div>
@@ -577,7 +596,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1160 }} pagination={{ pageSize: 8 }} sortDirections={['ascend', 'descend']} /></div>
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" rowSelection={studentRowSelection} columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1160 }} pagination={{ pageSize: 8 }} sortDirections={['ascend', 'descend']} /></div>
           )}
         </div>
       </Card>

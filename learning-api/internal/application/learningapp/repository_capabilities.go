@@ -18,6 +18,7 @@ type StudentRepository interface {
 	StudentScores(learning.Principal, string) ([]learning.StudentScoreSummary, error)
 	RemindStudent(string, learning.Principal, string) (learning.StudentRemindResult, error)
 	CleanupTestStudents(string, learning.Principal) (learning.StudentCleanupResult, error)
+	BatchDeleteStudents(string, learning.Principal, []string) (learning.StudentCleanupResult, error)
 	ImportStudents(string, learning.Principal, []learning.StudentUpsertRequest) (learning.StudentImportResult, error)
 	CreateStudentScore(string, learning.Principal, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	UpdateStudentScore(string, learning.Principal, string, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)

@@ -2,7 +2,13 @@
 set -euo pipefail
 
 DIST_DIR="${1:-web/dist}"
+MODE="${2:-all}"
 INDEX_FILE="$DIST_DIR/index.html"
+
+if [ "$MODE" != "all" ] && [ "$MODE" != "--entry-only" ]; then
+  echo "Usage: validate-web-assets.sh [dist-dir] [--entry-only]" >&2
+  exit 2
+fi
 
 if [ ! -f "$INDEX_FILE" ]; then
   echo "Missing web entry: $INDEX_FILE" >&2
@@ -21,8 +27,11 @@ while IFS= read -r asset_name; do
     missing=1
   fi
 done < <(
-  find "$DIST_DIR" -maxdepth 2 -type f \( -name '*.html' -o -name '*.js' -o -name '*.css' \) \
-    -exec grep -hEo '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]+\.(js|css)' {} + |
+  if [ "$MODE" = "--entry-only" ]; then
+    grep -hEo '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]+\.(js|css)' "$INDEX_FILE" || true
+  else
+    find "$DIST_DIR" -maxdepth 2 -type f \( -name '*.html' -o -name '*.js' -o -name '*.css' \) -exec grep -hEo '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]+\.(js|css)' {} + || true
+  fi |
     sort -u
 )
 

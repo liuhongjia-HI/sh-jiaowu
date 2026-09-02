@@ -218,6 +218,10 @@ type StudentCleanupResult struct {
 	DeletedIDs   []string `json:"deletedIds"`
 }
 
+type StudentBatchDeleteRequest struct {
+	StudentIDs []string `json:"studentIds"`
+}
+
 type StudentCourseCard struct {
 	Course
 	Progress       int    `json:"progress"`

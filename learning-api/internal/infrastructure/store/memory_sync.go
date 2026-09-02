@@ -768,6 +768,12 @@ func (s *MemoryStore) CleanupTestStudents(operator string, principal learning.Pr
 	return s.cleanupTestStudentsUnlocked(operator, principal)
 }
 
+func (s *MemoryStore) BatchDeleteStudents(operator string, principal learning.Principal, studentIDs []string) (learning.StudentCleanupResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.batchDeleteStudentsUnlocked(operator, principal, studentIDs)
+}
+
 func (s *MemoryStore) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) (learning.StudentImportResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

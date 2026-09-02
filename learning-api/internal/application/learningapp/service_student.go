@@ -20,6 +20,9 @@ func (s *Service) RemindStudent(operator string, principal learning.Principal, i
 func (s *Service) CleanupTestStudents(operator string, principal learning.Principal) (learning.StudentCleanupResult, error) {
 	return s.student.CleanupTestStudents(operator, principal)
 }
+func (s *Service) BatchDeleteStudents(operator string, principal learning.Principal, studentIDs []string) (learning.StudentCleanupResult, error) {
+	return s.student.BatchDeleteStudents(operator, principal, studentIDs)
+}
 func (s *Service) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) (learning.StudentImportResult, error) {
 	return s.student.ImportStudents(operator, principal, rows)
 }
