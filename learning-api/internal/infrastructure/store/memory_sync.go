@@ -743,6 +743,12 @@ func (s *MemoryStore) RemindStudent(operator string, principal learning.Principa
 	}, refreshStudentReminder)
 }
 
+func (s *MemoryStore) CleanupTestStudents(operator string, principal learning.Principal) (learning.StudentCleanupResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cleanupTestStudentsUnlocked(operator, principal)
+}
+
 func (s *MemoryStore) ImportStudents(operator string, principal learning.Principal, rows []learning.StudentUpsertRequest) (learning.StudentImportResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

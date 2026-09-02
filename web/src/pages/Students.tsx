@@ -26,7 +26,7 @@ import {
   message
 } from 'antd';
 import type { TableColumnsType, UploadFile } from 'antd';
-import { BellOutlined, EditOutlined, EyeOutlined, ImportOutlined, LockOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
+import { BellOutlined, DeleteOutlined, EditOutlined, EyeOutlined, ImportOutlined, LockOutlined, PlusOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
@@ -226,6 +226,15 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: () => message.error('提醒失败，请稍后重试。')
   });
 
+  const cleanupTestStudents = useMutation({
+    mutationFn: () => postData<{ deletedCount: number }>('/students/cleanup-test-data', {}),
+    onSuccess: (result) => {
+      message.success(result.deletedCount ? `已清理 ${result.deletedCount} 条测试学生数据` : '没有找到可清理的测试学生数据');
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: (err: Error) => message.error(err.message || '清理失败，请稍后重试。')
+  });
+
   const createDirectGrant = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error('请先选择学生');
@@ -401,6 +410,7 @@ export default function Students({ user }: { user: CurrentUser }) {
         </div>
         {writable && (
           <Space>
+            <Button danger icon={<DeleteOutlined />} loading={cleanupTestStudents.isPending} onClick={() => Modal.confirm({ title: '清理测试学生数据', content: '将删除标记为测试的学生及其关联数据，操作不可恢复。确定继续吗？', okText: '确认清理', cancelText: '取消', okButtonProps: { danger: true }, onOk: () => cleanupTestStudents.mutateAsync() })}>清理测试数据</Button>
             <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>批量导入</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增学生</Button>
           </Space>

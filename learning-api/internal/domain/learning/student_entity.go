@@ -213,6 +213,11 @@ type StudentRemindResult struct {
 	Message  string `json:"message"`
 }
 
+type StudentCleanupResult struct {
+	DeletedCount int      `json:"deletedCount"`
+	DeletedIDs   []string `json:"deletedIds"`
+}
+
 type StudentCourseCard struct {
 	Course
 	Progress       int    `json:"progress"`

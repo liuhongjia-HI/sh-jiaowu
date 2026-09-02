@@ -12,6 +12,85 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+func isTestStudent(student learning.Student) bool {
+	text := strings.ToLower(strings.TrimSpace(student.Name + " " + student.Remark + " " + student.RegistrationSource))
+	return strings.HasPrefix(student.ID, "test-") || strings.Contains(text, "测试") || strings.Contains(text, "test") || student.ID == "stu-001" || student.ID == "stu-002" || student.ID == "stu-003"
+}
+
+func filterStudentRows[T any](items []T, remove func(T) bool) []T {
+	out := make([]T, 0, len(items))
+	for _, item := range items {
+		if !remove(item) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+// cleanupStudentReferences removes rows in the in-memory aggregate whose owning
+// record is the student being cleaned. The persistence delta then deletes the
+// corresponding MySQL rows in the same transaction.
+func (s *MemoryStore) cleanupStudentReferences(studentID string) {
+	s.users = filterStudentRows(s.users, func(v learning.User) bool { return v.StudentID == studentID })
+	s.guardianStudents = filterStudentRows(s.guardianStudents, func(v learning.GuardianStudent) bool { return v.StudentID == studentID })
+	s.grants = filterStudentRows(s.grants, func(v packageGrant) bool { return v.StudentID == studentID })
+	s.trials = filterStudentRows(s.trials, func(v studentTrialRecord) bool { return v.StudentID == studentID })
+	s.availability = filterStudentRows(s.availability, func(v learning.AvailabilitySlot) bool { return v.OwnerID == studentID })
+	s.tutoringAssignments = filterStudentRows(s.tutoringAssignments, func(v learning.TutoringAssignment) bool { return v.StudentID == studentID })
+	s.lessonFeedbacks = filterStudentRows(s.lessonFeedbacks, func(v learning.LessonFeedback) bool { return v.StudentID == studentID })
+	s.commercialOrders = filterStudentRows(s.commercialOrders, func(v learning.CommercialOrder) bool { return v.StudentID == studentID })
+	s.lessonConsumptions = filterStudentRows(s.lessonConsumptions, func(v learning.LessonConsumption) bool { return v.StudentID == studentID })
+	s.renewalReminders = filterStudentRows(s.renewalReminders, func(v learning.RenewalReminder) bool { return v.StudentID == studentID })
+	s.parentNotices = filterStudentRows(s.parentNotices, func(v learning.ParentNotice) bool { return v.StudentID == studentID })
+	s.scoreRecords = filterStudentRows(s.scoreRecords, func(v learning.StudentScoreRecord) bool { return v.StudentID == studentID })
+	s.classReservations = filterStudentRows(s.classReservations, func(v learning.ClassReservationIntent) bool { return v.StudentID == studentID })
+	s.notices = filterStudentRows(s.notices, func(v learning.Notice) bool { return v.RelatedType == "student" && v.RelatedID == studentID })
+	delete(s.subscriptionPreferences, studentID)
+	for key, submission := range s.submissions {
+		if submission.StudentID == studentID {
+			delete(s.submissions, key)
+		}
+	}
+	for key, favorite := range s.favorites {
+		if favorite.StudentID == studentID {
+			delete(s.favorites, key)
+		}
+	}
+	for index := range s.scheduleClasses {
+		students := s.scheduleClasses[index].Students[:0]
+		for _, candidate := range s.scheduleClasses[index].Students {
+			if candidate.ID != studentID {
+				students = append(students, candidate)
+			}
+		}
+		s.scheduleClasses[index].Students = students
+	}
+}
+
+func (s *MemoryStore) cleanupTestStudentsUnlocked(operator string, principal learning.Principal) (learning.StudentCleanupResult, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.StudentCleanupResult, error) {
+			return work.cleanupTestStudentsUnlocked(operator, principal)
+		})
+	}
+	_ = principal
+	deleted := make([]string, 0)
+	kept := make([]learning.Student, 0, len(s.students))
+	for _, student := range s.students {
+		if !isTestStudent(student) {
+			kept = append(kept, student)
+			continue
+		}
+		deleted = append(deleted, student.ID)
+		s.cleanupStudentReferences(student.ID)
+	}
+	s.students = kept
+	for _, id := range deleted {
+		s.prependLog(operator, "清理测试学生", id)
+	}
+	return learning.StudentCleanupResult{DeletedCount: len(deleted), DeletedIDs: deleted}, nil
+}
+
 func materialTagIn(tag string, allowed ...string) bool {
 	if strings.TrimSpace(tag) == "" {
 		return true

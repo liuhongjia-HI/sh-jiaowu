@@ -17,6 +17,7 @@ type StudentRepository interface {
 	TransferTutoringAssignment(string, learning.Principal, string, learning.TutoringAssignmentTransferRequest) (learning.TutoringAssignment, error)
 	StudentScores(learning.Principal, string) ([]learning.StudentScoreSummary, error)
 	RemindStudent(string, learning.Principal, string) (learning.StudentRemindResult, error)
+	CleanupTestStudents(string, learning.Principal) (learning.StudentCleanupResult, error)
 	ImportStudents(string, learning.Principal, []learning.StudentUpsertRequest) (learning.StudentImportResult, error)
 	CreateStudentScore(string, learning.Principal, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)
 	UpdateStudentScore(string, learning.Principal, string, string, learning.StudentScoreUpsertRequest) (learning.StudentScoreRecord, error)

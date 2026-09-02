@@ -70,6 +70,17 @@ func (h *LearningHandler) RemindStudent(c *gin.Context) {
 	}
 	OK(c, result)
 }
+
+func (h *LearningHandler) CleanupTestStudents(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.CleanupTestStudents(operator.(string), principal)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
 func (h *LearningHandler) ImportStudents(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
