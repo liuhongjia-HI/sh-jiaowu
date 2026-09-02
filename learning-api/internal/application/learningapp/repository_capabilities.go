@@ -90,6 +90,7 @@ type GrantRepository interface {
 	ReplaceDirectGrant(string, learning.DirectGrantReplaceRequest) (learning.DirectGrantResult, error)
 	CreatePackage(string, learning.PackageUpsertRequest) (learning.Package, error)
 	UpdatePackage(string, string, learning.PackageUpsertRequest) (learning.Package, error)
+	DeletePackage(string, string) error
 }
 
 type SchedulingRepository interface {

@@ -546,6 +546,43 @@ func TestGrantPreviewAndCreateGrantThroughAPI(t *testing.T) {
 	}
 }
 
+func TestDeletePackageThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginAdmin(t, "13800000002")
+
+	createPackage := func(name string) learning.Package {
+		var created learning.Package
+		app.doJSON(t, http.MethodPost, "/api/packages", token, learning.PackageUpsertRequest{
+			Name:             name,
+			AcademicYear:     "2025.2026学年",
+			Grade:            "五年级",
+			Semester:         "S1",
+			Subject:          "英语",
+			PhaseScope:       "Q1",
+			PackageType:      "题",
+			LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+			ContentTypeCodes: []string{"question"},
+			Status:           learning.StatusEnabled,
+		}, http.StatusOK, &created)
+		return created
+	}
+
+	deletable := createPackage("可删除的接口测试套餐")
+	app.doJSON(t, http.MethodDelete, "/api/packages/"+deletable.ID, token, nil, http.StatusOK, nil)
+	var packages []learning.Package
+	app.doJSON(t, http.MethodGet, "/api/packages", token, nil, http.StatusOK, &packages)
+	for _, item := range packages {
+		if item.ID == deletable.ID {
+			t.Fatalf("deleted package is still listed: %#v", item)
+		}
+	}
+
+	granted := createPackage("已开通的接口测试套餐")
+	app.doJSON(t, http.MethodPost, "/api/grants", token, learning.GrantCreateRequest{StudentID: "stu-001", PackageID: granted.ID}, http.StatusOK, nil)
+	app.doJSON(t, http.MethodDelete, "/api/packages/"+granted.ID, token, nil, http.StatusBadRequest, nil)
+}
+
 func TestCreateDirectGrantThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

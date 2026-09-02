@@ -671,7 +671,7 @@
 }
 
 .home-course-swiper swiper-item {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .home-banner {

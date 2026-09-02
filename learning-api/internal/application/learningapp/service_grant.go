@@ -13,6 +13,9 @@ func (s *Service) CreatePackage(o string, r learning.PackageUpsertRequest) (lear
 func (s *Service) UpdatePackage(o, id string, r learning.PackageUpsertRequest) (learning.Package, error) {
 	return s.grant.UpdatePackage(o, id, r)
 }
+func (s *Service) DeletePackage(operator, id string) error {
+	return s.grant.DeletePackage(operator, id)
+}
 func (s *Service) LearningSpaces() []learning.LearningSpace { return s.grant.LearningSpaces() }
 func (s *Service) GrantPreview(studentID, packageID string) (learning.GrantPreview, error) {
 	return s.grant.GrantPreview(studentID, packageID)

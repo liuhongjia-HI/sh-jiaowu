@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 const SUBSCRIBE_TEMPLATE_ID = "vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0";
@@ -38,6 +40,14 @@ function loadHomePage(requestImpl, wxMock = {}, appMock = {}) {
 function flushPromises() {
   return new Promise((resolve) => setImmediate(resolve));
 }
+
+test("home course swiper clips neighboring course cards", () => {
+  const stylesheet = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxss"), "utf8");
+  const swiperItemRule = stylesheet.match(/\.home-course-swiper swiper-item\s*\{([^}]*)\}/);
+
+  assert(swiperItemRule, "expected a dedicated course swiper-item style rule");
+  assert.match(swiperItemRule[1], /overflow:\s*hidden\s*;/);
+});
 
 test("home page greeting follows the current local hour", () => {
   const page = loadHomePage(() => Promise.resolve({}));

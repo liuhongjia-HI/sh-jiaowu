@@ -161,6 +161,65 @@ func (s *MemoryStore) updatePackageUnlocked(operator string, id string, req lear
 	return learning.Package{}, errors.New("学习套餐不存在")
 }
 
+func (s *MemoryStore) deletePackageUnlocked(operator string, id string) error {
+	if s.db != nil {
+		return persistentMutationError(s, func(work *MemoryStore) error {
+			return work.deletePackageUnlocked(operator, id)
+		})
+	}
+	id = strings.TrimSpace(id)
+	pkg, exists := s.findPackage(id)
+	if !exists {
+		return errors.New("学习套餐不存在")
+	}
+	for _, grant := range s.grants {
+		if grant.PackageID == id {
+			return errors.New("该课程方案已有学生开通记录，不能删除，请改为停用")
+		}
+	}
+	for _, trial := range s.trials {
+		if trial.PackageID == id || trial.ConvertedPackageID == id {
+			return errors.New("该课程方案已有学生体验记录，不能删除，请改为停用")
+		}
+	}
+	for _, order := range s.commercialOrders {
+		if order.PackageID == id {
+			return errors.New("该课程方案已有订单记录，不能删除，请改为停用")
+		}
+	}
+	for index := range s.packages {
+		if s.packages[index].ID != id {
+			continue
+		}
+		s.packages = append(s.packages[:index], s.packages[index+1:]...)
+		s.packageSpaces = filterPackageSpaces(s.packageSpaces, id)
+		s.contentTypes = filterPackageContentTypes(s.contentTypes, id)
+		s.prependLog(operator, "删除学习套餐", pkg.Name)
+		return nil
+	}
+	return errors.New("学习套餐不存在")
+}
+
+func filterPackageSpaces(items []packageSpace, packageID string) []packageSpace {
+	result := items[:0]
+	for _, item := range items {
+		if item.PackageID != packageID {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func filterPackageContentTypes(items []packageContentType, packageID string) []packageContentType {
+	result := items[:0]
+	for _, item := range items {
+		if item.PackageID != packageID {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
 func (s *MemoryStore) learningSpacesUnlocked() []learning.LearningSpace {
 	out := make([]learning.LearningSpace, 0, len(s.learningSpaces))
 	for _, space := range s.learningSpaces {

@@ -116,6 +116,31 @@ test('新增课程方案默认带出当前学年', async ({ page }) => {
   await expect(drawer.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
 
+test('课程方案可在二次确认后删除', async ({ page }) => {
+  await login(page, '13800000001');
+  let exists = true;
+  await page.route('**/api/packages/pkg-delete-test', async (route) => {
+    expect(route.request().method()).toBe('DELETE');
+    exists = false;
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, message: 'ok', data: { id: 'pkg-delete-test' } }) });
+  });
+  await page.route('**/api/packages', async (route) => {
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+      code: 0,
+      message: 'ok',
+      data: exists ? [{ id: 'pkg-delete-test', name: '可删除的课程方案', academicYear: '2026.2027学年', grade: '五年级', semester: 'S1', subject: '英语', level: 'S', phaseScope: 'Q1', packageType: '题', summary: '', learningSpaceIds: [], contentTypeCodes: [], status: '启用' }] : []
+    }) });
+  });
+
+  await expectPageHeading(page, '/packages', '课程方案');
+  const row = page.locator('.ant-table-tbody tr', { hasText: '可删除的课程方案' });
+  await row.getByRole('button', { name: '删除' }).click();
+  await expect(page.getByText('确定删除“可删除的课程方案”吗？')).toBeVisible();
+  await page.locator('button.ant-btn-primary.ant-btn-dangerous').click();
+  await expect(row).toHaveCount(0);
+  await expect(page.getByText('课程方案已删除。')).toBeVisible();
+});
+
 test('学年校历只维护学期起止和期中日期', async ({ page }) => {
   await login(page, '13800000001');
   await expectPageHeading(page, '/settings', '系统设置');
@@ -526,37 +551,30 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   await expect(drawer.getByRole('tab', { name: '开通学习内容' })).toHaveCount(0);
 });
 
-test('教师可以进入题库并打开手动组卷入口', async ({ page }) => {
+test('教师可以打开新建课后练习入口', async ({ page }) => {
   await login(page, '13800000004');
 
-  await expectPageHeading(page, '/questions', '题库');
-  await page.getByRole('button', { name: '新增题目' }).click();
-  const questionDialog = page.getByRole('dialog', { name: '新增题库题目' });
-  await expect(questionDialog).toBeVisible();
-  await expect(questionDialog).toHaveClass(/ant-drawer-content/);
-  await questionDialog.getByRole('button', { name: '取消' }).click();
-
   await expectPageHeading(page, '/homework', '课后练习');
-  await page.getByRole('button', { name: '手动组卷' }).click();
-  const homeworkDialog = page.getByRole('dialog', { name: '组卷发布小挑战' });
+  await page.getByRole('button', { name: '新建课后练习' }).click();
+  const homeworkDialog = page.getByRole('dialog', { name: '新建课后练习' });
   await expect(homeworkDialog).toBeVisible();
-  await expect(page.getByText('先选课程，再从同年级、同学期、同学科的题库中手动选题组卷。')).toBeVisible();
+  await expect(page.getByText('选择课程后，可从匹配年级、学期和学科的题库中选题。')).toBeVisible();
 });
 
-test('教师可以新增题目并手动组卷发布小挑战', async ({ page }) => {
+test('教师可以新增题目并发布课后练习', async ({ page }) => {
   test.setTimeout(90_000);
   await login(page, '13800000004');
   const suffix = Date.now();
   const singleTitle = `验收单选题 ${suffix}`;
   const textTitle = `验收简答题 ${suffix}`;
-  const homeworkTitle = `验收组卷小挑战 ${suffix}`;
+  const homeworkTitle = `验收课后练习 ${suffix}`;
 
   await createQuestion(page, singleTitle, '单选题', 'Which word means apple?', '10', ['apple', 'book', 'desk', 'pen'], 'apple');
   await createQuestion(page, textTitle, '简答题', '用一句话说说今天学到的阅读方法。', '20');
 
   await expectPageHeading(page, '/homework', '课后练习');
-  await page.getByRole('button', { name: '手动组卷' }).click();
-  const dialog = page.getByRole('dialog', { name: '组卷发布小挑战' });
+  await page.getByRole('button', { name: '新建课后练习' }).click();
+  const dialog = page.getByRole('dialog', { name: '新建课后练习' });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('练习标题').fill(homeworkTitle);
   await selectOption(page, dialog, '课程范围', '五年级英文S1Q1课程');

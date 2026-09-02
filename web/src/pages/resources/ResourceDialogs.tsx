@@ -942,7 +942,7 @@ export function UploadDialog({
   const availableQuestions = questionsForCourse(selectedCourse, questions, learningSpaces);
   return (
     <FormDrawer
-      title={kind === 'materials' ? '上传课程讲义' : '组卷发布小挑战'}
+      title={kind === 'materials' ? '上传课程讲义' : '新建课后练习'}
       open={open}
       onCancel={onCancel}
       onSubmit={() => form.submit()}
@@ -979,7 +979,7 @@ export function UploadDialog({
             <Alert
               type="info"
               showIcon
-              message="先选课程，再从同年级、同学期、同学科的题库中手动选题组卷。"
+              message="选择课程后，可从匹配年级、学期和学科的题库中选题。"
               style={{ marginBottom: 16 }}
             />
             <Form.Item name="assessmentType" label="类型" initialValue="practice">
@@ -1053,7 +1053,7 @@ export function ContentEditDialog({
   const availableQuestions = questionsForCourse(selectedCourse, questions, learningSpaces);
   return (
     <FormDrawer
-      title={kind === 'materials' ? '编辑课程讲义' : '编辑小挑战组卷'}
+      title={kind === 'materials' ? '编辑课程讲义' : '编辑课后练习'}
       open={Boolean(item)}
       onCancel={onCancel}
       onSubmit={() => form.submit()}

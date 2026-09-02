@@ -36,6 +36,15 @@ func (h *LearningHandler) UpdatePackage(c *gin.Context) {
 	OK(c, updated)
 }
 
+func (h *LearningHandler) DeletePackage(c *gin.Context) {
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.DeletePackage(operator.(string), c.Param("id")); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"id": c.Param("id")})
+}
+
 func (h *LearningHandler) StudentPermissions(c *gin.Context) {
 	OK(c, h.service.StudentPermissions())
 }

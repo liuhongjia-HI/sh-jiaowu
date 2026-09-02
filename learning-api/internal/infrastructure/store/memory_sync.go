@@ -642,6 +642,12 @@ func (s *MemoryStore) UpdatePackage(operator string, id string, req learning.Pac
 	return result1, err
 }
 
+func (s *MemoryStore) DeletePackage(operator string, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deletePackageUnlocked(operator, id)
+}
+
 func (s *MemoryStore) LearningSpaces() []learning.LearningSpace {
 	s.mu.Lock()
 	defer s.mu.Unlock()

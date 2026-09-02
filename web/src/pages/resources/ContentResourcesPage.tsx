@@ -101,7 +101,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     },
     onSuccess: (result) => {
       const uploadCount = Array.isArray(result) ? result.length : 0;
-      message.success(kind === 'materials' ? `已上传 ${uploadCount || 1} 份课程讲义。` : '小挑战已组卷发布。');
+      message.success(kind === 'materials' ? `已上传 ${uploadCount || 1} 份课程讲义。` : '课后练习已发布。');
       setOpen(false);
       client.invalidateQueries({ queryKey: [kind] });
     },
@@ -116,7 +116,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
 	  return putData<Homework>(`/homework/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: values.status || '启用', questionIds: values.questionIds ?? [] });
     },
     onSuccess: () => {
-      message.success(kind === 'materials' ? '课程讲义已保存。' : '题目已保存。');
+      message.success(kind === 'materials' ? '课程讲义已保存。' : '课后练习已保存。');
       setEditing(null);
       contentForm.resetFields();
       client.invalidateQueries({ queryKey: [kind] });
@@ -291,9 +291,9 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     <div className="page-heading">
       <div>
         <Typography.Title level={3}>{title}</Typography.Title>
-        <Typography.Text type="secondary">{kind === 'materials' ? filterDescription : '从题库选题组卷并发布到学习空间。'}</Typography.Text>
+        <Typography.Text type="secondary">{kind === 'materials' ? filterDescription : '从题库选题并发布到学习空间。'}</Typography.Text>
       </div>
-      {canManage && <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => setOpen(true)}>{kind === 'materials' ? '上传讲义' : '手动组卷'}</Button>}
+      {canManage && <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => setOpen(true)}>{kind === 'materials' ? '上传讲义' : '新建课后练习'}</Button>}
     </div>
     {kind === 'materials' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索讲义标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="学科" value={subject} onChange={setSubject} options={subjectOptions} style={{ width: 130 }} /><Select allowClear showSearch placeholder="上传人" value={uploaderId} onChange={setUploaderId} options={uploaderOptions} style={{ width: 150 }} /><Input type="date" value={uploadedFrom} onChange={(event) => setUploadedFrom(event.target.value)} /><Input type="date" value={uploadedTo} onChange={(event) => setUploadedTo(event.target.value)} /><Button onClick={() => { setKeyword(''); setSubject(undefined); setTagCode(undefined); setUploaderId(undefined); setUploadedFrom(''); setUploadedTo(''); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
     {kind === 'homework' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
