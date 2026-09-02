@@ -14,6 +14,14 @@
   </view>
 
   <view wx:if="{{loading}}" class="study-state">正在加载学习内容...</view>
+  <view wx:elif="{{authRequired}}" class="study-section">
+    <view class="study-empty">
+      <view class="study-empty-art">✨</view>
+      <view class="study-empty-title">绑定学生后开始学习</view>
+      <view class="study-empty-sub">先逛逛课程，绑定学生后即可查看老师开通的内容、学习进度和课后反馈。</view>
+      <button class="button" bindtap="goLogin">绑定学生</button>
+    </view>
+  </view>
   <view wx:elif="{{courses.length === 0}}" class="study-section">
     <view class="study-empty">
       <view class="study-empty-art">📚</view>

@@ -693,8 +693,8 @@ func (s *MemoryStore) validateStudentWechatBinding(user learning.User, openID st
 	if !ok {
 		return errors.New("学生档案不存在，请联系老师确认")
 	}
-	if req.StudentName == "" || req.SchoolName == "" || req.Grade == "" {
-		return errors.New("请填写学生姓名、学校和年级后再绑定")
+	if req.StudentName == "" || req.Grade == "" {
+		return errors.New("请填写学生姓名和年级后再绑定")
 	}
 	if student.Name != "" && student.Name != req.StudentName {
 		return errors.New("学生姓名与后台档案不一致，请联系老师确认")

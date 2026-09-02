@@ -232,11 +232,11 @@ func unavailableAccountLoginError(status string) error {
 }
 
 // createWechatStudentAccount 为首次从小程序进入、且手机号尚未命中档案的学生直接建档。
-// 手机号 + OpenID 都已由微信授权链路确认；年级、姓名和学校由首次表单提供，因此不再
+// 手机号 + OpenID 都已由微信授权链路确认；年级和姓名由首次表单提供，学校可后补，因此不再
 // 进入人工审核。后续同一手机号会优先命中这份档案，不会重复创建。
 func (s *MemoryStore) createWechatStudentAccount(openID string, req learning.WechatLoginRequest) (learning.Principal, error) {
-	if req.StudentName == "" || req.SchoolName == "" || req.Grade == "" {
-		return learning.Principal{}, errors.New("请填写学生姓名、学校和年级后再绑定")
+	if req.StudentName == "" || req.Grade == "" {
+		return learning.Principal{}, errors.New("请填写学生姓名和年级后再绑定")
 	}
 	if len([]rune(req.StudentName)) > 32 || len([]rune(req.Grade)) > 32 || len([]rune(req.SchoolName)) > 64 {
 		return learning.Principal{}, errors.New("填写内容过长，请检查后重试")

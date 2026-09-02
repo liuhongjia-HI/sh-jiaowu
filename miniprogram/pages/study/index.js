@@ -59,6 +59,8 @@ Page({
       visibleCourses: [],
       materials: []
     });
+  },
+  goLogin() {
     wx.navigateTo({
       url: "/pages/login/index",
       fail() {
@@ -67,9 +69,6 @@ Page({
         }
       }
     });
-  },
-  goLogin() {
-    this.promptLogin();
   },
   loadStudy() {
     this.setData({ loading: true, error: "" });

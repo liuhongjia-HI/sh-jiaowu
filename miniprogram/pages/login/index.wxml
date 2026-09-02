@@ -1,25 +1,25 @@
 <view class="hero">
   <view class="eyebrow">欢迎来到学习小站</view>
-  <view class="hero-title">先完成登录绑定</view>
+  <view class="hero-title">绑定学生，开始学习</view>
 </view>
 <view class="section">
   <view class="card login-card">
     <view class="mascot">🐣</view>
     <view class="title">开启今天的学习</view>
-    <view class="sub">先填写学生信息，再绑定手机号匹配老师已开通的课程。</view>
+    <view class="sub">手机号用于匹配学生账号；绑定后即可查看老师开通的课程。</view>
     <view class="form-line">
       <input value="{{form.studentName}}" data-field="studentName" bindinput="onInput" placeholder="学生姓名" />
     </view>
     <view class="form-line">
-      <input value="{{form.schoolName}}" data-field="schoolName" bindinput="onInput" placeholder="学校" />
+      <input value="{{form.schoolName}}" data-field="schoolName" bindinput="onInput" placeholder="学校（选填）" />
     </view>
     <picker mode="selector" range="{{gradeOptions}}" value="{{gradeIndex}}" bindchange="onGradeChange">
       <view class="form-line picker-line">
         <view class="picker-value {{form.grade ? '' : 'placeholder'}}">{{form.grade || '请选择年级'}}</view>
       </view>
     </picker>
-    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">绑定手机号并登录</button>
-    <view class="login-tip">手机号会用于登录绑定；课程权限由老师在后台开通后自动生效。</view>
+    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">授权手机号并绑定</button>
+    <view class="login-tip">账号会立即绑定，不需要审核；课程权限由老师开通后自动生效。</view>
   </view>
 </view>
 <view class="section">

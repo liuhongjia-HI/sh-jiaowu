@@ -253,11 +253,6 @@ func TestWechatStudentBindingValidatesProfile(t *testing.T) {
 			req:  learning.WechatLoginRequest{Code: "student-c", Phone: "18500009069", StudentName: "小明", Grade: "五年级", SchoolName: "另一所学校"},
 			want: "学校与后台档案不一致",
 		},
-		{
-			name: "missing school",
-			req:  learning.WechatLoginRequest{Code: "student-d", Phone: "18500009069", StudentName: "小明", Grade: "五年级"},
-			want: "请填写学生姓名、学校和年级",
-		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -268,7 +263,7 @@ func TestWechatStudentBindingValidatesProfile(t *testing.T) {
 	}
 
 	student, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
-		Code: "student", Phone: "18500009069", StudentName: "小明", Grade: "五年级", SchoolName: "星河小学",
+		Code: "student", Phone: "18500009069", StudentName: "小明", Grade: "五年级",
 	})
 	if err != nil {
 		t.Fatalf("expected verified binding to succeed: %v", err)

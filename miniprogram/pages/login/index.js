@@ -49,10 +49,6 @@ Page({
       wx.showToast({ title: "请输入学生姓名", icon: "none" });
       return false;
     }
-    if (!(form.schoolName || "").trim()) {
-      wx.showToast({ title: "请输入学校", icon: "none" });
-      return false;
-    }
     if (!(form.grade || "").trim()) {
       wx.showToast({ title: "请输入年级", icon: "none" });
       return false;
