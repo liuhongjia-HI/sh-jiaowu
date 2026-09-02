@@ -557,7 +557,7 @@ func TestCreateDirectGrantThroughAPI(t *testing.T) {
 		LearningSpaceIDs: []string{"space-g05-math-s1-q1"},
 		ContentTypeCodes: []string{"course", "handout"},
 	}, http.StatusOK, &opened)
-	if opened.StudentID != "stu-001" || len(opened.OpenCourses) == 0 || len(opened.OpenMaterials) == 0 || len(opened.OpenHomework) != 0 {
+	if opened.StudentID != "stu-001" || len(opened.OpenCourses) == 0 || len(opened.OpenMaterials) == 0 || len(opened.OpenHomework) == 0 {
 		t.Fatalf("unexpected direct grant response: %#v", opened)
 	}
 
@@ -584,7 +584,7 @@ func TestReplaceDirectGrantThroughAPI(t *testing.T) {
 		StudentID:  "stu-001",
 		Selections: []learning.DirectGrantSelection{{LearningSpaceID: "space-g05-math-s1-q1", ContentTypeCodes: []string{"course"}}},
 	}, http.StatusOK, &updated)
-	if len(updated.OpenCourses) == 0 || len(updated.OpenMaterials) != 0 || len(updated.OpenHomework) != 0 {
+	if len(updated.OpenCourses) == 0 || len(updated.OpenMaterials) == 0 || len(updated.OpenHomework) == 0 {
 		t.Fatalf("unexpected replaced direct grant: %#v", updated)
 	}
 }

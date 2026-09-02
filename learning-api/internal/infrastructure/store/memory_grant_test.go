@@ -77,7 +77,7 @@ func TestCreatePackageSupportsGrantPreview(t *testing.T) {
 	}
 }
 
-func TestCreateDirectGrantOpensOnlySelectedLearningContent(t *testing.T) {
+func TestCreateDirectGrantWithCourseOpensFullLearningContent(t *testing.T) {
 	store := NewMemoryStore()
 
 	result, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
@@ -88,11 +88,11 @@ func TestCreateDirectGrantOpensOnlySelectedLearningContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected direct grant to succeed: %v", err)
 	}
-	if len(result.OpenCourses) == 0 || len(result.OpenHomework) == 0 {
-		t.Fatalf("expected selected course and exercises to be opened, got %#v", result)
+	if len(result.OpenCourses) == 0 || len(result.OpenMaterials) == 0 || len(result.OpenHomework) == 0 {
+		t.Fatalf("course grant should open the complete learning content, got %#v", result)
 	}
-	if len(result.OpenMaterials) != 0 {
-		t.Fatalf("direct grant must not open unselected materials, got %#v", result)
+	if !containsString(result.ContentTypes, "下载讲义") {
+		t.Fatalf("course grant should include download permission, got %#v", result.ContentTypes)
 	}
 	if !containsString(result.LearningSpaces, "五年级数学S1Q1S") {
 		t.Fatalf("expected the selected learning space in the result, got %#v", result.LearningSpaces)
@@ -104,7 +104,7 @@ func TestCreateDirectGrantOpensOnlySelectedLearningContent(t *testing.T) {
 	}
 }
 
-func TestReplaceDirectGrantRemovesOnlySelectedDirectContent(t *testing.T) {
+func TestReplaceDirectGrantWithCourseKeepsFullLearningContent(t *testing.T) {
 	store := NewMemoryStore()
 	studentID := "stu-001"
 	spaceID := "space-g05-math-s1-q1"
@@ -140,22 +140,32 @@ func TestReplaceDirectGrantRemovesOnlySelectedDirectContent(t *testing.T) {
 		t.Fatalf("content-only replacement must retain the existing period: %#v", store.grants)
 	}
 	mathCourse := findCourseByLearningSpace(study.Courses, spaceID)
-	if mathCourse == nil || mathCourse.MaterialNum != 0 || mathCourse.HomeworkNum != 0 {
-		t.Fatalf("only the retained direct course should remain accessible: %#v", mathCourse)
+	if mathCourse == nil || mathCourse.MaterialNum == 0 || mathCourse.HomeworkNum == 0 {
+		t.Fatalf("retaining a course grant should keep all course content accessible: %#v", mathCourse)
 	}
+	hasMaterial := false
 	for _, material := range store.materialsForStudent(studentID) {
 		if material.LearningSpaceID == spaceID {
-			t.Fatalf("removed direct handouts must no longer be visible: %#v", material)
+			hasMaterial = true
+			break
 		}
 	}
+	if !hasMaterial {
+		t.Fatal("course grant should retain handout access")
+	}
+	hasHomework := false
 	for _, homework := range store.homeworkForStudent(studentID) {
 		if homework.LearningSpaceID == spaceID {
-			t.Fatalf("removed direct questions must no longer be visible: %#v", homework)
+			hasHomework = true
+			break
 		}
+	}
+	if !hasHomework {
+		t.Fatal("course grant should retain exercise access")
 	}
 }
 
-func TestStudentStudyCountsOnlyAccessibleLearningContent(t *testing.T) {
+func TestStudentStudyCountsFullContentForCourseGrant(t *testing.T) {
 	store := NewMemoryStore()
 	request := learning.DirectGrantCreateRequest{
 		StudentID:        "stu-001",
@@ -178,8 +188,8 @@ func TestStudentStudyCountsOnlyAccessibleLearningContent(t *testing.T) {
 	if mathCourse == nil {
 		t.Fatalf("expected opened math course, got %#v", study.Courses)
 	}
-	if mathCourse.MaterialNum != 0 || mathCourse.HomeworkNum != 0 {
-		t.Fatalf("course card must not count inaccessible content, got %#v", mathCourse)
+	if mathCourse.MaterialNum == 0 || mathCourse.HomeworkNum == 0 {
+		t.Fatalf("course card should count the content included with a course grant, got %#v", mathCourse)
 	}
 
 	request.ContentTypeCodes = []string{"handout", "question"}
@@ -196,7 +206,7 @@ func TestStudentStudyCountsOnlyAccessibleLearningContent(t *testing.T) {
 	}
 }
 
-func TestCourseRemainsVisibleWithoutCourseDownloadPermission(t *testing.T) {
+func TestCourseGrantEnablesSecureHandoutDownload(t *testing.T) {
 	store := NewMemoryStore()
 	studentID := "stu-001"
 	spaceID := "space-g05-math-s1-q1"
@@ -254,24 +264,16 @@ func TestCourseRemainsVisibleWithoutCourseDownloadPermission(t *testing.T) {
 		t.Fatalf("student study after course permission: %v", err)
 	}
 	mathMaterial = findMaterialByLearningSpace(study.Materials, spaceID)
-	if mathMaterial == nil || mathMaterial.DownloadURL != "" {
-		t.Fatalf("course permission alone must not enable secure handout download: %#v", study.Materials)
+	if mathMaterial == nil || mathMaterial.DownloadURL == "" {
+		t.Fatalf("course grant should enable secure handout download: %#v", study.Materials)
 	}
 
 	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
 		StudentID:        studentID,
 		LearningSpaceIDs: []string{spaceID},
 		ContentTypeCodes: []string{"download"},
-	}); err != nil {
-		t.Fatalf("expected download permission to succeed: %v", err)
-	}
-	study, err = store.StudentStudy(principal)
-	if err != nil {
-		t.Fatalf("student study after download permission: %v", err)
-	}
-	mathMaterial = findMaterialByLearningSpace(study.Materials, spaceID)
-	if mathMaterial == nil || mathMaterial.DownloadURL == "" {
-		t.Fatalf("download permission should enable secure handout download: %#v", study.Materials)
+	}); err == nil {
+		t.Fatal("download permission must not be granted without a course")
 	}
 }
 
