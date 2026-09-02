@@ -14,7 +14,7 @@ import (
 
 func isTestStudent(student learning.Student) bool {
 	text := strings.ToLower(strings.TrimSpace(student.Name + " " + student.Remark + " " + student.RegistrationSource))
-	return strings.HasPrefix(student.ID, "test-") || strings.Contains(text, "测试") || strings.Contains(text, "test") || student.ID == "stu-001" || student.ID == "stu-002" || student.ID == "stu-003"
+	return strings.HasPrefix(student.ID, "test-") || strings.Contains(text, "另外一个孩子")|| strings.Contains(text, "一个家长两个孩子")|| strings.Contains(text, "王者荣耀") || strings.Contains(text, "王同学") || student.ID == "stu-001" || student.ID == "stu-002" || student.ID == "stu-003"
 }
 
 func filterStudentRows[T any](items []T, remove func(T) bool) []T {
