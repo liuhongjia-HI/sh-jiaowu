@@ -146,6 +146,7 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.PUT("/banners/:id", h.UpdateBanner)
 	g.DELETE("/banners/:id", h.DeleteBanner)
 	g.POST("/banners/upload", h.UploadBannerImage)
+	g.POST("/launch-campaign/upload", h.UploadLaunchCampaignImage)
 	g.GET("/class-reservations", h.ClassReservations)
 	g.PUT("/class-reservations/:id", h.UpdateClassReservation)
 }

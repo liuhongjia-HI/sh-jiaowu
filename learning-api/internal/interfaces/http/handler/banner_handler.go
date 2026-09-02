@@ -122,6 +122,21 @@ func (h *LearningHandler) UploadGradeSubjectImage(c *gin.Context) {
 	OK(c, gin.H{"imageUrl": asset.URL})
 }
 
+// UploadLaunchCampaignImage 上传开屏活动图片，返回可直接保存到活动配置中的公开地址。
+func (h *LearningHandler) UploadLaunchCampaignImage(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		BadRequest(c, "请选择活动图片")
+		return
+	}
+	asset, err := saveBannerImage(file, h.fileStorageRoot)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"imageUrl": asset.URL})
+}
+
 // BannerImage 是公开的只读图片地址：微信小程序 image 组件不会为图片请求自动追加
 // Authorization header，轮播图又必须在登录前（首页刚打开）就能显示。
 func (h *LearningHandler) BannerImage(c *gin.Context) {
