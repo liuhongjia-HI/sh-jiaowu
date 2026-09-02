@@ -289,6 +289,150 @@ body {
   flex-wrap: wrap;
 }
 
+.grade-catalog-page {
+  max-width: 1480px;
+}
+
+.grade-catalog-heading {
+  margin-bottom: 20px;
+}
+
+.grade-group + .grade-group {
+  margin-top: 28px;
+}
+
+.grade-group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.grade-group-heading h3 {
+  margin: 0;
+  color: #25303b;
+  font-size: 16px;
+}
+
+.grade-group-heading span {
+  color: #7d8791;
+  font-size: 13px;
+}
+
+.grade-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.grade-overview-card {
+  position: relative;
+  min-height: 144px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid #dfe7ed;
+  border-radius: 10px;
+  background: #fff;
+  color: #25303b;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.grade-overview-card:hover,
+.grade-overview-card:focus-visible {
+  border-color: #28a77b;
+  outline: none;
+  box-shadow: 0 10px 24px rgba(32, 92, 72, .11);
+  transform: translateY(-1px);
+}
+
+.grade-card-code {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #e8f6f0;
+  color: #087a58;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.grade-overview-card strong,
+.grade-card-summary,
+.grade-card-status {
+  display: block;
+}
+
+.grade-overview-card strong {
+  font-size: 17px;
+}
+
+.grade-card-summary {
+  margin-top: 6px;
+  color: #66727e;
+  font-size: 13px;
+}
+
+.grade-card-status {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  color: #66727e;
+  font-size: 12px;
+}
+
+.grade-card-ready {
+  color: #198754;
+}
+
+.grade-card-warning {
+  color: #b26b00;
+}
+
+.grade-card-arrow {
+  position: absolute;
+  right: 18px;
+  bottom: 20px;
+  color: #8f9aa4;
+  font-size: 14px;
+}
+
+.grade-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -8px 0 8px;
+  color: #7d8791;
+  font-size: 13px;
+}
+
+.grade-breadcrumb .ant-btn {
+  padding-left: 0;
+}
+
+.course-cover-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #7d8791;
+  font-size: 13px;
+}
+
+.subject-summary-text {
+  max-width: 460px;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #7d8791;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grade-subject-table-card {
+  overflow: hidden;
+}
+
 .student-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2524,6 +2668,10 @@ button.schedule-block:hover {
 
   .page-heading-actions {
     justify-content: flex-start;
+  }
+
+  .grade-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .student-stat-grid {

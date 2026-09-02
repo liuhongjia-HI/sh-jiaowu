@@ -20,6 +20,7 @@ const pages = [
   ['/admin-staff', '管理人员'],
   ['/teachers', '老师管理'],
   ['/logs', '操作记录'],
+  ['/grade-subjects', '年级课程目录'],
   ['/settings', '系统设置']
 ];
 

@@ -82,6 +82,7 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
     ['/admin-staff', '管理人员'],
     ['/teachers', '老师管理'],
     ['/logs', '操作记录'],
+    ['/grade-subjects', '年级课程目录'],
     ['/settings', '系统设置']
   ];
 
