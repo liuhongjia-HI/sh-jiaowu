@@ -274,7 +274,8 @@ export function CourseDialog({
   onSubmit: (values: CourseFormValues) => void;
 }) {
   const lastAutoName = useRef('');
-  const [, setCurriculumRevision] = useState(0);
+  const [curriculumNodes, setCurriculumNodes] = useState<CourseFormValues['curriculum']>([]);
+  const [curriculumError, setCurriculumError] = useState('');
   const availableSpaces = useMemo(
     () => learningSpaces.filter((space) => unrestricted || allowedLearningSpaceIds.includes(space.id)),
     [allowedLearningSpaceIds, learningSpaces, unrestricted]
@@ -318,6 +319,38 @@ export function CourseDialog({
     }
   }, [availableSpaces, form, open, selectedSpaceId]);
 
+  useEffect(() => {
+    if (!open) return;
+    setCurriculumNodes(form.getFieldValue('curriculum') ?? []);
+    setCurriculumError('');
+  }, [form, open]);
+
+  const updateCurriculum = (next: CourseFormValues['curriculum']) => {
+    setCurriculumNodes(next);
+    setCurriculumError('');
+  };
+  const addCurriculumNode = (type: 'unit' | 'chapter' | 'lesson', parentId?: string) => {
+    updateCurriculum([...curriculumNodes, { id: `node-${Date.now()}-${curriculumNodes.length}`, parentId, type, name: '', sortOrder: curriculumNodes.length + 1 }]);
+  };
+  const removeCurriculumBranch = (nodeId: string) => {
+    const ids = new Set([nodeId]);
+    let foundChild = true;
+    while (foundChild) {
+      foundChild = false;
+      curriculumNodes.forEach((node) => {
+        if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
+          ids.add(node.id);
+          foundChild = true;
+        }
+      });
+    }
+    updateCurriculum(curriculumNodes.filter((node) => !ids.has(node.id)));
+  };
+  const updateCurriculumName = (nodeId: string, name: string) => {
+    updateCurriculum(curriculumNodes.map((node) => node.id === nodeId ? { ...node, name } : node));
+  };
+  const missingCurriculumTypes = () => ['unit', 'chapter', 'lesson'].filter((type) => !curriculumNodes.some((node) => node.type === type));
+
   return (
     <FormDrawer
       title={editing ? '编辑课程' : '新增课程'}
@@ -335,7 +368,18 @@ export function CourseDialog({
           style={{ marginBottom: 16 }}
         />
       )}
-      <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
+      <Form form={form} layout="vertical" preserve={false} onFinish={(values) => {
+        const missing = missingCurriculumTypes();
+        if (missing.length) {
+          setCurriculumError(`请至少添加 1 个 ${missing.map((type) => ({ unit: 'Unit', chapter: 'Chapter', lesson: 'Lesson' })[type]).join('、')}`);
+          return;
+        }
+        if (curriculumNodes.some((node) => !node.name.trim())) {
+          setCurriculumError('请填写所有目录名称。');
+          return;
+        }
+        onSubmit({ ...values, curriculum: curriculumNodes });
+      }}>
         <Form.Item name="name" label="课程名称" rules={[{ required: true, message: '请输入课程名称' }]}>
           <Input placeholder="例如：五年级英语 S1 Q1 阅读课程" />
         </Form.Item>
@@ -375,97 +419,34 @@ export function CourseDialog({
             options={spaceOptions}
           />
         </Form.Item>
-        <Form.List
-          name="curriculum"
-          rules={[{
-            validator: async (_, nodes: CourseFormValues['curriculum'] = []) => {
-              const missing = [
-                ['unit', 'Unit'],
-                ['chapter', 'Chapter'],
-                ['lesson', 'Lesson']
-              ].filter(([type]) => !nodes.some((node) => node.type === type));
-              if (missing.length) throw new Error(`请至少添加 1 个 ${missing.map(([, label]) => label).join('、')}`);
-            }
-          }]}
-        >
-          {(fields, _operations, { errors }) => {
-            const nodes = form.getFieldValue('curriculum') ?? [];
-            const nodeAt = (field: typeof fields[number]) => form.getFieldValue(['curriculum', field.name]) as CourseFormValues['curriculum'][number] | undefined;
-            const fieldsFor = (type: string, parentId?: string) => fields.filter((field) => {
-              const node = nodeAt(field);
-              return node?.type === type && node.parentId === parentId;
-            });
-            const addNode = (type: 'unit' | 'chapter' | 'lesson', parentId?: string) => {
-              form.setFieldValue('curriculum', [...nodes, { id: `node-${Date.now()}-${fields.length}`, parentId, type, sortOrder: fields.length + 1 }]);
-              setCurriculumRevision((revision) => revision + 1);
-            };
-            const removeBranch = (nodeId: string) => {
-              const ids = new Set([nodeId]);
-              let foundChild = true;
-              while (foundChild) {
-                foundChild = false;
-                nodes.forEach((node: CourseFormValues['curriculum'][number]) => {
-                  if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
-                    ids.add(node.id);
-                    foundChild = true;
-                  }
-                });
-              }
-              form.setFieldValue('curriculum', nodes.filter((node: CourseFormValues['curriculum'][number]) => !ids.has(node.id)));
-              setCurriculumRevision((revision) => revision + 1);
-            };
-            const nodeName = (field: typeof fields[number], label: string, placeholder: string) => <>
-              <Form.Item {...field} name={[field.name, 'name']} rules={[{ required: true, message: `请输入${label}名称` }]} style={{ marginBottom: 0, flex: 1 }}>
-                <Input aria-label={`${label}名称`} placeholder={placeholder} />
-              </Form.Item>
-              <Form.Item {...field} name={[field.name, 'id']} hidden><Input /></Form.Item>
-              <Form.Item {...field} name={[field.name, 'type']} hidden><Input /></Form.Item>
-              <Form.Item {...field} name={[field.name, 'parentId']} hidden><Input /></Form.Item>
-            </>;
-            const lessonRow = (field: typeof fields[number]) => {
-              const lesson = nodeAt(field);
-              if (!lesson) return null;
-              return <Space key={field.key} align="start" style={{ display: 'flex', marginLeft: 48, marginTop: 8 }} data-testid="curriculum-lesson">
+        <Form.Item label="课程目录" extra="从 Unit 开始，随后在对应层级下添加 Chapter 和 Lesson；讲义和作业只能绑定 Lesson。">
+          {!curriculumNodes.some((node) => node.type === 'unit') && <Typography.Text type="secondary">还没有课程目录，请先新增 Unit。</Typography.Text>}
+          {curriculumNodes.filter((node) => node.type === 'unit').map((unit) => <div key={unit.id} data-testid="curriculum-unit" style={{ marginTop: 8 }}>
+            <Space align="start" style={{ display: 'flex' }}>
+              <Typography.Text>Unit</Typography.Text>
+              <Input aria-label="Unit名称" value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder="输入 Unit 名称" style={{ flex: 1 }} />
+              <Typography.Text type="secondary">顶层目录</Typography.Text>
+              <Button type="link" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('chapter', unit.id)}>新增 Chapter</Button>
+              <Button danger type="text" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
+            </Space>
+            {curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).map((chapter) => <div key={chapter.id} data-testid="curriculum-chapter" style={{ marginLeft: 24, marginTop: 8 }}>
+              <Space align="start" style={{ display: 'flex' }}>
+                <Typography.Text>Chapter</Typography.Text>
+                <Input aria-label="Chapter名称" value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder="输入 Chapter 名称" style={{ flex: 1 }} />
+                <Typography.Text type="secondary">归属当前 Unit</Typography.Text>
+                <Button type="link" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('lesson', chapter.id)}>新增 Lesson</Button>
+                <Button danger type="text" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
+              </Space>
+              {curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).map((lesson) => <Space key={lesson.id} align="start" style={{ display: 'flex', marginLeft: 24, marginTop: 8 }} data-testid="curriculum-lesson">
                 <Typography.Text type="secondary">Lesson</Typography.Text>
-                {nodeName(field, 'Lesson', '输入 Lesson 名称')}
-                <Button danger type="text" htmlType="button" onClick={() => removeBranch(lesson.id)}>删除</Button>
-              </Space>;
-            };
-            const chapterRow = (field: typeof fields[number]) => {
-              const chapter = nodeAt(field);
-              if (!chapter) return null;
-              return <div key={field.key} data-testid="curriculum-chapter" style={{ marginLeft: 24, marginTop: 8 }}>
-                <Space align="start" style={{ display: 'flex' }}>
-                  <Typography.Text>Chapter</Typography.Text>
-                  {nodeName(field, 'Chapter', '输入 Chapter 名称')}
-                  <Typography.Text type="secondary">归属当前 Unit</Typography.Text>
-                  <Button type="link" htmlType="button" icon={<PlusOutlined />} onClick={() => addNode('lesson', chapter.id)}>新增 Lesson</Button>
-                  <Button danger type="text" htmlType="button" onClick={() => removeBranch(chapter.id)}>删除</Button>
-                </Space>
-                {fieldsFor('lesson', chapter.id).map(lessonRow)}
-              </div>;
-            };
-            return <Form.Item label="课程目录" extra="从 Unit 开始，随后在对应层级下添加 Chapter 和 Lesson；讲义和作业只能绑定 Lesson。">
-              {!fieldsFor('unit').length && <Typography.Text type="secondary">还没有课程目录，请先新增 Unit。</Typography.Text>}
-              {fieldsFor('unit').map((field) => {
-                const unit = nodeAt(field);
-                if (!unit) return null;
-                return <div key={field.key} data-testid="curriculum-unit" style={{ marginTop: 8 }}>
-                  <Space align="start" style={{ display: 'flex' }}>
-                    <Typography.Text>Unit</Typography.Text>
-                    {nodeName(field, 'Unit', '输入 Unit 名称')}
-                    <Typography.Text type="secondary">顶层目录</Typography.Text>
-                    <Button type="link" htmlType="button" icon={<PlusOutlined />} onClick={() => addNode('chapter', unit.id)}>新增 Chapter</Button>
-                    <Button danger type="text" htmlType="button" onClick={() => removeBranch(unit.id)}>删除</Button>
-                  </Space>
-                  {fieldsFor('chapter', unit.id).map(chapterRow)}
-                </div>;
-              })}
-              <Button htmlType="button" icon={<PlusOutlined />} onClick={() => addNode('unit')} style={{ marginTop: 12 }}>新增 Unit</Button>
-              <Form.ErrorList errors={errors} />
-            </Form.Item>;
-          }}
-        </Form.List>
+                <Input aria-label="Lesson名称" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="输入 Lesson 名称" style={{ flex: 1 }} />
+                <Button danger type="text" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
+              </Space>)}
+            </div>)}
+          </div>)}
+          <Button htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('unit')} style={{ marginTop: 12 }}>新增 Unit</Button>
+          {curriculumError && <Typography.Text type="danger" style={{ display: 'block', marginTop: 8 }}>{curriculumError}</Typography.Text>}
+        </Form.Item>
         <Form.Item name="status" label="状态">
           <Select
             options={[

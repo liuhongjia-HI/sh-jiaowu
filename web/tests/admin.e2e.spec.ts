@@ -134,6 +134,9 @@ test('新增课程按目录层级引导添加内容', async ({ page }) => {
   const chapter = unit.getByTestId('curriculum-chapter').first();
   await expect(chapter.getByText('归属当前 Unit', { exact: true })).toBeVisible();
   await expect(chapter.getByRole('button', { name: '新增 Lesson' })).toBeVisible();
+
+  await chapter.getByRole('button', { name: '新增 Lesson' }).click();
+  await expect(chapter.getByTestId('curriculum-lesson')).toHaveCount(1);
 });
 
 test('课程方案可在二次确认后删除', async ({ page }) => {
