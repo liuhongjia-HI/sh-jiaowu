@@ -17,6 +17,9 @@ func (s *Service) LearningSpaces() []learning.LearningSpace { return s.grant.Lea
 func (s *Service) GrantPreview(studentID, packageID string) (learning.GrantPreview, error) {
 	return s.grant.GrantPreview(studentID, packageID)
 }
+func (s *Service) DirectGrantPeriodDefault() learning.DirectGrantPeriodDefault {
+	return s.grant.DirectGrantPeriodDefault()
+}
 func (s *Service) CreateGrant(operator string, req learning.GrantCreateRequest) (learning.GrantPreview, error) {
 	return s.grant.CreateGrant(operator, req)
 }

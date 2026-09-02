@@ -94,6 +94,13 @@ func (s *MemoryStore) GrantPreview(studentID, packageID string) (learning.GrantP
 	return result1, err
 }
 
+func (s *MemoryStore) DirectGrantPeriodDefault() learning.DirectGrantPeriodDefault {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	startsAt, endsAt := s.defaultGrantPeriod()
+	return learning.DirectGrantPeriodDefault{StartsAt: startsAt, EndsAt: endsAt}
+}
+
 func (s *MemoryStore) CreateGrant(operator string, req learning.GrantCreateRequest) (learning.GrantPreview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

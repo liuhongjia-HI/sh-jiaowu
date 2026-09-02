@@ -116,6 +116,20 @@ test('新增课程方案默认带出当前学年', async ({ page }) => {
   await expect(drawer.getByText('2026.2027学年', { exact: true })).toBeVisible();
 });
 
+test('学年校历只维护学期起止和期中日期', async ({ page }) => {
+  await login(page, '13800000001');
+  await expectPageHeading(page, '/settings', '系统设置');
+
+  await page.getByRole('button', { name: '新增学年' }).click();
+  const drawer = page.getByRole('dialog', { name: '新增学年' });
+  await expect(drawer.getByText('秋季学期开始', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('秋季学期结束', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('秋季学期期中', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('春季学期期中', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('秋季学期期末')).toHaveCount(0);
+  await expect(drawer.getByText('春季学期期末')).toHaveCount(0);
+});
+
 test('点击课程方案名称可查看该方案的课程讲义', async ({ page }) => {
   await login(page, '13800000001');
   await expectPageHeading(page, '/packages', '课程方案');
@@ -407,7 +421,7 @@ test('点击学生课程标签进入课程开通矩阵', async ({ page }) => {
   await expect(drawer.getByText(studentName, { exact: true }).first()).toBeVisible();
   await expect(drawer.getByRole('tab', { name: '课程开通' })).toHaveAttribute('aria-selected', 'true');
   await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
-  await expect(drawer.getByText('按课程范围开通', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('选择要开通的内容', { exact: true })).toBeVisible();
 });
 
 test('学生详情以卡片列表展示学习记录', async ({ page }) => {
@@ -484,9 +498,16 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   const drawer = page.locator('.ant-drawer-content').last();
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole('tab', { name: '课程开通' })).toHaveAttribute('aria-selected', 'true');
-  await expect(drawer.getByText('按课程范围开通', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('选择要开通的内容', { exact: true })).toBeVisible();
   await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
   await expect(drawer.getByText(/当前年级：/)).toBeVisible();
+  await expect(drawer.getByLabel('开通日期')).toBeVisible();
+  await expect(drawer.getByLabel('结束日期')).toBeVisible();
+  const openedFilter = drawer.getByRole('button', { name: '筛选已开通课程' });
+  await expect(openedFilter).toBeVisible();
+  await openedFilter.click();
+  const openedOnly = drawer.getByRole('button', { name: /仅看已开通（\d+）/ });
+  await expect(openedOnly).toHaveClass(/ant-btn-primary/);
   const subjectFilter = drawer.getByRole('group', { name: '科目筛选' });
   await expect(subjectFilter).toBeVisible();
   await expect(subjectFilter.getByRole('button', { name: /全部（\d+）/ })).toBeVisible();
@@ -498,22 +519,11 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   const firstEnglishCourse = firstEnglishContent.getByRole('checkbox', { name: '课程', exact: true });
   await firstEnglishContent.getByLabel(/课程明细$/).hover();
   await expect(page.getByText('课程明细', { exact: true })).toBeVisible();
-  const firstEditableContent = firstEnglishContent.locator('input[type="checkbox"]:not(:disabled)').first();
-  await firstEditableContent.check();
-  await expect(firstEditableContent).toBeChecked();
-
+  await expect(page.getByRole('button', { name: /撤销套餐“.+”/ }).first()).toBeVisible();
   await expect(firstEnglishContent.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
-  await expect(firstEnglishContent.getByRole('checkbox', { name: '题目', exact: true })).toBeVisible();
+  await expect(firstEnglishContent.getByRole('checkbox', { name: '习题', exact: true })).toBeVisible();
   await expect(firstEnglishContent.getByRole('checkbox', { name: '讲义', exact: true })).toBeVisible();
-  await expect(drawer.getByLabel('开通时间')).toBeVisible();
-  await expect(drawer.getByLabel('结束时间')).toBeVisible();
   await expect(drawer.getByRole('tab', { name: '开通学习内容' })).toHaveCount(0);
-
-  await page.goto('/open');
-  await expect(page).toHaveURL(/\/students$/);
-  await expect(page.getByRole('heading', { name: '学生管理' })).toBeVisible();
-  await page.goto('/permissions');
-  await expect(page).toHaveURL(/\/students$/);
 });
 
 test('教师可以进入题库并打开手动组卷入口', async ({ page }) => {

@@ -46,7 +46,7 @@ func TestConfiguredAcademicYearAlwaysFollowsDate(t *testing.T) {
 	}
 }
 
-func TestAcademicCalendarStoresExamDatesWithinEachSemester(t *testing.T) {
+func TestAcademicCalendarStoresMidtermDateWithinEachSemester(t *testing.T) {
 	store := NewMemoryStore()
 	calendar, err := json.Marshal([]academicCalendarTerm{
 		{
@@ -54,7 +54,6 @@ func TestAcademicCalendarStoresExamDatesWithinEachSemester(t *testing.T) {
 			Semester:     "S1 第一学期",
 			StartDate:    "2026-09-01",
 			MidtermDate:  "2026-11-01",
-			FinalDate:    "2027-01-10",
 			EndDate:      "2027-01-15",
 		},
 	})
@@ -62,13 +61,12 @@ func TestAcademicCalendarStoresExamDatesWithinEachSemester(t *testing.T) {
 		t.Fatalf("failed to encode calendar term: %v", err)
 	}
 	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(calendar)}); err != nil {
-		t.Fatalf("expected calendar with exam dates to be saved: %v", err)
+		t.Fatalf("expected calendar with midterm date to be saved: %v", err)
 	}
 
 	invalidTerms := []academicCalendarTerm{
-		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2026-08-31", FinalDate: "2027-01-10", EndDate: "2027-01-15"},
-		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2026-11-01", FinalDate: "2027-01-16", EndDate: "2027-01-15"},
-		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2027-01-12", FinalDate: "2027-01-10", EndDate: "2027-01-15"},
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2026-08-31", EndDate: "2027-01-15"},
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: "2026-09-01", MidtermDate: "2027-01-16", EndDate: "2027-01-15"},
 	}
 	for _, term := range invalidTerms {
 		invalidCalendar, err := json.Marshal([]academicCalendarTerm{term})

@@ -145,10 +145,10 @@ func (s *MemoryStore) openingMatrixForStudent(student learning.Student) []learni
 			continue
 		}
 		content := []learning.StudentOpeningCell{
-			{ContentTypeCode: "course", Items: s.openingItemsForSpace(space.ID, "course")},
-			{ContentTypeCode: "handout", Items: s.openingItemsForSpace(space.ID, "handout")},
-			{ContentTypeCode: "question", Items: s.openingItemsForSpace(space.ID, "question")},
-			{ContentTypeCode: "download", Items: s.openingItemsForSpace(space.ID, "download")},
+			{ContentTypeCode: "course", PackageGrants: []learning.StudentOpeningPackageGrant{}, Items: s.openingItemsForSpace(space.ID, "course")},
+			{ContentTypeCode: "handout", PackageGrants: []learning.StudentOpeningPackageGrant{}, Items: s.openingItemsForSpace(space.ID, "handout")},
+			{ContentTypeCode: "question", PackageGrants: []learning.StudentOpeningPackageGrant{}, Items: s.openingItemsForSpace(space.ID, "question")},
+			{ContentTypeCode: "download", PackageGrants: []learning.StudentOpeningPackageGrant{}, Items: s.openingItemsForSpace(space.ID, "download")},
 		}
 		for _, grant := range s.grants {
 			if grant.StudentID != student.ID || !grantActive(grant) {

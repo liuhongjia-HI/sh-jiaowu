@@ -55,6 +55,10 @@ func (h *LearningHandler) GrantPreview(c *gin.Context) {
 	OK(c, preview)
 }
 
+func (h *LearningHandler) DirectGrantPeriodDefault(c *gin.Context) {
+	OK(c, h.service.DirectGrantPeriodDefault())
+}
+
 func (h *LearningHandler) CreateGrant(c *gin.Context) {
 	var req learning.GrantCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

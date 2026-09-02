@@ -177,8 +177,14 @@ func TestRevokePackageGrantOnlyRemovesTheSelectedStudentsPackageAccess(t *testin
 		t.Fatalf("revoke package grant: %v", err)
 	}
 
-	index, found := store.findGrantIndex(studentID, packageID)
-	if !found || store.grants[index].Status != "revoked" {
+	grantWasRevoked := false
+	for _, grant := range store.grants {
+		if grant.StudentID == studentID && grant.PackageID == packageID && grant.Status == "revoked" {
+			grantWasRevoked = true
+			break
+		}
+	}
+	if !grantWasRevoked {
 		t.Fatalf("expected only the selected package grant to be revoked, got %#v", store.grants)
 	}
 	if _, found := store.findPackage(packageID); !found {

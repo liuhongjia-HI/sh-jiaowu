@@ -83,6 +83,7 @@ type GrantRepository interface {
 	LearningSpaces() []learning.LearningSpace
 	StudentGrants(learning.Principal, string) ([]learning.StudentGrant, error)
 	GrantPreview(string, string) (learning.GrantPreview, error)
+	DirectGrantPeriodDefault() learning.DirectGrantPeriodDefault
 	CreateGrant(string, learning.GrantCreateRequest) (learning.GrantPreview, error)
 	RevokePackageGrant(string, string, string) (learning.GrantRevokeResult, error)
 	CreateDirectGrant(string, learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error)

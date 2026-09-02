@@ -570,6 +570,23 @@ func TestCreateDirectGrantThroughAPI(t *testing.T) {
 	}
 }
 
+func TestRevokePackageGrantThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginAdmin(t, "13800000002")
+	packageID := "pkg-g05-english-s1-full"
+
+	app.doJSON(t, http.MethodPost, "/api/grants", token, learning.GrantCreateRequest{
+		StudentID: "stu-001", PackageID: packageID,
+	}, http.StatusOK, nil)
+
+	var revoked learning.GrantRevokeResult
+	app.doJSON(t, http.MethodDelete, "/api/grants/"+packageID+"?studentId=stu-001", token, nil, http.StatusOK, &revoked)
+	if revoked.StudentID != "stu-001" || revoked.PackageID != packageID || revoked.PackageName == "" {
+		t.Fatalf("unexpected revoked package result: %#v", revoked)
+	}
+}
+
 func TestReplaceDirectGrantThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

@@ -112,13 +112,13 @@ type StudentOpeningPackageGrant struct {
 // StudentOpeningCell 表示某个课程范围内一种内容的实际开通状态。
 // PackageOpened 和 DirectOpened 分别保留来源，避免运营人员误以为可以关闭课程方案内容。
 type StudentOpeningCell struct {
-	ContentTypeCode string               `json:"contentTypeCode"`
-	Opened          bool                 `json:"opened"`
-	PackageOpened   bool                 `json:"packageOpened"`
-	DirectOpened    bool                 `json:"directOpened"`
-	PackageNames    []string             `json:"packageNames"`
+	ContentTypeCode string                       `json:"contentTypeCode"`
+	Opened          bool                         `json:"opened"`
+	PackageOpened   bool                         `json:"packageOpened"`
+	DirectOpened    bool                         `json:"directOpened"`
+	PackageNames    []string                     `json:"packageNames"`
 	PackageGrants   []StudentOpeningPackageGrant `json:"packageGrants"`
-	Items           []StudentOpeningItem `json:"items"`
+	Items           []StudentOpeningItem         `json:"items"`
 }
 
 // StudentOpeningScope 是学生课程开通页的一行课程范围。
@@ -160,6 +160,14 @@ type DirectGrantReplaceRequest struct {
 	Selections []DirectGrantSelection `json:"selections"`
 	StartsAt   string                 `json:"startsAt"`
 	EndsAt     string                 `json:"endsAt"`
+}
+
+// DirectGrantPeriodDefault is the editable default shown before a student is
+// directly granted learning content. The server owns the calendar calculation
+// so management screens and saved grants cannot diverge around school terms.
+type DirectGrantPeriodDefault struct {
+	StartsAt string `json:"startsAt"`
+	EndsAt   string `json:"endsAt"`
 }
 
 type DirectGrantResult struct {

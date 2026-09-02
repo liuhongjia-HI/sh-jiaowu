@@ -30,7 +30,7 @@ import { BellOutlined, DeleteOutlined, EditOutlined, EyeOutlined, ImportOutlined
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { getData, postData, postForm, putData } from '../services/http';
+import { deleteData, getData, postData, postForm, putData } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
 import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
@@ -39,6 +39,7 @@ import type {
   DirectGrantReplaceRequest,
   DirectGrantResult,
   DirectGrantSelection,
+  GrantRevokeResult,
   LearningSpace,
   Student,
   StudentDetail,
@@ -256,6 +257,18 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: (err: Error) => message.error(err.message || '保存失败，请检查课程范围和学习内容。')
   });
 
+  const revokePackageGrant = useMutation({
+    mutationFn: ({ studentId, packageId }: { studentId: string; packageId: string }) => deleteData<GrantRevokeResult>(`/grants/${encodeURIComponent(packageId)}?studentId=${encodeURIComponent(studentId)}`),
+    onSuccess: (result) => {
+      message.success(`已撤销 ${selected?.name ?? '该学生'} 的套餐“${result.packageName}”。`);
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
+      queryClient.invalidateQueries({ queryKey: ['permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (err: Error) => message.error(err.message || '撤销套餐开通失败，请稍后重试。')
+  });
+
   const importStudents = useMutation({
     mutationFn: () => {
       const file = fileList[0]?.originFileObj;
@@ -395,6 +408,18 @@ export default function Students({ user }: { user: CurrentUser }) {
       okButtonProps: { danger: true },
       cancelText: '暂不取消',
       onOk: () => createDirectGrant.mutate()
+    });
+  }
+
+  function revokePackageOpening(packageId: string, packageName: string) {
+    if (!selected) return;
+    Modal.confirm({
+      title: '确认撤销套餐开通？',
+      content: `将撤销 ${selected.name} 的“${packageName}”套餐权限。该套餐覆盖的其他课程内容也会一并收回，但不会影响套餐设置或其他学生。`,
+      okText: '确认撤销',
+      okButtonProps: { danger: true },
+      cancelText: '暂不撤销',
+      onOk: () => revokePackageGrant.mutateAsync({ studentId: selected.id, packageId })
     });
   }
 
@@ -640,6 +665,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                     onStartsAtChange={(value) => { setDirectStartsAt(value); setDirectPeriodChanged(true); }}
                     onEndsAtChange={(value) => { setDirectEndsAt(value); setDirectPeriodChanged(true); }}
                     onSubmit={submitDirectGrant}
+                    onRevokePackage={revokePackageOpening}
                   />
                 ) : null
               },
@@ -1039,7 +1065,8 @@ function CourseOpeningPanel({
   onSelectionsChange,
   onStartsAtChange,
   onEndsAtChange,
-  onSubmit
+  onSubmit,
+  onRevokePackage
 }: {
   detail: StudentDetail;
   student: Student;
@@ -1054,6 +1081,7 @@ function CourseOpeningPanel({
   onStartsAtChange: (value: string) => void;
   onEndsAtChange: (value: string) => void;
   onSubmit: () => void;
+  onRevokePackage: (packageId: string, packageName: string) => void;
 }) {
   if (!writable) {
     return <CourseOpeningMatrix matrix={detail.openingMatrix} selections={selections} onSelectionsChange={onSelectionsChange} readOnly />;
@@ -1072,6 +1100,7 @@ function CourseOpeningPanel({
       onStartsAtChange={onStartsAtChange}
       onEndsAtChange={onEndsAtChange}
       onSubmit={onSubmit}
+      onRevokePackage={onRevokePackage}
     />
   );
 }
@@ -1087,11 +1116,13 @@ function CourseOpeningMatrix({
   matrix,
   selections,
   onSelectionsChange,
+  onRevokePackage,
   readOnly = false
 }: {
   matrix: StudentOpeningScope[];
   selections: DirectGrantSelection[];
   onSelectionsChange: (values: DirectGrantSelection[]) => void;
+  onRevokePackage?: (packageId: string, packageName: string) => void;
   readOnly?: boolean;
 }) {
   const selectionFor = (learningSpaceId: string) => selections.find((selection) => selection.learningSpaceId === learningSpaceId)?.contentTypeCodes ?? [];
@@ -1133,6 +1164,11 @@ function CourseOpeningMatrix({
                       {!readOnly && locked && directSelected && (
                         <Button type="link" size="small" danger onClick={() => changeSelection(scope.learningSpaceId, cell.contentTypeCode, false)}>撤销单独开通</Button>
                       )}
+                      {!readOnly && (cell.packageGrants ?? []).map((packageGrant) => (
+                        <Button key={packageGrant.packageId} type="link" size="small" danger onClick={() => onRevokePackage?.(packageGrant.packageId, packageGrant.packageName)}>
+                          撤销套餐“{packageGrant.packageName}”
+                        </Button>
+                      ))}
                     </Space>
                   )}
                 >
@@ -1168,7 +1204,8 @@ function DirectGrantPanel({
   onSelectionsChange,
   onStartsAtChange,
   onEndsAtChange,
-  onSubmit
+  onSubmit,
+  onRevokePackage
 }: {
   student: Student;
   matrix: StudentOpeningScope[];
@@ -1182,6 +1219,7 @@ function DirectGrantPanel({
   onStartsAtChange: (value: string) => void;
   onEndsAtChange: (value: string) => void;
   onSubmit: () => void;
+  onRevokePackage: (packageId: string, packageName: string) => void;
 }) {
   const [selectedSubject, setSelectedSubject] = useState<string>();
   const [selectedOnly, setSelectedOnly] = useState(false);
@@ -1190,11 +1228,11 @@ function DirectGrantPanel({
     matrix.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
     return Array.from(counts, ([subject, count]) => ({ subject, count }));
   }, [matrix]);
-  const selectedSpaceIds = useMemo(() => new Set(selections.filter((item) => item.contentTypeCodes.length > 0).map((item) => item.learningSpaceId)), [selections]);
+  const openedSpaceIds = useMemo(() => new Set(matrix.filter((space) => space.content.some((cell) => cell.opened || selections.find((selection) => selection.learningSpaceId === space.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode))).map((space) => space.learningSpaceId)), [matrix, selections]);
   const visibleMatrix = useMemo(() => {
-    const filtered = matrix.filter((space) => (!selectedSubject || space.subject === selectedSubject) && (!selectedOnly || selectedSpaceIds.has(space.learningSpaceId)));
-    return [...filtered].sort((a, b) => Number(selectedSpaceIds.has(b.learningSpaceId)) - Number(selectedSpaceIds.has(a.learningSpaceId)));
-  }, [matrix, selectedSubject, selectedOnly, selectedSpaceIds]);
+    const filtered = matrix.filter((space) => (!selectedSubject || space.subject === selectedSubject) && (!selectedOnly || openedSpaceIds.has(space.learningSpaceId)));
+    return [...filtered].sort((a, b) => Number(openedSpaceIds.has(b.learningSpaceId)) - Number(openedSpaceIds.has(a.learningSpaceId)));
+  }, [matrix, selectedSubject, selectedOnly, openedSpaceIds]);
   const selectedContentCount = matrix.reduce((count, scope) => count + scope.content.filter((cell) => {
     const directSelected = selections.find((selection) => selection.learningSpaceId === scope.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode);
     return cell.opened || directSelected;
@@ -1205,7 +1243,7 @@ function DirectGrantPanel({
         type="info"
         showIcon
         message="选择要开通的内容"
-        description="套餐已开通的内容会自动勾选并锁定；你可以勾选或取消学生的单独开通内容。"
+        description="套餐已开通的内容会自动勾选；可点击名称查看来源，误开套餐可撤销该学生的套餐权限。单独开通内容可直接勾选或取消。"
       />
       <div>
         <Typography.Text strong>课程范围</Typography.Text>
@@ -1215,7 +1253,7 @@ function DirectGrantPanel({
         <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
           <Space wrap size={[8, 8]}>
             <Tag color="blue">当前年级：{student.grade}</Tag>
-            <Typography.Text type="secondary" aria-live="polite">已选 {selectedContentCount} 项内容</Typography.Text>
+            <Button type="link" size="small" aria-label="筛选已开通课程" onClick={() => { setSelectedSubject(undefined); setSelectedOnly(true); }}>已选 {selectedContentCount} 项内容</Button>
           </Space>
           <div role="group" aria-label="科目筛选">
             <Space wrap size={[8, 8]}>
@@ -1234,14 +1272,14 @@ function DirectGrantPanel({
                 </Button>
               ))}
               <Button size="small" type={selectedOnly ? 'primary' : 'default'} onClick={() => setSelectedOnly((value) => !value)}>
-                已选优先（{selectedSpaceIds.size}）
+                仅看已开通（{openedSpaceIds.size}）
               </Button>
             </Space>
           </div>
-          {selectedSpaceIds.size > 0 && (
+          {openedSpaceIds.size > 0 && (
             <Space wrap size={[6, 6]} aria-label="已选项目快捷筛选">
               <Typography.Text type="secondary">已选项目：</Typography.Text>
-              {matrix.filter((space) => selectedSpaceIds.has(space.learningSpaceId)).map((space) => (
+              {matrix.filter((space) => openedSpaceIds.has(space.learningSpaceId)).map((space) => (
                 <Button key={space.learningSpaceId} size="small" type={selectedSubject === space.subject && selectedOnly ? 'primary' : 'default'} onClick={() => { setSelectedSubject(space.subject); setSelectedOnly(true); }}>
                   {space.name}
                 </Button>
@@ -1257,7 +1295,7 @@ function DirectGrantPanel({
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该科目暂无可开通课程范围。" />
         ) : (
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
-            <CourseOpeningMatrix matrix={visibleMatrix} selections={selections} onSelectionsChange={onSelectionsChange} />
+            <CourseOpeningMatrix matrix={visibleMatrix} selections={selections} onSelectionsChange={onSelectionsChange} onRevokePackage={onRevokePackage} />
           </Space>
         )}
       </div>

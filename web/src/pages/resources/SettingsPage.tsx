@@ -39,22 +39,19 @@ type AcademicTerm = {
   semester: string;
   startDate: string;
   midtermDate?: string;
-  finalDate?: string;
   endDate: string;
 };
 
 // 培训机构运营脑子里没有“学期条目”这个概念，只有“这一学年，秋季学期哪天到哪天、
 // 春季学期哪天到哪天”。后端仍然按学期条目存（每学年两条），但界面按学年折成一行，
-// 一行四个日期，不需要先搞懂“学期”是什么、也不需要一年点两次“新增”。
+// 一行三个日期，不需要先搞懂“学期”是什么、也不需要一年点两次“新增”。
 type AcademicYearRow = {
   academicYear: string;
   fallStart: string;
   fallMidterm: string;
-  fallFinal: string;
   fallEnd: string;
   springStart: string;
   springMidterm: string;
-  springFinal: string;
   springEnd: string;
 };
 
@@ -87,11 +84,9 @@ function groupIntoYearRows(terms: AcademicTerm[]): AcademicYearRow[] {
       academicYear,
       fallStart: fall?.startDate ?? '',
       fallMidterm: fall?.midtermDate ?? '',
-      fallFinal: fall?.finalDate ?? '',
       fallEnd: fall?.endDate ?? '',
       springStart: spring?.startDate ?? '',
       springMidterm: spring?.midtermDate ?? '',
-      springFinal: spring?.finalDate ?? '',
       springEnd: spring?.endDate ?? ''
     });
   });
@@ -104,26 +99,21 @@ function upsertYearRow(base: AcademicTerm[], originalYear: string | null, values
   const kept = base.filter((term) => term.academicYear !== targetYear);
   const nextTerms: AcademicTerm[] = [...kept];
   if (values.fallStart && values.fallEnd) {
-    nextTerms.push({ academicYear: values.academicYear, semester: FALL_LABEL, startDate: values.fallStart, midtermDate: values.fallMidterm, finalDate: values.fallFinal, endDate: values.fallEnd });
+    nextTerms.push({ academicYear: values.academicYear, semester: FALL_LABEL, startDate: values.fallStart, midtermDate: values.fallMidterm, endDate: values.fallEnd });
   }
   if (values.springStart && values.springEnd) {
-    nextTerms.push({ academicYear: values.academicYear, semester: SPRING_LABEL, startDate: values.springStart, midtermDate: values.springMidterm, finalDate: values.springFinal, endDate: values.springEnd });
+    nextTerms.push({ academicYear: values.academicYear, semester: SPRING_LABEL, startDate: values.springStart, midtermDate: values.springMidterm, endDate: values.springEnd });
   }
   return nextTerms;
 }
 
 function calendarDateError(values: AcademicYearRow): string | null {
   const semesters = [
-    { label: '秋季学期', start: values.fallStart, midterm: values.fallMidterm, final: values.fallFinal, end: values.fallEnd },
-    { label: '春季学期', start: values.springStart, midterm: values.springMidterm, final: values.springFinal, end: values.springEnd }
+    { label: '秋季学期', start: values.fallStart, midterm: values.fallMidterm, end: values.fallEnd },
+    { label: '春季学期', start: values.springStart, midterm: values.springMidterm, end: values.springEnd }
   ];
   for (const semester of semesters) {
-    if (semester.midterm < semester.start || semester.midterm > semester.end || semester.final < semester.start || semester.final > semester.end) {
-      return `${semester.label}的期中、期末日期必须在学期起止日期内。`;
-    }
-    if (semester.midterm > semester.final) {
-      return `${semester.label}的期中日期不能晚于期末日期。`;
-    }
+    if (semester.midterm < semester.start || semester.midterm > semester.end) return `${semester.label}的期中日期必须在学期起止日期内。`;
   }
   return null;
 }
@@ -138,11 +128,9 @@ function suggestNextYear(rows: AcademicYearRow[]): AcademicYearRow {
     academicYear: `${startYear}.${startYear + 1}学年`,
     fallStart: `${startYear}-09-01`,
     fallMidterm: `${startYear}-11-01`,
-    fallFinal: `${startYear + 1}-01-10`,
     fallEnd: `${startYear + 1}-01-15`,
     springStart: `${startYear + 1}-02-01`,
     springMidterm: `${startYear + 1}-04-30`,
-    springFinal: `${startYear + 1}-07-10`,
     springEnd: `${startYear + 1}-07-15`
   };
 }
@@ -178,9 +166,7 @@ function AcademicCalendarCard({
     form.setFieldsValue({
       ...row,
       fallMidterm: row.fallMidterm || row.fallStart,
-      fallFinal: row.fallFinal || row.fallEnd,
-      springMidterm: row.springMidterm || row.springStart,
-      springFinal: row.springFinal || row.springEnd
+      springMidterm: row.springMidterm || row.springStart
     });
     setModalOpen(true);
   }
@@ -207,7 +193,7 @@ function AcademicCalendarCard({
   return (
     <Card title="学年校历" extra={<Button type="primary" size="small" icon={<PlusOutlined />} onClick={openAdd}>新增学年</Button>}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        每学年一行，维护秋季、春季学期的起止日期，以及各自的期中、期末日期。可以提前配好下一学年；已开通记录不受影响。
+        每学年一行，维护秋季、春季学期的起止日期及各自的期中日期。可以提前配好下一学年；已开通记录不受影响。
       </Typography.Paragraph>
       {rows.length === 0 ? (
         <Empty description="还没有配置校历，点击右上角新增学年。" />
@@ -218,8 +204,8 @@ function AcademicCalendarCard({
           dataSource={rows}
           columns={[
             { title: '学年', dataIndex: 'academicYear' },
-            { title: '秋季学期', render: (_, row) => row.fallStart && row.fallEnd ? <Space direction="vertical" size={0}><span>{row.fallStart} 至 {row.fallEnd}</span><Typography.Text type="secondary">期中 {row.fallMidterm || '未设置'} · 期末 {row.fallFinal || '未设置'}</Typography.Text></Space> : <Typography.Text type="secondary">未设置</Typography.Text> },
-            { title: '春季学期', render: (_, row) => row.springStart && row.springEnd ? <Space direction="vertical" size={0}><span>{row.springStart} 至 {row.springEnd}</span><Typography.Text type="secondary">期中 {row.springMidterm || '未设置'} · 期末 {row.springFinal || '未设置'}</Typography.Text></Space> : <Typography.Text type="secondary">未设置</Typography.Text> },
+            { title: '秋季学期', render: (_, row) => row.fallStart && row.fallEnd ? <Space direction="vertical" size={0}><span>{row.fallStart} 至 {row.fallEnd}</span><Typography.Text type="secondary">期中 {row.fallMidterm || '未设置'}</Typography.Text></Space> : <Typography.Text type="secondary">未设置</Typography.Text> },
+            { title: '春季学期', render: (_, row) => row.springStart && row.springEnd ? <Space direction="vertical" size={0}><span>{row.springStart} 至 {row.springEnd}</span><Typography.Text type="secondary">期中 {row.springMidterm || '未设置'}</Typography.Text></Space> : <Typography.Text type="secondary">未设置</Typography.Text> },
             {
               title: '操作',
               render: (_, row) => (
@@ -254,14 +240,9 @@ function AcademicCalendarCard({
               <DateField />
             </Form.Item>
           </Space.Compact>
-          <Space.Compact block>
-            <Form.Item name="fallMidterm" label="秋季学期期中" style={{ width: '50%' }} rules={[{ required: true, message: '请选择期中日期' }]}>
-              <DateField />
-            </Form.Item>
-            <Form.Item name="fallFinal" label="秋季学期期末" style={{ width: '50%' }} rules={[{ required: true, message: '请选择期末日期' }]}>
-              <DateField />
-            </Form.Item>
-          </Space.Compact>
+          <Form.Item name="fallMidterm" label="秋季学期期中" rules={[{ required: true, message: '请选择期中日期' }]}>
+            <DateField />
+          </Form.Item>
           <Space.Compact block>
             <Form.Item name="springStart" label="春季学期开始" style={{ width: '50%' }} rules={[{ required: true, message: '请选择开始日期' }]}>
               <DateField />
@@ -270,14 +251,9 @@ function AcademicCalendarCard({
               <DateField />
             </Form.Item>
           </Space.Compact>
-          <Space.Compact block>
-            <Form.Item name="springMidterm" label="春季学期期中" style={{ width: '50%' }} rules={[{ required: true, message: '请选择期中日期' }]}>
-              <DateField />
-            </Form.Item>
-            <Form.Item name="springFinal" label="春季学期期末" style={{ width: '50%' }} rules={[{ required: true, message: '请选择期末日期' }]}>
-              <DateField />
-            </Form.Item>
-          </Space.Compact>
+          <Form.Item name="springMidterm" label="春季学期期中" rules={[{ required: true, message: '请选择期中日期' }]}>
+            <DateField />
+          </Form.Item>
         </Form>
       </FormDrawer>
     </Card>

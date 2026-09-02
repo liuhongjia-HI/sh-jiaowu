@@ -227,12 +227,18 @@ export type StudentOpeningItem = {
   title: string;
 };
 
+export type StudentOpeningPackageGrant = {
+  packageId: string;
+  packageName: string;
+};
+
 export type StudentOpeningCell = {
   contentTypeCode: 'course' | 'handout' | 'question' | 'download';
   opened: boolean;
   packageOpened: boolean;
   directOpened: boolean;
   packageNames: string[];
+  packageGrants: StudentOpeningPackageGrant[];
   items: StudentOpeningItem[];
 };
 
@@ -311,6 +317,13 @@ export type DirectGrantResult = {
   openCourses: string[];
   openMaterials: string[];
   openHomework: string[];
+};
+
+export type GrantRevokeResult = {
+  studentId: string;
+  packageId: string;
+  packageName: string;
+  learningSpaces: string[];
 };
 
 export type StudentLearningRecord = {
