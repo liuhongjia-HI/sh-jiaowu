@@ -6,6 +6,35 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func TestCleanupTestStudentsRemovesOnlyMarkedStudents(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false, SkipBaseData: true})
+	admin := learning.Principal{UserID: "admin", CampusID: "campus-main", Roles: []learning.Role{learning.RoleSuperAdmin}}
+	testStudent, err := store.CreateStudent("管理员", admin, learning.StudentUpsertRequest{Name: "接口测试学生", Phone: "13900000001", Grade: "五年级", Remark: "接口测试"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prodStudent, err := store.CreateStudent("管理员", admin, learning.StudentUpsertRequest{Name: "正式学生", Phone: "13900000002", Grade: "五年级"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := store.CleanupTestStudents("管理员", admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.DeletedCount != 1 || len(result.DeletedIDs) != 1 || result.DeletedIDs[0] != testStudent.ID {
+		t.Fatalf("unexpected cleanup result: %#v", result)
+	}
+	if _, ok := store.findStudent(testStudent.ID); ok {
+		t.Fatal("test student should be removed")
+	}
+	if _, ok := store.findStudent(prodStudent.ID); !ok {
+		t.Fatal("formal student should be kept")
+	}
+	if _, ok := store.findUserByStudentID(testStudent.ID); ok {
+		t.Fatal("test student user should be removed")
+	}
+}
+
 func TestStudentAverageScoreIsDerivedFromGradedSubmissions(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")

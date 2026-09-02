@@ -31,6 +31,12 @@ func filterStudentRows[T any](items []T, remove func(T) bool) []T {
 // record is the student being cleaned. The persistence delta then deletes the
 // corresponding MySQL rows in the same transaction.
 func (s *MemoryStore) cleanupStudentReferences(studentID string) {
+	orderIDs := map[string]bool{}
+	for _, order := range s.commercialOrders {
+		if order.StudentID == studentID {
+			orderIDs[order.ID] = true
+		}
+	}
 	s.users = filterStudentRows(s.users, func(v learning.User) bool { return v.StudentID == studentID })
 	s.guardianStudents = filterStudentRows(s.guardianStudents, func(v learning.GuardianStudent) bool { return v.StudentID == studentID })
 	s.grants = filterStudentRows(s.grants, func(v packageGrant) bool { return v.StudentID == studentID })
@@ -39,6 +45,15 @@ func (s *MemoryStore) cleanupStudentReferences(studentID string) {
 	s.tutoringAssignments = filterStudentRows(s.tutoringAssignments, func(v learning.TutoringAssignment) bool { return v.StudentID == studentID })
 	s.lessonFeedbacks = filterStudentRows(s.lessonFeedbacks, func(v learning.LessonFeedback) bool { return v.StudentID == studentID })
 	s.commercialOrders = filterStudentRows(s.commercialOrders, func(v learning.CommercialOrder) bool { return v.StudentID == studentID })
+	s.payments = filterStudentRows(s.payments, func(v learning.PaymentRecord) bool { return orderIDs[v.OrderID] })
+	s.refunds = filterStudentRows(s.refunds, func(v learning.RefundRecord) bool { return orderIDs[v.OrderID] })
+	s.contracts = filterStudentRows(s.contracts, func(v learning.ContractRecord) bool { return orderIDs[v.OrderID] })
+	s.invoices = filterStudentRows(s.invoices, func(v learning.InvoiceRecord) bool { return orderIDs[v.OrderID] })
+	for index := range s.guardians {
+		if s.guardians[index].LastStudentID == studentID {
+			s.guardians[index].LastStudentID = ""
+		}
+	}
 	s.lessonConsumptions = filterStudentRows(s.lessonConsumptions, func(v learning.LessonConsumption) bool { return v.StudentID == studentID })
 	s.renewalReminders = filterStudentRows(s.renewalReminders, func(v learning.RenewalReminder) bool { return v.StudentID == studentID })
 	s.parentNotices = filterStudentRows(s.parentNotices, func(v learning.ParentNotice) bool { return v.StudentID == studentID })
