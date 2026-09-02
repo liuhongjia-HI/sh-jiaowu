@@ -74,6 +74,18 @@ func (h *LearningHandler) CreateGrant(c *gin.Context) {
 	OK(c, preview)
 }
 
+func (h *LearningHandler) RevokePackageGrant(c *gin.Context) {
+	studentID := strings.TrimSpace(c.Query("studentId"))
+	packageID := strings.TrimSpace(c.Param("packageId"))
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.RevokePackageGrant(operator.(string), studentID, packageID)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
 func (h *LearningHandler) CreateDirectGrant(c *gin.Context) {
 	var req learning.DirectGrantCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

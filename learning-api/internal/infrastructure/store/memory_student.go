@@ -169,6 +169,16 @@ func (s *MemoryStore) openingMatrixForStudent(student learning.Student) []learni
 				} else {
 					cell.PackageOpened = true
 					cell.PackageNames = appendUnique(cell.PackageNames, pkg.Name)
+					alreadyAdded := false
+					for _, packageGrant := range cell.PackageGrants {
+						if packageGrant.PackageID == pkg.ID {
+							alreadyAdded = true
+							break
+						}
+					}
+					if !alreadyAdded {
+						cell.PackageGrants = append(cell.PackageGrants, learning.StudentOpeningPackageGrant{PackageID: pkg.ID, PackageName: pkg.Name})
+					}
 				}
 			}
 		}

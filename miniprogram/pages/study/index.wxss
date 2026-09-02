@@ -285,6 +285,12 @@
   line-height: 1;
 }
 
+.course-action-disabled {
+  background: #e7e9ee;
+  color: #8a8e98;
+  font-weight: 700;
+}
+
 .study-state,
 .study-empty {
   text-align: center;

@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
 
 function loadStudyPage(requestImpl) {
   const pages = [];
@@ -38,6 +40,14 @@ function loadStudyPage(requestImpl) {
 function flushPromises() {
   return new Promise((resolve) => setImmediate(resolve));
 }
+
+test("准备中的课程没有学习入口，也不会绑定点击事件", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/study/index.wxml"), "utf8");
+
+  assert.match(template, /wx:if="{{item\.canOpen}}" class="course-action" bindtap="goDetail"/);
+  assert.match(template, /wx:else class="course-action course-action-disabled">{{item\.accessLabel \|\| '内容准备中'}}<\/view>/);
+  assert.doesNotMatch(template, /class="course-card[^\n]*bindtap="goDetail"/);
+});
 
 test("study page refreshes opened courses when tab is shown again", async () => {
   const calls = [];
@@ -109,4 +119,22 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
   assert.equal(toasts[0].title, "开通后即可学习全部内容");
   page.goDetail({ currentTarget: { dataset: { id: "course-math-first", canOpen: true } } });
   assert.equal(navigations[0].url, "/pages/study-detail/index?id=course-math-first");
+});
+
+test("内容准备中的课程即使存在课程编号也不可进入", async () => {
+  const page = loadStudyPage((path) => {
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.resolve({
+      student: { id: "stu-001", grade: "五年级", openedPackages: ["五年级语文"] },
+      subjects: [
+        { id: "g5-chinese", entryCourseId: "course-chinese", displayName: "语文", subject: "语文", grade: "五年级", accessState: "pending", accessLabel: "内容准备中", canOpen: false }
+      ],
+      courses: [], materials: []
+    });
+  });
+
+  page.loadStudy();
+  await flushPromises();
+
+  assert.equal(page.data.visibleCourses[0].canOpen, false);
 });

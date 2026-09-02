@@ -108,7 +108,7 @@ function decorateCourses(courses, favorites) {
       newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
       entryCourseId: course.entryCourseId || course.id,
-      canOpen: Boolean(course.canOpen || course.id),
+      canOpen: course.accessState !== "locked" && course.accessState !== "pending" && (typeof course.canOpen === "boolean" ? course.canOpen : Boolean(course.id)),
       isLocked: course.accessState === "locked" || course.accessState === "pending",
       imageUrl: course.imageUrl || ""
     };

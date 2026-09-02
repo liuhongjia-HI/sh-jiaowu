@@ -20,6 +20,9 @@ func (s *Service) GrantPreview(studentID, packageID string) (learning.GrantPrevi
 func (s *Service) CreateGrant(operator string, req learning.GrantCreateRequest) (learning.GrantPreview, error) {
 	return s.grant.CreateGrant(operator, req)
 }
+func (s *Service) RevokePackageGrant(operator, studentID, packageID string) (learning.GrantRevokeResult, error) {
+	return s.grant.RevokePackageGrant(operator, studentID, packageID)
+}
 func (s *Service) CreateDirectGrant(operator string, req learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error) {
 	return s.grant.CreateDirectGrant(operator, req)
 }

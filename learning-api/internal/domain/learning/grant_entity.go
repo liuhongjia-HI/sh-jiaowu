@@ -102,6 +102,13 @@ type StudentOpeningItem struct {
 	Title string `json:"title"`
 }
 
+// StudentOpeningPackageGrant identifies a package that contributes an opened
+// cell. A package remains shared, but its grant can be revoked for one student.
+type StudentOpeningPackageGrant struct {
+	PackageID   string `json:"packageId"`
+	PackageName string `json:"packageName"`
+}
+
 // StudentOpeningCell 表示某个课程范围内一种内容的实际开通状态。
 // PackageOpened 和 DirectOpened 分别保留来源，避免运营人员误以为可以关闭课程方案内容。
 type StudentOpeningCell struct {
@@ -110,6 +117,7 @@ type StudentOpeningCell struct {
 	PackageOpened   bool                 `json:"packageOpened"`
 	DirectOpened    bool                 `json:"directOpened"`
 	PackageNames    []string             `json:"packageNames"`
+	PackageGrants   []StudentOpeningPackageGrant `json:"packageGrants"`
 	Items           []StudentOpeningItem `json:"items"`
 }
 
@@ -162,6 +170,13 @@ type DirectGrantResult struct {
 	OpenCourses    []string `json:"openCourses"`
 	OpenMaterials  []string `json:"openMaterials"`
 	OpenHomework   []string `json:"openHomework"`
+}
+
+type GrantRevokeResult struct {
+	StudentID      string   `json:"studentId"`
+	PackageID      string   `json:"packageId"`
+	PackageName    string   `json:"packageName"`
+	LearningSpaces []string `json:"learningSpaces"`
 }
 
 type GrantPreview struct {

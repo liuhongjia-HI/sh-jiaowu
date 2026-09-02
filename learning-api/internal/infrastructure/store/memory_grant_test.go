@@ -165,6 +165,27 @@ func TestReplaceDirectGrantWithCourseKeepsFullLearningContent(t *testing.T) {
 	}
 }
 
+func TestRevokePackageGrantOnlyRemovesTheSelectedStudentsPackageAccess(t *testing.T) {
+	store := NewMemoryStore()
+	studentID := "stu-001"
+	packageID := "pkg-g05-english-s1-full"
+
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: studentID, PackageID: packageID}); err != nil {
+		t.Fatalf("create package grant: %v", err)
+	}
+	if _, err := store.RevokePackageGrant("运营教务", studentID, packageID); err != nil {
+		t.Fatalf("revoke package grant: %v", err)
+	}
+
+	index, found := store.findGrantIndex(studentID, packageID)
+	if !found || store.grants[index].Status != "revoked" {
+		t.Fatalf("expected only the selected package grant to be revoked, got %#v", store.grants)
+	}
+	if _, found := store.findPackage(packageID); !found {
+		t.Fatal("revoking one student's package access must not delete the shared package")
+	}
+}
+
 func TestStudentStudyCountsFullContentForCourseGrant(t *testing.T) {
 	store := NewMemoryStore()
 	request := learning.DirectGrantCreateRequest{

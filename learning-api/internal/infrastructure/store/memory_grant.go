@@ -46,6 +46,38 @@ func (s *MemoryStore) createGrantUnlocked(operator string, req learning.GrantCre
 	return s.createGrantForPackageUnlocked(operator, req, "开通套餐", "调整套餐有效期")
 }
 
+func (s *MemoryStore) revokePackageGrantUnlocked(operator, studentID, packageID string) (learning.GrantRevokeResult, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.GrantRevokeResult, error) {
+			return work.revokePackageGrantUnlocked(operator, studentID, packageID)
+		})
+	}
+	student, exists := s.findStudent(strings.TrimSpace(studentID))
+	if !exists {
+		return learning.GrantRevokeResult{}, errors.New("student not found")
+	}
+	pkg, exists := s.findPackage(strings.TrimSpace(packageID))
+	if !exists {
+		return learning.GrantRevokeResult{}, errors.New("套餐不存在")
+	}
+	if isDirectGrantPackage(pkg.ID) {
+		return learning.GrantRevokeResult{}, errors.New("单独开通内容请在课程范围内取消")
+	}
+	index, exists := s.findGrantIndex(student.ID, pkg.ID)
+	if !exists || s.grants[index].Status == "revoked" {
+		return learning.GrantRevokeResult{}, errors.New("该学生没有生效中的套餐开通")
+	}
+	grant := s.grants[index]
+	grant.Status = "revoked"
+	s.grants[index] = grant
+	s.replaceSpaceAccessForGrant(grant)
+	s.prependLog(operator, "撤销套餐开通", student.Name+" / "+pkg.Name)
+	return learning.GrantRevokeResult{
+		StudentID: student.ID, PackageID: pkg.ID, PackageName: pkg.Name,
+		LearningSpaces: s.learningSpaceNamesForPackage(pkg.ID),
+	}, nil
+}
+
 func (s *MemoryStore) createGrantForPackageUnlocked(operator string, req learning.GrantCreateRequest, openAction, updateAction string) (learning.GrantPreview, error) {
 	preview, err := s.grantPreviewUnlocked(req.StudentID, req.PackageID)
 	if err != nil {
