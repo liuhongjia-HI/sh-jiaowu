@@ -355,6 +355,30 @@ func TestScheduleClassAutoOfficialAccountNotices(t *testing.T) {
 	}
 }
 
+func TestScheduleNoticeIsIdempotentPerStudentAndEvent(t *testing.T) {
+	store := NewMemoryStore()
+	store.notifyScheduleClass(learning.ScheduleClass{
+		ID: "schedule-idempotent", CourseName: "英语课程", DayOfWeek: 3,
+		StartTime: "19:00", EndTime: "20:00", TeacherName: "李老师",
+		Students: []learning.CandidateStudent{{ID: "stu-001", Name: "小明"}},
+	}, "课程调整提醒", "已调整")
+	store.notifyScheduleClass(learning.ScheduleClass{
+		ID: "schedule-idempotent", CourseName: "英语课程", DayOfWeek: 3,
+		StartTime: "19:00", EndTime: "20:00", TeacherName: "李老师",
+		Students: []learning.CandidateStudent{{ID: "stu-001", Name: "小明"}},
+	}, "课程调整提醒", "已调整")
+
+	count := 0
+	for _, notice := range store.notices {
+		if notice.RelatedType == "schedule" && notice.RelatedID == "schedule-idempotent" && notice.Title == "课程调整提醒" {
+			count++
+		}
+	}
+	if count != 2 {
+		t.Fatalf("expected one official record and one station record, got %d: %#v", count, store.notices)
+	}
+}
+
 func findScheduleOfficialNotice(t *testing.T, notices []learning.Notice, scheduleID, title string) learning.Notice {
 	t.Helper()
 	for _, notice := range notices {

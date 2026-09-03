@@ -164,7 +164,7 @@ test("notice without a related detail stays on the list and explains why", async
   assert.deepEqual(toasts, [{ title: "这条通知暂无可查看的详情", icon: "none" }]);
 });
 
-test("notice header lists every linked student by name and grade", async () => {
+test("notice header only identifies the student selected in personal center", async () => {
   const page = loadNoticesPage((path) => {
     if (path === "/student/accounts") {
       return Promise.resolve([
@@ -178,7 +178,8 @@ test("notice header lists every linked student by name and grade", async () => {
   page.onLoad();
   await flushPromises();
 
-  assert.equal(page.data.linkedStudentText, "小星（五年级）、小月（三年级）");
+  assert.equal(page.data.linkedStudentText, "小星（五年级）");
+  assert.equal(page.data.studentCount, 2);
 });
 
 test("notice summary wraps so the complete message remains visible", () => {

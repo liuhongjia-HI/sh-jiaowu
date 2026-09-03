@@ -42,7 +42,7 @@ Page({
           notices: decorateNotices(notices || [], active),
           currentStudentName: active.name || "",
           currentStudentGrade: active.grade || "",
-          linkedStudentText: (accounts || []).map(studentDisplay).filter(Boolean).join("、"),
+          linkedStudentText: studentDisplay(active),
           studentCount: (accounts || []).length,
           loading: false
         }, () => this.applyFilters());

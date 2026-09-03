@@ -725,6 +725,9 @@ func (s *MemoryStore) notifyScheduleClass(item learning.ScheduleClass, title, ac
 			target = student.Name
 			openID = student.OfficialAccountOpenID
 		}
+		if s.hasScheduleNoticeForStudent(item.ID, title, target) {
+			continue
+		}
 		notice := learning.Notice{
 			ID:              "notice-schedule-" + action + "-" + item.ID + "-" + candidate.ID + "-" + time.Now().Format("20060102150405.000000000"),
 			Type:            "课",
@@ -739,6 +742,15 @@ func (s *MemoryStore) notifyScheduleClass(item learning.ScheduleClass, title, ac
 		notice = s.deliverNotice(notice)
 		s.prependNoticeRecord(notice)
 	}
+}
+
+func (s *MemoryStore) hasScheduleNoticeForStudent(scheduleID, title, target string) bool {
+	for _, notice := range s.notices {
+		if notice.RelatedType == "schedule" && notice.RelatedID == scheduleID && notice.Title == title && notice.Target == target {
+			return true
+		}
+	}
+	return false
 }
 
 // updateScheduleSeriesUnlocked 处理「此课次及后续」和「整个系列」两种范围。

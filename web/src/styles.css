@@ -294,7 +294,36 @@ body {
 }
 
 .grade-catalog-heading {
+  align-items: center;
   margin-bottom: 20px;
+}
+
+.grade-catalog-overview-heading {
+  display: block;
+}
+
+.grade-catalog-heading h2 {
+  margin: 0;
+  color: #17202a;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+.grade-catalog-heading p {
+  margin: 10px 0 0;
+  color: #66727e;
+  font-size: 14px;
+}
+
+.grade-catalog-note {
+  width: 100%;
+  margin: 18px auto 0;
+  text-align: center;
+  color: #ff554f;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .grade-group + .grade-group {
@@ -311,7 +340,8 @@ body {
 .grade-group-heading h3 {
   margin: 0;
   color: #25303b;
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .grade-group-heading span {
@@ -327,11 +357,11 @@ body {
 
 .grade-overview-card {
   position: relative;
-  min-height: 144px;
-  padding: 20px;
+  min-height: 142px;
+  padding: 24px;
   overflow: hidden;
   border: 1px solid #dfe7ed;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
   color: #25303b;
   text-align: left;
@@ -365,11 +395,12 @@ body {
 }
 
 .grade-overview-card strong {
-  font-size: 17px;
+  font-size: 20px;
+  line-height: 1.25;
 }
 
 .grade-card-summary {
-  margin-top: 6px;
+  margin-top: 8px;
   color: #66727e;
   font-size: 13px;
 }
@@ -377,7 +408,7 @@ body {
 .grade-card-status {
   display: flex;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 18px;
   color: #66727e;
   font-size: 12px;
 }
@@ -2674,6 +2705,17 @@ button.schedule-block:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .grade-catalog-heading {
+    align-items: flex-start;
+  }
+
+  .grade-catalog-note {
+    margin: 0;
+    text-align: left;
+    padding-top: 4px;
+    white-space: normal;
+  }
+
   .student-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2761,6 +2803,15 @@ button.schedule-block:hover {
 }
 
 @media (max-width: 560px) {
+  .grade-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .grade-overview-card {
+    min-height: 128px;
+    padding: 20px;
+  }
+
   .student-detail-drawer .ant-drawer-body {
     padding: 16px 16px 0;
   }
