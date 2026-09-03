@@ -21,19 +21,30 @@ if [ ! -d "$DIST_DIR/assets" ]; then
 fi
 
 missing=0
-while IFS= read -r asset_name; do
-  if [ ! -f "$DIST_DIR/assets/$asset_name" ]; then
-    echo "Missing referenced web asset: $DIST_DIR/assets/$asset_name" >&2
-    missing=1
+checked_files=""
+files_to_check=("$INDEX_FILE")
+
+while [ "${#files_to_check[@]}" -gt 0 ]; do
+  source_file="${files_to_check[0]}"
+  files_to_check=("${files_to_check[@]:1}")
+  if printf '%s' "$checked_files" | grep -Fqx "$source_file"; then
+    continue
   fi
-done < <(
-  if [ "$MODE" = "--entry-only" ]; then
-    grep -hEo '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]+\.(js|css)' "$INDEX_FILE" || true
-  else
-    find "$DIST_DIR" -maxdepth 2 -type f \( -name '*.html' -o -name '*.js' -o -name '*.css' \) -exec grep -hEo '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]+\.(js|css)' {} + || true
-  fi |
-    sort -u
-)
+  checked_files="${checked_files}${source_file}"$'\n'
+
+  while IFS= read -r asset_name; do
+    [ -n "$asset_name" ] || continue
+    asset_file="$DIST_DIR/assets/$asset_name"
+    if [ ! -f "$asset_file" ]; then
+      echo "Missing referenced web asset: $asset_file" >&2
+      missing=1
+      continue
+    fi
+    if [ "$MODE" != "--entry-only" ]; then
+      files_to_check+=("$asset_file")
+    fi
+  done < <(grep -hEo '[A-Za-z0-9_.-]+-[A-Za-z0-9_-]+\.(js|css)' "$source_file" || true)
+done
 
 if [ "$missing" -ne 0 ]; then
   echo "Web asset validation failed." >&2
