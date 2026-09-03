@@ -743,10 +743,10 @@
 }
 
 .banner-visual {
-  right: 10rpx;
-  top: 68rpx;
-  width: 206rpx;
-  height: 210rpx;
+  right: 18rpx;
+  top: 78rpx;
+  width: 176rpx;
+  height: 186rpx;
 }
 
 .paper-card,
@@ -755,10 +755,10 @@
 }
 
 .paper-card {
-  left: 28rpx;
-  top: 60rpx;
-  width: 104rpx;
-  height: 124rpx;
+  left: 22rpx;
+  top: 54rpx;
+  width: 86rpx;
+  height: 104rpx;
   background: #fffaf7;
 }
 
@@ -769,19 +769,19 @@
 
 .score-card {
   left: 0;
-  top: 24rpx;
-  width: 104rpx;
-  height: 48rpx;
-  border-radius: 24rpx;
+  top: 18rpx;
+  width: 88rpx;
+  height: 42rpx;
+  border-radius: 21rpx;
   background: #ff8a5c;
-  font-size: 23rpx;
+  font-size: 21rpx;
 }
 
 .phone-card {
-  right: 4rpx;
-  top: 28rpx;
-  width: 64rpx;
-  height: 116rpx;
+  right: 0;
+  top: 22rpx;
+  width: 54rpx;
+  height: 98rpx;
   border-color: #ff9a73;
 }
 
