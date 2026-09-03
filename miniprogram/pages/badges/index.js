@@ -3,7 +3,7 @@ const { request } = require("../../utils/request");
 Page({
   data: {
     loading: true,
-    emptyMessage: "继续学习，点亮属于你的成长徽章吧。",
+    emptyMessage: "继续学习，点亮成长徽章。",
     badges: [],
     obtainedCount: 0
   },

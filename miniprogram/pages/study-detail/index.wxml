@@ -9,15 +9,15 @@
     <view class="detail-summary-copy">
       <view class="detail-status"><text>●</text> 正在学习</view>
       <view class="detail-title">{{course.name || "学习课程"}}</view>
-      <view class="detail-meta">讲师：{{teacherText}} <text>｜</text> 时长：{{course.duration || "持续学习"}}</view>
-      <view class="detail-progress-row"><text>已学 {{progress}}%</text><text>{{progress >= 100 ? "已完成" : "继续加油"}}</text></view>
+      <view wx:if="{{teacherText || course.duration}}" class="detail-meta">{{teacherText ? '老师：' + teacherText : ''}}{{teacherText && course.duration ? ' ｜ ' : ''}}{{course.duration ? '时长：' + course.duration : ''}}</view>
+      <view class="detail-progress-row"><text>已学 {{progress}}%</text><text>{{progress >= 100 ? "已完成" : (progress > 0 ? "继续学习" : "开始学习")}}</text></view>
       <view class="detail-progress"><view class="detail-progress-bar" style="width: {{progress}}%;"></view></view>
     </view>
     <view class="detail-book-art">📖</view>
   </view>
 
   <view class="detail-section-head">
-    <view class="detail-section-title">课程目录 <text>（共 {{stations.length}} 节）</text></view>
+    <view class="detail-section-title">课程目录 <text>· {{stations.length}} 节</text></view>
   </view>
   <scroll-view class="tag-filter" scroll-x="true" enable-flex="true" wx:if="{{tags.length}}">
     <view class="tag-filter-inner">
@@ -40,10 +40,10 @@
 
   <view class="detail-section-head material-head">
     <view class="detail-section-title material-title-toggle" bindtap="toggleMaterials">
-      课程讲义 <text>（{{materials.length}} 份）</text>
-      <text wx:if="{{materials.length > 2}}" class="material-toggle-hint">{{materialsExpanded ? "收起" : "展开全部"}}</text>
+      课程讲义 <text>· {{materials.length}} 份</text>
+      <text wx:if="{{materials.length > 2}}" class="material-toggle-hint">{{materialsExpanded ? "收起" : "展开"}}</text>
     </view>
-    <view class="detail-section-link" bindtap="goPreview">{{canDownloadMaterials ? "全部讲义下载" : "查看全部讲义"}} ›</view>
+    <view class="detail-section-link" bindtap="goPreview">{{canDownloadMaterials ? "下载全部" : "查看全部"}} ›</view>
   </view>
   <view wx:if="{{visibleMaterials.length}}" class="material-list">
     <view wx:for="{{visibleMaterials}}" wx:key="id" class="material-row" data-id="{{item.id}}" bindtap="previewMaterial">
@@ -60,8 +60,8 @@
   <view class="detail-feedback">
     <view class="detail-section-head">
       <view class="detail-section-title">课堂反馈</view>
-      <view class="detail-section-link">去反馈 ›</view>
+      <view class="detail-section-link">写反馈 ›</view>
     </view>
-    <view class="detail-feedback-copy">对本节课有什么收获或疑问？快来反馈吧～</view>
+    <view class="detail-feedback-copy">有收获或疑问？欢迎反馈</view>
   </view>
 </view>

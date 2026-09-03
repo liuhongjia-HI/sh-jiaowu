@@ -1,12 +1,12 @@
 <view class="study-page">
   <view class="study-heading">
     <view class="study-heading-title">学习中心</view>
-    <view class="study-heading-sub">把每一次学习，都变成看得见的进步</view>
+    <view class="study-heading-sub">课程、讲义和练习都在这里</view>
   </view>
 
   <view class="study-search">
     <view class="study-search-icon">⌕</view>
-    <input class="study-search-input" value="{{keyword}}" placeholder="搜索内容名称" bindinput="changeKeyword" confirm-type="search" />
+    <input class="study-search-input" value="{{keyword}}" placeholder="搜索课程或资料" bindinput="changeKeyword" confirm-type="search" />
   </view>
 
   <view class="study-tabs">

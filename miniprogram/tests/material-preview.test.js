@@ -430,7 +430,7 @@ test("small challenge does not use a task that is missing the material's lesson"
   await flushPromises();
 
   assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
-  assert.deepEqual(toastTitles, ["本课节暂无小挑战"]);
+  assert.deepEqual(toastTitles, ["本课节暂无练习"]);
 });
 
 test("small challenge opens the task list when the lesson has no matching task", async () => {
@@ -451,5 +451,5 @@ test("small challenge opens the task list when the lesson has no matching task",
   await flushPromises();
 
   assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
-  assert.deepEqual(toastTitles, ["本课节暂无小挑战"]);
+  assert.deepEqual(toastTitles, ["本课节暂无练习"]);
 });

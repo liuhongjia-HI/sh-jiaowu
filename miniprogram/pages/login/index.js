@@ -122,8 +122,8 @@ Page({
     const detail = event.detail || {};
     if (isCancel(detail)) {
       wx.showModal({
-        title: "已取消手机号授权",
-        content: "你可以继续填写资料，也可以先返回首页，之后再完成绑定。",
+      title: "已取消手机号授权",
+      content: "可继续填写资料，也可以返回首页后再绑定。",
         confirmText: "返回首页",
         cancelText: "继续填写",
         success: ({ confirm }) => {
@@ -200,7 +200,7 @@ Page({
   },
   promptStudentSelection(candidates, payload, path) {
     if (!candidates.length) {
-      wx.showToast({ title: "未找到可绑定的学生，请联系老师", icon: "none" });
+      wx.showToast({ title: "未找到可绑定的学生，请联系老师确认", icon: "none" });
       return;
     }
     wx.showActionSheet({

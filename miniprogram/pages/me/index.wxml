@@ -60,7 +60,7 @@
           <view class="recent-progress"><view class="recent-progress-bar" style="width: {{recentLearning.progress}}%;"></view></view>
         </view>
       </view>
-      <view wx:else class="recent-empty">还没有最近学习记录，去学习中心看看吧。</view>
+          <view wx:else class="recent-empty">暂无学习记录，去学习吧。</view>
     </view>
 
     <view class="metric-strip">

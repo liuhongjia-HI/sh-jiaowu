@@ -5,7 +5,7 @@ Page({
     loading: true,
     error: "",
     visitorMode: false,
-    emptyMessage: "请先登录绑定，或联系老师开通学习套餐。",
+    emptyMessage: "请先登录，或联系老师开通课程。",
     greeting: "你好",
     greetingName: "同学",
     keyword: "",
@@ -26,7 +26,7 @@ Page({
     feedbackItems: [],
     subscriptionReminder: null,
     subscribeEnabled: false,
-    courseTitle: "待解锁学习星球",
+    courseTitle: "待开通课程",
     courseMeta: "",
     bannerTag: "继续学习",
     shortcuts: buildShortcuts(),
@@ -138,7 +138,7 @@ Page({
           feedbackItems,
           subscriptionReminder: decorateSubscription(home.subscriptionReminder, subscribeEnabled),
           subscribeEnabled,
-          courseTitle: selectedCourse.name || "待解锁学习星球",
+          courseTitle: selectedCourse.name || "待开通课程",
           courseMeta: formatCourseMeta(selectedCourse),
           bannerTag: pendingTask ? "今日题目" : "继续学习",
           loading: false
@@ -147,7 +147,7 @@ Page({
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
-        emptyMessage: error.message || "请先登录绑定，或联系老师开通学习套餐。",
+          emptyMessage: error.message || "请先登录，或联系老师开通课程。",
         hasContent: false,
         hasOpenedPackage: false,
         recommendations: [],
@@ -177,7 +177,7 @@ Page({
       currentCourseIndex: index,
       continueCourse: selectedCourse,
       progressPercent: Number(selectedCourse.progress) || 0,
-      courseTitle: selectedCourse.name || "待解锁学习星球",
+          courseTitle: selectedCourse.name || "待开通课程",
       courseMeta: formatCourseMeta(selectedCourse),
       bannerTag: index === 0 && this.data.pendingTask ? "今日题目" : "继续学习"
     });
@@ -216,7 +216,7 @@ Page({
       .catch((error) => this.setData({
         recommendations: [],
         visibleRecommendations: [],
-        recommendationError: error.message || "推荐套餐加载失败，请稍后重试。",
+        recommendationError: error.message || "推荐课程加载失败，请稍后重试。",
         recommendationsLoading: false
       }));
   },
@@ -271,7 +271,7 @@ Page({
   },
   goFirstMaterial() {
     if (!this.data.firstMaterial || !this.data.firstMaterial.id) {
-      wx.showToast({ title: "老师发布资料后会显示在这里", icon: "none" });
+      wx.showToast({ title: "老师发布讲义后会显示在这里", icon: "none" });
       wx.switchTab({ url: "/pages/study/index" });
       return;
     }
@@ -290,7 +290,7 @@ Page({
   goLatestFeedback() {
     const latest = (this.data.feedbackItems || [])[0];
     if (!latest || !latest.relatedSubmissionId) {
-      wx.showToast({ title: "老师完成批改后会显示课堂反馈", icon: "none" });
+      wx.showToast({ title: "老师批改后会显示反馈", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/result/index?id=${latest.relatedSubmissionId}` });
@@ -399,7 +399,7 @@ Page({
   contactTeacher(event) {
     const name = event.currentTarget.dataset.name || "该套餐";
     wx.showModal({
-      title: "联系老师开通",
+      title: "联系老师",
       content: `请联系老师或教务开通“${name}”。开通后，学习内容和资料会自动出现在学习中心。`,
       showCancel: false,
       confirmText: "我知道了"
@@ -450,7 +450,7 @@ function buildCourseSlides(courses, pendingTask) {
   if (!courses.length) {
     return [{
       id: "empty-course",
-      name: "待解锁学习星球",
+      name: "待开通课程",
       progress: 0,
       hasCourse: false,
       meta: "",
@@ -496,7 +496,7 @@ function buildFallbackTodos({ pendingHomework, continueCourse, subscribeEnabled 
     type: "homework",
     title: item.title || "待完成练习",
     summary: [item.course, item.deadline ? `截止 ${item.deadline}` : "", item.questionCount ? `${item.questionCount} 道题` : ""].filter(Boolean).join(" · "),
-    actionText: "去完成",
+    actionText: "开始练习",
     path: item.id ? `/pages/answer/index?id=${item.id}` : "/pages/tasks/index",
     priority: 100 - index,
     status: item.studentStatus || "待完成"
@@ -506,7 +506,7 @@ function buildFallbackTodos({ pendingHomework, continueCourse, subscribeEnabled 
     type: "schedule",
     title: "继续学习",
     summary: [continueCourse.name, continueCourse.grade, continueCourse.subject].filter(Boolean).join(" · "),
-    actionText: "去学习",
+    actionText: "继续学习",
     path: `/pages/study-detail/index?id=${continueCourse.id}`,
     priority: 60,
     status: "进行中"
@@ -594,7 +594,7 @@ function buildShortcuts() {
 
 function homeEmptyMessage(hasOpenedPackage) {
   if (hasOpenedPackage) {
-    return "学习套餐已开通，老师发布学习内容、资料或小挑战后会显示在这里。";
+    return "课程已开通，内容发布后会显示在这里。";
   }
-  return "你的身份已绑定，暂时还没有开通学习套餐，请联系老师或教务确认开通。";
+  return "暂时还没有开通课程，请联系老师确认。";
 }

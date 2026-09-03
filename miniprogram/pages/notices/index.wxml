@@ -9,7 +9,7 @@
       <view class="notice-student-label">{{studentCount > 1 ? "已关联学生" : "当前查看学生"}}</view>
       <view class="notice-student-name">{{linkedStudentText}}</view>
     </view>
-    <view class="notice-student-action">{{studentCount > 1 ? "切换学生" : "查看个人中心"}} ›</view>
+    <view class="notice-student-action">{{studentCount > 1 ? "切换学生" : "个人中心"}} ›</view>
   </view>
 
   <view class="notice-tabs">
@@ -23,8 +23,8 @@
       <view class="notice-empty-star">✦</view>
     </view>
     <view class="notice-empty-title">{{notices.length === 0 ? "暂无新消息" : "这个分类还没有消息"}}</view>
-    <view class="notice-empty-sub">{{notices.length === 0 ? "课程更新和学习提醒会显示在这里" : "切换到“全部”查看其他通知"}}</view>
-    <button class="notice-empty-button" bindtap="goStudy">去学习中心</button>
+      <view class="notice-empty-sub">{{notices.length === 0 ? "课程和学习提醒会显示在这里" : "切换到“全部”查看"}}</view>
+      <button class="notice-empty-button" bindtap="goStudy">去学习</button>
   </view>
   <view wx:else class="notice-list">
     <view wx:for="{{visibleNotices}}" wx:key="id" class="notice-item" data-id="{{item.id}}" bindtap="goNotice">

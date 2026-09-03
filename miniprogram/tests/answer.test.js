@@ -121,7 +121,7 @@ test("answer page blocks submission when any question is unanswered", () => {
   assert.equal(calls.some((item) => item[0] === "request"), false);
   assert.deepEqual(calls.find((item) => item[0] === "showToast"), [
     "showToast",
-    { title: "还有题目没有完成哦", icon: "none" }
+    { title: "还有题目未完成", icon: "none" }
   ]);
 });
 

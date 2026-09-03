@@ -11,14 +11,14 @@
       <view class="badge">{{rewardText}}</view>
       <view class="badge">🔓 下一节已解锁</view>
     </view>
-    <view class="sub">继续保持，争取解锁更多成长徽章。</view>
+    <view class="sub">继续学习，解锁更多徽章。</view>
   </view>
   <view class="card blue">
     <view class="title">老师评语</view>
     <rich-text class="sub rich-text" nodes="{{teacherCommentNodes}}"></rich-text>
   </view>
   <view class="button-row">
-    <button class="button light" bindtap="goBack">返回小挑战</button>
+    <button class="button light" bindtap="goBack">返回练习</button>
     <button class="button" bindtap="goStudy">继续学习</button>
   </view>
 </view>

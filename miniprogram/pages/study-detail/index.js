@@ -98,7 +98,7 @@ Page({
   goAnswer() {
     const homework = this.data.homework[0];
     if (!homework) {
-      wx.showToast({ title: "暂无小挑战", icon: "none" });
+      wx.showToast({ title: "暂无练习", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/answer/index?id=${homework.id}` });

@@ -33,7 +33,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: this.data.taskTitle ? `我完成了 Starline 小挑战：${this.data.taskTitle}` : "我完成了 Starline 小挑战",
+      title: this.data.taskTitle ? `我完成了 Starline 练习：${this.data.taskTitle}` : "我完成了 Starline 练习",
       path: "/pages/home/index"
     };
   },

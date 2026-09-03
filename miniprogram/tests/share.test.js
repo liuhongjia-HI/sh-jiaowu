@@ -85,7 +85,7 @@ test("study detail keeps lecture list collapsed until expanded", () => {
   const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
 
   assert.equal(page.data.materialsExpanded, false);
-  assert.match(wxml, /全部讲义下载/);
+  assert.match(wxml, /下载全部/);
   assert.match(wxml, /wx:if="\{\{visibleMaterials\.length\}\}"/);
 
   page.toggleMaterials();

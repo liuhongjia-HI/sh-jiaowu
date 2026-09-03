@@ -30,5 +30,5 @@
   </view>
 </view>
 <view class="section">
-  <view class="bubble">账号被停用或暂未开通学习星球时，请联系老师或管理员处理。</view>
+  <view class="bubble">账号未开通或已停用，请联系老师。</view>
 </view>

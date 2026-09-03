@@ -4,7 +4,7 @@ Page({
   data: {
     loading: true,
     error: "",
-    emptyMessage: "新挑战发布后，会第一时间出现在这里。",
+    emptyMessage: "新练习发布后，会显示在这里。",
     activeFilter: "全部",
     filters: [
       { label: "全部", className: "active" },
@@ -20,7 +20,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "Starline 课后小挑战",
+      title: "Starline 课后练习",
       path: "/pages/tasks/index"
     };
   },
@@ -37,7 +37,7 @@ Page({
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
-        emptyMessage: error.message || "新挑战发布后，会第一时间出现在这里。",
+        emptyMessage: error.message || "新练习发布后，会显示在这里。",
         loading: false
       }));
   },

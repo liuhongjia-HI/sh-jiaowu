@@ -21,7 +21,7 @@
   <view class="section">
     <view class="section-title">考试成绩</view>
     <view wx:if="{{examScores.length === 0}}" class="empty-card">
-      <view class="sub">还没有考试成绩。</view>
+      <view class="sub">暂无考试成绩。</view>
     </view>
     <view wx:for="{{examScores}}" wx:key="subject" class="card">
       <view class="row">
@@ -45,7 +45,7 @@
   <view class="section">
     <view class="section-title">平时练习</view>
     <view wx:if="{{practiceRecords.length === 0}}" class="empty-card">
-      <view class="sub">还没有平时练习记录。</view>
+      <view class="sub">暂无练习记录。</view>
     </view>
     <view wx:for="{{practiceRecords}}" wx:key="id" class="card blue">
       <view class="row">

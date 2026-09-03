@@ -1,11 +1,11 @@
 <view class="hero">
   <view class="eyebrow">资料预览</view>
   <view class="hero-title">{{pageTitle}}</view>
-  <view class="badge">{{material.downloadUrl ? '当前可以下载保存' : '资料仅在线查看'}}</view>
+  <view class="badge">{{material.downloadUrl ? '支持下载' : '仅支持在线查看'}}</view>
 </view>
 <view class="section">
   <view class="card">
-    <view class="bubble">学习小提示：先看资料里的例子，再做小挑战会更轻松。</view>
+    <view class="bubble">学习提示：先看例子，再做练习。</view>
     <view class="row preview-meta">
       <view class="sub">学习进度已自动保存</view>
       <view class="sub">已添加专属水印</view>
@@ -34,7 +34,7 @@
 
     <view wx:elif="{{previewMode === 'unknown' || previewMode === 'processing'}}" class="preview-unavailable preview-processing">
       <view class="preview-unavailable-icon">⏳</view>
-      <view class="preview-unavailable-title">{{previewMode === 'processing' ? '课件预览正在生成' : '正在加载课件预览'}}</view>
+        <view class="preview-unavailable-title">{{previewMode === 'processing' ? '预览生成中' : '加载预览中'}}</view>
       <view wx:if="{{previewMessage}}" class="preview-unavailable-message">{{previewMessage}}</view>
     </view>
 
@@ -57,9 +57,9 @@
       <view class="badge">距离小徽章还差一步</view>
     </view>
     <view class="button-row">
-      <button class="button light {{material.downloadUrl ? '' : 'solo-secondary'}}" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏资料 ♡'}}</button>
+      <button class="button light {{material.downloadUrl ? '' : 'solo-secondary'}}" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
       <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
-      <button class="button challenge-button" bindtap="goAnswer">去做小挑战</button>
+      <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
     </view>
   </view>
 </view>

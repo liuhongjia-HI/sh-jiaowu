@@ -4,7 +4,7 @@ Page({
   data: {
     loading: true,
     error: "",
-    emptyMessage: "有新小挑战、批改结果或资料更新时，会提醒你。",
+    emptyMessage: "课程、练习和反馈有更新时，会提醒你。",
     activeFilter: "全部",
     filters: [
       { label: "全部", className: "active" },
@@ -49,7 +49,7 @@ Page({
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
-        emptyMessage: error.message || "有新小挑战、批改结果或资料更新时，会提醒你。",
+        emptyMessage: error.message || "课程、练习和反馈有更新时，会提醒你。",
         loading: false
       }));
   },

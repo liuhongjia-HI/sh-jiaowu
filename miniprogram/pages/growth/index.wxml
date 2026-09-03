@@ -1,6 +1,6 @@
 <view class="hero">
-  <view class="eyebrow">我的成长轨迹</view>
-  <view class="hero-title">看看你的进步 🌱</view>
+  <view class="eyebrow">成长记录</view>
+  <view class="hero-title">记录每一步进步 🌱</view>
 </view>
 <view wx:if="{{loading}}" class="empty">正在加载成长记录...</view>
 <view wx:elif="{{records.length === 0}}" class="section">

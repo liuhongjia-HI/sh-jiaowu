@@ -1,5 +1,5 @@
 <view class="hero">
-  <view class="eyebrow">我的徽章墙</view>
+  <view class="eyebrow">成长徽章</view>
   <view class="hero-title">已点亮 {{obtainedCount}} 枚徽章 🏅</view>
 </view>
 <view wx:if="{{loading}}" class="empty">正在加载徽章...</view>
@@ -8,6 +8,6 @@
     <view class="badge-icon">{{item.obtained ? item.icon : '🔒'}}</view>
     <view class="title small-title">{{item.name}}</view>
     <view class="sub">{{item.desc}}</view>
-    <view class="muted">{{item.obtained ? '已获得' : '未点亮'}}</view>
+    <view class="muted">{{item.obtained ? '已获得' : '待获得'}}</view>
   </view>
 </view>

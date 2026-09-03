@@ -4,13 +4,13 @@ const { activateContentSecurity } = require("../../utils/content-security");
 Page({
   data: {
     homeworkId: "",
-    taskTitle: "课后小挑战",
+    taskTitle: "课后练习",
     deadlineText: "",
-    rewardText: "做完就能获得新徽章",
+    rewardText: "完成练习可获得徽章",
     questions: [],
-    watermarkText: "专属水印加载中",
-    watermarkTexts: ["专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中", "专属水印加载中"],
-    securityNotice: "学习内容仅限本人查看，请勿外传。",
+    watermarkText: "水印加载中",
+    watermarkTexts: ["水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中"],
+    securityNotice: "仅供本人学习，请勿外传。",
     favorited: false,
     favoriteId: "",
     saving: false,
@@ -41,15 +41,15 @@ Page({
         choices: [],
         text: ""
       }));
-      const watermarkText = homework.watermarkText || "专属水印加载中";
+      const watermarkText = homework.watermarkText || "水印加载中";
       this.setData({
-        taskTitle: `${homework.assessmentType === "mock_exam" ? "模拟考试 · " : "练习 · "}${homework.title || "课后小挑战"}`,
+        taskTitle: `${homework.assessmentType === "mock_exam" ? "模拟考试 · " : "练习 · "}${homework.title || "课后练习"}`,
         deadlineText: homework.isOverdue ? "已截止" : (homework.deadlineAt ? `截止 ${formatDeadline(homework.deadlineAt)}` : (homework.deadline ? `${homework.deadline} 前完成` : "")),
-        rewardText: homework.course || "做完就能获得新徽章",
+        rewardText: homework.course || "完成练习可获得徽章",
         questions: restoreDraftAnswers(id, questions),
         watermarkText,
         watermarkTexts: buildWatermarks(watermarkText),
-        securityNotice: homework.securityNotice || "学习内容仅限本人查看，请勿外传。",
+        securityNotice: homework.securityNotice || "仅供本人学习，请勿外传。",
         isOverdue: Boolean(homework.isOverdue)
       });
     }).catch(() => {
@@ -62,7 +62,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: this.data.taskTitle ? `Starline 小挑战：${this.data.taskTitle}` : "Starline 课后小挑战",
+      title: this.data.taskTitle ? `Starline 练习：${this.data.taskTitle}` : "Starline 课后练习",
       path: this.data.homeworkId ? `/pages/answer/index?id=${encodeURIComponent(this.data.homeworkId)}` : "/pages/tasks/index"
     };
   },
@@ -159,7 +159,7 @@ Page({
       question.type === "single" || question.type === "judge" ? !question.choice : question.type === "multiple" ? !(question.choices || []).length : !question.text.trim()
     );
     if (unanswered) {
-      wx.showToast({ title: "还有题目没有完成哦", icon: "none" });
+          wx.showToast({ title: "还有题目未完成", icon: "none" });
       return;
     }
     this.setData({ saving: true });

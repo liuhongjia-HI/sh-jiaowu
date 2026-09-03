@@ -3,7 +3,7 @@ const { request } = require("../../utils/request");
 Page({
   data: {
     loading: true,
-    emptyMessage: "老师录入成绩或完成批改后，这里会显示学习效果。",
+    emptyMessage: "完成练习或测评后，这里会显示成绩。",
     examScores: [],
     practiceRecords: [],
     latestSummary: null
@@ -64,9 +64,9 @@ function normalizeExamScores(scores) {
       trend,
       examTypeText: latest.examType || "阶段测评",
       latestScoreText: latest.fullScore ? `${latest.score}/${latest.fullScore}` : `${latest.score || 0}`,
-      problemPoint: summary.problemPoint || summary.description || "老师还没有标记问题点。",
-      nextStep: summary.nextStep || latest.teacherComment || "老师还没有填写下一步建议。",
-      teacherComment: latest.teacherComment || summary.description || "老师还没有填写建议。"
+      problemPoint: summary.problemPoint || summary.description || "老师暂未填写问题点。",
+      nextStep: summary.nextStep || latest.teacherComment || "老师暂未填写下一步建议。",
+      teacherComment: latest.teacherComment || summary.description || "老师暂未填写建议。"
     };
   });
 }

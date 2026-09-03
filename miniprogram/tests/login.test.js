@@ -224,7 +224,7 @@ test("login page lets users return home after cancelling phone authorization", (
   assert.deepEqual(calls.find((item) => item[0] === "showModal"), [
     "showModal",
     "已取消手机号授权",
-    "你可以继续填写资料，也可以先返回首页，之后再完成绑定。",
+    "可继续填写资料，也可以返回首页后再绑定。",
     "返回首页",
     "继续填写"
   ]);

@@ -4,7 +4,7 @@ Page({
   data: {
     loading: true,
     error: "",
-    emptyMessage: "老师开通学习套餐后，你会在这里看到学习星球。",
+    emptyMessage: "开通课程后，这里会显示学习内容。",
     keyword: "",
     activeFilter: "全部",
     filters: [
@@ -90,7 +90,7 @@ Page({
       })
       .catch((error) => this.setData({
         error: error.message || "加载失败",
-        emptyMessage: error.message || "老师开通学习套餐后，你会在这里看到学习星球。",
+        emptyMessage: error.message || "开通课程后，这里会显示学习内容。",
         hasOpenedPackage: false,
         authRequired: !hasStudentToken(),
         loginPrompted: !hasStudentToken(),
@@ -178,7 +178,7 @@ function formatCourseTime(value) {
 
 function studyEmptyMessage(hasOpenedPackage) {
   if (hasOpenedPackage) {
-    return "学习套餐已开通，老师发布学习内容后会显示在这里。你也可以先回首页查看资料和小挑战。";
+    return "课程已开通，内容发布后会显示在这里。";
   }
-  return "你的身份已绑定，暂时还没有开通学习套餐，请联系老师或教务确认。";
+  return "暂时还没有开通课程，请联系老师确认。";
 }

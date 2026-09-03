@@ -20,7 +20,7 @@ Page({
     savingBasicProfile: false,
     profileEditing: false,
     profileEditText: "编辑",
-    emptyMessage: "登录后可以同步学习记录、小挑战结果和老师反馈。",
+    emptyMessage: "登录后可同步学习记录和老师反馈。",
     me: null,
     home: null,
     continueCourse: null,
@@ -79,9 +79,9 @@ Page({
         this.loadStudentAccounts();
       })
       .catch((error) => {
-        const message = error.message || "登录后可以同步学习记录、小挑战结果和老师反馈。";
+        const message = error.message || "登录后可同步学习记录和老师反馈。";
         if (options.silent && this.data.me) {
-          wx.showToast({ title: error.message || "学习记录刷新失败", icon: "none" });
+          wx.showToast({ title: error.message || "学习记录更新失败", icon: "none" });
           return;
         }
         this.setData({
@@ -381,7 +381,7 @@ Page({
   goLatestFeedback() {
     const feedback = (this.data.home && this.data.home.classroomFeedback || [])[0];
     if (!feedback || !feedback.relatedSubmissionId) {
-      wx.showToast({ title: "老师完成批改后会显示课堂反馈", icon: "none" });
+      wx.showToast({ title: "老师批改后会显示反馈", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/result/index?id=${feedback.relatedSubmissionId}` });
@@ -528,9 +528,9 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
       action: "answer",
       tone: "urgent",
       label: "待完成",
-      title: pendingTask.title || "有小挑战待完成",
-      desc: meta || "完成后可以查看得分和老师反馈。",
-      buttonText: "去完成"
+      title: pendingTask.title || "有练习待完成",
+      desc: meta || "完成后查看得分和反馈。",
+      buttonText: "开始练习"
     };
   }
   if (continueCourse && continueCourse.id) {
@@ -551,7 +551,7 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
       tone: "review",
       label: "学习反馈",
       title: "查看最近成绩反馈",
-      desc: "看看老师建议，再安排下一次练习。",
+      desc: "查看老师建议，继续练习。",
       buttonText: "查看反馈"
     };
   }
@@ -559,9 +559,9 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
     action: "study",
     tone: "quiet",
     label: "学习状态",
-    title: "老师发布内容后会提醒你",
-    desc: "你可以先进入学习中心查看已开通内容。",
-    buttonText: "去学习中心"
+      title: "有新内容时会提醒你",
+      desc: "去学习中心查看已开通课程。",
+      buttonText: "去学习"
   };
 }
 
@@ -600,7 +600,7 @@ function buildProfileCompleteness(student = {}) {
     statusClass: complete ? "complete" : "pending",
     status: complete ? "资料完整" : "资料待补全",
     summary: complete ? `${student.name} · ${student.grade} · ${student.schoolName}` : `待补全：${missing.join("、")}`,
-    detail: complete ? "老师记录成绩和反馈时会使用这些信息。" : "补全后，老师录入成绩和反馈会更准确。"
+    detail: complete ? "老师会用这些信息记录成绩和反馈。" : "补全后，成绩和反馈记录会更准确。"
   };
 }
 
@@ -608,7 +608,7 @@ function buildSupportNotice(notices = [], pendingHomework = []) {
   const pendingCount = Array.isArray(pendingHomework) ? pendingHomework.length : 0;
   const noticeCount = Array.isArray(notices) ? notices.length : 0;
   if (pendingCount > 0) {
-    return { action: "tasks", title: "还有小挑战待完成", desc: `${pendingCount} 个任务等待处理`, actionText: "去处理" };
+    return { action: "tasks", title: "还有练习待完成", desc: `${pendingCount} 个练习待完成`, actionText: "开始练习" };
   }
   if (noticeCount > 0) {
     return { action: "notices", title: "有新的通知", desc: `${noticeCount} 条通知需要查看`, actionText: "查看" };

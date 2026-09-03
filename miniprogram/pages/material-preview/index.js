@@ -7,7 +7,7 @@ Page({
     pageTitle: "资料预览",
     paperTitle: "",
     readText: "",
-    securityNotice: "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。",
+    securityNotice: "仅供本人学习，请勿分享、截图或录屏。",
     favorited: false,
     favoriteId: "",
     // previewMode: unknown 加载中 / processing 生成中 / image 首图预览 / pdf 无缩略图降级 / cover-error 首图失败 / unavailable 不可用
@@ -40,7 +40,7 @@ Page({
         pageTitle: material.title,
         paperTitle: (material.curriculum && material.curriculum.lesson) || material.title,
         readText: `${material.viewCount || 0} 人学过`,
-        securityNotice: material.securityNotice || "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。"
+        securityNotice: material.securityNotice || "仅供本人学习，请勿分享、截图或录屏。"
       });
       this.loadPagedPreview(id);
     }).catch(() => {
@@ -214,10 +214,10 @@ Page({
         wx.navigateTo({ url: `/pages/answer/index?id=${selected.id}` });
         return;
       }
-      wx.showToast({ title: "本课节暂无小挑战", icon: "none" });
+      wx.showToast({ title: "本课节暂无练习", icon: "none" });
       wx.navigateTo({ url: "/pages/tasks/index" });
     }).catch(() => {
-      wx.showToast({ title: "小挑战加载失败，请稍后重试", icon: "none" });
+      wx.showToast({ title: "练习加载失败，请稍后重试", icon: "none" });
       wx.navigateTo({ url: "/pages/tasks/index" });
     });
   },

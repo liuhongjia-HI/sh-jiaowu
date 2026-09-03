@@ -287,7 +287,7 @@ test("home page guides student to contact teacher for recommendation", () => {
 
   page.contactTeacher({ currentTarget: { dataset: { name: "英语阅读提升" } } });
 
-  assert.equal(calls[0].title, "联系老师开通");
+  assert.equal(calls[0].title, "联系老师");
   assert.match(calls[0].content, /英语阅读提升/);
 });
 
