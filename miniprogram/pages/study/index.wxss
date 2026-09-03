@@ -99,6 +99,25 @@
   gap: 16rpx;
 }
 
+.course-list-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 4rpx 4rpx 2rpx;
+}
+
+.course-list-title {
+  color: #17181b;
+  font-size: 28rpx;
+  font-weight: 850;
+}
+
+.course-list-count {
+  color: #a1a3aa;
+  font-size: 20rpx;
+}
+
 .course-card-hit-area {
   display: block;
 }
@@ -118,6 +137,15 @@
   border-color: #95de64;
   background: linear-gradient(135deg, #f6ffed, #fff);
   box-shadow: 0 10rpx 26rpx rgba(82, 196, 26, .12);
+}
+
+.course-card.opened-course {
+  border-color: #ffd2be;
+  box-shadow: 0 10rpx 26rpx rgba(255, 90, 31, .09);
+}
+
+.course-card.opened-course .course-cover {
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, .24);
 }
 
 .course-cover {

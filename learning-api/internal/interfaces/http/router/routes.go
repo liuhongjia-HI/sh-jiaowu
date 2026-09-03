@@ -31,6 +31,8 @@ func registerPublicRoutes(api *gin.RouterGroup, h *handler.LearningHandler) {
 	api.GET("/student/avatars/:asset", h.StudentAvatar)
 	// 轮播图和头像一样：小程序首页 image 组件在登录前就要显示，不能挂 Authorization header。
 	api.GET("/banners/images/:asset", h.BannerImage)
+	// 首页运营位与学生课程、年级无关，访客也可以先看到；图片资源本身同样是公开只读的。
+	api.GET("/student/banners", h.StudentBanners)
 	api.POST("/auth/wechat-login", h.WechatLogin)
 	api.POST("/auth/admin-password-login", h.AdminPasswordLogin)
 	api.POST("/auth/demo-student-login", h.DemoStudentLogin)
@@ -175,7 +177,6 @@ func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
 	g := api.Group("/student", middleware.AuthRequired(tokens, service, learning.RoleStudent))
 	g.GET("/home", h.StudentHome)
-	g.GET("/banners", h.StudentBanners)
 	g.GET("/recommendations", h.StudentRecommendations)
 	g.GET("/launch-campaign", h.StudentLaunchCampaign)
 	g.POST("/class-reservations", h.CreateClassReservation)

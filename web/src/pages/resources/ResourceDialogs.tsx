@@ -340,8 +340,9 @@ export function CourseDialog({
     setCurriculumError('');
   };
   const addCurriculumNode = (type: 'unit' | 'chapter' | 'lesson', parentId?: string) => {
+    const siblingCount = curriculumNodes.filter((node) => node.type === type && (type === 'unit' ? !node.parentId : node.parentId === parentId)).length;
     const id = `node-${Date.now()}-${curriculumNodes.length}`;
-    updateCurriculum([...curriculumNodes, { id, parentId, type, name: '', sortOrder: curriculumNodes.length + 1 }]);
+    updateCurriculum([...curriculumNodes, { id, parentId, type, name: String(siblingCount + 1), sortOrder: curriculumNodes.length + 1 }]);
     if (type === 'chapter' && parentId) setCollapsedUnits((current) => new Set([...current].filter((item) => item !== parentId)));
     if (type === 'lesson' && parentId) setCollapsedChapters((current) => new Set([...current].filter((item) => item !== parentId)));
   };
@@ -352,14 +353,18 @@ export function CourseDialog({
       setCurriculumError(`当前已有 ${existing.length} 个 ${type === 'unit' ? 'Unit' : type === 'chapter' ? 'Chapter' : 'Lesson'}，数量不能直接减少，请先删除多余目录。`);
       return;
     }
+    const numberedExisting = curriculumNodes.map((node) => {
+      const siblingIndex = existing.findIndex((item) => item.id === node.id);
+      return siblingIndex >= 0 && !node.name.trim() ? { ...node, name: String(siblingIndex + 1) } : node;
+    });
     const additions = Array.from({ length: safeCount - existing.length }, (_, index) => ({
       id: `node-${Date.now()}-${curriculumNodes.length + index}`,
       parentId: type === 'unit' ? undefined : parentId,
       type,
-      name: '',
+      name: String(existing.length + index + 1),
       sortOrder: curriculumNodes.length + index + 1
     }));
-    if (additions.length) updateCurriculum([...curriculumNodes, ...additions]);
+    if (additions.length || numberedExisting.some((node, index) => node !== curriculumNodes[index])) updateCurriculum([...numberedExisting, ...additions]);
     if (type === 'unit') setUnitCount(safeCount);
     if (type === 'chapter' && parentId) setChapterCounts((current) => ({ ...current, [parentId]: safeCount }));
     if (type === 'lesson' && parentId) setLessonCounts((current) => ({ ...current, [parentId]: safeCount }));
@@ -391,6 +396,7 @@ export function CourseDialog({
       open={open}
       onCancel={onCancel}
       onSubmit={() => form.submit()}
+      width="min(760px, 100vw)"
       submitDisabled={!hasSpaceOptions}
       submitting={loading}
     >
@@ -465,37 +471,43 @@ export function CourseDialog({
             }}>{collapsedUnits.size > 0 || collapsedChapters.size > 0 ? '全部展开' : '全部收起'}</Button>}
           </div>
           <Space.Compact block style={{ margin: '8px 0 12px' }}>
-            <InputNumber min={1} max={200} value={unitCount} onChange={(value) => setUnitCount(value || 1)} addonBefore="Unit 数量" style={{ flex: 1 }} />
+            <InputNumber min={1} max={200} value={unitCount} onChange={(value) => setUnitCount(value || 1)} onPressEnter={() => generateCurriculumChildren('unit', unitCount)} addonBefore="Unit 数量" style={{ flex: 1 }} />
             <Button htmlType="button" onClick={() => generateCurriculumChildren('unit', unitCount)}>生成 Unit</Button>
           </Space.Compact>
           {!curriculumNodes.some((node) => node.type === 'unit') && <Typography.Text type="secondary">还没有课程目录，请先新增 Unit。</Typography.Text>}
-          {curriculumNodes.filter((node) => node.type === 'unit').map((unit) => <div key={unit.id} data-testid="curriculum-unit" style={{ marginTop: 8 }}>
-            <Space align="start" style={{ display: 'flex' }}>
+          {curriculumNodes.filter((node) => node.type === 'unit').map((unit) => <div key={unit.id} data-testid="curriculum-unit" className="curriculum-unit-card">
+            <div className="curriculum-node-main">
               <Button type="text" size="small" htmlType="button" aria-label={`${collapsedUnits.has(unit.id) ? '展开' : '收起'} Unit`} onClick={() => setCollapsedUnits((current) => { const next = new Set(current); next.has(unit.id) ? next.delete(unit.id) : next.add(unit.id); return next; })}>{collapsedUnits.has(unit.id) ? '▸' : '▾'}</Button>
-              <Typography.Text strong>Unit</Typography.Text>
-              <Input aria-label="Unit名称" value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder="输入 Unit 名称" style={{ flex: 1 }} />
-              <Typography.Text type="secondary">顶层目录 · {curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} 个 Chapter</Typography.Text>
-              <InputNumber min={0} max={200} size="small" value={chapterCounts[unit.id] ?? curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} onChange={(value) => setChapterCounts((current) => ({ ...current, [unit.id]: value || 0 }))} addonBefore="数量" />
-              <Button type="link" size="small" htmlType="button" onClick={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)}>生成</Button>
-              <Button type="link" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('chapter', unit.id)}>新增 Chapter</Button>
-              <Button danger type="text" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
-            </Space>
-            {!collapsedUnits.has(unit.id) && curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).map((chapter) => <div key={chapter.id} data-testid="curriculum-chapter" style={{ marginLeft: 24, marginTop: 8 }}>
-              <Space align="start" style={{ display: 'flex' }}>
+              <Typography.Text strong className="curriculum-node-type">Unit</Typography.Text>
+              <Input aria-label="Unit名称" value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder="输入 Unit 名称" />
+              <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} 个 Chapter</Typography.Text>
+              <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
+            </div>
+            <div className="curriculum-node-actions">
+              <span>批量创建 Chapter</span>
+              <InputNumber min={0} max={200} size="small" aria-label={`${unit.name} Chapter数量`} value={chapterCounts[unit.id] ?? curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} onChange={(value) => setChapterCounts((current) => ({ ...current, [unit.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)} />
+              <Button size="small" htmlType="button" onClick={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)}>生成</Button>
+              <Button type="link" size="small" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('chapter', unit.id)}>新增 Chapter</Button>
+            </div>
+            {!collapsedUnits.has(unit.id) && curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).map((chapter) => <div key={chapter.id} data-testid="curriculum-chapter" className="curriculum-chapter-card">
+              <div className="curriculum-node-main">
                 <Button type="text" size="small" htmlType="button" aria-label={`${collapsedChapters.has(chapter.id) ? '展开' : '收起'} Chapter`} onClick={() => setCollapsedChapters((current) => { const next = new Set(current); next.has(chapter.id) ? next.delete(chapter.id) : next.add(chapter.id); return next; })}>{collapsedChapters.has(chapter.id) ? '▸' : '▾'}</Button>
-                <Typography.Text strong>Chapter</Typography.Text>
-                <Input aria-label="Chapter名称" value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder="输入 Chapter 名称" style={{ flex: 1 }} />
-                <Typography.Text type="secondary">归属当前 Unit · {curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} 个 Lesson</Typography.Text>
-                <InputNumber min={0} max={200} size="small" value={lessonCounts[chapter.id] ?? curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} onChange={(value) => setLessonCounts((current) => ({ ...current, [chapter.id]: value || 0 }))} addonBefore="数量" />
-                <Button type="link" size="small" htmlType="button" onClick={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)}>生成</Button>
-                <Button type="link" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('lesson', chapter.id)}>新增 Lesson</Button>
-                <Button danger type="text" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
-              </Space>
-              {!collapsedChapters.has(chapter.id) && curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).map((lesson) => <Space key={lesson.id} align="start" style={{ display: 'flex', marginLeft: 48, marginTop: 8 }} data-testid="curriculum-lesson">
-                <Typography.Text type="secondary">Lesson</Typography.Text>
-                <Input aria-label="Lesson名称" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="输入 Lesson 名称" style={{ flex: 1 }} />
-                <Button danger type="text" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
-              </Space>)}
+                <Typography.Text strong className="curriculum-node-type">Chapter</Typography.Text>
+                <Input aria-label="Chapter名称" value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder="输入 Chapter 名称" />
+                <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} 个 Lesson</Typography.Text>
+                <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
+              </div>
+              <div className="curriculum-node-actions">
+                <span>批量创建 Lesson</span>
+                <InputNumber min={0} max={200} size="small" aria-label={`${chapter.name} Lesson数量`} value={lessonCounts[chapter.id] ?? curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} onChange={(value) => setLessonCounts((current) => ({ ...current, [chapter.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)} />
+                <Button size="small" htmlType="button" onClick={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)}>生成</Button>
+                <Button type="link" size="small" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('lesson', chapter.id)}>新增 Lesson</Button>
+              </div>
+              {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
+                <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
+                <Input aria-label="Lesson名称" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="输入 Lesson 名称" />
+                <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
+              </div>)}</div>}
             </div>)}
           </div>)}
           <Button htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('unit')} style={{ marginTop: 12 }}>新增 Unit</Button>

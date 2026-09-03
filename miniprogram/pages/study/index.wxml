@@ -37,6 +37,10 @@
     </view>
   </view>
   <view wx:else class="study-section course-list">
+    <view wx:if="{{openedCourseCount}}" class="course-list-heading">
+      <view class="course-list-title">已开通课程</view>
+      <view class="course-list-count">{{openedCourseCount}} 门 · 可直接学习</view>
+    </view>
     <block wx:for="{{visibleCourses}}" wx:key="id">
       <view wx:if="{{item.canOpen}}" class="course-card-hit-area" bindtap="goDetail" data-id="{{item.entryCourseId}}" data-message="{{item.accessLabel === '内容准备中' ? '学习内容正在准备' : '开通后即可学习全部内容'}}">
         <template is="course-card" data="{{item: item, index: index}}" />

@@ -23,6 +23,10 @@ Page({
     materialCount: 0,
     noticeCount: 0,
     todoItems: [],
+    todoGroups: [],
+    visibleTodoGroup: [],
+    todoGroupIndex: 0,
+    todoRotationState: "todo-fade-in",
     feedbackItems: [],
     subscriptionReminder: null,
     subscribeEnabled: false,
@@ -41,6 +45,7 @@ Page({
     this.refreshGreeting();
     if (!hasStudentToken()) {
       this.showVisitorHome();
+      this.loadPromoBanners();
       return;
     }
     this.loadHome();
@@ -68,6 +73,13 @@ Page({
     if (!this.data.loading && !this.data.home) {
       this.loadHome();
     }
+    this.startTodoRotation();
+  },
+  onHide() {
+    this.stopTodoRotation();
+  },
+  onUnload() {
+    this.stopTodoRotation();
   },
   showVisitorHome() {
     this.setData({
@@ -82,6 +94,9 @@ Page({
       courses: [],
       courseSlides: [],
       todoItems: [],
+      todoGroups: [],
+      visibleTodoGroup: [],
+      todoGroupIndex: 0,
       feedbackItems: [],
       recommendations: [],
       visibleRecommendations: [],
@@ -93,6 +108,7 @@ Page({
     this.setData({ greeting: greetingForHour(now.getHours()) });
   },
   loadHome() {
+    this.stopTodoRotation();
     this.setData({ loading: true, error: "" });
     request("/student/home")
       .then((home) => {
@@ -135,6 +151,9 @@ Page({
           materialCount: materials.length,
           noticeCount: notices.length,
           todoItems,
+          todoGroups: buildTodoGroups(todoItems),
+          visibleTodoGroup: buildTodoGroups(todoItems)[0] || [],
+          todoGroupIndex: 0,
           feedbackItems,
           subscriptionReminder: decorateSubscription(home.subscriptionReminder, subscribeEnabled),
           subscribeEnabled,
@@ -142,7 +161,10 @@ Page({
           courseMeta: formatCourseMeta(selectedCourse),
           bannerTag: pendingTask ? "今日题目" : "继续学习",
           loading: false
-        }, () => this.loadRecommendations());
+        }, () => {
+          this.startTodoRotation();
+          this.loadRecommendations();
+        });
         this.loadLaunchCampaign(student);
       })
       .catch((error) => this.setData({
@@ -154,6 +176,9 @@ Page({
         visibleRecommendations: [],
         recommendationsLoading: false,
         todoItems: [],
+        todoGroups: [],
+        visibleTodoGroup: [],
+        todoGroupIndex: 0,
         feedbackItems: [],
         loading: false
       }));
@@ -223,7 +248,8 @@ Page({
   // 轮播图是纯展示的运营位，加载失败不该挡住首页其余内容，所以用 silent 请求，
   // 失败就悄悄清空、不弹错误提示，也不影响 loadHome 那条主链路。
   loadPromoBanners() {
-    request("/student/banners", { silent: true })
+    // 运营位与登录、年级无关；skipAuth 让未登录访客也能读取公开接口。
+    request("/student/banners", { silent: true, skipAuth: true })
       .then((banners) => {
         this.setData({
           promoBanners: (Array.isArray(banners) ? banners : []).map((item) => ({
@@ -323,7 +349,10 @@ Page({
             this.setData({
               subscribeEnabled: true,
               subscriptionReminder: decorateSubscription(reminder || this.data.subscriptionReminder, true),
-              todoItems: this.data.todoItems.filter((item) => item.type !== "subscribe")
+              todoItems: this.data.todoItems.filter((item) => item.type !== "subscribe"),
+              todoGroups: buildTodoGroups(this.data.todoItems.filter((item) => item.type !== "subscribe")),
+              visibleTodoGroup: buildTodoGroups(this.data.todoItems.filter((item) => item.type !== "subscribe"))[0] || [],
+              todoGroupIndex: 0
             });
             wx.showToast({ title: "已开启学习提醒", icon: "success" });
           }).catch((error) => {
@@ -373,6 +402,35 @@ Page({
       return;
     }
     navigateByPath(path);
+  },
+  startTodoRotation() {
+    this.stopTodoRotation();
+    if (!this.data.todoGroups || this.data.todoGroups.length <= 1) return;
+    this.todoRotationTimer = setInterval(() => {
+      const groups = this.data.todoGroups || [];
+      if (groups.length <= 1) return;
+      const nextIndex = (this.data.todoGroupIndex + 1) % groups.length;
+      this.setData({ todoRotationState: "todo-fade-out" }, () => {
+        this.todoRotationSwapTimer = setTimeout(() => {
+          this.setData({ todoGroupIndex: nextIndex, todoRotationState: "todo-fade-in", visibleTodoGroup: groups[nextIndex] });
+          this.todoRotationSwapTimer = null;
+        }, 220);
+      });
+    }, 3500);
+    // Node 测试环境下不让展示定时器阻止进程退出；微信运行时没有 unref，行为不受影响。
+    if (this.todoRotationTimer && typeof this.todoRotationTimer.unref === "function") {
+      this.todoRotationTimer.unref();
+    }
+  },
+  stopTodoRotation() {
+    if (this.todoRotationTimer) {
+      clearInterval(this.todoRotationTimer);
+      this.todoRotationTimer = null;
+    }
+    if (this.todoRotationSwapTimer) {
+      clearTimeout(this.todoRotationSwapTimer);
+      this.todoRotationSwapTimer = null;
+    }
   },
   goFeedback(event) {
     const id = event.currentTarget.dataset.id;
@@ -430,6 +488,15 @@ function decorateTodos(todos) {
     icon: todoIcon(item.type),
     className: `todo-${item.type || "default"}`
   }));
+}
+
+function buildTodoGroups(todos) {
+  const items = Array.isArray(todos) ? todos : [];
+  const groups = [];
+  for (let index = 0; index < items.length; index += 2) {
+    groups.push(items.slice(index, index + 2));
+  }
+  return groups;
 }
 
 function normalizeHomeCourses(home, continueCourse) {

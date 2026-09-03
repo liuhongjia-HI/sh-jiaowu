@@ -62,11 +62,13 @@ test("home page greeting follows the current local hour", () => {
   assert.equal(page.data.greeting, "晚上好");
 });
 
-test("home page opens directly for a visitor without showing a welcome gate", () => {
+test("home page opens directly for a visitor and still loads promo banners", async () => {
   const calls = [];
   const page = loadHomePage((path) => {
     calls.push(path);
-    return Promise.resolve({});
+    return Promise.resolve(path === "/student/banners"
+      ? [{ id: "visitor-banner", imageUrl: "/visitor.jpg", linkType: "none", linkValue: "" }]
+      : {});
   }, {
     getStorageSync() {
       return "";
@@ -74,11 +76,13 @@ test("home page opens directly for a visitor without showing a welcome gate", ()
   });
 
   page.onLoad();
+  await flushPromises();
 
   assert.equal(page.data.visitorMode, true);
   assert.deepEqual(page.data.home, {});
   assert.equal(page.data.loading, false);
-  assert.deepEqual(calls, []);
+  assert.deepEqual(calls, ["/student/banners"]);
+  assert.equal(page.data.promoBanners.length, 1);
 });
 
 test("home page greeting uses the student's nickname, name, then a friendly fallback", async () => {
@@ -149,6 +153,30 @@ test("home page renders today todos and classroom feedback from student home", a
   assert.equal(page.data.feedbackItems.length, 1);
   assert.equal(page.data.feedbackItems[0].score, 95);
   assert.equal(page.data.subscriptionReminder.actionText, "开启提醒");
+});
+
+test("home page shows two todos at a time and groups the rest for rotation", async () => {
+  const todos = Array.from({ length: 6 }, (_, index) => ({
+    id: `todo-${index + 1}`,
+    type: "homework",
+    title: `练习 ${index + 1}`,
+    actionText: "去完成",
+    status: "待完成"
+  }));
+  const page = loadHomePage(() => Promise.resolve({
+    student: { id: "stu-001", openedPackages: ["英语套餐"] },
+    todayTodos: todos,
+    pendingHomework: [], materials: [], notices: [], classroomFeedback: [],
+    subscriptionReminder: { enabled: true }
+  }), { getStorageSync() { return "token"; } });
+
+  page.loadHome();
+  await flushPromises();
+
+  assert.equal(page.data.todoItems.length, 6);
+  assert.equal(page.data.todoGroups.length, 3);
+  assert.deepEqual(page.data.visibleTodoGroup.map((item) => item.id), ["todo-1", "todo-2"]);
+  page.onHide();
 });
 
 test("home page exposes every course for swipeable banner cards", async () => {

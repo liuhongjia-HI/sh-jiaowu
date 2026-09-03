@@ -2913,6 +2913,91 @@ button.schedule-block:hover {
   color: #b45309;
 }
 
+.curriculum-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.curriculum-unit-card {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #dbe4ea;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.curriculum-chapter-card {
+  margin: 10px 0 0 28px;
+  padding: 10px;
+  border-left: 3px solid #b7ded2;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.curriculum-node-main,
+.curriculum-lesson-row {
+  display: grid;
+  grid-template-columns: 28px 64px minmax(180px, 1fr) max-content 44px;
+  align-items: center;
+  gap: 8px;
+}
+
+.curriculum-node-main > .ant-input,
+.curriculum-lesson-row > .ant-input {
+  min-width: 0;
+}
+
+.curriculum-node-type,
+.curriculum-node-count,
+.curriculum-node-actions {
+  white-space: nowrap;
+}
+
+.curriculum-node-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0 100px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.curriculum-node-actions .ant-input-number {
+  width: 72px;
+}
+
+.curriculum-lessons {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0 36px;
+}
+
+.curriculum-lesson-row {
+  grid-template-columns: 64px minmax(180px, 1fr) 44px;
+}
+
+@media (max-width: 680px) {
+  .curriculum-node-main {
+    grid-template-columns: 28px 58px minmax(120px, 1fr) 44px;
+  }
+
+  .curriculum-node-count {
+    display: none;
+  }
+
+  .curriculum-node-actions {
+    margin-left: 36px;
+    flex-wrap: wrap;
+  }
+
+  .curriculum-chapter-card {
+    margin-left: 12px;
+  }
+}
+
 /* 课程块下沿的拉伸手柄。平时几乎不可见，悬浮到块上才显出来——
    常驻一条实线会在密排的课表里变成视觉噪音。
    高度 8px 是可点击的下限，再窄就抓不住。 */

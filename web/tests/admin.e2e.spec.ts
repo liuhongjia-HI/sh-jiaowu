@@ -139,14 +139,17 @@ test('新增课程按目录层级引导添加内容', async ({ page }) => {
   await expect(drawer.getByRole('button', { name: '新增 Unit' })).toBeVisible();
   await expect(drawer.getByText('选择上级', { exact: true })).toHaveCount(0);
 
-  await drawer.getByRole('button', { name: '新增 Unit' }).click();
+  await drawer.getByRole('spinbutton').first().fill('5');
+  await drawer.getByRole('button', { name: '生成 Unit' }).click();
+  await expect(drawer.getByTestId('curriculum-unit')).toHaveCount(5);
+  expect(await drawer.getByLabel('Unit名称').allInputValues()).toEqual(['1', '2', '3', '4', '5']);
   const unit = drawer.getByTestId('curriculum-unit').first();
-  await expect(unit.getByText('顶层目录', { exact: true })).toBeVisible();
+  await expect(unit.getByText('0 个 Chapter', { exact: true })).toBeVisible();
   await expect(unit.getByRole('button', { name: '新增 Chapter' })).toBeVisible();
 
   await unit.getByRole('button', { name: '新增 Chapter' }).click();
   const chapter = unit.getByTestId('curriculum-chapter').first();
-  await expect(chapter.getByText('归属当前 Unit', { exact: true })).toBeVisible();
+  await expect(chapter.getByText('0 个 Lesson', { exact: true })).toBeVisible();
   await expect(chapter.getByRole('button', { name: '新增 Lesson' })).toBeVisible();
 
   await chapter.getByRole('button', { name: '新增 Lesson' }).click();

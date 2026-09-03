@@ -536,6 +536,51 @@ func (s *MemoryStore) pendingHomeworkForPrincipal(principal learning.Principal) 
 		}
 		out = append(out, item)
 	}
+	// 待办按课程目录逐课节推进：同一课程只暴露最先未完成的课节，
+	// 避免学生完成 1.1.1 后直接跳到更后面的练习。一个课节可以有多份练习，
+	// 这些练习仍全部保留；当该课节全部提交后，下一次请求自然推进到下一课节。
+	return s.firstPendingLessonPerCourse(out)
+}
+
+func (s *MemoryStore) firstPendingLessonPerCourse(items []learning.Homework) []learning.Homework {
+	if len(items) < 2 {
+		return items
+	}
+	type lessonKey struct{ courseID, lessonID string }
+	ranks := make(map[lessonKey]int)
+	best := make(map[string]int)
+	for _, item := range items {
+		key := lessonKey{item.CourseID, item.LessonID}
+		if _, ok := ranks[key]; ok {
+			continue
+		}
+		rank := item.SortOrder
+		if rank == 0 {
+			rank = 1 << 30
+		}
+		for _, course := range s.courses {
+			if course.ID != item.CourseID {
+				continue
+			}
+			for index, node := range course.Curriculum {
+				if node.Type == learning.CurriculumLesson && node.ID == item.LessonID {
+					rank = index + 1
+					break
+				}
+			}
+			break
+		}
+		ranks[key] = rank
+		if current, ok := best[item.CourseID]; !ok || rank < current {
+			best[item.CourseID] = rank
+		}
+	}
+	out := make([]learning.Homework, 0, len(items))
+	for _, item := range items {
+		if ranks[lessonKey{item.CourseID, item.LessonID}] == best[item.CourseID] {
+			out = append(out, item)
+		}
+	}
 	return out
 }
 

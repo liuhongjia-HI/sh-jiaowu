@@ -87,8 +87,8 @@
         <view class="title">今天没有待处理事项</view>
         <view class="sub">课程、练习和反馈会显示在这里。</view>
       </view>
-      <view wx:else class="todo-list">
-        <view wx:for="{{todoItems}}" wx:key="id" class="todo-card {{item.className}}" data-type="{{item.type}}" data-path="{{item.path}}" bindtap="handleTodo">
+      <view wx:else class="todo-list {{todoRotationState}}">
+        <view wx:for="{{visibleTodoGroup}}" wx:key="id" class="todo-card {{item.className}}" data-type="{{item.type}}" data-path="{{item.path}}" bindtap="handleTodo">
           <view class="todo-icon">{{item.icon}}</view>
           <view class="todo-main">
             <view class="todo-top">

@@ -16,6 +16,7 @@ Page({
     courses: [],
     subjects: [],
     visibleCourses: [],
+    openedCourseCount: 0,
     materials: [],
     hasOpenedPackage: false,
     authRequired: false,
@@ -79,8 +80,10 @@ Page({
         const materials = Array.isArray(data) ? [] : (data.materials || []);
         const student = Array.isArray(data) ? {} : (data.student || {});
         const hasOpenedPackage = Array.isArray(student.openedPackages) && student.openedPackages.length > 0;
+        const mergedCourses = mergeStudyCourses(subjects, courses, favorites || []);
         this.setData({
-          courses: decorateCourses(subjects.length ? subjects : courses, favorites || []),
+          courses: mergedCourses,
+          openedCourseCount: mergedCourses.filter((course) => course.isOpened).length,
           subjects,
           materials,
           hasOpenedPackage,
@@ -144,20 +147,35 @@ function decorateCourses(courses, favorites) {
   return [...courses].sort((left, right) => courseAvailableAt(right) - courseAvailableAt(left)).map((course, index) => {
     const progress = Number(course.progress) || 0;
     const isNew = Boolean(course.isNew);
+    const isOpened = Boolean(course.isOpened);
     return {
       ...course,
       progress,
       favorited: favoriteCourseNames.includes(course.name),
       badgeText: course.accessLabel || (progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新内容"),
-      cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : "",
+      cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : isOpened ? "opened-course" : "",
       newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
       entryCourseId: course.entryCourseId || course.id,
+      accessLabel: course.accessLabel || (isOpened ? "已开通" : ""),
       canOpen: course.accessState !== "locked" && course.accessState !== "pending" && (typeof course.canOpen === "boolean" ? course.canOpen : Boolean(course.id)),
       isLocked: course.accessState === "locked" || course.accessState === "pending",
-      imageUrl: course.imageUrl || ""
+      imageUrl: course.imageUrl || "",
+      isOpened
     };
   });
+}
+
+// 接口会同时返回已开通课程和年级学科目录。已开通课程保留真实进度并置顶，
+// 目录中与其同学科的占位卡片不再重复展示。
+function mergeStudyCourses(subjects, courses, favorites) {
+  const opened = decorateCourses((courses || []).map((course) => ({ ...course, isOpened: true })), favorites);
+  const openedSubjects = new Set(opened.map((course) => String(course.subject || course.displayName || "").trim()).filter(Boolean));
+  const catalog = decorateCourses((subjects || []).filter((subject) => {
+    const key = String(subject.subject || subject.displayName || "").trim();
+    return !openedSubjects.has(key);
+  }), favorites);
+  return opened.concat(catalog);
 }
 
 function subjectEmoji(subject, index) {
