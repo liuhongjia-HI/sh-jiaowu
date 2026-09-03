@@ -48,6 +48,8 @@ test("课程卡片整体可点击，学习入口只负责展示状态", () => {
   assert.match(template, /wx:else class="course-card-hit-area">\s*<template is="course-card"/);
   assert.match(template, /wx:if="{{item\.canOpen}}" class="course-action">/);
   assert.match(template, /wx:else class="course-action course-action-disabled">{{item\.accessLabel \|\| '内容准备中'}}<\/view>/);
+  assert.match(template, /item\.accessLabel === '首节可体验' \? '体验' : '进入学习'/);
+  assert.doesNotMatch(template, /体验第一节/);
 });
 
 test("内容准备中的课程分支不绑定课程点击事件", () => {

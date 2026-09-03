@@ -427,8 +427,9 @@ func generateTemporaryPassword() (string, error) {
 }
 
 func matchesStudentQuery(student learning.Student, query learning.StudentQuery) bool {
-	keyword := strings.TrimSpace(query.Keyword)
-	if keyword != "" && !strings.Contains(student.Name, keyword) && !strings.Contains(student.Phone, keyword) {
+	// 学生姓名和手机号检索统一按小写比较，避免用户因大小写差异搜不到结果。
+	keyword := strings.ToLower(strings.TrimSpace(query.Keyword))
+	if keyword != "" && !strings.Contains(strings.ToLower(student.Name), keyword) && !strings.Contains(strings.ToLower(student.Phone), keyword) {
 		return false
 	}
 	if query.Grade != "" && student.Grade != query.Grade {

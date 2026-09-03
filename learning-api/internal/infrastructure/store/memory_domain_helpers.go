@@ -769,7 +769,7 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 
 func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.CurriculumNode, error) {
 	if len(nodes) == 0 {
-		return nil, errors.New("请至少维护一个 Unit、Chapter 和 Lesson")
+		return nil, errors.New("请至少维护一个 Unit")
 	}
 	result := make([]learning.CurriculumNode, 0, len(nodes))
 	byID := make(map[string]learning.CurriculumNode, len(nodes))
@@ -800,7 +800,7 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 		byID[node.ID] = node
 		result = append(result, node)
 	}
-	unitCount, chapterCount, lessonCount := 0, 0, 0
+	unitCount := 0
 	for _, node := range result {
 		switch node.Type {
 		case learning.CurriculumUnit:
@@ -813,17 +813,15 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 			if !ok || parent.Type != learning.CurriculumUnit {
 				return nil, errors.New("Chapter 必须归属 Unit")
 			}
-			chapterCount++
 		case learning.CurriculumLesson:
 			parent, ok := byID[node.ParentID]
 			if !ok || parent.Type != learning.CurriculumChapter {
 				return nil, errors.New("Lesson 必须归属 Chapter")
 			}
-			lessonCount++
 		}
 	}
-	if unitCount == 0 || chapterCount == 0 || lessonCount == 0 {
-		return nil, errors.New("课程目录必须包含 Unit、Chapter 和 Lesson")
+	if unitCount == 0 {
+		return nil, errors.New("课程目录必须包含至少一个 Unit")
 	}
 	return result, nil
 }

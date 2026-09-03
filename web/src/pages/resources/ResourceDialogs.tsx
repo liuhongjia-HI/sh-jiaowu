@@ -349,7 +349,7 @@ export function CourseDialog({
   const updateCurriculumName = (nodeId: string, name: string) => {
     updateCurriculum(curriculumNodes.map((node) => node.id === nodeId ? { ...node, name } : node));
   };
-  const missingCurriculumTypes = () => ['unit', 'chapter', 'lesson'].filter((type) => !curriculumNodes.some((node) => node.type === type));
+  const missingCurriculumTypes = () => ['unit'].filter((type) => !curriculumNodes.some((node) => node.type === type));
 
   return (
     <FormDrawer
@@ -371,7 +371,7 @@ export function CourseDialog({
       <Form form={form} layout="vertical" preserve={false} onFinish={(values) => {
         const missing = missingCurriculumTypes();
         if (missing.length) {
-          setCurriculumError(`请至少添加 1 个 ${missing.map((type) => ({ unit: 'Unit', chapter: 'Chapter', lesson: 'Lesson' })[type]).join('、')}`);
+          setCurriculumError(`请至少添加 1 个 ${missing.map((type) => ({ unit: 'Unit' })[type]).join('、')}`);
           return;
         }
         if (curriculumNodes.some((node) => !node.name.trim())) {
@@ -419,7 +419,7 @@ export function CourseDialog({
             options={spaceOptions}
           />
         </Form.Item>
-        <Form.Item label="课程目录" extra="从 Unit 开始，随后在对应层级下添加 Chapter 和 Lesson；讲义和作业只能绑定 Lesson。">
+        <Form.Item label="课程目录" extra="Unit 必填，Chapter 和 Lesson 可按实际教学需求选择填写；讲义和作业需绑定 Lesson。">
           {!curriculumNodes.some((node) => node.type === 'unit') && <Typography.Text type="secondary">还没有课程目录，请先新增 Unit。</Typography.Text>}
           {curriculumNodes.filter((node) => node.type === 'unit').map((unit) => <div key={unit.id} data-testid="curriculum-unit" style={{ marginTop: 8 }}>
             <Space align="start" style={{ display: 'flex' }}>

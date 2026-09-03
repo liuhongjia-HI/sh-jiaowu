@@ -6,6 +6,22 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func TestStudentsKeywordSearchIgnoresCase(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false, SkipBaseData: true})
+	admin := learning.Principal{UserID: "admin", CampusID: "campus-main", Roles: []learning.Role{learning.RoleSuperAdmin}}
+	student, err := store.CreateStudent("管理员", admin, learning.StudentUpsertRequest{Name: "Gevin", Phone: "13900000001", Grade: "五年级"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, keyword := range []string{"gevin", "GEVIN", "13900000001"} {
+		rows := store.Students(admin, learning.StudentQuery{Keyword: keyword})
+		if len(rows) != 1 || rows[0].ID != student.ID {
+			t.Fatalf("keyword %q should find Gevin, got %#v", keyword, rows)
+		}
+	}
+}
+
 func TestCleanupTestStudentsRemovesOnlyMarkedStudents(t *testing.T) {
 	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false, SkipBaseData: true})
 	admin := learning.Principal{UserID: "admin", CampusID: "campus-main", Roles: []learning.Role{learning.RoleSuperAdmin}}

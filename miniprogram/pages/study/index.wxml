@@ -73,7 +73,7 @@
         <text>{{item.progress >= 100 ? "已完成" : "继续学习"}}</text>
       </view>
       <view wx:if="{{!item.isLocked}}" class="course-progress"><view class="course-progress-bar" style="width: {{item.progress}}%;"></view></view>
-      <view wx:if="{{item.canOpen}}" class="course-action">{{item.accessLabel === '首节可体验' ? '体验第一节' : '进入学习'}} <text class="course-action-arrow">›</text></view>
+      <view wx:if="{{item.canOpen}}" class="course-action">{{item.accessLabel === '首节可体验' ? '体验' : '进入学习'}} <text class="course-action-arrow">›</text></view>
       <view wx:else class="course-action course-action-disabled">{{item.accessLabel || '内容准备中'}}</view>
     </view>
   </view>

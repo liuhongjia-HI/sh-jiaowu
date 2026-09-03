@@ -7,6 +7,25 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func TestCourseCurriculumOnlyRequiresUnit(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	course, err := store.CreateCourse("英语老师", teacher, learning.CourseUpsertRequest{
+		Name: "单元级课程", LearningSpaceID: "space-g05-english-s1-q1", Status: learning.StatusEnabled,
+		Curriculum: []learning.CurriculumNode{{ID: "unit-only", Type: learning.CurriculumUnit, Name: "Unit 1"}},
+	})
+	if err != nil {
+		t.Fatalf("unit-only curriculum should be accepted: %v", err)
+	}
+	if course.LessonCount != 0 || len(course.Curriculum) != 1 {
+		t.Fatalf("unexpected unit-only course: %#v", course)
+	}
+}
+
 func TestContentMustBindToLeafLessonInItsCourseCurriculum(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")

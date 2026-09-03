@@ -583,12 +583,12 @@ function buildShortcuts() {
   return [
     { label: "题库练习", action: "tasks", icon: "/assets/icons/shortcut-question.png" },
     { label: "学习资料", action: "materials", icon: "/assets/icons/shortcut-material.png" },
-    { label: "课表", action: "schedule", icon: "/assets/icons/shortcut-schedule.png" },
-    { label: "课堂反馈", action: "feedback", icon: "/assets/icons/shortcut-open.png" },
+    { label: "上次练习", action: "last", icon: "/assets/icons/shortcut-last.png" },
+    { label: "通知消息", action: "notices", icon: "/assets/icons/shortcut-notice.png" },
     { label: "学习中心", action: "study", icon: "/assets/icons/shortcut-study.png" },
     { label: "成绩报告", action: "scores", icon: "/assets/icons/shortcut-score.png" },
-    { label: "上次练习", action: "last", icon: "/assets/icons/shortcut-last.png" },
-    { label: "通知消息", action: "notices", icon: "/assets/icons/shortcut-notice.png" }
+    { label: "课表", action: "schedule", icon: "/assets/icons/shortcut-schedule.png" },
+    { label: "课堂反馈", action: "feedback", icon: "/assets/icons/shortcut-open.png" }
   ];
 }
 
