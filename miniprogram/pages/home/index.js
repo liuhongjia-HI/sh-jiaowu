@@ -56,9 +56,7 @@ Page({
   onShow() {
     this.refreshGreeting();
     if (!hasStudentToken()) {
-      if (!this.data.visitorMode || this.data.home) {
-        this.showVisitorHome();
-      }
+      this.showVisitorHome();
       return;
     }
     if (this.data.visitorMode) {
@@ -75,8 +73,10 @@ Page({
     this.setData({
       loading: false,
       error: "",
+      // 未登录用户也直接进入首页内容流，不再展示额外的欢迎卡片。
+      // 保留访客态标记，登录后 onShow 可据此刷新真实学习数据。
       visitorMode: true,
-      home: null,
+      home: {},
       hasContent: false,
       hasOpenedPackage: false,
       courses: [],

@@ -62,7 +62,7 @@ test("home page greeting follows the current local hour", () => {
   assert.equal(page.data.greeting, "晚上好");
 });
 
-test("home page stays public for a visitor before they choose a learning entry", () => {
+test("home page opens directly for a visitor without showing a welcome gate", () => {
   const calls = [];
   const page = loadHomePage((path) => {
     calls.push(path);
@@ -76,6 +76,7 @@ test("home page stays public for a visitor before they choose a learning entry",
   page.onLoad();
 
   assert.equal(page.data.visitorMode, true);
+  assert.deepEqual(page.data.home, {});
   assert.equal(page.data.loading, false);
   assert.deepEqual(calls, []);
 });

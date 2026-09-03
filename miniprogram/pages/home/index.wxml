@@ -15,14 +15,6 @@
   </view>
 
   <view wx:if="{{loading}}" class="empty">正在准备今天的学习内容...</view>
-  <view wx:elif="{{visitorMode}}" class="section">
-    <view class="empty-card home-empty">
-      <view class="title">欢迎来到 Starline 学习</view>
-      <view class="sub">学习资料、练习和老师反馈都会在这里。选择想看的内容后，再完成身份绑定即可。</view>
-      <button class="button" bindtap="goStudy">进入学习中心</button>
-      <button class="button light" bindtap="goTasks">查看题库练习</button>
-    </view>
-  </view>
   <view wx:elif="{{!home}}" class="section">
     <view class="empty-card home-empty">
       <view class="title">学习内容加载失败</view>
@@ -38,7 +30,7 @@
         </swiper-item>
       </swiper>
     </view>
-    <view class="section">
+    <view wx:if="{{courseSlides.length > 0}}" class="section">
       <swiper class="home-course-swiper" current="{{currentCourseIndex}}" indicator-dots="{{courses.length > 1}}" indicator-color="rgba(255,90,31,.22)" indicator-active-color="#ff5a1f" circular="{{courses.length > 1}}" autoplay="{{courses.length > 1}}" interval="5200" bindchange="changeCourse">
         <swiper-item wx:for="{{courseSlides}}" wx:key="id">
           <view class="home-banner" data-course-id="{{item.id}}" bindtap="goStudyDetail">
