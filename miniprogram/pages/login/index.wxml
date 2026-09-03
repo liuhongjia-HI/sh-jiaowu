@@ -18,8 +18,8 @@
         <view class="picker-value {{form.grade ? '' : 'placeholder'}}">{{form.grade || '请选择年级'}}</view>
       </view>
     </picker>
-    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">微信授权手机号并继续</button>
-    <button class="button light secondary-button" bindtap="leaveLogin" disabled="{{binding}}">暂不绑定，返回首页</button>
+    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">绑定手机号</button>
+    <button class="button light secondary-button" bindtap="leaveLogin" disabled="{{binding}}">返回首页</button>
     <view class="login-tip">暂不绑定也可以先浏览公开内容；专属学习内容由老师开通后自动显示。</view>
   </view>
 </view>

@@ -406,5 +406,5 @@ test("login page does not submit binding when wx.login returns no code", async (
   await flushPromises();
 
   assert.equal(calls.some((item) => item[0] === "request"), false);
-  assert.equal(calls.some((item) => item[1] === "微信登录失败，请重试"), true);
+  assert.equal(calls.some((item) => item[1] === "登录失败，请重试"), true);
 });

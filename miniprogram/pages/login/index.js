@@ -94,13 +94,13 @@ Page({
       success: (res) => {
         const code = res.code;
         if (!code) {
-          wx.showToast({ title: "微信登录失败", icon: "none" });
+          wx.showToast({ title: "登录失败", icon: "none" });
           return;
         }
         this.doLogin({ code });
       },
       fail: () => {
-        wx.showToast({ title: "微信登录失败", icon: "none" });
+        wx.showToast({ title: "登录失败", icon: "none" });
       }
     });
   },
@@ -132,7 +132,7 @@ Page({
       success: (res) => {
         const code = res.code;
         if (!code) {
-          wx.showToast({ title: "微信登录失败，请重试", icon: "none" });
+          wx.showToast({ title: "登录失败，请重试", icon: "none" });
           return;
         }
         // detail.code 为手机号凭据，后端调用 getuserphonenumber 解析后绑定。
@@ -145,7 +145,7 @@ Page({
           grade: (form.grade || "").trim()
         });
       },
-      fail: () => wx.showToast({ title: "微信登录失败", icon: "none" })
+      fail: () => wx.showToast({ title: "登录失败", icon: "none" })
     });
   },
   leaveLogin() {
