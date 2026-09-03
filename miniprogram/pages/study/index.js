@@ -58,6 +58,7 @@ Page({
       courses: [],
       subjects: [],
       visibleCourses: [],
+      openedCourseCount: 0,
       materials: []
     });
   },
@@ -95,6 +96,7 @@ Page({
         error: error.message || "加载失败",
         emptyMessage: error.message || "开通课程后，这里会显示学习内容。",
         hasOpenedPackage: false,
+        openedCourseCount: 0,
         authRequired: !hasStudentToken(),
         loginPrompted: !hasStudentToken(),
         loading: false
@@ -114,7 +116,7 @@ Page({
     const keyword = this.data.keyword.trim().toLowerCase();
     const activeFilter = this.data.activeFilter;
     const visibleCourses = this.data.courses.filter((course) => {
-      const matchKeyword = !keyword || [course.name, course.subject, course.grade].join(" ").toLowerCase().includes(keyword);
+      const matchKeyword = !keyword || [course.name, course.displayName, course.subject, course.grade].join(" ").toLowerCase().includes(keyword);
       const matchFilter = activeFilter === "全部" || (activeFilter === "学习中" && course.status !== "已完成") || (activeFilter === "已收藏" && course.favorited) || (activeFilter === "已完成" && course.status === "已完成");
       return matchKeyword && matchFilter;
     });
