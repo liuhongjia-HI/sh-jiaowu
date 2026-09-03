@@ -24,6 +24,7 @@ Page({
   },
   onUnload() {
     completeLoginRedirect();
+    wx.removeStorageSync(LOGIN_RETURN_KEY);
   },
   onShareAppMessage() {
     return {
@@ -105,12 +106,22 @@ Page({
   },
   // 手机号绑定：getPhoneNumber 授权后，把手机号随登录一起上送给后端完成绑定。
   bindPhone(event) {
-    if (!this.validateProfile()) {
-      return;
-    }
     const detail = event.detail || {};
     if (isCancel(detail)) {
-      wx.showToast({ title: "已取消手机号授权", icon: "none" });
+      wx.showModal({
+        title: "已取消手机号授权",
+        content: "你可以继续填写资料，也可以先返回首页，之后再完成绑定。",
+        confirmText: "返回首页",
+        cancelText: "继续填写",
+        success: ({ confirm }) => {
+          if (confirm) {
+            this.leaveLogin();
+          }
+        }
+      });
+      return;
+    }
+    if (!this.validateProfile()) {
       return;
     }
     if (!detail.code) {
@@ -135,6 +146,16 @@ Page({
         });
       },
       fail: () => wx.showToast({ title: "微信登录失败", icon: "none" })
+    });
+  },
+  leaveLogin() {
+    completeLoginRedirect();
+    wx.removeStorageSync(LOGIN_RETURN_KEY);
+    wx.switchTab({
+      url: "/pages/home/index",
+      fail: () => {
+        wx.reLaunch({ url: "/pages/home/index" });
+      }
     });
   },
   doLogin(payload, path = "/auth/wechat-login") {

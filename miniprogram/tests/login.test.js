@@ -191,6 +191,95 @@ test("login page sends wx code, phone code, and student profile when binding pho
   assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/home/index"]);
 });
 
+test("login page lets users return home after cancelling phone authorization", () => {
+  const calls = [];
+  const page = loadLoginPage(() => Promise.resolve({ token: "unused" }), {
+    showModal(args) {
+      calls.push(["showModal", args.title, args.content, args.confirmText, args.cancelText]);
+      args.success({ confirm: true });
+    },
+    removeStorageSync(key) {
+      calls.push(["removeStorageSync", key]);
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    },
+    showToast(args) {
+      calls.push(["showToast", args.title]);
+    }
+  });
+
+  page.bindPhone({ detail: { errMsg: "getPhoneNumber:fail user deny" } });
+
+  assert.deepEqual(calls.find((item) => item[0] === "showModal"), [
+    "showModal",
+    "已取消手机号授权",
+    "你可以继续填写资料，也可以先返回首页，之后再完成绑定。",
+    "返回首页",
+    "继续填写"
+  ]);
+  assert.deepEqual(calls.find((item) => item[0] === "removeStorageSync"), ["removeStorageSync", "starline_after_login"]);
+  assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/home/index"]);
+  assert.equal(calls.some((item) => item[0] === "showToast"), false, "cancel should not be replaced by form validation feedback");
+});
+
+test("login page keeps the form when users cancel authorization and choose to continue", () => {
+  const calls = [];
+  const page = loadLoginPage(() => Promise.resolve({ token: "unused" }), {
+    showModal(args) {
+      calls.push(["showModal", args.title]);
+      args.success({ confirm: false });
+    },
+    removeStorageSync(key) {
+      calls.push(["removeStorageSync", key]);
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    }
+  });
+
+  page.bindPhone({ detail: { errMsg: "getPhoneNumber:fail user deny" } });
+
+  assert.deepEqual(calls, [["showModal", "已取消手机号授权"]]);
+});
+
+test("login page falls back to relaunching home when switchTab fails", () => {
+  const calls = [];
+  const page = loadLoginPage(() => Promise.resolve({ token: "unused" }), {
+    removeStorageSync(key) {
+      calls.push(["removeStorageSync", key]);
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+      args.fail();
+    },
+    reLaunch(args) {
+      calls.push(["reLaunch", args.url]);
+    }
+  });
+
+  page.leaveLogin();
+
+  assert.deepEqual(calls, [
+    ["removeStorageSync", "starline_after_login"],
+    ["switchTab", "/pages/home/index"],
+    ["reLaunch", "/pages/home/index"]
+  ]);
+});
+
+test("leaving login page clears a stale protected-page destination", () => {
+  const calls = [];
+  const page = loadLoginPage(() => Promise.resolve({ token: "unused" }), {
+    removeStorageSync(key) {
+      calls.push(["removeStorageSync", key]);
+    }
+  });
+
+  page.onUnload();
+
+  assert.deepEqual(calls, [["removeStorageSync", "starline_after_login"]]);
+});
+
 test("login page uses selected grade option when binding phone", async () => {
   const calls = [];
   const page = loadLoginPage((path, options) => {
