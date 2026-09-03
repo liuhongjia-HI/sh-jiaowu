@@ -99,6 +99,10 @@
   gap: 16rpx;
 }
 
+.course-card-hit-area {
+  display: block;
+}
+
 .course-card {
   display: flex;
   gap: 20rpx;

@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
 
 function loadLoginPage(requestImpl, wxMock) {
   const pages = [];
@@ -79,6 +81,14 @@ test("login page silently restores bound wechat session on load", async () => {
   assert.deepEqual(calls.find((item) => item[0] === "setStorageSync"), ["setStorageSync", "starline_token", "restored-token"]);
   assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/home/index"]);
   assert.equal(calls.some((item) => item[0] === "removeStorageSync"), false);
+});
+
+test("login page owns its back affordance so return works even without a page stack", () => {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, "../pages/login/index.json"), "utf8"));
+  const template = fs.readFileSync(path.join(__dirname, "../pages/login/index.wxml"), "utf8");
+
+  assert.equal(config.navigationStyle, "custom");
+  assert.match(template, /class="login-nav-back"[^>]*bindtap="leaveLogin"/);
 });
 
 test("login page returns to the protected material that triggered binding", async () => {

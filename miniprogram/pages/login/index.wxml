@@ -1,3 +1,9 @@
+<view class="login-nav" style="padding-top: {{statusBarHeight}}px;">
+  <view class="login-nav-bar">
+    <button class="login-nav-back" plain="true" bindtap="leaveLogin" aria-label="返回首页">‹</button>
+    <view class="login-nav-title">登录绑定</view>
+  </view>
+</view>
 <view class="hero">
   <view class="eyebrow">欢迎来到学习小站</view>
   <view class="hero-title">绑定手机号，查看专属学习内容</view>

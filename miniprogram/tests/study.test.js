@@ -44,9 +44,17 @@ function flushPromises() {
 test("课程卡片整体可点击，学习入口只负责展示状态", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/study/index.wxml"), "utf8");
 
-  assert.match(template, /class="course-card[^\n]*" bindtap="goDetail" data-id="{{item\.entryCourseId}}"/);
+  assert.match(template, /wx:if="{{item\.canOpen}}" class="course-card-hit-area" bindtap="goDetail" data-id="{{item\.entryCourseId}}"/);
+  assert.match(template, /wx:else class="course-card-hit-area">\s*<template is="course-card"/);
   assert.match(template, /wx:if="{{item\.canOpen}}" class="course-action">/);
   assert.match(template, /wx:else class="course-action course-action-disabled">{{item\.accessLabel \|\| '内容准备中'}}<\/view>/);
+});
+
+test("内容准备中的课程分支不绑定课程点击事件", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/study/index.wxml"), "utf8");
+
+  assert.match(template, /<view wx:else class="course-card-hit-area">\s*<template is="course-card"/);
+  assert.doesNotMatch(template, /wx:else class="course-card-hit-area"[^>]*bindtap=/);
 });
 
 test("study page refreshes opened courses when tab is shown again", async () => {

@@ -10,6 +10,7 @@ const {
 
 Page({
   data: {
+    statusBarHeight: 0,
     binding: false,
     gradeOptions: ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级"],
     gradeIndex: -1,
@@ -20,6 +21,7 @@ Page({
     }
   },
   onLoad() {
+    this.setStatusBarHeight();
     this.silentLogin();
   },
   onUnload() {
@@ -31,6 +33,17 @@ Page({
       title: "加入 Starline 学习",
       path: "/pages/home/index"
     };
+  },
+  setStatusBarHeight() {
+    try {
+      const info = wx.getWindowInfo ? wx.getWindowInfo() : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : null);
+      const statusBarHeight = info && Number(info.statusBarHeight);
+      if (statusBarHeight > 0) {
+        this.setData({ statusBarHeight });
+      }
+    } catch (error) {
+      // 部分旧版基础库没有窗口信息 API，保留 0 让顶部栏按默认高度渲染。
+    }
   },
   onInput(event) {
     const field = event.currentTarget.dataset.field;

@@ -1,2 +1,4 @@
-{ "navigationBarTitleText": "登录绑定" }
-
+{
+  "navigationStyle": "custom",
+  "navigationBarTitleText": "登录绑定"
+}
