@@ -2,7 +2,7 @@
 set -euo pipefail
 
 missing=()
-for command_name in soffice gs; do
+for command_name in soffice gs qpdf; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     missing+=("$command_name")
   fi
@@ -16,4 +16,4 @@ fi
 
 soffice --headless --version >/dev/null
 gs --version >/dev/null
-
+qpdf --version >/dev/null

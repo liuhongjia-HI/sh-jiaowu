@@ -28,7 +28,7 @@ nginx -t && systemctl reload nginx
 
 ### 文件处理依赖的外部命令行工具
 
-生产环境必须安装 LibreOffice 和 Ghostscript。发布激活前会执行 `check-preview-runtime.sh`，依赖缺失时停止切换版本，避免出现“上传成功但无法预览”。首次部署或旧服务器补齐依赖时执行：
+生产环境必须安装 LibreOffice、Ghostscript 和 qpdf。发布激活前会执行 `check-preview-runtime.sh`，依赖缺失时停止切换版本，避免出现“上传成功但无法预览”或“下载返回未保护 PDF”。首次部署或旧服务器补齐依赖时执行：
 
 ```bash
 sudo /opt/starline/current/deploy/production/provision-preview-runtime.sh
@@ -45,6 +45,11 @@ sudo /opt/starline/current/deploy/production/provision-preview-runtime.sh
 - `gs`（Ghostscript）：上传后把预览 PDF 逐页转换为图片，并在学生预览、下载时将专属追溯水印直接写进返回的图片/PDF。平台防截屏能力不可用时不阻止打开，只保留水印与安全提示。
   ```bash
   apt-get install -y ghostscript
+  ```
+
+- `qpdf`：对学生端返回的带水印 PDF 启用 AES-256 加密，并设置禁止复制、编辑和打印的权限位。学生端不设置打开密码，以保持微信内打开体验；PDF 权限属于阅读器约束，不能替代 DRM。
+  ```bash
+  apt-get install -y qpdf
   ```
 
 再创建 `/etc/starline/learning-api.env`，写入生产环境变量：

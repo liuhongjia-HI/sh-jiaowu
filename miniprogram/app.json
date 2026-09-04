@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/home/index",
+    "pages/parent-onboarding/index",
     "pages/starline-intro/index",
     "pages/study/index",
     "pages/study-detail/index",

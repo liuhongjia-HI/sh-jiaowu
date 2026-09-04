@@ -1,0 +1,186 @@
+.onboarding-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 28rpx 32rpx 72rpx;
+  background: #f7f7f8;
+  color: #17181b;
+}
+
+.onboarding-hero {
+  position: relative;
+  box-sizing: border-box;
+  min-height: 410rpx;
+  padding: 28rpx 28rpx 34rpx;
+  overflow: hidden;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #fff8f2 0%, #ffe2ce 100%);
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 18rpx;
+  background: #ff6b2d;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.eyebrow {
+  margin-top: 28rpx;
+  color: #b65a2a;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.hero-title {
+  position: relative;
+  z-index: 1;
+  margin-top: 14rpx;
+  color: #202326;
+  font-size: 44rpx;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.hero-subtitle {
+  position: relative;
+  z-index: 1;
+  max-width: 470rpx;
+  margin-top: 14rpx;
+  color: #75665d;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.hero-illustration {
+  position: absolute;
+  right: 24rpx;
+  bottom: 18rpx;
+  width: 214rpx;
+  height: 190rpx;
+}
+
+.illustration-orbit {
+  position: absolute;
+  right: 8rpx;
+  top: 10rpx;
+  width: 162rpx;
+  height: 162rpx;
+  border: 18rpx solid rgba(255, 255, 255, .65);
+  border-radius: 50%;
+}
+
+.illustration-card {
+  position: absolute;
+  right: 44rpx;
+  bottom: 16rpx;
+  width: 94rpx;
+  height: 126rpx;
+  border-radius: 18rpx;
+  background: #fff;
+  transform: rotate(9deg);
+  box-shadow: 0 12rpx 24rpx rgba(169, 91, 49, .14);
+}
+
+.illustration-card::before,
+.illustration-card::after {
+  content: "";
+  position: absolute;
+  left: 17rpx;
+  right: 17rpx;
+  height: 9rpx;
+  border-radius: 9rpx;
+  background: #ffc3a4;
+}
+
+.illustration-card::before { top: 36rpx; }
+.illustration-card::after { top: 62rpx; right: 30rpx; }
+
+.illustration-dot {
+  position: absolute;
+  right: 20rpx;
+  top: 0;
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  background: #ff9b68;
+}
+
+.onboarding-card {
+  box-sizing: border-box;
+  margin-top: 22rpx;
+  padding: 30rpx 28rpx 26rpx;
+  border: 1rpx solid #ececef;
+  border-radius: 24rpx;
+  background: #fff;
+  box-shadow: 0 12rpx 28rpx rgba(32, 36, 44, .06);
+}
+
+.card-title,
+.benefits-title {
+  color: #17181b;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.card-subtitle {
+  margin-top: 8rpx;
+  color: #808891;
+  font-size: 23rpx;
+  line-height: 1.5;
+}
+
+.primary-button,
+.secondary-button {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 18rpx 0 0;
+  border: 0;
+  border-radius: 38rpx;
+  font-size: 26rpx;
+  font-weight: 850;
+  line-height: 76rpx;
+}
+
+.primary-button { height: 76rpx; background: #ff6b2d; color: #fff; }
+.secondary-button { height: 62rpx; margin-top: 10rpx; background: transparent; color: #e96524; line-height: 62rpx; }
+.primary-button::after, .secondary-button::after { border: 0; }
+
+.benefits-title { margin: 34rpx 0 16rpx 4rpx; font-size: 28rpx; }
+
+.benefit-list { display: grid; gap: 14rpx; }
+
+.benefit-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 96rpx;
+  padding: 16rpx 20rpx;
+  border: 1rpx solid #e9eaed;
+  border-radius: 18rpx;
+  background: #fff;
+}
+
+.benefit-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 18rpx;
+  font-size: 26rpx;
+  font-weight: 900;
+}
+
+.benefit-icon-orange { background: #fff0e4; color: #e86b2b; }
+.benefit-icon-blue { background: #eaf3ff; color: #347edb; }
+.benefit-icon-green { background: #eaf8f1; color: #16845d; }
+.benefit-copy { min-width: 0; }
+.benefit-title { color: #2a3035; font-size: 27rpx; font-weight: 850; }
+.benefit-summary { margin-top: 5rpx; color: #879099; font-size: 22rpx; }
+.help-copy { margin-top: 28rpx; color: #939aa1; font-size: 22rpx; text-align: center; }

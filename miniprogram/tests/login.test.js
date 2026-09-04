@@ -83,6 +83,15 @@ test("login page silently restores bound wechat session on load", async () => {
   assert.equal(calls.some((item) => item[0] === "removeStorageSync"), false);
 });
 
+test("login page preselects the grade passed from parent onboarding", () => {
+  const page = loadLoginPage(() => Promise.reject(new Error("skip silent login")), {
+    login() {}
+  });
+  page.onLoad({ grade: "五年级" });
+  assert.equal(page.data.form.grade, "五年级");
+  assert.equal(page.data.gradeIndex, 4);
+});
+
 test("login page sends the device's remembered student when silently restoring", async () => {
   const calls = [];
   const page = loadLoginPage((path, options) => {

@@ -1,0 +1,33 @@
+<view class="onboarding-page">
+  <view class="onboarding-hero">
+    <view class="brand-mark">S</view>
+    <view class="eyebrow">欢迎来到 Starline</view>
+    <view class="hero-title">陪孩子把学习<br />一步一步做好</view>
+    <view class="hero-subtitle">添加学生后，课程、练习、成绩和老师反馈都会为你准备好。</view>
+    <view class="hero-illustration" aria-hidden="true">
+      <view class="illustration-orbit"></view>
+      <view class="illustration-card"></view>
+      <view class="illustration-dot"></view>
+    </view>
+  </view>
+
+  <view class="benefits-title">添加后可以查看</view>
+  <view class="benefit-list">
+    <view wx:for="{{benefits}}" wx:key="title" class="benefit-card">
+      <view class="benefit-icon benefit-icon-{{item.tone}}">{{item.icon}}</view>
+      <view class="benefit-copy">
+        <view class="benefit-title">{{item.title}}</view>
+        <view class="benefit-summary">{{item.summary}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="onboarding-card">
+    <view class="card-title">准备好后，添加一位学生</view>
+    <view class="card-subtitle">填写孩子信息，完成手机号绑定后即可查看专属内容</view>
+    <button class="primary-button" bindtap="goAddStudent">添加学生</button>
+    <button class="secondary-button" bindtap="goBindStudent">已有学生信息，直接绑定</button>
+  </view>
+
+  <view class="help-copy">需要帮助？联系老师或教务</view>
+</view>

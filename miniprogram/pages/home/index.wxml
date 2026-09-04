@@ -29,49 +29,7 @@
         </swiper-item>
       </swiper>
     </view>
-    <view wx:if="{{courseSlides.length > 0}}" class="section">
-      <swiper class="home-course-swiper" current="{{currentCourseIndex}}" indicator-dots="{{courses.length > 1}}" indicator-color="rgba(255,90,31,.22)" indicator-active-color="#ff5a1f" circular="{{courses.length > 1}}" autoplay="{{courses.length > 1}}" interval="5200" bindchange="changeCourse">
-        <swiper-item wx:for="{{courseSlides}}" wx:key="id">
-          <view class="home-banner" data-course-id="{{item.id}}" bindtap="goStudyDetail">
-            <view class="banner-copy">
-              <view class="banner-year">{{item.bannerTag}}</view>
-              <view class="banner-title">{{item.name}}</view>
-              <view wx:if="{{item.hasCourse}}" class="banner-sub">{{item.meta}}</view>
-              <view wx:else class="banner-empty-tip">{{item.meta}}</view>
-              <view wx:if="{{item.hasCourse}}" class="banner-progress-row"><text>已学 {{item.progress}}%</text><text>{{item.progress >= 100 ? "已完成" : "继续学习"}}</text></view>
-              <view wx:if="{{item.hasCourse}}" class="progress banner-progress"><view class="progress-bar" style="width: {{item.progress}}%;"></view></view>
-              <view wx:if="{{item.hasCourse}}" class="banner-action">{{item.actionText}}</view>
-              <view wx:else class="banner-action banner-activate-action" catchtap="openLearningPlanet">{{item.actionText}}</view>
-            </view>
-            <view class="banner-visual">
-              <view class="paper-card"></view>
-              <view wx:if="{{item.hasCourse}}" class="score-card">{{item.progress}}%</view>
-              <view class="phone-card"></view>
-            </view>
-          </view>
-        </swiper-item>
-      </swiper>
-    </view>
-
-    <view class="section service-section">
-      <view class="section-head">
-        <view>
-          <view class="section-title tight">Starline 学习服务</view>
-          <view class="section-sub">课程、练习和老师反馈，一站式完成</view>
-        </view>
-      </view>
-      <view class="service-list">
-        <view wx:for="{{serviceHighlights}}" wx:key="action" class="service-card" data-action="{{item.action}}" bindtap="handleShortcut">
-          <view class="service-icon">{{item.icon}}</view>
-          <view class="service-copy">
-            <view class="service-title">{{item.title}}</view>
-            <view class="service-summary">{{item.summary}}</view>
-          </view>
-          <view class="service-arrow">›</view>
-        </view>
-      </view>
-    </view>
-
+    <!-- 课程入口统一由“今日待办”和学习页承载，避免与待办任务重复展示。 -->
     <view class="section shortcut-wrap">
       <view wx:for="{{shortcuts}}" wx:key="label" class="shortcut-item" data-action="{{item.action}}" bindtap="handleShortcut">
         <image class="shortcut-icon" src="{{item.icon}}" mode="aspectFit"></image>

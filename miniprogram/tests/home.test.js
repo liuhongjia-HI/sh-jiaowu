@@ -41,12 +41,11 @@ function flushPromises() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-test("home course swiper clips neighboring course cards", () => {
-  const stylesheet = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxss"), "utf8");
-  const swiperItemRule = stylesheet.match(/\.home-course-swiper swiper-item\s*\{([^}]*)\}/);
+test("home does not render a course card that duplicates today's todos", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
 
-  assert(swiperItemRule, "expected a dedicated course swiper-item style rule");
-  assert.match(swiperItemRule[1], /overflow:\s*hidden\s*;/);
+  assert.doesNotMatch(template, /home-course-swiper/);
+  assert.doesNotMatch(template, /class="home-banner"/);
 });
 
 test("home empty course card provides a teacher-contact activation path without progress details", async () => {
@@ -82,23 +81,23 @@ test("home empty course card opens activation guidance instead of navigating to 
   assert.equal(calls.some((item) => item[0] === "switchTab"), false);
 });
 
-test("home keeps formal learning service content visible when the account has no course data", () => {
+test("home no longer renders the redundant learning service section", () => {
   const page = loadHomePage(() => Promise.resolve({}), {
     getStorageSync() { return ""; }
   });
   const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
 
-  assert.deepEqual(page.data.serviceHighlights.map((item) => item.title), ["课程学习", "课后练习", "课堂反馈"]);
-  assert.match(template, /Starline 学习服务/);
-  assert.match(template, /wx:for="\{\{serviceHighlights\}\}"/);
+  assert.equal(page.data.serviceHighlights, undefined);
+  assert.doesNotMatch(template, /Starline 学习服务/);
+  assert.doesNotMatch(template, /serviceHighlights/);
 });
 
-test("home removes the duplicate top search icon and keeps empty course content inside its card", () => {
+test("home removes the duplicate top search icon and course card", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
 
   assert.doesNotMatch(template, /home-search-mark/);
-  assert.match(template, /wx:if="\{\{item\.hasCourse\}\}" class="banner-progress-row"/);
-  assert.match(template, /wx:else class="banner-empty-tip">\{\{item\.meta\}\}<\/view>/);
+  assert.doesNotMatch(template, /banner-progress-row/);
+  assert.doesNotMatch(template, /banner-empty-tip/);
 });
 
 test("home page greeting follows the current local hour", () => {
@@ -135,6 +134,40 @@ test("home page opens directly for a visitor and still loads promo banners", asy
   assert.equal(page.data.loading, false);
   assert.deepEqual(calls, ["/student/banners"]);
   assert.equal(page.data.promoBanners.length, 1);
+});
+
+test("home page routes an unauthenticated visitor to parent onboarding once", () => {
+  const navigations = [];
+  const page = loadHomePage(() => Promise.resolve({}), {
+    getStorageSync() {
+      return "";
+    },
+    reLaunch(args) {
+      navigations.push(args.url);
+    }
+  });
+
+  page.onLoad();
+  page.onShow();
+
+  assert.deepEqual(navigations, ["/pages/parent-onboarding/index"]);
+  assert.equal(page.data.onboardingRedirected, true);
+});
+
+test("home page does not route an authenticated student to parent onboarding", () => {
+  const navigations = [];
+  const page = loadHomePage(() => Promise.resolve({}), {
+    getStorageSync() {
+      return "student-token";
+    },
+    reLaunch(args) {
+      navigations.push(args.url);
+    }
+  });
+
+  page.onLoad();
+
+  assert.deepEqual(navigations, []);
 });
 
 test("home page greeting uses the student's nickname, name, then a friendly fallback", async () => {

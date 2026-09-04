@@ -80,19 +80,15 @@ test("study detail filters its ordered directory by the selected content tag", a
   assert.deepEqual(page.data.visibleStations.map((station) => station.homeworkId), ["hw-exam"]);
 });
 
-test("study detail keeps lecture list collapsed until expanded", () => {
-  const page = loadStudyDetailPage(() => Promise.resolve({}), { showToast() {} });
+test("study detail shows all lectures without bulk controls", () => {
   const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
 
-  assert.equal(page.data.materialsExpanded, false);
-  assert.match(wxml, /下载全部/);
-  assert.match(wxml, /wx:if="\{\{visibleMaterials\.length\}\}"/);
-
-  page.toggleMaterials();
-  assert.equal(page.data.materialsExpanded, true);
+  assert.doesNotMatch(wxml, /下载全部/);
+  assert.doesNotMatch(wxml, /收起/);
+  assert.match(wxml, /wx:for="\{\{materials\}\}"/);
 });
 
-test("study detail shows only the first two lectures before expanding", async () => {
+test("study detail renders every lecture returned by the API", async () => {
   const materials = [
     { id: "mat-1", title: "第一份讲义" },
     { id: "mat-2", title: "第二份讲义" },
@@ -104,7 +100,5 @@ test("study detail shows only the first two lectures before expanding", async ()
   page.loadDetail();
   await flushPromises();
 
-  assert.deepEqual(page.data.visibleMaterials.map((item) => item.id), ["mat-1", "mat-2"]);
-  page.toggleMaterials();
-  assert.deepEqual(page.data.visibleMaterials.map((item) => item.id), ["mat-1", "mat-2", "mat-3"]);
+  assert.deepEqual(page.data.materials.map((item) => item.id), ["mat-1", "mat-2", "mat-3"]);
 });

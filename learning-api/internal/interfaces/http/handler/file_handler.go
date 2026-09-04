@@ -427,7 +427,21 @@ func makeWatermarkedPDF(ctx context.Context, asset learning.FileAsset) (string, 
 	if strings.TrimSpace(asset.WatermarkStampText) == "" {
 		return "", errors.New("课件缺少专属水印信息")
 	}
-	file, err := os.CreateTemp("", "starline-material-watermark-*.pdf")
+	watermarkedFile, err := os.CreateTemp("", "starline-material-watermark-source-*.pdf")
+	if err != nil {
+		return "", err
+	}
+	watermarkedPath := watermarkedFile.Name()
+	if err := watermarkedFile.Close(); err != nil {
+		os.Remove(watermarkedPath)
+		return "", err
+	}
+	defer os.Remove(watermarkedPath)
+	if err := watermarkPDF(ctx, asset.PreviewPath, watermarkedPath, asset.WatermarkStampText); err != nil {
+		return "", err
+	}
+
+	file, err := os.CreateTemp("", "starline-material-protected-*.pdf")
 	if err != nil {
 		return "", err
 	}
@@ -436,7 +450,7 @@ func makeWatermarkedPDF(ctx context.Context, asset learning.FileAsset) (string, 
 		os.Remove(targetPath)
 		return "", err
 	}
-	if err := watermarkPDF(ctx, asset.PreviewPath, targetPath, asset.WatermarkStampText); err != nil {
+	if err := protectPDF(ctx, watermarkedPath, targetPath); err != nil {
 		os.Remove(targetPath)
 		return "", err
 	}
@@ -446,6 +460,10 @@ func makeWatermarkedPDF(ctx context.Context, asset learning.FileAsset) (string, 
 func secureWatermarkFailure(c *gin.Context, err error) {
 	if errors.Is(err, errGhostscriptUnavailable) {
 		BadRequest(c, "课件安全水印服务暂不可用，请稍后再试")
+		return
+	}
+	if errors.Is(err, errQPDFUnavailable) {
+		BadRequest(c, "课件 PDF 安全保护服务暂不可用，请稍后再试")
 		return
 	}
 	BadRequest(c, "课件安全水印生成失败，请稍后再试")

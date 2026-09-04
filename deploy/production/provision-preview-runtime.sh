@@ -13,8 +13,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y libreoffice ghostscript fonts-noto-cjk
+apt-get install -y libreoffice ghostscript qpdf fonts-noto-cjk
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/check-preview-runtime.sh"
-

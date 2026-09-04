@@ -29,8 +29,13 @@ Page({
       grade: ""
     }
   },
-  onLoad() {
+  onLoad(options = {}) {
     this.setStatusBarHeight();
+    const grade = String(options.grade || "").trim();
+    const gradeIndex = this.data.gradeOptions.indexOf(grade);
+    if (gradeIndex >= 0) {
+      this.setData({ gradeIndex, "form.grade": grade });
+    }
     this.silentLogin();
   },
   onUnload() {

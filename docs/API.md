@@ -279,7 +279,7 @@
 }
 ```
 
-可维护的 `key` 包括：`grades`、`semesters`、`watermarkRule`、`downloadPolicy`、`miniProgramDomainStatus`、`productionApiDomain`、`officialAccountBindingStatus`、`templateMessageStatus`。`downloadPolicy` 只能为“仅在线预览”或“允许下载带水印PDF”，学生从不获取原始文件。当前学年由系统按日期自动判断（每年 7 月 1 日切换），无需维护；套餐开通有效期按“学年校历”自动计算。成功后返回完整设置对象，并记录操作日志。
+可维护的 `key` 包括：`grades`、`semesters`、`watermarkRule`、`downloadPolicy`、`miniProgramDomainStatus`、`productionApiDomain`、`officialAccountBindingStatus`、`templateMessageStatus`。`downloadPolicy` 只能为“仅在线预览”或“允许下载带水印PDF”。允许下载时，学生拿到的是服务端写入专属水印、使用 AES-256 加密并设置禁止复制/编辑/打印权限位的 PDF；学生从不获取原始文件。PDF 权限位用于阻止普通阅读器操作，不能替代 DRM，也不能保证绝对防截图或 OCR。当前学年由系统按日期自动判断（每年 7 月 1 日切换），无需维护；套餐开通有效期按“学年校历”自动计算。成功后返回完整设置对象，并记录操作日志。
 
 学科颜色、简称和排序属于学科元数据，不放入系统设置 JSON：`GET /api/subjects` 获取完整列表，校区管理员和超级管理员可通过 `PUT /api/subjects/{id}` 维护 `shortLabel`、`color`、`sortOrder` 与 `status`。学科名称不在此接口修改，避免破坏已有课程、学习空间和历史数据的关联。
 

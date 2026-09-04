@@ -284,18 +284,6 @@
   margin-top: 28rpx;
 }
 
-.material-title-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.material-toggle-hint {
-  color: #9b9da5;
-  font-size: 20rpx;
-  font-weight: 500;
-}
-
 .material-list {
   overflow: hidden;
   border: 1rpx solid #ededf0;

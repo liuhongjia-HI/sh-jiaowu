@@ -39,13 +39,14 @@ Page({
     recommendationsLoading: true,
     recommendationError: "",
     promoBanners: [],
-    serviceHighlights: buildServiceHighlights()
+    onboardingRedirected: false
     ,launchCampaign: null, launchVisible: false, launchTimeOption: ""
   },
   onLoad() {
     this.refreshGreeting();
     if (!hasStudentToken()) {
       this.showVisitorHome();
+      this.redirectToParentOnboarding();
       this.loadPromoBanners();
       return;
     }
@@ -63,7 +64,11 @@ Page({
     this.refreshGreeting();
     if (!hasStudentToken()) {
       this.showVisitorHome();
+      this.redirectToParentOnboarding();
       return;
+    }
+    if (this.data.onboardingRedirected) {
+      this.setData({ onboardingRedirected: false });
     }
     if (this.data.visitorMode) {
       this.setData({ visitorMode: false });
@@ -104,6 +109,14 @@ Page({
       recommendationsLoading: false,
       promoBanners: []
     });
+  },
+  redirectToParentOnboarding() {
+    if (this.data.onboardingRedirected) return;
+    // 未完成绑定时清掉学生首页，避免家长返回后再次落到不适用的学生视角。
+    const navigate = typeof wx.reLaunch === "function" ? wx.reLaunch : wx.navigateTo;
+    if (typeof navigate !== "function") return;
+    this.setData({ onboardingRedirected: true });
+    navigate({ url: "/pages/parent-onboarding/index" });
   },
   refreshGreeting(now = new Date()) {
     this.setData({ greeting: greetingForHour(now.getHours()) });
@@ -673,12 +686,4 @@ function homeEmptyMessage(hasOpenedPackage) {
     return "课程已开通，老师发布内容后会显示在这里。";
   }
   return "暂未开通课程，请联系老师开始学习。";
-}
-
-function buildServiceHighlights() {
-  return [
-    { icon: "学", title: "课程学习", summary: "课程、讲义和章节进度集中查看", action: "study" },
-    { icon: "练", title: "课后练习", summary: "完成老师布置的练习并查看结果", action: "tasks" },
-    { icon: "评", title: "课堂反馈", summary: "查看老师点评与下一步学习建议", action: "feedback" }
-  ];
 }

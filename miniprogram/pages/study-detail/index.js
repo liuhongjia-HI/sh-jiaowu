@@ -4,8 +4,6 @@ Page({
   data: {
     course: {},
     materials: [],
-    visibleMaterials: [],
-    materialsExpanded: false,
     homework: [],
     stations: [],
 	visibleStations: [],
@@ -51,8 +49,6 @@ Page({
       this.setData({
         course,
         materials,
-        visibleMaterials: this.data.materialsExpanded ? materials : materials.slice(0, 2),
-        canDownloadMaterials: materials.some((item) => Boolean(item.downloadUrl)),
         homework,
 		stations,
 		tags,
@@ -72,25 +68,10 @@ Page({
 		const code = event.currentTarget.dataset.code || 'all';
 		this.setData({ activeTag: code, visibleStations: filterStations(this.data.stations, code) });
 	},
-  toggleMaterials() {
-    const materialsExpanded = !this.data.materialsExpanded;
-    this.setData({
-      materialsExpanded,
-      visibleMaterials: materialsExpanded ? this.data.materials : this.data.materials.slice(0, 2)
-    });
-  },
-  goPreview() {
-    const material = this.data.materials[0];
-    if (!material) {
-      wx.showToast({ title: "暂无课程讲义", icon: "none" });
-      return;
-    }
-    wx.navigateTo({ url: `/pages/material-preview/index?id=${material.id}` });
-  },
   previewMaterial(event) {
     const id = event.currentTarget.dataset.id;
     if (!id) {
-      this.goPreview();
+      wx.showToast({ title: "暂无课程讲义", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/material-preview/index?id=${id}` });

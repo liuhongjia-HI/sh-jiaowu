@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,66 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	}
 	if count := strings.Count(script, "WatermarkText show"); count != 2 {
 		t.Fatalf("watermark count = %d, want 2 to avoid obstructing courseware text", count)
+	}
+}
+
+func TestProtectPDFUsesEncryptionAndDisablesExtractionAndModification(t *testing.T) {
+	args := protectPDFArgs("owner-secret", "/tmp/watermarked.pdf", "/tmp/protected.pdf")
+
+	want := []string{"--encrypt", "", "owner-secret", "256", "--print=none", "--modify=none", "--extract=n", "--", "/tmp/watermarked.pdf", "/tmp/protected.pdf"}
+	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("protect PDF args = %#v, want %#v", args, want)
+	}
+}
+
+func TestProtectPDFInvokesQPDFAndCreatesProtectedOutput(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	argsFile := filepath.Join(root, "qpdf-args")
+	qpdfScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$@\" > \"" + argsFile + "\"\n" +
+		"target=\"\"\n" +
+		"for arg in \"$@\"; do target=\"$arg\"; done\n" +
+		"printf 'protected' > \"$target\"\n"
+	if err := os.WriteFile(filepath.Join(binDir, "qpdf"), []byte(qpdfScript), 0755); err != nil {
+		t.Fatalf("write fake qpdf: %v", err)
+	}
+	t.Setenv("PATH", binDir)
+
+	source := filepath.Join(root, "source.pdf")
+	target := filepath.Join(root, "protected.pdf")
+	if err := os.WriteFile(source, []byte("watermarked"), 0600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := protectPDF(context.Background(), source, target); err != nil {
+		t.Fatalf("protect PDF: %v", err)
+	}
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read protected output: %v", err)
+	}
+	if string(content) != "protected" {
+		t.Fatalf("protected output = %q, want qpdf output", content)
+	}
+	args, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("read qpdf args: %v", err)
+	}
+	for _, expected := range []string{"--encrypt", "256", "--print=none", "--modify=none", "--extract=n", source, target} {
+		if !strings.Contains(string(args), expected) {
+			t.Fatalf("qpdf args missing %q: %s", expected, args)
+		}
+	}
+}
+
+func TestProtectPDFFailsClosedWhenQPDFMissing(t *testing.T) {
+	t.Setenv("PATH", "")
+	err := protectPDF(context.Background(), "/tmp/source.pdf", "/tmp/target.pdf")
+	if !errors.Is(err, errQPDFUnavailable) {
+		t.Fatalf("protect PDF error = %v, want errQPDFUnavailable", err)
 	}
 }
 
