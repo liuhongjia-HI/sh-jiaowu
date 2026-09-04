@@ -298,10 +298,6 @@ body {
   margin-bottom: 20px;
 }
 
-.grade-catalog-overview-heading {
-  display: block;
-}
-
 .grade-catalog-heading h2 {
   margin: 0;
   color: #17202a;
@@ -314,16 +310,6 @@ body {
   margin: 10px 0 0;
   color: #66727e;
   font-size: 14px;
-}
-
-.grade-catalog-note {
-  width: 100%;
-  margin: 18px auto 0;
-  text-align: center;
-  color: #ff554f;
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .grade-group + .grade-group {
@@ -2707,13 +2693,6 @@ button.schedule-block:hover {
 
   .grade-catalog-heading {
     align-items: flex-start;
-  }
-
-  .grade-catalog-note {
-    margin: 0;
-    text-align: left;
-    padding-top: 4px;
-    white-space: normal;
   }
 
   .student-stat-grid {

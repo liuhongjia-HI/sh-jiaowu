@@ -118,6 +118,21 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 		// 又跳回老大，跟切换器承诺的行为对不上。
 		if idx, ok := s.findGuardianByOpenIDIndex(openID); ok {
 			guardian := s.guardians[idx]
+			if req.SelectedStudentID != "" {
+				// 设备带回的孩子只允许在当前家长的有效关系内恢复，不能把
+				// selectedStudentId 当成任意学生账号来信任。
+				if !s.guardianStudentActive(guardian.ID, req.SelectedStudentID) {
+					return learning.Principal{}, errors.New("选择的学生账号不存在，请重新选择")
+				}
+				if selectedUser, ok := s.findUserByStudentID(req.SelectedStudentID); ok && selectedUser.AccountStatus == "正常" && hasRole(selectedUser.Roles, learning.RoleStudent) {
+					resumed := principalFromUser(selectedUser)
+					resumed.GuardianID = guardian.ID
+					guardian.LastStudentID = selectedUser.StudentID
+					s.guardians[idx] = guardian
+					return resumed, nil
+				}
+				return learning.Principal{}, errors.New("学生登录账号不存在，请联系老师处理")
+			}
 			principal := principalFromUser(user)
 			principal.GuardianID = guardian.ID
 			if guardian.LastStudentID != "" && guardian.LastStudentID != user.StudentID &&

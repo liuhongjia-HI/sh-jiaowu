@@ -83,6 +83,39 @@ test("login page silently restores bound wechat session on load", async () => {
   assert.equal(calls.some((item) => item[0] === "removeStorageSync"), false);
 });
 
+test("login page sends the device's remembered student when silently restoring", async () => {
+  const calls = [];
+  const page = loadLoginPage((path, options) => {
+    calls.push(["request", path, options]);
+    return Promise.resolve({ token: "restored-token", user: { studentId: "stu-b" } });
+  }, {
+    getStorageSync(key) {
+      return key === "starline_student_id" ? "stu-b" : "";
+    },
+    setStorageSync(key, value) {
+      calls.push(["setStorageSync", key, value]);
+    },
+    login(args) {
+      args.success({ code: "wx-login-code" });
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    }
+  });
+
+  page.onLoad();
+  await flushPromises();
+
+  assert.deepEqual(calls.find((item) => item[0] === "request"), [
+    "request",
+    "/auth/wechat-login",
+    { method: "POST", data: { code: "wx-login-code", selectedStudentId: "stu-b" } }
+  ]);
+  assert.deepEqual(calls.find((item) => item[0] === "setStorageSync" && item[1] === "starline_student_id"), [
+    "setStorageSync", "starline_student_id", "stu-b"
+  ]);
+});
+
 test("login page owns its back affordance so return works even without a page stack", () => {
   const config = JSON.parse(fs.readFileSync(path.join(__dirname, "../pages/login/index.json"), "utf8"));
   const template = fs.readFileSync(path.join(__dirname, "../pages/login/index.wxml"), "utf8");

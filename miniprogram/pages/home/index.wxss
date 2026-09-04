@@ -597,6 +597,78 @@
   line-height: 54rpx;
 }
 
+/* 审核态也要有完整、可理解的正式内容，避免首页只剩空状态。 */
+.service-section {
+  padding-top: 8rpx;
+}
+
+.service-list {
+  display: grid;
+  gap: 16rpx;
+}
+
+.service-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 112rpx;
+  padding: 20rpx 22rpx;
+  border: 1rpx solid #e8e8eb;
+  border-radius: 18rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 20rpx rgba(32, 36, 44, .045);
+}
+
+.service-icon {
+  flex: none;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff1e7;
+  color: #e56d28;
+  font-size: 27rpx;
+  font-weight: 900;
+}
+
+.service-card:nth-child(2) .service-icon {
+  background: #edf5ff;
+  color: #2f7de1;
+}
+
+.service-card:nth-child(3) .service-icon {
+  background: #eaf8f1;
+  color: #16845d;
+}
+
+.service-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.service-title {
+  color: #1f2933;
+  font-size: 28rpx;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.service-summary {
+  margin-top: 6rpx;
+  color: #728092;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.service-arrow {
+  flex: none;
+  color: #b3bbc5;
+  font-size: 38rpx;
+  line-height: 1;
+}
+
 /* 首页高保真视觉：原型的白色顶部、浅灰背景和橙色主行动。 */
 .home-page {
   min-height: 100vh;
@@ -632,19 +704,6 @@
   color: #9b9da5;
   font-size: 23rpx;
   line-height: 1.4;
-}
-
-.home-search-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 66rpx;
-  height: 66rpx;
-  border: 1rpx solid #ececef;
-  border-radius: 50%;
-  color: #17181b;
-  font-size: 42rpx;
-  line-height: 1;
 }
 
 .search-panel {
@@ -725,6 +784,14 @@
   font-size: 22rpx;
 }
 
+.banner-empty-tip {
+  max-width: 318rpx;
+  margin-top: 10rpx;
+  color: #88746d;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
 .banner-progress-row {
   display: flex;
   align-items: center;
@@ -755,6 +822,10 @@
   background: #ff5a1f;
   color: #fff;
   font-size: 24rpx;
+}
+
+.banner-activate-action {
+  margin-top: 20rpx;
 }
 
 .banner-visual {

@@ -49,6 +49,58 @@ test("home course swiper clips neighboring course cards", () => {
   assert.match(swiperItemRule[1], /overflow:\s*hidden\s*;/);
 });
 
+test("home empty course card provides a teacher-contact activation path without progress details", async () => {
+  const page = loadHomePage(() => Promise.resolve({
+    student: { id: "stu-001", openedPackages: [] },
+    continueCourse: {}, pendingHomework: [], materials: [], notices: []
+  }), {
+    getStorageSync() { return "token"; }
+  });
+
+  page.loadHome();
+  await flushPromises();
+
+  assert.equal(page.data.courseSlides.length, 1);
+  assert.equal(page.data.courseSlides[0].hasCourse, false);
+  assert.equal(page.data.courseSlides[0].actionText, "开通学习星球");
+  assert.match(page.data.courseSlides[0].meta, /联系老师或教务/);
+});
+
+test("home empty course card opens activation guidance instead of navigating to study", () => {
+  const calls = [];
+  const page = loadHomePage(() => Promise.resolve({}), {
+    getStorageSync() { return "token"; },
+    showModal(args) { calls.push(["showModal", args]); },
+    switchTab(args) { calls.push(["switchTab", args.url]); }
+  });
+
+  page.goStudyDetail({ currentTarget: { dataset: {} } });
+
+  assert.equal(calls[0][0], "showModal");
+  assert.equal(calls[0][1].title, "开通学习星球");
+  assert.match(calls[0][1].content, /联系老师或教务/);
+  assert.equal(calls.some((item) => item[0] === "switchTab"), false);
+});
+
+test("home keeps formal learning service content visible when the account has no course data", () => {
+  const page = loadHomePage(() => Promise.resolve({}), {
+    getStorageSync() { return ""; }
+  });
+  const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
+
+  assert.deepEqual(page.data.serviceHighlights.map((item) => item.title), ["课程学习", "课后练习", "课堂反馈"]);
+  assert.match(template, /Starline 学习服务/);
+  assert.match(template, /wx:for="\{\{serviceHighlights\}\}"/);
+});
+
+test("home removes the duplicate top search icon and keeps empty course content inside its card", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
+
+  assert.doesNotMatch(template, /home-search-mark/);
+  assert.match(template, /wx:if="\{\{item\.hasCourse\}\}" class="banner-progress-row"/);
+  assert.match(template, /wx:else class="banner-empty-tip">\{\{item\.meta\}\}<\/view>/);
+});
+
 test("home page greeting follows the current local hour", () => {
   const page = loadHomePage(() => Promise.resolve({}));
 

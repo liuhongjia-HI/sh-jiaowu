@@ -53,9 +53,27 @@ func (s *MemoryStore) backfillGuardianLinksForPhoneUnlocked(phone string) error 
 	if len(studentIDs) < 2 {
 		return nil
 	}
+	// 回填关系是补数据，不应改变家长已经选择的默认孩子。否则每次静默登录
+	// 扫描兄弟姐妹时，LastStudentID 都会被最后一次 ensureGuardianLink 覆盖，
+	// 两台设备的默认孩子会随机漂移。
+	lastStudentID := ""
+	for _, guardian := range s.guardians {
+		if phoneSame(guardian.Phone, phone) {
+			lastStudentID = guardian.LastStudentID
+			break
+		}
+	}
 	sort.Strings(studentIDs) // 让"谁是默认主关系人"这种细节不随 map/切片遍历顺序抖动。
 	for _, studentID := range studentIDs {
 		s.ensureGuardianLink(phone, "", studentID)
+	}
+	if lastStudentID != "" {
+		for i := range s.guardians {
+			if phoneSame(s.guardians[i].Phone, phone) {
+				s.guardians[i].LastStudentID = lastStudentID
+				break
+			}
+		}
 	}
 	return nil
 }

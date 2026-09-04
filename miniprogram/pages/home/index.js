@@ -38,7 +38,8 @@ Page({
     visibleRecommendations: [],
     recommendationsLoading: true,
     recommendationError: "",
-    promoBanners: []
+    promoBanners: [],
+    serviceHighlights: buildServiceHighlights()
     ,launchCampaign: null, launchVisible: false, launchTimeOption: ""
   },
   onLoad() {
@@ -202,7 +203,7 @@ Page({
       currentCourseIndex: index,
       continueCourse: selectedCourse,
       progressPercent: Number(selectedCourse.progress) || 0,
-          courseTitle: selectedCourse.name || "待开通课程",
+      courseTitle: selectedCourse.name || "待开通课程",
       courseMeta: formatCourseMeta(selectedCourse),
       bannerTag: index === 0 && this.data.pendingTask ? "今日题目" : "继续学习"
     });
@@ -283,10 +284,18 @@ Page({
     const dataset = event && event.currentTarget && event.currentTarget.dataset;
     const courseId = (dataset && dataset.courseId) || (this.data.continueCourse && this.data.continueCourse.id);
     if (!courseId) {
-      wx.switchTab({ url: "/pages/study/index" });
+      this.openLearningPlanet();
       return;
     }
     wx.navigateTo({ url: `/pages/study-detail/index?id=${courseId}` });
+  },
+  openLearningPlanet() {
+    wx.showModal({
+      title: "开通学习星球",
+      content: "请联系老师或教务确认开通学习套餐。开通后，课程、资料和练习会自动出现在学习中心。",
+      showCancel: false,
+      confirmText: "我知道了"
+    });
   },
   goAnswer() {
     if (!this.data.pendingTask) {
@@ -449,7 +458,7 @@ Page({
     }
     wx.showModal({
       title: recommendation.packageName,
-      content: recommendation.summary || "该套餐包含学习内容和资料，开通后即可使用。",
+      content: recommendation.summary || "该套餐包含课程和资料，开通后即可使用。",
       showCancel: false,
       confirmText: "我知道了"
     });
@@ -458,7 +467,7 @@ Page({
     const name = event.currentTarget.dataset.name || "该套餐";
     wx.showModal({
       title: "联系老师",
-      content: `请联系老师或教务开通“${name}”。开通后，学习内容和资料会自动出现在学习中心。`,
+      content: `请联系老师或教务开通“${name}”。开通后，课程、资料和练习会自动出现在学习中心。`,
       showCancel: false,
       confirmText: "我知道了"
     });
@@ -520,9 +529,9 @@ function buildCourseSlides(courses, pendingTask) {
       name: "待开通课程",
       progress: 0,
       hasCourse: false,
-      meta: "",
+      meta: "暂未开通学习套餐，请联系老师或教务确认开通。",
       bannerTag: "继续学习",
-      actionText: "查看学习中心"
+      actionText: "开通学习星球"
     }];
   }
   return courses.map((course, index) => ({
@@ -635,7 +644,7 @@ function normalizeBannerImageUrl(value) {
 
 function navigateByPath(path) {
   if (!path) {
-    wx.showToast({ title: "待办信息缺失", icon: "none" });
+    wx.showToast({ title: "待办详情不存在", icon: "none" });
     return;
   }
   const tabPages = ["/pages/home/index", "/pages/study/index", "/pages/notices/index", "/pages/me/index"];
@@ -661,7 +670,15 @@ function buildShortcuts() {
 
 function homeEmptyMessage(hasOpenedPackage) {
   if (hasOpenedPackage) {
-    return "课程已开通，内容发布后会显示在这里。";
+    return "课程已开通，老师发布内容后会显示在这里。";
   }
-  return "暂时还没有开通课程，请联系老师确认。";
+  return "暂未开通课程，请联系老师开始学习。";
+}
+
+function buildServiceHighlights() {
+  return [
+    { icon: "学", title: "课程学习", summary: "课程、讲义和章节进度集中查看", action: "study" },
+    { icon: "练", title: "课后练习", summary: "完成老师布置的练习并查看结果", action: "tasks" },
+    { icon: "评", title: "课堂反馈", summary: "查看老师点评与下一步学习建议", action: "feedback" }
+  ];
 }

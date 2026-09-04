@@ -103,6 +103,7 @@ Page({
     this.setData({ switchingStudentId: studentId });
     request(`/student/accounts/${studentId}/switch`, { method: "POST", data: {} }).then((result) => {
       wx.setStorageSync("starline_token", result.token);
+      wx.setStorageSync("starline_student_id", studentId);
       wx.showToast({ title: `已切换到${result.user.name}`, icon: "success" });
       this.setData({ switchingStudentId: "" });
       this.loadMe();

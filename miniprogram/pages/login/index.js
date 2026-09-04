@@ -8,6 +8,15 @@ const {
   isCancel
 } = require("../../utils/phone-auth");
 
+const STUDENT_SELECTION_KEY = "starline_student_id";
+
+function rememberedStudentID() {
+  if (!wx.getStorageSync) {
+    return "";
+  }
+  return String(wx.getStorageSync(STUDENT_SELECTION_KEY) || "").trim();
+}
+
 Page({
   data: {
     statusBarHeight: 0,
@@ -87,15 +96,23 @@ Page({
         if (!code) {
           return;
         }
-        request("/auth/wechat-login", { method: "POST", data: { code } })
+        const selectedStudentId = rememberedStudentID();
+        const data = selectedStudentId ? { code, selectedStudentId } : { code };
+        request("/auth/wechat-login", { method: "POST", data })
           .then((result) => {
             wx.setStorageSync("starline_token", result.token);
+            if (result.user && result.user.studentId) {
+              wx.setStorageSync(STUDENT_SELECTION_KEY, result.user.studentId);
+            }
             resumeAfterLogin();
           })
           .catch((error) => {
             const message = error && error.message ? error.message : "";
             if (message.indexOf("微信账号未绑定") === -1) {
               wx.removeStorageSync("starline_token");
+              if (selectedStudentId && (message.indexOf("选择的学生账号") !== -1 || message.indexOf("学生登录账号") !== -1)) {
+                wx.removeStorageSync(STUDENT_SELECTION_KEY);
+              }
             }
           });
       }
@@ -189,6 +206,9 @@ Page({
           return;
         }
         wx.setStorageSync("starline_token", result.token);
+        if (result.user && result.user.studentId) {
+          wx.setStorageSync(STUDENT_SELECTION_KEY, result.user.studentId);
+        }
         wx.showToast({ title: "绑定成功", icon: "success" });
         resumeAfterLogin();
         this.setData({ binding: false });

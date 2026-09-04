@@ -44,12 +44,18 @@ App({
           wx.request({
             url: `${this.globalData.apiBaseUrl}/auth/wechat-login`,
             method: "POST",
-            data: { code },
+            data: (() => {
+              const selectedStudentId = String(wx.getStorageSync("starline_student_id") || "").trim();
+              return selectedStudentId ? { code, selectedStudentId } : { code };
+            })(),
             header: { "content-type": "application/json" },
             success: (loginRes) => {
               const body = loginRes.data || {};
               if (body.code === 0 && body.data && body.data.token) {
                 wx.setStorageSync("starline_token", body.data.token);
+                if (body.data.user && body.data.user.studentId) {
+                  wx.setStorageSync("starline_student_id", body.data.user.studentId);
+                }
                 resolve(body.data.token);
                 return;
               }

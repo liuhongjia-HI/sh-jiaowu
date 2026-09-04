@@ -321,6 +321,7 @@ func (s *MemoryStore) LoginWithWechatCode(req learning.WechatLoginRequest) (lear
 	req.StudentName = strings.TrimSpace(req.StudentName)
 	req.SchoolName = strings.TrimSpace(req.SchoolName)
 	req.Grade = strings.TrimSpace(req.Grade)
+	req.SelectedStudentID = strings.TrimSpace(req.SelectedStudentID)
 	s.mu.Lock()
 	wechatResolver := s.wechatResolver
 	phoneResolver := s.phoneResolver

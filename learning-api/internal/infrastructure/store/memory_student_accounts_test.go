@@ -93,6 +93,49 @@ func TestParentPhoneCanSwitchBetweenStudentAccounts(t *testing.T) {
 	}
 }
 
+func TestSilentReloginRestoresDeviceSelectedStudent(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("expected admin principal: %v", err)
+	}
+	firstStudent, _ := store.findStudent("stu-001")
+	firstUser, _ := store.findUserByStudentID("stu-001")
+	second, err := store.CreateStudent("超级管理员", admin, learning.StudentUpsertRequest{
+		Name: "小明妹妹", Phone: firstUser.Phone, Grade: "三年级", AccountStatus: "正常",
+	})
+	if err != nil {
+		t.Fatalf("create sibling: %v", err)
+	}
+	principal, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "device-parent-1", Phone: firstUser.Phone, StudentName: firstStudent.Name,
+		SchoolName: "星河小学", Grade: "五年级", SelectedStudentID: firstStudent.ID,
+	})
+	if err != nil {
+		t.Fatalf("login parent: %v", err)
+	}
+	if _, err := store.SwitchStudentAccount(principal, second.ID); err != nil {
+		t.Fatalf("switch to sibling: %v", err)
+	}
+	// 模拟另一台设备切回老大，覆盖家长级别的最近查看值。
+	if _, err := store.SwitchStudentAccount(principal, firstStudent.ID); err != nil {
+		t.Fatalf("switch other device back: %v", err)
+	}
+	guardian, ok := store.guardianByID(principal.GuardianID)
+	if !ok || guardian.LastStudentID != firstStudent.ID {
+		t.Fatalf("expected guardian last student to be first child, got %#v", guardian)
+	}
+	resumed, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "device-parent-1", SelectedStudentID: second.ID,
+	})
+	if err != nil {
+		t.Fatalf("silent relogin with device selection: %v", err)
+	}
+	if resumed.StudentID != second.ID || resumed.GuardianID != principal.GuardianID {
+		t.Fatalf("expected device-selected sibling, got %#v", resumed)
+	}
+}
+
 func TestParentCanAddAdditionalStudentAndSwitchWithoutAdminApproval(t *testing.T) {
 	store := NewMemoryStore()
 	firstStudent, ok := store.findStudent("stu-001")

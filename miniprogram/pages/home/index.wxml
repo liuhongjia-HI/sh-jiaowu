@@ -5,7 +5,6 @@
         <view class="home-greeting">{{greeting}}，{{greetingName}} <text class="home-greeting-wave">👋</text></view>
         <view class="home-greeting-sub">今天也来学一点</view>
       </view>
-      <view class="home-search-mark">⌕</view>
     </view>
     <view class="search-panel">
       <view class="search-icon">⌕</view>
@@ -37,19 +36,40 @@
             <view class="banner-copy">
               <view class="banner-year">{{item.bannerTag}}</view>
               <view class="banner-title">{{item.name}}</view>
-              <view class="banner-sub">{{item.hasCourse ? item.meta : emptyMessage}}</view>
-              <view class="banner-progress-row"><text>已学 {{item.progress}}%</text><text>{{item.progress >= 100 ? "已完成" : "继续学习"}}</text></view>
-              <view class="progress banner-progress"><view class="progress-bar" style="width: {{item.progress}}%;"></view></view>
-              <view class="banner-action">{{item.actionText}}</view>
+              <view wx:if="{{item.hasCourse}}" class="banner-sub">{{item.meta}}</view>
+              <view wx:else class="banner-empty-tip">{{item.meta}}</view>
+              <view wx:if="{{item.hasCourse}}" class="banner-progress-row"><text>已学 {{item.progress}}%</text><text>{{item.progress >= 100 ? "已完成" : "继续学习"}}</text></view>
+              <view wx:if="{{item.hasCourse}}" class="progress banner-progress"><view class="progress-bar" style="width: {{item.progress}}%;"></view></view>
+              <view wx:if="{{item.hasCourse}}" class="banner-action">{{item.actionText}}</view>
+              <view wx:else class="banner-action banner-activate-action" catchtap="openLearningPlanet">{{item.actionText}}</view>
             </view>
             <view class="banner-visual">
               <view class="paper-card"></view>
-              <view class="score-card">{{item.progress}}%</view>
+              <view wx:if="{{item.hasCourse}}" class="score-card">{{item.progress}}%</view>
               <view class="phone-card"></view>
             </view>
           </view>
         </swiper-item>
       </swiper>
+    </view>
+
+    <view class="section service-section">
+      <view class="section-head">
+        <view>
+          <view class="section-title tight">Starline 学习服务</view>
+          <view class="section-sub">课程、练习和老师反馈，一站式完成</view>
+        </view>
+      </view>
+      <view class="service-list">
+        <view wx:for="{{serviceHighlights}}" wx:key="action" class="service-card" data-action="{{item.action}}" bindtap="handleShortcut">
+          <view class="service-icon">{{item.icon}}</view>
+          <view class="service-copy">
+            <view class="service-title">{{item.title}}</view>
+            <view class="service-summary">{{item.summary}}</view>
+          </view>
+          <view class="service-arrow">›</view>
+        </view>
+      </view>
     </view>
 
     <view class="section shortcut-wrap">
@@ -92,12 +112,12 @@
           <view class="todo-icon">{{item.icon}}</view>
           <view class="todo-main">
             <view class="todo-top">
-              <view class="todo-title">{{item.title}}</view>
-              <view class="todo-status">{{item.status}}</view>
+          <view class="todo-title">{{item.type === 'subscribe' ? '学习提醒' : item.title}}</view>
+              <view class="todo-status">{{item.type === 'subscribe' ? '建议开启' : item.status}}</view>
             </view>
-            <view class="todo-summary">{{item.summary}}</view>
+          <view class="todo-summary">{{item.type === 'subscribe' ? '接收上课、作业和批改完成提醒。' : item.summary}}</view>
           </view>
-          <view class="todo-action">{{item.actionText}}</view>
+          <view class="todo-action">{{item.type === 'subscribe' ? '开启提醒' : item.actionText}}</view>
         </view>
       </view>
     </view>
@@ -106,12 +126,12 @@
       <view class="section-head">
         <view>
           <view class="section-title tight">课堂反馈</view>
-          <view class="section-sub">看清本节课表现和下一步</view>
+          <view class="section-sub">查看课堂表现和下一步建议</view>
         </view>
       </view>
       <view wx:if="{{feedbackItems.length === 0}}" class="empty-card home-empty">
-        <view class="title">还没有课堂反馈</view>
-        <view class="sub">老师批改后会显示反馈。</view>
+        <view class="title">暂时还没有课堂反馈</view>
+        <view class="sub">老师批改后，反馈会显示在这里。</view>
       </view>
       <view wx:else class="feedback-list">
         <view wx:for="{{feedbackItems}}" wx:key="id" class="feedback-card" data-id="{{item.relatedSubmissionId}}" bindtap="goFeedback">
@@ -134,7 +154,7 @@
       <view class="section-head">
         <view>
           <view class="section-title tight">推荐课程</view>
-          <view class="section-sub">{{keyword ? "按搜索结果展示" : "看看还可以学习什么"}}</view>
+          <view class="section-sub">{{keyword ? "根据搜索结果为你推荐" : "看看还可以学习什么"}}</view>
         </view>
       </view>
 
@@ -151,8 +171,8 @@
         <view class="sub">老师发布课程后，会显示在这里。</view>
       </view>
       <view wx:elif="{{visibleRecommendations.length === 0}}" class="empty-card home-empty">
-        <view class="title">没有找到相关课程</view>
-        <view class="sub">换个关键词，或清除搜索后查看全部推荐。</view>
+        <view class="title">没有找到匹配课程</view>
+        <view class="sub">换个关键词试试，或清除搜索查看全部推荐。</view>
         <button class="button light" bindtap="clearKeyword">清除搜索</button>
       </view>
       <view wx:else class="recommendation-list">
@@ -180,7 +200,7 @@
     <view class="launch-title">{{launchCampaign.title}}</view>
     <view class="launch-message">{{launchCampaign.message}}</view>
     <view wx:if="{{launchCampaign.subMessage}}" class="launch-sub">{{launchCampaign.subMessage}}</view>
-    <picker wx:if="{{launchCampaign.timeOptions.length}}" mode="selector" range="{{launchCampaign.timeOptions}}" bindchange="chooseLaunchTime"><view class="launch-picker">{{launchTimeOption || '请选择上课时间'}}</view></picker>
+    <picker wx:if="{{launchCampaign.timeOptions.length}}" mode="selector" range="{{launchCampaign.timeOptions}}" bindchange="chooseLaunchTime"><view class="launch-picker">{{launchTimeOption || '选择上课时间'}}</view></picker>
     <button class="button launch-action" bindtap="submitLaunchCampaign">{{launchCampaign.primaryActionText}}</button>
   </view>
 </view>
