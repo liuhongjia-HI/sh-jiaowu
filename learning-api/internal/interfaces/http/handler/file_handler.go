@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"os"
 	"os/exec"
@@ -393,15 +394,18 @@ func (h *LearningHandler) StudentMaterialDownload(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	material, err := h.service.StudentMaterial(principal, c.Param("id"))
 	if err != nil {
+		log.Printf("event=student_material_download_denied material_id=%s user_id=%s student_id=%s reason=material_access error=%q", c.Param("id"), principal.UserID, principal.StudentID, err.Error())
 		Forbidden(c, err.Error())
 		return
 	}
 	if material.DownloadURL == "" {
+		log.Printf("event=student_material_download_denied material_id=%s user_id=%s student_id=%s reason=download_not_enabled", c.Param("id"), principal.UserID, principal.StudentID)
 		Forbidden(c, "当前资料仅支持在线预览")
 		return
 	}
 	asset, err := h.service.StudentMaterialPreviewFile(principal, c.Param("id"))
 	if err != nil {
+		log.Printf("event=student_material_download_denied material_id=%s user_id=%s student_id=%s reason=preview_asset error=%q", c.Param("id"), principal.UserID, principal.StudentID, err.Error())
 		Forbidden(c, err.Error())
 		return
 	}

@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -83,6 +86,7 @@ func AuthRequired(tokens *auth.TokenManager, resolver PrincipalResolver, roles .
 		}
 		tokenPrincipal, err := tokens.Parse(token)
 		if err != nil {
+			log.Printf("event=auth_denied path=%s status=401 reason=token_parse token_sha256=%s", c.Request.URL.Path, tokenFingerprint(token))
 			c.AbortWithStatusJSON(401, gin.H{"code": 401, "message": "请先登录", "data": nil})
 			return
 		}
@@ -108,6 +112,7 @@ func AuthRequired(tokens *auth.TokenManager, resolver PrincipalResolver, roles .
 		}
 		principal.AuthMethod = tokenPrincipal.AuthMethod
 		if len(allowed) > 0 && !hasAnyRole(principal.Roles, allowed) {
+			log.Printf("event=auth_denied path=%s status=403 reason=role_mismatch user_id=%s student_id=%s roles=%v required_roles=%v token_sha256=%s", c.Request.URL.Path, principal.UserID, principal.StudentID, principal.Roles, roles, tokenFingerprint(token))
 			c.AbortWithStatusJSON(403, gin.H{"code": 403, "message": "没有权限访问该功能", "data": nil})
 			return
 		}
@@ -130,6 +135,16 @@ func AuthRequired(tokens *auth.TokenManager, resolver PrincipalResolver, roles .
 		c.Set(OperatorIDKey, id)
 		c.Next()
 	}
+}
+
+// tokenFingerprint lets operators correlate repeated failures without logging
+// the bearer token itself.
+func tokenFingerprint(token string) string {
+	if token == "" {
+		return "empty"
+	}
+	sum := sha256.Sum256([]byte(token))
+	return fmt.Sprintf("%x", sum[:8])
 }
 
 func isPasswordBootstrapPath(path string) bool {
