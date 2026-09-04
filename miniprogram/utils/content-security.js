@@ -16,6 +16,10 @@ function activateContentSecurity(options = {}) {
   const captureHandler = () => {
     safeToast("学习内容已加专属水印，请勿外传");
     reportSecurityEvent({ ...context, eventType: "screenshot", detail: "用户触发截屏事件" });
+    if (isIPadIOS()) {
+      safeToast("检测到截图，页面即将返回");
+      navigateBackFromSecurePage();
+    }
   };
   captureHandlers.add(captureHandler);
   if (wx.onUserCaptureScreen) {
@@ -43,6 +47,24 @@ function activateContentSecurity(options = {}) {
       disableCaptureProtection(context);
     }
   };
+}
+
+function isIPadIOS() {
+  if (!wx.getDeviceInfo) return false;
+  const info = wx.getDeviceInfo() || {};
+  const platform = String(info.platform || "").toLowerCase();
+  const model = String(info.model || "").toLowerCase();
+  return platform === "ios" && model.includes("ipad");
+}
+
+function navigateBackFromSecurePage() {
+  if (!wx.navigateBack) return;
+  wx.navigateBack({
+    delta: 1,
+    fail() {
+      if (wx.reLaunch) wx.reLaunch({ url: "/pages/study/index" });
+    }
+  });
 }
 
 function buildRecordingHandler(context, onRecordingChange) {

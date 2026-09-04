@@ -2,6 +2,29 @@
   margin: 22rpx 0 0;
 }
 
+.global-watermark-layer {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(150rpx, 1fr);
+  gap: 70rpx 16rpx;
+  padding: 80rpx 0;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.global-watermark {
+  transform: rotate(-24deg);
+  opacity: .09;
+  color: #5d4d45;
+  font-size: 24rpx;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .material-preview-card {
   position: relative;
   min-height: 520rpx;

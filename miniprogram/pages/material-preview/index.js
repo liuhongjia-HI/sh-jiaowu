@@ -8,6 +8,8 @@ Page({
     paperTitle: "",
     readText: "",
     securityNotice: "仅供本人学习，请勿分享、截图或录屏。",
+    watermarkText: "水印加载中",
+    watermarkTexts: ["水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中"],
     favorited: false,
     favoriteId: "",
     // previewMode: unknown 加载中 / processing 生成中 / image 首图预览 / pdf 无缩略图降级 / cover-error 首图失败 / unavailable 不可用
@@ -40,6 +42,8 @@ Page({
         pageTitle: material.title,
         paperTitle: (material.curriculum && material.curriculum.lesson) || material.title,
         readText: `${material.viewCount || 0} 人学过`,
+        watermarkText: material.watermarkText || "水印加载中",
+        watermarkTexts: buildWatermarks(material.watermarkText || "水印加载中"),
         securityNotice: material.securityNotice || "仅供本人学习，请勿分享、截图或录屏。"
       });
       this.loadPagedPreview(id);
@@ -322,4 +326,8 @@ function openDocument(filePath) {
 // 小程序这边此前一直没处理，是一个独立的既有 bug。
 function stripApiPrefix(path) {
   return String(path || "").replace(/^\/api/, "");
+}
+
+function buildWatermarks(text) {
+  return Array.from({ length: 10 }).map(() => text);
 }

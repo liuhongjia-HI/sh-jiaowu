@@ -102,3 +102,45 @@ test("activateContentSecurity degrades silently when the platform has no recordi
     stop();
   });
 });
+
+test("iPad screenshot navigates back while iPhone keeps the page open", () => {
+  let captureHandler = null;
+  const calls = [];
+  const wxMock = baseWxMock({
+    getDeviceInfo() {
+      return { platform: "ios", model: "iPad13,18" };
+    },
+    onUserCaptureScreen(handler) {
+      captureHandler = handler;
+    },
+    navigateBack(options) {
+      calls.push("navigateBack");
+      options && options.success && options.success();
+    },
+    showToast(args) {
+      calls.push(args.title);
+    }
+  });
+  const { activateContentSecurity } = loadContentSecurity(wxMock);
+  const stop = activateContentSecurity({ targetType: "material", targetId: "mat-1" });
+  captureHandler();
+  stop();
+
+  assert.equal(calls.includes("navigateBack"), true);
+  assert.equal(calls.includes("检测到截图，页面即将返回"), true);
+
+  let iphoneCapture = null;
+  const iphoneCalls = [];
+  const iphoneWx = baseWxMock({
+    getDeviceInfo() {
+      return { platform: "ios", model: "iPhone15,2" };
+    },
+    onUserCaptureScreen(handler) { iphoneCapture = handler; },
+    navigateBack() { iphoneCalls.push("navigateBack"); }
+  });
+  const security = loadContentSecurity(iphoneWx);
+  const stopIphone = security.activateContentSecurity({ targetType: "material", targetId: "mat-1" });
+  iphoneCapture();
+  stopIphone();
+  assert.equal(iphoneCalls.includes("navigateBack"), false);
+});

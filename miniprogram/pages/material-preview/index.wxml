@@ -1,3 +1,6 @@
+<view class="global-watermark-layer" aria-hidden="true">
+  <view wx:for="{{watermarkTexts}}" wx:key="index" class="global-watermark">{{item}}</view>
+</view>
 <view class="hero">
   <view class="eyebrow">资料预览</view>
   <view class="hero-title">{{pageTitle}}</view>
