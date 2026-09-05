@@ -8,9 +8,14 @@ for command_name in soffice gs qpdf; do
   fi
 done
 
+if command -v gs >/dev/null 2>&1 && ! gs -q -dBATCH -dNOPAUSE -dNODISPLAY \
+  -c '/NotoSansCJKsc-Regular-UniGB-UCS2-H findfont pop quit' >/dev/null 2>&1; then
+	missing+=("Noto CJK Ghostscript font")
+fi
+
 if [ "${#missing[@]}" -gt 0 ]; then
   echo "Missing preview runtime commands: ${missing[*]}" >&2
-  echo "Run deploy/production/provision-preview-runtime.sh as root before activating this release." >&2
+	echo "Run deploy/production/provision-preview-runtime.sh as root or with passwordless sudo before activating this release." >&2
   exit 1
 fi
 

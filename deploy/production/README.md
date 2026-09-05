@@ -28,7 +28,7 @@ nginx -t && systemctl reload nginx
 
 ### 文件处理依赖的外部命令行工具
 
-生产环境必须安装 LibreOffice、Ghostscript 和 qpdf。发布激活前会执行 `check-preview-runtime.sh`，依赖缺失时停止切换版本，避免出现“上传成功但无法预览”或“下载返回未保护 PDF”。首次部署或旧服务器补齐依赖时执行：
+生产环境必须安装 LibreOffice、Ghostscript 和 qpdf。发布激活前会执行 `check-preview-runtime.sh`，依赖缺失时先尝试执行运行时准备脚本，再停止切换版本，避免出现“上传成功但无法预览”或“下载返回未保护 PDF”。检查项包含 `soffice`、`gs`、`qpdf` 以及实际可用的 Noto CJK Ghostscript 字体。首次部署或旧服务器补齐依赖时执行：
 
 ```bash
 sudo /opt/starline/current/deploy/production/provision-preview-runtime.sh
