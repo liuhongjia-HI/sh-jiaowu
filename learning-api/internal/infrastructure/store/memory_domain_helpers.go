@@ -1610,6 +1610,9 @@ func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, home
 	homework.WatermarkText = s.studentWatermarkText(principal)
 	homework.SecurityNotice = studentSecurityNotice()
 	homework.DownloadURL = ""
+	if homework.FileID != "" && s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, homework.LearningSpaceID, "download") {
+		homework.DownloadURL = "/api/student/homework/" + homework.ID + "/download"
+	}
 	return homework
 }
 

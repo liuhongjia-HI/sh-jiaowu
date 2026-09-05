@@ -178,3 +178,36 @@ test("answer page applies dynamic watermark and reports capture event", async ()
   assert.equal(calls.some((item) => item[0] === "setVisualEffectOnCapture" && item[1] === "hidden"), true);
   assert.equal(calls.some((item) => item[0] === "setVisualEffectOnCapture" && item[1] === "none"), true);
 });
+
+test("answer page downloads the secured homework file when the API exposes permission", async () => {
+  const calls = [];
+  global.getApp = () => ({ globalData: { apiBaseUrl: "https://gate.example.com/api" } });
+  const page = loadAnswerPage(() => Promise.resolve({}), {
+    getStorageSync() { return "token-abc"; },
+    showLoading(args) { calls.push(["showLoading", args.title]); },
+    hideLoading() { calls.push(["hideLoading"]); },
+    showToast(args) { calls.push(["showToast", args.title]); },
+    showModal(args) { calls.push(["showModal", args.title, args.content]); },
+    downloadFile(options) {
+      calls.push(["downloadFile", options.url, options.header.Authorization]);
+      options.success({ statusCode: 200, tempFilePath: "/tmp/homework.pdf" });
+    },
+    saveFile(options) {
+      calls.push(["saveFile", options.tempFilePath]);
+      options.success({ savedFilePath: "/saved/homework.pdf" });
+    }
+  });
+  page.setData({ downloadUrl: "/api/student/homework/hw-1/download" });
+
+  page.downloadHomework();
+  await flushPromises();
+  await flushPromises();
+
+  assert.deepEqual(calls.find((item) => item[0] === "downloadFile"), [
+    "downloadFile",
+    "https://gate.example.com/api/student/homework/hw-1/download",
+    "Bearer token-abc"
+  ]);
+  assert.deepEqual(calls.find((item) => item[0] === "saveFile"), ["saveFile", "/tmp/homework.pdf"]);
+  assert.equal(calls.some((item) => item[0] === "showToast" && item[1] === "已保存习题"), true);
+});

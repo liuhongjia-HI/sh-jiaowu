@@ -315,6 +315,34 @@ func (s *MemoryStore) studentMaterialPreviewFileUnlocked(principal learning.Prin
 	return asset, nil
 }
 
+func (s *MemoryStore) studentHomeworkPreviewFileUnlocked(principal learning.Principal, homeworkID string) (learning.FileAsset, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.FileAsset, error) {
+			return work.studentHomeworkPreviewFileUnlocked(principal, homeworkID)
+		})
+	}
+	homework, err := s.studentHomeworkUnlocked(principal, homeworkID)
+	if err != nil {
+		return learning.FileAsset{}, err
+	}
+	if strings.TrimSpace(homework.FileID) == "" {
+		return learning.FileAsset{}, errors.New("练习暂未上传下载文件")
+	}
+	asset, ok := s.fileAssets[homework.FileID]
+	if !ok {
+		return learning.FileAsset{}, errors.New("练习下载文件不存在")
+	}
+	asset.WatermarkText = s.studentWatermarkText(principal)
+	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
+		return asset, nil
+	}
+	generatedAt := time.Now().Truncate(5 * time.Minute)
+	stampText, traceCode := s.studentWatermarkStampText(principal, homework.ID, generatedAt)
+	asset.WatermarkStampText = stampText
+	s.prependLogDetail(studentAuditOperator(principal), "内容防盗版风控", homework.Title, "eventType=homework_download; targetType=homework; targetId="+homework.ID+"; watermarkTrace="+traceCode)
+	return asset, nil
+}
+
 func (s *MemoryStore) studentHomeworkUnlocked(principal learning.Principal, homeworkID string) (learning.Homework, error) {
 	if principal.StudentID == "" {
 		return learning.Homework{}, errors.New("student account is not bound")

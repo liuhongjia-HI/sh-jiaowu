@@ -189,6 +189,7 @@ func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, t
 	g.GET("/materials/:id/preview/pages/:page", h.StudentMaterialPreviewPage)
 	g.GET("/materials/:id/download", h.StudentMaterialDownload)
 	g.GET("/homework/:id", h.StudentHomeworkDetail)
+	g.GET("/homework/:id/download", h.StudentHomeworkDownload)
 	g.POST("/security/events", h.StudentSecurityEvent)
 	g.GET("/tasks", h.StudentTasks)
 	g.GET("/notices", h.StudentNotices)

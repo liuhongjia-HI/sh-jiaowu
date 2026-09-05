@@ -21,6 +21,7 @@
     </view>
   </block>
   <view class="button-row">
+    <button wx:if="{{downloadUrl}}" class="button light" bindtap="downloadHomework">下载习题</button>
     <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏练习 ♡'}}</button>
     <button class="button light" disabled="{{isOverdue}}" bindtap="saveDraft">保存草稿</button>
     <button class="button" disabled="{{isOverdue}}" loading="{{saving}}" bindtap="submit">{{isOverdue ? '已截止' : '我做完啦'}}</button>

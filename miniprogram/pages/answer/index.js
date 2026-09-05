@@ -8,6 +8,7 @@ Page({
     deadlineText: "",
     rewardText: "完成练习可获得徽章",
     questions: [],
+    downloadUrl: "",
     watermarkText: "水印加载中",
     watermarkTexts: ["水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中"],
     securityNotice: "仅供本人学习，请勿外传。",
@@ -47,6 +48,7 @@ Page({
         deadlineText: homework.isOverdue ? "已截止" : (homework.deadlineAt ? `截止 ${formatDeadline(homework.deadlineAt)}` : (homework.deadline ? `${homework.deadline} 前完成` : "")),
         rewardText: homework.course || "完成练习可获得徽章",
         questions: restoreDraftAnswers(id, questions),
+        downloadUrl: homework.downloadUrl || "",
         watermarkText,
         watermarkTexts: buildWatermarks(watermarkText),
         securityNotice: homework.securityNotice || "仅供本人学习，请勿外传。",
@@ -71,6 +73,21 @@ Page({
       this.stopContentSecurity();
       this.stopContentSecurity = null;
     }
+  },
+  downloadHomework() {
+    const downloadUrl = this.data.downloadUrl;
+    if (!downloadUrl) {
+      wx.showToast({ title: "当前习题没有开放下载", icon: "none" });
+      return;
+    }
+    wx.showLoading({ title: "正在下载" });
+    downloadWithAuth(stripApiPrefix(downloadUrl)).then((tempFilePath) => new Promise((resolve, reject) => {
+      wx.saveFile({ tempFilePath, success: resolve, fail: reject });
+    })).then(() => {
+      wx.showToast({ title: "已保存习题", icon: "success" });
+    }).catch((error) => {
+      showFileError("习题下载失败", error);
+    }).finally(() => wx.hideLoading());
   },
   refreshFavorite(homeworkId) {
     request("/student/favorites").then((favorites) => {
@@ -231,4 +248,39 @@ function formatDeadline(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function downloadWithAuth(path) {
+  const app = getApp();
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url: `${app.globalData.apiBaseUrl}${path}`,
+      header: {
+        Authorization: wx.getStorageSync("starline_token") ? `Bearer ${wx.getStorageSync("starline_token")}` : ""
+      },
+      success(res) {
+        if (res.statusCode !== 200) {
+          reject(new Error(`习题请求失败（${res.statusCode}）`));
+          return;
+        }
+        resolve(res.tempFilePath);
+      },
+      fail(err) {
+        reject(new Error((err && err.errMsg) || "网络下载失败"));
+      }
+    });
+  });
+}
+
+function showFileError(title, error) {
+  const content = (error && error.message) || "请稍后重试";
+  if (wx.showModal) {
+    wx.showModal({ title, content, showCancel: false, confirmText: "知道了" });
+    return;
+  }
+  wx.showToast({ title: content, icon: "none" });
+}
+
+function stripApiPrefix(path) {
+  return String(path || "").replace(/^\/api/, "");
 }

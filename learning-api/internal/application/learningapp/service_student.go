@@ -90,6 +90,9 @@ func (s *Service) StudentMaterialPreviewFile(principal learning.Principal, mater
 func (s *Service) StudentHomework(principal learning.Principal, homeworkID string) (learning.Homework, error) {
 	return s.student.StudentHomework(principal, homeworkID)
 }
+func (s *Service) StudentHomeworkPreviewFile(principal learning.Principal, homeworkID string) (learning.FileAsset, error) {
+	return s.student.StudentHomeworkPreviewFile(principal, homeworkID)
+}
 func (s *Service) RecordStudentSecurityEvent(operator string, principal learning.Principal, req learning.SecurityEventRequest) error {
 	return s.student.RecordStudentSecurityEvent(operator, principal, req)
 }

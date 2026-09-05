@@ -34,6 +34,7 @@ type StudentRepository interface {
 	StudentMaterial(learning.Principal, string) (learning.Material, error)
 	StudentMaterialPreviewFile(learning.Principal, string) (learning.FileAsset, error)
 	StudentHomework(learning.Principal, string) (learning.Homework, error)
+	StudentHomeworkPreviewFile(learning.Principal, string) (learning.FileAsset, error)
 	RecordStudentSecurityEvent(string, learning.Principal, learning.SecurityEventRequest) error
 	CreateSubmission(string, learning.Principal, learning.SubmissionRequest) (learning.Submission, error)
 	StudentSubmission(learning.Principal, string) (learning.Submission, error)

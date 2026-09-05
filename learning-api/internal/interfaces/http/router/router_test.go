@@ -1213,6 +1213,102 @@ func TestStudentHomeworkDetailIncludesSecurityWatermark(t *testing.T) {
 	}
 }
 
+func TestStudentHomeworkDownloadUsesStudentSecureRoute(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	source := filepath.Join(t.TempDir(), "student-homework.pdf")
+	original := []byte("%PDF-1.4 original-homework-only-secret")
+	if err := os.WriteFile(source, original, 0600); err != nil {
+		t.Fatalf("write source file: %v", err)
+	}
+	teacher, err := app.store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatalf("teacher principal: %v", err)
+	}
+	homework, err := app.store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
+		Title: "学生习题下载测试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "HW",
+		File: learning.FileAsset{
+			ID: "file-student-homework-download", FileName: "homework.pdf", FileSize: int64(len(original)), FileType: "PDF",
+			ContentType: "application/pdf", OriginalPath: source, PreviewPath: source, PreviewStatus: "可预览",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create homework: %v", err)
+	}
+	if _, err := app.store.CreateDirectGrant("测试操作人", learning.DirectGrantCreateRequest{
+		StudentID: "stu-001", LearningSpaceIDs: []string{"space-g05-english-s1-q1"}, ContentTypeCodes: []string{"course"},
+		StartsAt: "2026-01-01", EndsAt: "2027-12-31",
+	}); err != nil {
+		t.Fatalf("grant student download permission: %v", err)
+	}
+	if _, err := app.store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "允许下载带水印PDF"}); err != nil {
+		t.Fatalf("enable watermarked download: %v", err)
+	}
+
+	studentToken := app.loginStudent(t)
+	var visible learning.Homework
+	app.doJSON(t, http.MethodGet, "/api/student/homework/"+homework.ID, studentToken, nil, http.StatusOK, &visible)
+	if visible.DownloadURL != "/api/student/homework/"+homework.ID+"/download" {
+		t.Fatalf("expected student homework download url, got %q", visible.DownloadURL)
+	}
+
+	t.Setenv("PATH", "")
+	req, err := http.NewRequest(http.MethodGet, app.server.URL+visible.DownloadURL, nil)
+	if err != nil {
+		t.Fatalf("new download request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+studentToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("download request: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read download response: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected secure download failure without watermark service, got status=%d body=%s", resp.StatusCode, body)
+	}
+	if bytes.Contains(body, original) {
+		t.Fatalf("student response must never contain the original homework file, got %q", body)
+	}
+
+	toolDir := t.TempDir()
+	fakeTools := map[string]string{
+		"gs":   "#!/bin/sh\noutput=''\nfor arg in \"$@\"; do case \"$arg\" in -sOutputFile=*) output=\"${arg#-sOutputFile=}\";; esac; done\n[ -n \"$output\" ] || exit 1\nprintf 'watermarked-pdf' > \"$output\"\n",
+		"qpdf": "#!/bin/sh\noutput=''\nfor arg in \"$@\"; do output=\"$arg\"; done\n[ -n \"$output\" ] || exit 1\nprintf 'protected-pdf' > \"$output\"\n",
+	}
+	for name, script := range fakeTools {
+		path := filepath.Join(toolDir, name)
+		if err := os.WriteFile(path, []byte(script), 0700); err != nil {
+			t.Fatalf("write fake %s: %v", name, err)
+		}
+	}
+	t.Setenv("PATH", toolDir)
+	successReq, err := http.NewRequest(http.MethodGet, app.server.URL+visible.DownloadURL, nil)
+	if err != nil {
+		t.Fatalf("new successful download request: %v", err)
+	}
+	successReq.Header.Set("Authorization", "Bearer "+studentToken)
+	successResp, err := http.DefaultClient.Do(successReq)
+	if err != nil {
+		t.Fatalf("successful download request: %v", err)
+	}
+	defer successResp.Body.Close()
+	successBody, err := io.ReadAll(successResp.Body)
+	if err != nil {
+		t.Fatalf("read successful download response: %v", err)
+	}
+	if successResp.StatusCode != http.StatusOK || !bytes.Equal(successBody, []byte("protected-pdf")) {
+		t.Fatalf("expected secured homework download, got status=%d body=%q", successResp.StatusCode, successBody)
+	}
+	if !strings.Contains(successResp.Header.Get("Content-Disposition"), "homework-") || !strings.Contains(successResp.Header.Get("Content-Disposition"), ".pdf") {
+		t.Fatalf("expected homework download filename, got %q", successResp.Header.Get("Content-Disposition"))
+	}
+}
+
 func TestStudentSubmissionThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

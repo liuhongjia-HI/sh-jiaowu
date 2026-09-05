@@ -931,6 +931,13 @@ func (s *MemoryStore) StudentHomework(principal learning.Principal, homeworkID s
 	return result1, err
 }
 
+func (s *MemoryStore) StudentHomeworkPreviewFile(principal learning.Principal, homeworkID string) (learning.FileAsset, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result1, err := s.studentHomeworkPreviewFileUnlocked(principal, homeworkID)
+	return result1, err
+}
+
 func (s *MemoryStore) RecordStudentSecurityEvent(operator string, principal learning.Principal, req learning.SecurityEventRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

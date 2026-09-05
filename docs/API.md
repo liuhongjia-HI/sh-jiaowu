@@ -546,6 +546,7 @@
 - `GET /api/student/study/{id}` — 学习详情（课程 + 资料 + 小挑战 + 学习地图站点 + 进度）
 - `GET /api/student/materials/{id}` — 资料详情
 - `GET /api/student/homework/{id}` — 小挑战题目详情（含 `questions`）
+- `GET /api/student/homework/{id}/download` — 有下载权限时返回服务端生成的带水印 PDF；无权限或文件未生成时拒绝返回原文件
 - `GET /api/student/tasks`
 - `GET /api/student/notices`
 - `GET /api/student/me`

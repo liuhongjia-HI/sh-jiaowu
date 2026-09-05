@@ -427,6 +427,44 @@ func (h *LearningHandler) StudentMaterialDownload(c *gin.Context) {
 	c.FileAttachment(watermarkedPath, studentWatermarkedFileName(asset.FileName))
 }
 
+// StudentHomeworkDownload 复用学生习题访问校验；套餐授权到期后下载地址立即失效。
+func (h *LearningHandler) StudentHomeworkDownload(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	homework, err := h.service.StudentHomework(principal, c.Param("id"))
+	if err != nil {
+		log.Printf("event=student_homework_download_denied homework_id=%s user_id=%s student_id=%s reason=homework_access error=%q", c.Param("id"), principal.UserID, principal.StudentID, err.Error())
+		Forbidden(c, err.Error())
+		return
+	}
+	if homework.DownloadURL == "" {
+		log.Printf("event=student_homework_download_denied homework_id=%s user_id=%s student_id=%s reason=download_not_enabled", c.Param("id"), principal.UserID, principal.StudentID)
+		Forbidden(c, "当前习题没有开放下载权限")
+		return
+	}
+	asset, err := h.service.StudentHomeworkPreviewFile(principal, c.Param("id"))
+	if err != nil {
+		log.Printf("event=student_homework_download_denied homework_id=%s user_id=%s student_id=%s reason=preview_asset error=%q", c.Param("id"), principal.UserID, principal.StudentID, err.Error())
+		Forbidden(c, err.Error())
+		return
+	}
+	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
+		BadRequest(c, previewUnavailableMessage(asset))
+		return
+	}
+	if _, err := os.Stat(asset.PreviewPath); err != nil {
+		BadRequest(c, "历史习题文件缺失，请联系老师重新上传")
+		return
+	}
+	watermarkedPath, err := makeWatermarkedPDF(c.Request.Context(), asset)
+	if err != nil {
+		secureWatermarkFailure(c, err)
+		return
+	}
+	defer os.Remove(watermarkedPath)
+	c.Header("Cache-Control", "private, no-store")
+	c.FileAttachment(watermarkedPath, studentWatermarkedHomeworkFileName(asset.FileName))
+}
+
 func makeWatermarkedPDF(ctx context.Context, asset learning.FileAsset) (string, error) {
 	if strings.TrimSpace(asset.WatermarkStampText) == "" {
 		return "", errors.New("课件缺少专属水印信息")
@@ -477,6 +515,14 @@ func studentWatermarkedFileName(fileName string) string {
 	base := strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
 	if base == "" || base == "." {
 		base = "学习资料"
+	}
+	return base + "-学习版.pdf"
+}
+
+func studentWatermarkedHomeworkFileName(fileName string) string {
+	base := strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
+	if base == "" || base == "." {
+		base = "课后练习"
 	}
 	return base + "-学习版.pdf"
 }
