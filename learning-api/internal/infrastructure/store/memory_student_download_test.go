@@ -97,10 +97,13 @@ func TestStudentHomeworkPreviewFileIncludesServerRenderableWatermarkTrace(t *tes
 	if err != nil {
 		t.Fatalf("expected homework preview file: %v", err)
 	}
-	for _, expected := range []string{"小明", "STARLINE", "P-9069", "T-"} {
+	for _, expected := range []string{"小明", "STARLINE"} {
 		if !strings.Contains(asset.WatermarkStampText, expected) {
 			t.Fatalf("expected server-renderable trace %q, got %q", expected, asset.WatermarkStampText)
 		}
+	}
+	if strings.Contains(asset.WatermarkStampText, "P-") || strings.Contains(asset.WatermarkStampText, "T-") {
+		t.Fatalf("visible watermark should not contain trace fields, got %q", asset.WatermarkStampText)
 	}
 }
 
@@ -124,10 +127,13 @@ func TestStudentPreviewFileIncludesServerRenderableWatermarkTrace(t *testing.T) 
 	if err != nil {
 		t.Fatalf("expected preview file: %v", err)
 	}
-	for _, expected := range []string{"STARLINE", "P-9069", "T-"} {
+	for _, expected := range []string{"STARLINE"} {
 		if !strings.Contains(asset.WatermarkStampText, expected) {
 			t.Fatalf("expected server-renderable trace %q, got %q", expected, asset.WatermarkStampText)
 		}
+	}
+	if strings.Contains(asset.WatermarkStampText, "P-") || strings.Contains(asset.WatermarkStampText, "T-") {
+		t.Fatalf("visible watermark should not contain trace fields, got %q", asset.WatermarkStampText)
 	}
 }
 

@@ -1653,17 +1653,11 @@ func (s *MemoryStore) studentWatermarkName(principal learning.Principal) string 
 
 func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, materialID string, generatedAt time.Time) (string, string) {
 	name := s.studentWatermarkName(principal)
-	studentRef := idSuffix(strings.TrimSpace(principal.StudentID))
-	if studentRef == "" {
-		studentRef = "ANON"
-	}
-	phoneRef := strings.TrimPrefix(phoneTail(principal.Phone), "尾号")
-	if phoneRef == "" {
-		phoneRef = "NONE"
-	}
 	digest := sha256.Sum256([]byte(principal.StudentID + "|" + materialID + "|" + generatedAt.Format(time.RFC3339Nano)))
 	traceCode := fmt.Sprintf("%X", digest[:])[:10]
-	stamp := fmt.Sprintf("%s · STARLINE | U-%s | P-%s | %s | T-%s", name, studentRef, phoneRef, generatedAt.Format("2006-01-02 15:04"), traceCode)
+	// 页面和下载文件上的可见水印只保留“学生姓名 + STARLINE”，
+	// 追溯串只写入审计日志，避免长串把平铺水印挤成少数几行。
+	stamp := fmt.Sprintf("%s · STARLINE", name)
 	return stamp, traceCode
 }
 
