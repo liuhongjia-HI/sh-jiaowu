@@ -212,8 +212,12 @@ func watermarkGhostscriptFontArgs() ([]string, func(), error) {
 func encodePostScriptUTF16BE(text string) string {
 	units := utf16.Encode([]rune(text))
 	var builder strings.Builder
-	builder.Grow(len(units)*4 + 2)
+	// Ghostscript 的 Unicode CMap 需要 BOM 才能稳定识别输入字节序；
+	// 没有 BOM 时，部分 10.x 版本会把 UTF-16BE 当成低字节在前，导致
+	// ASCII 和中文都被绘制成乱码字形。
+	builder.Grow(len(units)*4 + 6)
 	builder.WriteByte('<')
+	builder.WriteString("FEFF")
 	for _, unit := range units {
 		fmt.Fprintf(&builder, "%04X", unit)
 	}

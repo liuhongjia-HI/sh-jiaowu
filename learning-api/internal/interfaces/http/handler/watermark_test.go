@@ -13,7 +13,7 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	script := watermarkPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
 
 	for _, expected := range []string{
-		"<0053005400410052004C0049004E00450020007C00200055002D0030003000310020007C0020004F0027005200650069006C006C00790020002800390030003600390029005C0070006100740068>",
+		"<FEFF0053005400410052004C0049004E00450020007C00200055002D0030003000310020007C0020004F0027005200650069006C006C00790020002800390030003600390029005C0070006100740068>",
 		"<< /BeginPage {",
 		"pop\n  StarlineWatermark",
 		"initgraphics",
@@ -51,7 +51,7 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 
 func TestWatermarkScriptEncodesChineseStudentName(t *testing.T) {
 	script := watermarkPageScript("小明")
-	if !strings.Contains(script, "<5C0F660E>") {
+	if !strings.Contains(script, "<FEFF5C0F660E>") {
 		t.Fatalf("watermark should encode the Chinese student name as UTF-16BE, got %s", script)
 	}
 }
