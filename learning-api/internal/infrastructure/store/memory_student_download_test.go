@@ -105,6 +105,9 @@ func TestStudentHomeworkPreviewFileIncludesServerRenderableWatermarkTrace(t *tes
 	if strings.Contains(asset.WatermarkStampText, "P-") || strings.Contains(asset.WatermarkStampText, "T-") {
 		t.Fatalf("visible watermark should not contain trace fields, got %q", asset.WatermarkStampText)
 	}
+	if asset.WatermarkStampText != "小明 STARLINE" {
+		t.Fatalf("visible watermark should only contain name and STARLINE, got %q", asset.WatermarkStampText)
+	}
 }
 
 func TestStudentPreviewFileIncludesServerRenderableWatermarkTrace(t *testing.T) {
@@ -134,6 +137,9 @@ func TestStudentPreviewFileIncludesServerRenderableWatermarkTrace(t *testing.T) 
 	}
 	if strings.Contains(asset.WatermarkStampText, "P-") || strings.Contains(asset.WatermarkStampText, "T-") {
 		t.Fatalf("visible watermark should not contain trace fields, got %q", asset.WatermarkStampText)
+	}
+	if asset.WatermarkStampText != "小明 STARLINE" {
+		t.Fatalf("visible watermark should only contain name and STARLINE, got %q", asset.WatermarkStampText)
 	}
 }
 

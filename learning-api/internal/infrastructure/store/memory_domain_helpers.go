@@ -1657,7 +1657,7 @@ func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, ma
 	traceCode := fmt.Sprintf("%X", digest[:])[:10]
 	// 页面和下载文件上的可见水印只保留“学生姓名 + STARLINE”，
 	// 追溯串只写入审计日志，避免长串把平铺水印挤成少数几行。
-	stamp := fmt.Sprintf("%s · STARLINE", name)
+	stamp := fmt.Sprintf("%s STARLINE", name)
 	return stamp, traceCode
 }
 
