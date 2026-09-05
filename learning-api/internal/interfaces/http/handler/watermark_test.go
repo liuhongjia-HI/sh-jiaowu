@@ -13,12 +13,12 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	script := watermarkPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
 
 	for _, expected := range []string{
-		"<FEFF0053005400410052004C0049004E00450020007C00200055002D0030003000310020007C0020004F0027005200650069006C006C00790020002800390030003600390029005C0070006100740068>",
+		"(STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path)",
 		"<< /BeginPage {",
 		"pop\n  StarlineWatermark",
 		"initgraphics",
 		"clippath pathbbox",
-		"StarlineNotoSansCJKsc-UniGB-UTF16-H",
+		"/Helvetica findfont",
 		"8 scalefont",
 		"/row",
 		"/column",
@@ -28,12 +28,6 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 		if !strings.Contains(script, expected) {
 			t.Fatalf("watermark script should contain %q, got %s", expected, script)
 		}
-	}
-	if strings.Contains(script, "Identity-UTF16-H") {
-		t.Fatalf("watermark must use UniGB UTF-16 CMap, got %s", script)
-	}
-	if strings.Contains(script, "StarlineNotoSansCJKsc-Regular") {
-		t.Fatalf("watermark must not use the old hyphenated CID font alias, got %s", script)
 	}
 	if strings.Contains(script, "/EndPage") || strings.Contains(script, "/showpage") {
 		t.Fatalf("watermark must draw before the PDF content instead of overriding page output: %s", script)
@@ -51,8 +45,8 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 
 func TestWatermarkScriptEncodesChineseStudentName(t *testing.T) {
 	script := watermarkPageScript("小明")
-	if !strings.Contains(script, "<FEFF5C0F660E>") {
-		t.Fatalf("watermark should encode the Chinese student name as UTF-16BE, got %s", script)
+	if !strings.Contains(script, "(U+5C0FU+660E)") {
+		t.Fatalf("watermark should encode non-ASCII names as readable code points, got %s", script)
 	}
 }
 

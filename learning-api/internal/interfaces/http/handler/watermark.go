@@ -134,13 +134,15 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 // 避免水印压住正文。Ghostscript 的 PDF 解释器支持 BeginPage / EndPage 钩子：
 // https://ghostscript.com/blog/pdfi.html
 func watermarkPageScript(watermarkText string) string {
-	encoded := encodePostScriptUTF16BE(watermarkText)
-	fontResource := watermarkCIDFontName + "-UniGB-UTF16-H"
+	// 使用标准 PostScript 字体绘制安全 ASCII 文本。此前通过 CID/Unicode CMap
+	// 绘制中文时，Ghostscript 在不同运行环境下会把字节映射成乱码；标准字体
+	// 不会再出现“看起来生成成功、实际字形错误”的情况。
+	encoded := encodePostScriptWatermarkText(watermarkText)
 	return `/StarlineWatermark {
   gsave
   initgraphics
   0.92 setgray
-  /` + fontResource + ` findfont
+	/Helvetica findfont
   8 scalefont setfont
   /WatermarkText ` + encoded + ` def
   clippath pathbbox
@@ -154,14 +156,14 @@ func watermarkPageScript(watermarkText string) string {
   pageTop pageBottom add 2 div
   translate
   35 rotate
-  halfWidth neg 260 sub
+	halfWidth neg 460 sub
   230
-  halfWidth 260 add
+	halfWidth 460 add
   {
     /column exch def
-    halfHeight neg 180 sub
-    150
-    halfHeight 180 add
+	  halfHeight neg 300 sub
+  150
+	  halfHeight 300 add
     {
       /row exch def
       column row moveto
@@ -174,6 +176,30 @@ func watermarkPageScript(watermarkText string) string {
   pop
   StarlineWatermark
 } bind >> setpagedevice`
+}
+
+// encodePostScriptWatermarkText 将水印转换成标准 PostScript 字符串。
+// ASCII 姓名（如 gaga）原样显示；非 ASCII 字符转成可读的 U+XXXX 标记，
+// 避免再把 UTF-16/CID 字节交给 Ghostscript 后产生不可识别的乱码。
+func encodePostScriptWatermarkText(text string) string {
+	var builder strings.Builder
+	builder.WriteByte('(')
+	for _, r := range text {
+		switch {
+		case r >= 32 && r <= 126:
+			switch r {
+			case '\\', '(', ')':
+				builder.WriteByte('\\')
+			}
+			builder.WriteRune(r)
+		case r <= 0xFFFF:
+			fmt.Fprintf(&builder, "U+%04X", r)
+		default:
+			fmt.Fprintf(&builder, "U+%06X", r)
+		}
+	}
+	builder.WriteByte(')')
+	return builder.String()
 }
 
 // watermarkCIDFontMap 为 Ghostscript 显式声明简体中文 Unicode TrueType 字体。
