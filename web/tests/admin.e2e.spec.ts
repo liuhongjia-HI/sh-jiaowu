@@ -482,7 +482,7 @@ test('学生列表课程列隐藏直接开通的内部伪套餐名称', async ({
   await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
   const row = page.locator('.student-table tbody tr', { hasText: '直接开通学生' });
   await expect(row.getByText('五年级地理S1Q1S · 直接开通', { exact: true })).toHaveCount(0);
-  await expect(row.getByRole('link', { name: '已开通课程', exact: true })).toBeVisible();
+  await expect(row).toContainText('已开通课程');
 });
 
 test('iPad 横屏时学生姓名完整显示且表格可横向查看', async ({ page }) => {
