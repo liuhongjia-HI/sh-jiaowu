@@ -456,6 +456,35 @@ test('学生列表课程列只展示开通方案摘要', async ({ page }) => {
   await expect(row.getByText(/课程：|讲义：|题目：/)).toHaveCount(0);
 });
 
+test('学生列表课程列隐藏直接开通的内部伪套餐名称', async ({ page }) => {
+  await login(page, '13800000002');
+  await page.route('**/api/students*', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [{
+          id: 'direct-grant-list', name: '直接开通学生', phone: '13900000161', grade: '五年级', schoolName: '星河小学',
+          openedPackages: ['五年级地理S1Q1S · 直接开通'],
+          openedPackageRefs: [{ packageId: 'direct-grant', packageName: '五年级地理S1Q1S · 直接开通' }],
+          learningStatus: '已开通', accountStatus: '正常', streakDays: 0, averageScore: 0, bindStatus: '待绑定', createdAt: '2026-08-30 20:00:00'
+        }]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/students', '学生管理');
+  await page.getByLabel('列表视图：starline:list-view:students').getByText('表格').click();
+  const row = page.locator('.student-table tbody tr', { hasText: '直接开通学生' });
+  await expect(row.getByText('五年级地理S1Q1S · 直接开通', { exact: true })).toHaveCount(0);
+  await expect(row.getByRole('link', { name: '已开通课程', exact: true })).toBeVisible();
+});
+
 test('iPad 横屏时学生姓名完整显示且表格可横向查看', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await login(page, '13800000002');

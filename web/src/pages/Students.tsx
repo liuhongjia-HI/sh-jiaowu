@@ -394,7 +394,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       title: '课程',
       dataIndex: 'openedPackageRefs',
       width: 220,
-      sorter: (left, right) => compareStudentText(left.openedPackageRefs?.map((item) => item.packageName).join('、'), right.openedPackageRefs?.map((item) => item.packageName).join('、')),
+      sorter: (left, right) => compareStudentText(publicPackageRefs(left.openedPackageRefs).map((item) => item.packageName).join('、'), publicPackageRefs(right.openedPackageRefs).map((item) => item.packageName).join('、')),
       render: (values: StudentPackageRef[], record) => <PackageLinks values={values} onOpen={() => openStudentDetail(record, 'courses')} />
     },
     {
@@ -1400,14 +1400,22 @@ function packageExpiryReminder(endTime?: string) {
 }
 
 function PackageLinks({ values, onOpen }: { values?: StudentPackageRef[]; onOpen: () => void }) {
-  if (!values?.length) return <Typography.Text type="secondary">暂未开通课程</Typography.Text>;
+  const visibleValues = publicPackageRefs(values);
+  if (visibleValues.length === 0) {
+    if (values?.length) return <Typography.Link onClick={onOpen}>已开通课程</Typography.Link>;
+    return <Typography.Text type="secondary">暂未开通课程</Typography.Text>;
+  }
   return (
     <Space size={[4, 4]} wrap>
-      {values.map((item) => (
+      {visibleValues.map((item) => (
         <Typography.Link key={item.packageId} onClick={onOpen}><Tag color="blue">{item.packageName}</Tag></Typography.Link>
       ))}
     </Space>
   );
+}
+
+function publicPackageRefs(values?: StudentPackageRef[]) {
+  return (values ?? []).filter((item) => !item.packageId.startsWith('direct-'));
 }
 
 function RecordTable({ detail }: { detail: StudentDetail }) {
