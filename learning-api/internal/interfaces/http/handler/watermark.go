@@ -14,6 +14,12 @@ import (
 // errGhostscriptUnavailable 表示服务器没有安装 Ghostscript，无法生成分页图片。
 var errGhostscriptUnavailable = errors.New("ghostscript unavailable")
 
+// watermarkFontPath 是 production provisioner 安装的 Noto Sans CJK 字体集合。
+// fonts-noto-cjk 的简体中文子字体固定为 TTC 的第 2 个 face（JP=0、KR=1、SC=2）。
+const watermarkFontPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
+
+const watermarkCIDFontName = "StarlineNotoSansCJKsc-Regular"
+
 // execCommandContext 可在测试中替换，用于在不安装 Ghostscript 的环境下验证降级逻辑。
 var execCommandContext = exec.CommandContext
 
@@ -62,15 +68,24 @@ func rasterizeWatermarkedPDFPage(ctx context.Context, sourcePath, targetPath str
 	}
 	ctx, cancel := context.WithTimeout(ctx, watermarkStampTimeout)
 	defer cancel()
+	fontArgs, cleanupFontMap, err := watermarkGhostscriptFontArgs()
+	if err != nil {
+		return fmt.Errorf("准备中文水印字体失败: %w", err)
+	}
+	defer cleanupFontMap()
 	pageArg := fmt.Sprintf("%d", page)
-	cmd := execCommandContext(ctx, "gs",
+	args := []string{
 		"-q", "-dBATCH", "-dNOPAUSE", "-dSAFER",
 		"-sDEVICE=jpeg", "-r100", "-dJPEGQ=82",
-		"-dFirstPage="+pageArg, "-dLastPage="+pageArg,
-		"-sOutputFile="+targetPath,
+		"-dFirstPage=" + pageArg, "-dLastPage=" + pageArg,
+		"-sOutputFile=" + targetPath,
+	}
+	args = append(args, fontArgs...)
+	args = append(args,
 		"-c", watermarkPageScript(watermarkText),
 		"-f", sourcePath,
 	)
+	cmd := execCommandContext(ctx, "gs", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("生成带水印分页图片失败: %w", err)
 	}
@@ -87,12 +102,21 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := execCommandContext(ctx, "gs",
+	fontArgs, cleanupFontMap, err := watermarkGhostscriptFontArgs()
+	if err != nil {
+		return fmt.Errorf("准备中文水印字体失败: %w", err)
+	}
+	defer cleanupFontMap()
+	args := []string{
 		"-q", "-dBATCH", "-dNOPAUSE", "-dSAFER",
-		"-sDEVICE=pdfwrite", "-sOutputFile="+targetPath,
+		"-sDEVICE=pdfwrite", "-sOutputFile=" + targetPath,
+	}
+	args = append(args, fontArgs...)
+	args = append(args,
 		"-c", watermarkPageScript(watermarkText),
 		"-f", sourcePath,
 	)
+	cmd := execCommandContext(ctx, "gs", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("生成带水印 PDF 失败: %w", err)
 	}
@@ -111,7 +135,7 @@ func watermarkPageScript(watermarkText string) string {
   gsave
   initgraphics
   0.92 setgray
-  /NotoSansCJKsc-Regular-Identity-UTF16-H findfont
+  /StarlineNotoSansCJKsc-Regular-Identity-UTF16-H findfont
   8 scalefont setfont
   /WatermarkText ` + encoded + ` def
   clippath pathbbox
@@ -145,6 +169,27 @@ func watermarkPageScript(watermarkText string) string {
   pop
   StarlineWatermark
 } bind >> setpagedevice`
+}
+
+// watermarkCIDFontMap 为 Ghostscript 显式声明 Unicode TrueType 字体。
+// 不能直接把 Identity CMap 套在 Noto 的 GB1 CID 资源上，否则 ASCII 和中文都会被映射到错误的 CID。
+func watermarkCIDFontMap(fontPath string) string {
+	return fmt.Sprintf("/%s << /FileType /TrueType /Path (%s) /SubfontID 2 /CSI [(Artifex) (Unicode) 0] >> ;\n", watermarkCIDFontName, escapePostScriptString(fontPath))
+}
+
+// watermarkGhostscriptFontArgs 为每次 Ghostscript 调用生成隔离的 cidfmap，
+// 同时显式放行 map 和 TTC 文件，兼容 -dSAFER 模式。
+func watermarkGhostscriptFontArgs() ([]string, func(), error) {
+	mapPath, err := writeTempFile(os.TempDir(), "starline-cidfmap-*.ps", watermarkCIDFontMap(watermarkFontPath))
+	if err != nil {
+		return nil, func() {}, err
+	}
+	cleanup := func() { _ = os.Remove(mapPath) }
+	return []string{
+		"-sCIDFMAP=" + mapPath,
+		"--permit-file-read=" + mapPath,
+		"--permit-file-read=" + watermarkFontPath,
+	}, cleanup, nil
 }
 
 // encodePostScriptUTF16BE 生成供 Identity-UTF16-H 使用的 UTF-16BE 十六进制字符串，

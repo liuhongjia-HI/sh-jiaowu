@@ -18,8 +18,7 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 		"pop\n  StarlineWatermark",
 		"initgraphics",
 		"clippath pathbbox",
-		"NotoSansCJKsc-Regular",
-		"Identity-UTF16-H",
+		"StarlineNotoSansCJKsc-Regular-Identity-UTF16-H",
 		"8 scalefont",
 		"/row",
 		"/column",
@@ -51,6 +50,21 @@ func TestWatermarkScriptEncodesChineseStudentName(t *testing.T) {
 	script := watermarkPageScript("小明")
 	if !strings.Contains(script, "<5C0F660E>") {
 		t.Fatalf("watermark should encode the Chinese student name as UTF-16BE, got %s", script)
+	}
+}
+
+func TestWatermarkCIDFontMapUsesUnicodeTrueTypeFont(t *testing.T) {
+	mapText := watermarkCIDFontMap("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
+	for _, expected := range []string{
+		"/StarlineNotoSansCJKsc-Regular",
+		"/FileType /TrueType",
+		"/Path (/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc)",
+		"/SubfontID 2",
+		"/CSI [(Artifex) (Unicode) 0]",
+	} {
+		if !strings.Contains(mapText, expected) {
+			t.Fatalf("watermark cidfmap should contain %q, got %s", expected, mapText)
+		}
 	}
 }
 
