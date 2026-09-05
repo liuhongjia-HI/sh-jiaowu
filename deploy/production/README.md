@@ -36,7 +36,7 @@ sudo /opt/starline/current/deploy/production/provision-preview-runtime.sh
 
 如果新版本因依赖预检而尚未激活，请把 `current` 替换为本次上传的 `releases/<commit>` 目录，安装完成后重新执行激活脚本。
 
-该脚本同时安装常用中文字体 `fonts-noto-cjk`，降低 Word/PPT 转 PDF 后的字体替换和版式偏移。
+该脚本同时安装常用中文字体 `fonts-noto-cjk`，用于降低 Word/PPT 转 PDF 后的字体替换和版式偏移，并保证学生姓名水印可以在 Ghostscript 中正常渲染。已经部署过的旧服务器也需要执行一次该脚本补齐字体。
 
 - `soffice`（LibreOffice headless）：把老师上传的 PPT/Word 转成 PDF 预览。
   ```bash

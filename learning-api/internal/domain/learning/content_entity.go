@@ -303,7 +303,7 @@ type FileAsset struct {
 	PreviewError     string
 	// WatermarkText 仅在学生端返回，用于小程序展示专属水印提示。
 	WatermarkText string
-	// WatermarkStampText 是可被服务端稳定渲染的 ASCII 追溯文本，绝不包含完整手机号或学生 ID。
+	// WatermarkStampText 是可被服务端稳定渲染的姓名与 ASCII 追溯文本，绝不包含完整手机号或学生 ID。
 	WatermarkStampText string
 }
 

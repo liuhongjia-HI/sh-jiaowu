@@ -1617,21 +1617,13 @@ func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, home
 }
 
 func (s *MemoryStore) studentWatermarkText(principal learning.Principal) string {
-	name := strings.TrimSpace(principal.Name)
+	name := s.studentWatermarkName(principal)
 	phone := strings.TrimSpace(principal.Phone)
 	studentID := strings.TrimSpace(principal.StudentID)
 	if student, ok := s.findStudent(principal.StudentID); ok {
-		if strings.TrimSpace(student.Nickname) != "" {
-			name = strings.TrimSpace(student.Nickname)
-		} else if strings.TrimSpace(student.Name) != "" {
-			name = strings.TrimSpace(student.Name)
-		}
 		if strings.TrimSpace(student.Phone) != "" {
 			phone = strings.TrimSpace(student.Phone)
 		}
-	}
-	if name == "" {
-		name = "Starline学员"
 	}
 	parts := []string{name}
 	if tail := phoneTail(phone); tail != "" {
@@ -1644,7 +1636,23 @@ func (s *MemoryStore) studentWatermarkText(principal learning.Principal) string 
 	return strings.Join(parts, " · ")
 }
 
+func (s *MemoryStore) studentWatermarkName(principal learning.Principal) string {
+	name := strings.TrimSpace(principal.Name)
+	if student, ok := s.findStudent(principal.StudentID); ok {
+		if strings.TrimSpace(student.Nickname) != "" {
+			name = strings.TrimSpace(student.Nickname)
+		} else if strings.TrimSpace(student.Name) != "" {
+			name = strings.TrimSpace(student.Name)
+		}
+	}
+	if name == "" {
+		name = "Starline学员"
+	}
+	return name
+}
+
 func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, materialID string, generatedAt time.Time) (string, string) {
+	name := s.studentWatermarkName(principal)
 	studentRef := idSuffix(strings.TrimSpace(principal.StudentID))
 	if studentRef == "" {
 		studentRef = "ANON"
@@ -1655,7 +1663,7 @@ func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, ma
 	}
 	digest := sha256.Sum256([]byte(principal.StudentID + "|" + materialID + "|" + generatedAt.Format(time.RFC3339Nano)))
 	traceCode := fmt.Sprintf("%X", digest[:])[:10]
-	stamp := fmt.Sprintf("STARLINE | U-%s | P-%s | %s | T-%s", studentRef, phoneRef, generatedAt.Format("2006-01-02 15:04"), traceCode)
+	stamp := fmt.Sprintf("%s · STARLINE | U-%s | P-%s | %s | T-%s", name, studentRef, phoneRef, generatedAt.Format("2006-01-02 15:04"), traceCode)
 	return stamp, traceCode
 }
 

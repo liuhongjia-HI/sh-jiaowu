@@ -97,7 +97,7 @@ func TestStudentHomeworkPreviewFileIncludesServerRenderableWatermarkTrace(t *tes
 	if err != nil {
 		t.Fatalf("expected homework preview file: %v", err)
 	}
-	for _, expected := range []string{"STARLINE", "P-9069", "T-"} {
+	for _, expected := range []string{"小明", "STARLINE", "P-9069", "T-"} {
 		if !strings.Contains(asset.WatermarkStampText, expected) {
 			t.Fatalf("expected server-renderable trace %q, got %q", expected, asset.WatermarkStampText)
 		}

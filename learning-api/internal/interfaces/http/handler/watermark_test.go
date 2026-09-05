@@ -13,12 +13,16 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	script := watermarkPageScript("STARLINE | U-001 | O'Reilly (9069)\\path")
 
 	for _, expected := range []string{
-		"STARLINE | U-001 | O'Reilly \\(9069\\)\\\\path",
+		"<0053005400410052004C0049004E00450020007C00200055002D0030003000310020007C0020004F0027005200650069006C006C00790020002800390030003600390029005C0070006100740068>",
 		"<< /BeginPage {",
 		"pop\n  StarlineWatermark",
 		"initgraphics",
 		"clippath pathbbox",
-		"stringwidth",
+		"NotoSansCJKsc-Regular",
+		"UniGB-UCS2-H",
+		"8 scalefont",
+		"/row",
+		"/column",
 		"rotate",
 		"show",
 	} {
@@ -29,11 +33,21 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	if strings.Contains(script, "/EndPage") || strings.Contains(script, "/showpage") {
 		t.Fatalf("watermark must draw before the PDF content instead of overriding page output: %s", script)
 	}
-	if !strings.Contains(script, "0.93 setgray") {
-		t.Fatalf("watermark should use the lighter 7%% black shade, got %s", script)
+	if !strings.Contains(script, "0.92 setgray") {
+		t.Fatalf("watermark should use a light gray shade, got %s", script)
 	}
-	if count := strings.Count(script, "WatermarkText show"); count != 2 {
-		t.Fatalf("watermark count = %d, want 2 to avoid obstructing courseware text", count)
+	if strings.Contains(script, "15 scalefont") {
+		t.Fatalf("watermark should not use the old oversized font, got %s", script)
+	}
+	if count := strings.Count(script, "WatermarkText show"); count != 1 {
+		t.Fatalf("watermark should draw from a tiled loop, got %d show calls", count)
+	}
+}
+
+func TestWatermarkScriptEncodesChineseStudentName(t *testing.T) {
+	script := watermarkPageScript("小明")
+	if !strings.Contains(script, "<5C0F660E>") {
+		t.Fatalf("watermark should encode the Chinese student name as UTF-16BE, got %s", script)
 	}
 }
 

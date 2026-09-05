@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode/utf16"
 )
 
 // errGhostscriptUnavailable 表示服务器没有安装 Ghostscript，无法生成分页图片。
@@ -101,36 +102,63 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 	return nil
 }
 
-// watermarkPageScript 通过 BeginPage 钩子先绘制可追溯文字，再由 PDF 内容覆盖，
+// watermarkPageScript 通过 BeginPage 钩子先绘制姓名水印，再由 PDF 内容覆盖，
 // 避免水印压住正文。Ghostscript 的 PDF 解释器支持 BeginPage / EndPage 钩子：
 // https://ghostscript.com/blog/pdfi.html
-// 学生交付水印只使用 ASCII 追溯信息，避免服务器缺少中文字体时出现空白或乱码。
 func watermarkPageScript(watermarkText string) string {
-	escaped := escapePostScriptString(watermarkText)
+	encoded := encodePostScriptUTF16BE(watermarkText)
 	return `/StarlineWatermark {
   gsave
   initgraphics
-  0.93 setgray
-  /Helvetica-Bold findfont 15 scalefont setfont
-  /WatermarkText (` + escaped + `) def
+  0.92 setgray
+  /NotoSansCJKsc-Regular-UniGB-UCS2-H findfont
+  8 scalefont setfont
+  /WatermarkText ` + encoded + ` def
   clippath pathbbox
   /pageTop exch def
   /pageRight exch def
   /pageBottom exch def
   /pageLeft exch def
-  pageLeft pageRight add 2 div
-  pageBottom pageTop add 2 div
+  pageRight pageLeft sub 2 div /halfWidth exch def
+  pageTop pageBottom sub 2 div /halfHeight exch def
+  pageRight pageLeft add 2 div
+  pageTop pageBottom add 2 div
   translate
-  42 rotate
-  /watermarkWidth WatermarkText stringwidth pop def
-  watermarkWidth -2 div -130 moveto WatermarkText show
-  watermarkWidth -2 div 130 moveto WatermarkText show
+  35 rotate
+  halfWidth neg 260 sub
+  230
+  halfWidth 260 add
+  {
+    /column exch def
+    halfHeight neg 180 sub
+    150
+    halfHeight 180 add
+    {
+      /row exch def
+      column row moveto
+      WatermarkText show
+    } for
+  } for
   grestore
 } bind def
 << /BeginPage {
   pop
   StarlineWatermark
 } bind >> setpagedevice`
+}
+
+// encodePostScriptUTF16BE 生成供 UniGB-UCS2-H 使用的 UTF-16BE 十六进制字符串，
+// 这样中文姓名可以由服务器端 Noto CJK 字体稳定渲染，不依赖 PostScript 源码编码。
+func encodePostScriptUTF16BE(text string) string {
+	units := utf16.Encode([]rune(text))
+	var builder strings.Builder
+	builder.Grow(len(units)*4 + 2)
+	builder.WriteByte('<')
+	for _, unit := range units {
+		fmt.Fprintf(&builder, "%04X", unit)
+	}
+	builder.WriteByte('>')
+	return builder.String()
 }
 
 // countPDFPages 用 Ghostscript 内置的 runpdfbegin/pdfpagecount 探测页数，
