@@ -9,7 +9,7 @@ for command_name in soffice gs qpdf; do
 done
 
 if command -v gs >/dev/null 2>&1 && ! gs -q -dBATCH -dNOPAUSE -dNODISPLAY \
-  -c '/NotoSansCJKsc-Regular-UniGB-UCS2-H findfont pop quit' >/dev/null 2>&1; then
+  -c '/NotoSansCJKsc-Regular-Identity-UTF16-H findfont pop quit' >/dev/null 2>&1; then
 	missing+=("Noto CJK Ghostscript font")
 fi
 

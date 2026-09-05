@@ -19,7 +19,7 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 		"initgraphics",
 		"clippath pathbbox",
 		"NotoSansCJKsc-Regular",
-		"UniGB-UCS2-H",
+		"Identity-UTF16-H",
 		"8 scalefont",
 		"/row",
 		"/column",
@@ -29,6 +29,9 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 		if !strings.Contains(script, expected) {
 			t.Fatalf("watermark script should contain %q, got %s", expected, script)
 		}
+	}
+	if strings.Contains(script, "UniGB-UCS2-H") {
+		t.Fatalf("watermark must use Unicode CMap instead of GB CMap, got %s", script)
 	}
 	if strings.Contains(script, "/EndPage") || strings.Contains(script, "/showpage") {
 		t.Fatalf("watermark must draw before the PDF content instead of overriding page output: %s", script)

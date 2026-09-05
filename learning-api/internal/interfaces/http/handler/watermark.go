@@ -111,7 +111,7 @@ func watermarkPageScript(watermarkText string) string {
   gsave
   initgraphics
   0.92 setgray
-  /NotoSansCJKsc-Regular-UniGB-UCS2-H findfont
+  /NotoSansCJKsc-Regular-Identity-UTF16-H findfont
   8 scalefont setfont
   /WatermarkText ` + encoded + ` def
   clippath pathbbox
@@ -147,7 +147,7 @@ func watermarkPageScript(watermarkText string) string {
 } bind >> setpagedevice`
 }
 
-// encodePostScriptUTF16BE 生成供 UniGB-UCS2-H 使用的 UTF-16BE 十六进制字符串，
+// encodePostScriptUTF16BE 生成供 Identity-UTF16-H 使用的 UTF-16BE 十六进制字符串，
 // 这样中文姓名可以由服务器端 Noto CJK 字体稳定渲染，不依赖 PostScript 源码编码。
 func encodePostScriptUTF16BE(text string) string {
 	units := utf16.Encode([]rune(text))
