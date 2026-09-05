@@ -91,7 +91,7 @@ func TestWatermarkGhostscriptFontArgsUseResourceSearchPath(t *testing.T) {
 	if searchDir == "" {
 		t.Fatalf("Ghostscript args should add a resource search directory, got %#v", args)
 	}
-	mapText, err := os.ReadFile(filepath.Join(searchDir, "cidfmap"))
+	mapText, err := os.ReadFile(filepath.Join(searchDir, "Resource", "Init", "cidfmap"))
 	if err != nil {
 		t.Fatalf("read generated cidfmap: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestWatermarkPDFPassesCIDFontMapToGhostscript(t *testing.T) {
 	argsPath := filepath.Join(root, "gs-args")
 	gsScript := "#!/bin/sh\n" +
 		"printf '%s\\n' \"$@\" > \"" + argsPath + "\"\n" +
-		"for arg in \"$@\"; do case \"$arg\" in -I*) /bin/cat \"${arg#-I}/cidfmap\" > \"" + argsPath + ".map\";; esac; done\n" +
+		"for arg in \"$@\"; do case \"$arg\" in -I*) /bin/cat \"${arg#-I}/Resource/Init/cidfmap\" > \"" + argsPath + ".map\";; esac; done\n" +
 		"output=''\n" +
 		"for arg in \"$@\"; do case \"$arg\" in -sOutputFile=*) output=\"${arg#-sOutputFile=}\";; esac; done\n" +
 		"[ -n \"$output\" ] || exit 1\n" +

@@ -189,7 +189,11 @@ func watermarkGhostscriptFontArgs() ([]string, func(), error) {
 	if err != nil {
 		return nil, func() {}, err
 	}
-	mapPath := filepath.Join(mapDir, "cidfmap")
+	mapPath := filepath.Join(mapDir, "Resource", "Init", "cidfmap")
+	if err := os.MkdirAll(filepath.Dir(mapPath), 0755); err != nil {
+		_ = os.RemoveAll(mapDir)
+		return nil, func() {}, err
+	}
 	if err := os.WriteFile(mapPath, []byte(watermarkCIDFontMap(watermarkFontPath)), 0600); err != nil {
 		_ = os.RemoveAll(mapDir)
 		return nil, func() {}, err

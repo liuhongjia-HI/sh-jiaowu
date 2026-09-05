@@ -16,8 +16,9 @@ if command -v gs >/dev/null 2>&1; then
 		watermark_cidfmap="$(mktemp)"
 		printf '%s\n' '%!PS' "/StarlineNotoSansCJKsc << /FileType /TrueType /Path ($watermark_font_path) /SubfontID 2 /CSI [(Artifex) (Unicode) 0] >> ;" > "$watermark_cidfmap"
 		watermark_cidmap_dir="$(mktemp -d)"
-		mv "$watermark_cidfmap" "$watermark_cidmap_dir/cidfmap"
-		watermark_cidfmap="$watermark_cidmap_dir/cidfmap"
+		mkdir -p "$watermark_cidmap_dir/Resource/Init"
+		mv "$watermark_cidfmap" "$watermark_cidmap_dir/Resource/Init/cidfmap"
+		watermark_cidfmap="$watermark_cidmap_dir/Resource/Init/cidfmap"
 		if ! gs -q -dBATCH -dNOPAUSE -dNODISPLAY \
 			-I"$watermark_cidmap_dir" \
 			--permit-file-read="$watermark_cidfmap" \
@@ -26,6 +27,8 @@ if command -v gs >/dev/null 2>&1; then
 			missing+=("Noto CJK Unicode Ghostscript font map")
 		fi
 		rm -f "$watermark_cidfmap"
+		rmdir "$watermark_cidmap_dir/Resource/Init"
+		rmdir "$watermark_cidmap_dir/Resource"
 		rmdir "$watermark_cidmap_dir"
 	fi
 fi
