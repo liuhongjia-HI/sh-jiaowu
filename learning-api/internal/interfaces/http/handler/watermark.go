@@ -19,7 +19,10 @@ var errGhostscriptUnavailable = errors.New("ghostscript unavailable")
 // fonts-noto-cjk 的简体中文子字体固定为 TTC 的第 2 个 face（JP=0、KR=1、SC=2）。
 const watermarkFontPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
 
-const watermarkCIDFontName = "StarlineNotoSansCJKsc-Regular"
+// Ghostscript 用 "CIDFont-CMap" 形式自动组合字体和 CMap。CID 字体别名不能
+// 再包含连字符，否则会把 "Regular-Identity-UTF16-H" 误解析成 CMap 名的一部分，
+// 最终虽然能生成 PDF，却会把水印字符映射成乱码。
+const watermarkCIDFontName = "StarlineNotoSansCJKsc"
 
 // execCommandContext 可在测试中替换，用于在不安装 Ghostscript 的环境下验证降级逻辑。
 var execCommandContext = exec.CommandContext
@@ -132,11 +135,12 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 // https://ghostscript.com/blog/pdfi.html
 func watermarkPageScript(watermarkText string) string {
 	encoded := encodePostScriptUTF16BE(watermarkText)
+	fontResource := watermarkCIDFontName + "-Identity-UTF16-H"
 	return `/StarlineWatermark {
   gsave
   initgraphics
   0.92 setgray
-  /StarlineNotoSansCJKsc-Regular-Identity-UTF16-H findfont
+  /` + fontResource + ` findfont
   8 scalefont setfont
   /WatermarkText ` + encoded + ` def
   clippath pathbbox
