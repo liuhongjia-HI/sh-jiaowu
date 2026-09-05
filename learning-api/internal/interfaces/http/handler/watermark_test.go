@@ -18,7 +18,7 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 		"pop\n  StarlineWatermark",
 		"initgraphics",
 		"clippath pathbbox",
-		"StarlineNotoSansCJKsc-Identity-UTF16-H",
+		"StarlineNotoSansCJKsc-UniGB-UTF16-H",
 		"8 scalefont",
 		"/row",
 		"/column",
@@ -29,8 +29,8 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 			t.Fatalf("watermark script should contain %q, got %s", expected, script)
 		}
 	}
-	if strings.Contains(script, "UniGB-UCS2-H") {
-		t.Fatalf("watermark must use Unicode CMap instead of GB CMap, got %s", script)
+	if strings.Contains(script, "Identity-UTF16-H") {
+		t.Fatalf("watermark must use UniGB UTF-16 CMap, got %s", script)
 	}
 	if strings.Contains(script, "StarlineNotoSansCJKsc-Regular") {
 		t.Fatalf("watermark must not use the old hyphenated CID font alias, got %s", script)
@@ -63,7 +63,7 @@ func TestWatermarkCIDFontMapUsesUnicodeTrueTypeFont(t *testing.T) {
 		"/FileType /TrueType",
 		"/Path (/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc)",
 		"/SubfontID 2",
-		"/CSI [(Artifex) (Unicode) 0]",
+		"/CSI [(GB1) 2]",
 	} {
 		if !strings.Contains(mapText, expected) {
 			t.Fatalf("watermark cidfmap should contain %q, got %s", expected, mapText)
@@ -95,8 +95,8 @@ func TestWatermarkGhostscriptFontArgsUseResourceSearchPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read generated cidfmap: %v", err)
 	}
-	if !strings.Contains(string(mapText), "/CSI [(Artifex) (Unicode) 0]") {
-		t.Fatalf("generated cidfmap should use Unicode CSI, got %s", mapText)
+	if !strings.Contains(string(mapText), "/CSI [(GB1) 2]") {
+		t.Fatalf("generated cidfmap should use GB1 CSI, got %s", mapText)
 	}
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-sCIDFMAP=") {
@@ -150,8 +150,8 @@ func TestWatermarkPDFPassesCIDFontMapToGhostscript(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read Ghostscript cidfmap: %v", err)
 	}
-	if !strings.Contains(string(mapText), "/CSI [(Artifex) (Unicode) 0]") {
-		t.Fatalf("Ghostscript cidfmap should use Unicode CSI, got %s", mapText)
+	if !strings.Contains(string(mapText), "/CSI [(GB1) 2]") {
+		t.Fatalf("Ghostscript cidfmap should use GB1 CSI, got %s", mapText)
 	}
 }
 

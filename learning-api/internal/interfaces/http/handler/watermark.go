@@ -20,8 +20,8 @@ var errGhostscriptUnavailable = errors.New("ghostscript unavailable")
 const watermarkFontPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
 
 // Ghostscript 用 "CIDFont-CMap" 形式自动组合字体和 CMap。CID 字体别名不能
-// 再包含连字符，否则会把 "Regular-Identity-UTF16-H" 误解析成 CMap 名的一部分，
-// 最终虽然能生成 PDF，却会把水印字符映射成乱码。
+// 再包含连字符，否则会把字体名误解析成 CMap 名的一部分，最终虽然能生成 PDF，
+// 却会把水印字符映射成乱码。
 const watermarkCIDFontName = "StarlineNotoSansCJKsc"
 
 // execCommandContext 可在测试中替换，用于在不安装 Ghostscript 的环境下验证降级逻辑。
@@ -135,7 +135,7 @@ func watermarkPDF(ctx context.Context, sourcePath, targetPath, watermarkText str
 // https://ghostscript.com/blog/pdfi.html
 func watermarkPageScript(watermarkText string) string {
 	encoded := encodePostScriptUTF16BE(watermarkText)
-	fontResource := watermarkCIDFontName + "-Identity-UTF16-H"
+	fontResource := watermarkCIDFontName + "-UniGB-UTF16-H"
 	return `/StarlineWatermark {
   gsave
   initgraphics
@@ -176,10 +176,11 @@ func watermarkPageScript(watermarkText string) string {
 } bind >> setpagedevice`
 }
 
-// watermarkCIDFontMap 为 Ghostscript 显式声明 Unicode TrueType 字体。
-// 不能直接把 Identity CMap 套在 Noto 的 GB1 CID 资源上，否则 ASCII 和中文都会被映射到错误的 CID。
+// watermarkCIDFontMap 为 Ghostscript 显式声明简体中文 Unicode TrueType 字体。
+// UniGB-UTF16-H 将 UTF-16 字符映射到 Adobe-GB1 字符集，ASCII 与中文都由
+// 同一个字体资源渲染，避免 Identity CMap 在当前 Ghostscript 版本中产生乱码。
 func watermarkCIDFontMap(fontPath string) string {
-	return fmt.Sprintf("%%!PS\n/%s << /FileType /TrueType /Path (%s) /SubfontID 2 /CSI [(Artifex) (Unicode) 0] >> ;\n", watermarkCIDFontName, escapePostScriptString(fontPath))
+	return fmt.Sprintf("%%!PS\n/%s << /FileType /TrueType /Path (%s) /SubfontID 2 /CSI [(GB1) 2] >> ;\n", watermarkCIDFontName, escapePostScriptString(fontPath))
 }
 
 // watermarkGhostscriptFontArgs 为每次 Ghostscript 调用生成隔离的 cidfmap，
@@ -206,7 +207,7 @@ func watermarkGhostscriptFontArgs() ([]string, func(), error) {
 	}, cleanup, nil
 }
 
-// encodePostScriptUTF16BE 生成供 Identity-UTF16-H 使用的 UTF-16BE 十六进制字符串，
+// encodePostScriptUTF16BE 生成供 UniGB-UTF16-H 使用的 UTF-16BE 十六进制字符串，
 // 这样中文姓名可以由服务器端 Noto CJK 字体稳定渲染，不依赖 PostScript 源码编码。
 func encodePostScriptUTF16BE(text string) string {
 	units := utf16.Encode([]rune(text))
