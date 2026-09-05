@@ -14,15 +14,19 @@ if command -v gs >/dev/null 2>&1; then
 		missing+=("$watermark_font_path")
 	else
 		watermark_cidfmap="$(mktemp)"
-		printf '%s\n' "/StarlineNotoSansCJKsc-Regular << /FileType /TrueType /Path ($watermark_font_path) /SubfontID 2 /CSI [(Artifex) (Unicode) 0] >> ;" > "$watermark_cidfmap"
+		printf '%s\n' '%!PS' "/StarlineNotoSansCJKsc-Regular << /FileType /TrueType /Path ($watermark_font_path) /SubfontID 2 /CSI [(Artifex) (Unicode) 0] >> ;" > "$watermark_cidfmap"
+		watermark_cidmap_dir="$(mktemp -d)"
+		mv "$watermark_cidfmap" "$watermark_cidmap_dir/cidfmap"
+		watermark_cidfmap="$watermark_cidmap_dir/cidfmap"
 		if ! gs -q -dBATCH -dNOPAUSE -dNODISPLAY \
-			-sCIDFMAP="$watermark_cidfmap" \
+			-I"$watermark_cidmap_dir" \
 			--permit-file-read="$watermark_cidfmap" \
 			--permit-file-read="$watermark_font_path" \
 			-c '/StarlineNotoSansCJKsc-Regular-Identity-UTF16-H findfont pop quit' >/dev/null 2>&1; then
 			missing+=("Noto CJK Unicode Ghostscript font map")
 		fi
 		rm -f "$watermark_cidfmap"
+		rmdir "$watermark_cidmap_dir"
 	fi
 fi
 

@@ -68,6 +68,87 @@ func TestWatermarkCIDFontMapUsesUnicodeTrueTypeFont(t *testing.T) {
 	}
 }
 
+func TestWatermarkGhostscriptFontArgsUseResourceSearchPath(t *testing.T) {
+	args, cleanup, err := watermarkGhostscriptFontArgs()
+	if err != nil {
+		t.Fatalf("create watermark cidfmap: %v", err)
+	}
+	defer cleanup()
+
+	var searchDir string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-I") {
+			searchDir = strings.TrimPrefix(arg, "-I")
+			break
+		}
+	}
+	if searchDir == "" {
+		t.Fatalf("Ghostscript args should add a resource search directory, got %#v", args)
+	}
+	mapText, err := os.ReadFile(filepath.Join(searchDir, "cidfmap"))
+	if err != nil {
+		t.Fatalf("read generated cidfmap: %v", err)
+	}
+	if !strings.Contains(string(mapText), "/CSI [(Artifex) (Unicode) 0]") {
+		t.Fatalf("generated cidfmap should use Unicode CSI, got %s", mapText)
+	}
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-sCIDFMAP=") {
+			t.Fatalf("-sCIDFMAP is only an mkcidfm.ps output option, got %#v", args)
+		}
+	}
+}
+
+func TestWatermarkPDFPassesCIDFontMapToGhostscript(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	argsPath := filepath.Join(root, "gs-args")
+	gsScript := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$@\" > \"" + argsPath + "\"\n" +
+		"for arg in \"$@\"; do case \"$arg\" in -I*) /bin/cat \"${arg#-I}/cidfmap\" > \"" + argsPath + ".map\";; esac; done\n" +
+		"output=''\n" +
+		"for arg in \"$@\"; do case \"$arg\" in -sOutputFile=*) output=\"${arg#-sOutputFile=}\";; esac; done\n" +
+		"[ -n \"$output\" ] || exit 1\n" +
+		"printf 'watermarked' > \"$output\"\n"
+	if err := os.WriteFile(filepath.Join(binDir, "gs"), []byte(gsScript), 0755); err != nil {
+		t.Fatalf("write fake gs: %v", err)
+	}
+	t.Setenv("PATH", binDir)
+
+	source := filepath.Join(root, "source.pdf")
+	target := filepath.Join(root, "watermarked.pdf")
+	if err := os.WriteFile(source, []byte("source"), 0600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := watermarkPDF(context.Background(), source, target, "小明 | U-001"); err != nil {
+		t.Fatalf("watermark PDF: %v", err)
+	}
+	args, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatalf("read gs args: %v", err)
+	}
+	var searchDir string
+	for _, arg := range strings.Split(strings.TrimSpace(string(args)), "\n") {
+		if strings.HasPrefix(arg, "-I") {
+			searchDir = strings.TrimPrefix(arg, "-I")
+			break
+		}
+	}
+	if searchDir == "" {
+		t.Fatalf("Ghostscript should receive a cidfmap search directory, got %s", args)
+	}
+	mapText, err := os.ReadFile(argsPath + ".map")
+	if err != nil {
+		t.Fatalf("read Ghostscript cidfmap: %v", err)
+	}
+	if !strings.Contains(string(mapText), "/CSI [(Artifex) (Unicode) 0]") {
+		t.Fatalf("Ghostscript cidfmap should use Unicode CSI, got %s", mapText)
+	}
+}
+
 func TestProtectPDFUsesEncryptionAndDisablesExtractionAndModification(t *testing.T) {
 	args := protectPDFArgs("owner-secret", "/tmp/watermarked.pdf", "/tmp/protected.pdf")
 
