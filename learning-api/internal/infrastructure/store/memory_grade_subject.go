@@ -218,10 +218,23 @@ func (s *MemoryStore) subjectContentCounts(studentID string, courseIDs []string)
 }
 
 func (s *MemoryStore) previewCourseForGradeSubject(studentID string, meta learning.GradeSubjectMetadata) (learning.Course, bool) {
+	var fallback learning.Course
+	var hasFallback bool
 	for _, course := range s.previewCoursesForStudent(studentID) {
-		if course.Grade == meta.Grade && subjectsMatch(course.Subject, meta.Subject) && (meta.PreviewCourseID == "" || meta.PreviewCourseID == course.ID) {
+		if course.Grade != meta.Grade || !subjectsMatch(course.Subject, meta.Subject) {
+			continue
+		}
+		if meta.PreviewCourseID != "" && meta.PreviewCourseID == course.ID {
 			return course, true
 		}
+		// 目录中的课程编号可能来自旧学期；只要当前学科存在可体验首节，
+		// 不应因旧编号阻断所有用户的体验入口。
+		if !hasFallback {
+			fallback, hasFallback = course, true
+		}
+	}
+	if hasFallback {
+		return fallback, true
 	}
 	return learning.Course{}, false
 }
