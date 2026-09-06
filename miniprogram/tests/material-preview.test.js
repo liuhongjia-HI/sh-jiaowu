@@ -174,12 +174,14 @@ test("material preview lets the student retry when the first-page cover fails", 
 test("openSecurePreview strips the redundant /api prefix from previewUrl before downloading", async () => {
   const downloadedUrls = [];
   let openedPath = "";
+  let openedOptions;
   const wxMock = baseWxMock({
     downloadFile(opts) {
       downloadedUrls.push(opts.url);
       opts.success({ statusCode: 200, tempFilePath: "secure-preview.pdf#local" });
     },
     openDocument(opts) {
+      openedOptions = opts;
       openedPath = opts.filePath;
       opts.success && opts.success();
     }
@@ -206,6 +208,7 @@ test("openSecurePreview strips the redundant /api prefix from previewUrl before 
 
   assert.deepEqual(downloadedUrls, ["https://gate.example.com/api/student/materials/mat-1/preview"]);
   assert.equal(openedPath, "secure-preview.pdf#local");
+  assert.equal(openedOptions.showMenu, true);
 });
 
 test("openSecurePreview ignores repeated taps while the document is opening", async () => {

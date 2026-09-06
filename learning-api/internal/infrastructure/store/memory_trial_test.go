@@ -7,7 +7,7 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
-func TestNewStudentCanPermanentlyReadTheFirstChapterOfEachGradeSubject(t *testing.T) {
+func TestNewStudentCannotReadPreviewContentWithoutPackage(t *testing.T) {
 	store := NewMemoryStore()
 	store.grants = nil
 	store.spaceAccess = nil
@@ -48,11 +48,8 @@ func TestNewStudentCanPermanentlyReadTheFirstChapterOfEachGradeSubject(t *testin
 	if err != nil {
 		t.Fatalf("load study: %v", err)
 	}
-	if !containsCourseID(study.Courses, englishCourseID) || !containsCourseID(study.Courses, mathCourseID) {
-		t.Fatalf("expected first course of each subject to be available, got %#v", study.Courses)
-	}
-	if !containsMaterialID(study.Materials, "preview-english-first-material") || !containsMaterialID(study.Materials, "preview-math-first-material") {
-		t.Fatalf("expected first-chapter handouts, got %#v", study.Materials)
+	if containsMaterialID(study.Materials, "preview-english-first-material") || containsMaterialID(study.Materials, "preview-math-first-material") {
+		t.Fatalf("unopened courses must not expose preview handouts, got %#v", study.Materials)
 	}
 	if containsMaterialID(study.Materials, "preview-english-later-material") {
 		t.Fatalf("later-chapter handout must stay locked, got %#v", study.Materials)
@@ -61,8 +58,8 @@ func TestNewStudentCanPermanentlyReadTheFirstChapterOfEachGradeSubject(t *testin
 	if err != nil {
 		t.Fatalf("load home: %v", err)
 	}
-	if !containsHomeworkID(home.PendingHomework, "preview-english-first-homework") || !containsHomeworkID(home.PendingHomework, "preview-math-first-homework") {
-		t.Fatalf("expected first-chapter exercises, got %#v", home.PendingHomework)
+	if containsHomeworkID(home.PendingHomework, "preview-english-first-homework") || containsHomeworkID(home.PendingHomework, "preview-math-first-homework") {
+		t.Fatalf("unopened courses must not expose preview exercises, got %#v", home.PendingHomework)
 	}
 	if containsHomeworkID(home.PendingHomework, "preview-english-later-homework") {
 		t.Fatalf("later-chapter exercise must stay locked, got %#v", home.PendingHomework)
@@ -78,7 +75,7 @@ func TestNewStudentCanPermanentlyReadTheFirstChapterOfEachGradeSubject(t *testin
 		t.Fatalf("open formal package: %v", err)
 	}
 	if _, err := store.StudentMaterial(student, "preview-english-later-material"); err != nil {
-		t.Fatalf("formal package must override preview limit: %v", err)
+		t.Fatalf("formal package must unlock later content: %v", err)
 	}
 }
 
@@ -105,8 +102,8 @@ func TestStudentStudyListsConfiguredGradeSubjectsAndMarksPreview(t *testing.T) {
 			break
 		}
 	}
-	if english.ID == "" || english.AccessState != "preview" || english.AccessLabel != "首节可体验" {
-		t.Fatalf("english preview card = %#v", english)
+	if english.ID == "" || english.AccessState != "locked" || english.AccessLabel != "暂未开通" || english.CanOpen {
+		t.Fatalf("english unopened card = %#v", english)
 	}
 }
 
@@ -164,12 +161,8 @@ func TestPreviewLessonUsesFirstUnitFirstLesson(t *testing.T) {
 	}
 }
 
-func TestPreviewDetailShowsLaterLessonsAsLockedWithoutContentIDs(t *testing.T) {
+func TestUnopenedDetailShowsAllLessonsAsLockedWithoutContentIDs(t *testing.T) {
 	store := NewMemoryStore()
-	student, err := store.PrincipalByUserID("user-student-001")
-	if err != nil {
-		t.Fatal(err)
-	}
 	store.grants = nil
 	store.spaceAccess = nil
 	for index := range store.courses {
@@ -177,16 +170,26 @@ func TestPreviewDetailShowsLaterLessonsAsLockedWithoutContentIDs(t *testing.T) {
 			store.courses[index].Curriculum = append(store.courses[index].Curriculum, learning.CurriculumNode{ID: "preview-locked-lesson", ParentID: "course-g05-english-s1-q1-chapter-1", Type: learning.CurriculumLesson, Name: "第二节", SortOrder: 2})
 		}
 	}
-	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
-	if err != nil {
-		t.Fatalf("preview detail: %v", err)
+	var course learning.Course
+	for _, item := range store.courses {
+		if item.ID == "course-g05-english-s1-q1" {
+			course = item
+			break
+		}
 	}
-	var locked learning.Station
-	for _, station := range detail.Stations {
+	stations := store.lockedPreviewStations(course)
+	var first, locked learning.Station
+	for _, station := range stations {
+		if station.Title == "基础巩固" {
+			first = station
+		}
 		if station.Title == "第二节" {
 			locked = station
 			break
 		}
+	}
+	if first.Status != "未开通" || first.MaterialID != "" || first.HomeworkID != "" {
+		t.Fatalf("first station must also stay locked without package: %#v", first)
 	}
 	if locked.Status != "未开通" || locked.MaterialID != "" || locked.HomeworkID != "" {
 		t.Fatalf("locked station must not expose content IDs: %#v", locked)

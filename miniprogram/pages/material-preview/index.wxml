@@ -1,13 +1,14 @@
-<view class="global-watermark-layer" aria-hidden="true">
-  <view wx:for="{{watermarkTexts}}" wx:key="index" class="global-watermark">{{item}}</view>
-</view>
-<view class="hero">
-  <view class="eyebrow">资料预览</view>
-  <view class="hero-title">{{pageTitle}}</view>
-  <view class="badge">{{material.downloadUrl ? '支持下载' : '仅支持在线查看'}}</view>
-</view>
-<view class="section">
-  <view class="card">
+<view class="material-preview-page">
+  <view class="global-watermark-layer" aria-hidden="true">
+    <view wx:for="{{watermarkTexts}}" wx:key="index" class="global-watermark">{{item}}</view>
+  </view>
+  <view class="hero">
+    <view class="eyebrow">资料预览</view>
+    <view class="hero-title">{{pageTitle}}</view>
+    <view class="badge">{{material.downloadUrl ? '可打开并打印' : '仅支持在线查看'}}</view>
+  </view>
+  <view class="section">
+    <view class="card">
     <view class="bubble">学习提示：先看例子，再做练习。</view>
     <view class="row preview-meta">
       <view class="sub">学习进度已自动保存</view>
@@ -61,8 +62,9 @@
     </view>
     <view class="button-row">
       <button class="button light {{material.downloadUrl ? '' : 'solo-secondary'}}" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
-      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
+      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">打开并打印</button>
       <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
+    </view>
     </view>
   </view>
 </view>

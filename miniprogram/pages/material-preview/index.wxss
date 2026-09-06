@@ -2,6 +2,64 @@
   margin: 22rpx 0 0;
 }
 
+/* 资料预览页的内容层级：白色信息头部 + 浅灰阅读区。 */
+.material-preview-page {
+  min-height: 100vh;
+  background: #f7f7f8;
+}
+
+.material-preview-page .hero {
+  padding: 56rpx 64rpx 42rpx;
+  background: #fff;
+  border-bottom: 1rpx solid #ededf0;
+}
+
+.material-preview-page .hero::after {
+  right: -56rpx;
+  top: -52rpx;
+  width: 210rpx;
+  height: 210rpx;
+  background: #fff1eb;
+}
+
+.material-preview-page .eyebrow {
+  color: #8b8e98;
+  font-size: 24rpx;
+}
+
+.material-preview-page .hero-title {
+  max-width: 900rpx;
+  margin-top: 14rpx;
+  color: #17181b;
+  font-size: 56rpx;
+  font-weight: 900;
+  letter-spacing: -1rpx;
+  line-height: 1.16;
+}
+
+.material-preview-page .hero .badge {
+  margin-top: 24rpx;
+  padding: 14rpx 24rpx;
+  background: #fff0e9;
+  color: #f15a2b;
+  font-size: 26rpx;
+}
+
+.material-preview-page .section {
+  padding: 34rpx 64rpx 48rpx;
+}
+
+.material-preview-page .card {
+  padding: 34rpx;
+  border-radius: 28rpx;
+  background: #fff;
+}
+
+.material-preview-page .bubble {
+  padding: 22rpx 24rpx;
+  font-size: 26rpx;
+}
+
 .global-watermark-layer {
   position: fixed;
   inset: 0;

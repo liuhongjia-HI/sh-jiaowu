@@ -330,9 +330,9 @@ test("home summary cards expose direct actions for todos, materials, and notices
   const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
 
   assert.match(template, /class="status-item"\s+data-action="tasks"\s+bindtap="handleShortcut"/);
-  assert.match(template, /class="status-item"\s+data-action="materials"\s+bindtap="handleShortcut"/);
+  assert.match(template, /class="status-item"\s+data-action="study"\s+bindtap="handleShortcut"/);
   assert.match(template, /class="status-item"\s+data-action="notices"\s+bindtap="handleShortcut"/);
-  assert.match(template, /<view class="status-item"\s+data-action="materials"\s+bindtap="handleShortcut">\s*<view class="status-value">\{\{materialCount\}\}<\/view>\s*<view class="status-label">在学课程<\/view>/);
+  assert.match(template, /<view class="status-item"\s+data-action="study"\s+bindtap="handleShortcut">\s*<view class="status-value">\{\{materialCount\}\}<\/view>\s*<view class="status-label">在学课程<\/view>/);
 });
 
 test("home page displays unopened package recommendations", async () => {

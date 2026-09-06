@@ -82,9 +82,21 @@ Page({
     }
     wx.showLoading({ title: "正在下载" });
     downloadWithAuth(stripApiPrefix(downloadUrl)).then((tempFilePath) => new Promise((resolve, reject) => {
-      wx.saveFile({ tempFilePath, success: resolve, fail: reject });
-    })).then(() => {
-      wx.showToast({ title: "已保存课件", icon: "success" });
+      wx.saveFile({ tempFilePath, success: (result) => resolve(result && result.savedFilePath ? result.savedFilePath : tempFilePath), fail: reject });
+    })).then((savedFilePath) => {
+      wx.showModal({
+        title: "课件已保存",
+        content: "课件已保存。点击“立即打开”查看并打印；打开 PDF 后，点右上角“…”可发送到文件传输助手或选择打印。",
+        confirmText: "打开课件",
+        cancelText: "知道了",
+        success: (result) => {
+          if (!result || !result.confirm) {
+            wx.showToast({ title: "已保存，打开 PDF 后可发送或打印", icon: "none", duration: 2600 });
+            return;
+          }
+          openDocument(savedFilePath).catch((error) => showFileError("课件打开失败", error));
+        }
+      });
     }).catch((error) => {
       showFileError("课件下载失败", error);
     }).finally(() => wx.hideLoading());
@@ -310,6 +322,9 @@ function openDocument(filePath) {
     wx.openDocument({
       filePath,
       fileType: "pdf",
+      // 打开右上角文档菜单，客户可从菜单转发到文件传输助手或选择支持打印的应用。
+      // 小程序无法强制指定系统浏览器，showMenu 是微信侧可用的兼容入口。
+      showMenu: true,
       success: resolve,
       fail(error) {
         reject(new Error((error && error.errMsg) || "资料打开失败，请稍后再试"));

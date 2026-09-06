@@ -804,3 +804,253 @@
   font-size: 21rpx;
   line-height: 1.5;
 }
+
+/* 首页视觉收敛：以项目橙色为主色，降低卡片和多色入口的噪音。 */
+.me-shell {
+  padding: 8rpx 32rpx 156rpx;
+  background: #f7f7f8;
+}
+
+.me-toolbar {
+  height: 64rpx;
+}
+
+.me-toolbar-icon {
+  width: 48rpx;
+  height: 48rpx;
+  color: #25262a;
+}
+
+.profile-card {
+  min-height: 136rpx;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid #ffe0d3;
+  border-radius: 22rpx;
+  background: #fff0e9;
+  box-shadow: none;
+}
+
+.profile-avatar,
+.profile-avatar-image,
+.profile-avatar-fallback {
+  width: 84rpx;
+  height: 84rpx;
+}
+
+.profile-copy {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  column-gap: 8rpx;
+}
+
+.profile-greeting {
+  width: 100%;
+  color: #8d9099;
+  font-size: 20rpx;
+  line-height: 1.2;
+}
+
+.profile-nickname {
+  width: auto;
+  max-width: 280rpx;
+  height: 40rpx;
+  color: #17181b;
+  font-size: 30rpx;
+  line-height: 40rpx;
+}
+
+.profile-phone-action {
+  height: 36rpx;
+  margin-top: 4rpx;
+  padding: 0 12rpx;
+  background: rgba(255, 255, 255, .82);
+  color: #ff5a1f;
+  font-size: 18rpx;
+  line-height: 36rpx;
+}
+
+.profile-phone-action.authorized {
+  color: #45a978;
+}
+
+.profile-arrow {
+  color: #c4775b;
+  font-size: 34rpx;
+}
+
+.student-switcher {
+  margin: 14rpx 0 22rpx;
+  padding: 14rpx 16rpx;
+  border: 0;
+  border-radius: 18rpx;
+  background: #fff;
+}
+
+.student-switcher-label {
+  color: #8d9099;
+  font-size: 20rpx;
+  font-weight: 600;
+}
+
+.student-switcher-list {
+  margin-top: 10rpx;
+}
+
+.student-switch-button {
+  min-width: 178rpx;
+  padding: 0 18rpx;
+  border: 1rpx solid #ffd5c6;
+  color: #ff5a1f;
+  font-size: 22rpx;
+}
+
+.student-switch-button.active {
+  border-color: #ffb79d;
+  background: #fff0e9;
+  color: #ff5a1f;
+}
+
+.student-add-button {
+  min-width: 158rpx;
+  border-color: #ffb79d;
+  background: #fff;
+  color: #ff5a1f;
+  font-size: 21rpx;
+}
+
+.me-section {
+  margin-top: 22rpx;
+}
+
+.me-section-head {
+  margin-bottom: 12rpx;
+}
+
+.me-section-title {
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.me-section-more {
+  color: #9b9da5;
+  font-size: 20rpx;
+}
+
+.recent-card {
+  align-items: flex-start;
+  gap: 18rpx;
+  min-height: 188rpx;
+  padding: 20rpx;
+  border: 1rpx solid #ededf0;
+  border-radius: 22rpx;
+  box-shadow: 0 8rpx 22rpx rgba(30, 31, 35, .04);
+}
+
+.recent-cover {
+  width: 126rpx;
+  height: 144rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(145deg, #fff0e9 0%, #ffc2aa 100%);
+}
+
+.recent-cover-art {
+  right: 10rpx;
+  bottom: 10rpx;
+  width: 60rpx;
+  height: 60rpx;
+  font-size: 32rpx;
+}
+
+.recent-title {
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.recent-date {
+  margin-top: 6rpx;
+  font-size: 19rpx;
+}
+
+.recent-progress-row {
+  margin-top: 18rpx;
+  font-size: 19rpx;
+}
+
+.recent-progress {
+  height: 10rpx;
+  margin-top: 8rpx;
+}
+
+.recent-progress-bar {
+  background: #ff5a1f;
+}
+
+.recent-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14rpx;
+  color: #ff5a1f;
+  font-size: 21rpx;
+  font-weight: 750;
+}
+
+.recent-cta text {
+  font-size: 30rpx;
+  line-height: 1;
+}
+
+.metric-strip {
+  margin-top: 16rpx;
+  padding: 18rpx 8rpx;
+  border-radius: 20rpx;
+  box-shadow: 0 8rpx 22rpx rgba(30, 31, 35, .035);
+}
+
+.metric-value {
+  font-size: 30rpx;
+}
+
+.metric-label {
+  margin-top: 6rpx;
+  font-size: 20rpx;
+}
+
+.function-section {
+  margin-top: 26rpx;
+}
+
+.function-section .quick-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.function-section .quick-action {
+  min-height: 142rpx;
+  padding: 12rpx 6rpx;
+  border: 1rpx solid #ededf0;
+  border-radius: 18rpx;
+  box-shadow: none;
+}
+
+.function-section .quick-symbol,
+.function-section .quick-action-materials .quick-symbol,
+.function-section .quick-action-feedback .quick-symbol,
+.function-section .quick-action-favorites .quick-symbol,
+.function-section .quick-action-notice .quick-symbol,
+.function-section .quick-action-settings .quick-symbol {
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 18rpx;
+  background: #fff0e9;
+  color: #ff5a1f;
+  font-size: 27rpx;
+}
+
+.function-section .quick-title {
+  margin-top: 10rpx;
+  color: #3a3b40;
+  font-size: 20rpx;
+}

@@ -1105,9 +1105,6 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 			}
 		}
 	}
-	for _, course := range s.previewCoursesForStudent(studentID) {
-		out = appendCourseUnique(out, course)
-	}
 	materialCounts := make(map[string]int)
 	for _, material := range s.materialsForStudent(studentID) {
 		materialCounts[material.CourseID]++
@@ -1131,9 +1128,7 @@ func (s *MemoryStore) coursesForStudent(studentID string) []learning.Course {
 	return out
 }
 
-// previewCoursesForStudent 为未购课学生提供本年级每门学科的首个课节入口。
-// 预览是由课程内容实时派生的永久权限，不写入套餐授权：内容发布完整后即可
-// 自动出现，也不会与正式套餐的有效期或学习状态混在一起。
+// previewCoursesForStudent 保留用于兼容历史数据模型；未开通学生不再获得任何内容预览权限。
 func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Course {
 	student, ok := s.findStudent(studentID)
 	if !ok || student.AccountStatus != "正常" {
@@ -1403,20 +1398,6 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			}
 		}
 	}
-	for _, course := range s.previewCoursesForStudent(studentID) {
-		if s.hasAnyContentGrantForLearningSpace(studentID, course.LearningSpaceID) {
-			continue
-		}
-		lessonID, ready := s.previewLessonForCourse(course)
-		if !ready {
-			continue
-		}
-		for _, material := range s.materials {
-			if material.CourseID == course.ID && material.LessonID == lessonID && materialPublished(material.Status) {
-				out = appendMaterialUnique(out, s.decorateMaterial(material))
-			}
-		}
-	}
 	return out
 }
 
@@ -1440,20 +1421,6 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 				continue
 			}
 			if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, "HW", "EXAM", "Exam", "Special") && containsString(spaceIDs, item.LearningSpaceID) {
-				out = appendHomeworkUnique(out, item)
-			}
-		}
-	}
-	for _, course := range s.previewCoursesForStudent(studentID) {
-		if s.hasAnyContentGrantForLearningSpace(studentID, course.LearningSpaceID) {
-			continue
-		}
-		lessonID, ready := s.previewLessonForCourse(course)
-		if !ready {
-			continue
-		}
-		for _, item := range s.homework {
-			if item.CourseID == course.ID && item.LessonID == lessonID && homeworkVisible(item.Status) {
 				out = appendHomeworkUnique(out, item)
 			}
 		}

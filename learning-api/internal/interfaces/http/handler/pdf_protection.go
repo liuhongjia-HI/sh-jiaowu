@@ -27,7 +27,8 @@ func qpdfAvailable() bool {
 func protectPDFArgs(ownerPassword, sourcePath, targetPath string) []string {
 	return []string{
 		"--encrypt", "", ownerPassword, "256",
-		"--print=none", "--modify=none", "--extract=n",
+		// 允许客户打印学习版，但仍禁止修改和提取内容。
+		"--print=full", "--modify=none", "--extract=n",
 		"--", sourcePath, targetPath,
 	}
 }

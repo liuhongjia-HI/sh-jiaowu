@@ -24,6 +24,7 @@
         </view>
       </button>
       <view class="profile-copy">
+        <view class="profile-greeting">下午好，</view>
         <input class="profile-nickname" type="nickname" value="{{profileForm.nickname}}" placeholder="微信用户" bindinput="onNicknameInput" bindblur="commitNickname" confirm-type="done" aria-label="微信昵称" />
         <button class="profile-phone-action {{studentProfile.phoneAuthorized ? 'authorized' : 'pending'}}" open-type="getPhoneNumber" bindgetphonenumber="authorizePhone" loading="{{savingProfile}}" disabled="{{savingProfile}}" aria-label="授权手机号">
           <text>{{studentProfile.phoneHint}}</text>
@@ -33,7 +34,7 @@
     </view>
 
     <view wx:if="{{studentAccounts.length}}" class="student-switcher">
-      <view class="student-switcher-label">当前查看：{{studentProfile.name}}</view>
+      <view class="student-switcher-label">当前学生</view>
       <view class="student-switcher-list">
         <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}} {{!item.canSwitch && !item.active ? 'pending' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{!item.canSwitch && !item.active || switchingStudentId}}">
           <text>{{item.name}} · {{item.grade}}</text>
@@ -45,8 +46,8 @@
 
     <view class="me-section recent-section">
       <view class="me-section-head">
-        <view class="me-section-title">最近学习</view>
-        <view class="me-section-more" bindtap="goStudy">查看更多 ›</view>
+        <view class="me-section-title">继续学习</view>
+        <view class="me-section-more" bindtap="goStudy">学习中心 ›</view>
       </view>
       <view wx:if="{{recentLearning}}" class="recent-card" bindtap="goStudyDetail">
         <view class="recent-cover">
@@ -58,6 +59,7 @@
           <view class="recent-date">最近学习：{{recentLearning.lastStudyAt || "今天"}}</view>
           <view class="recent-progress-row"><text>已学 {{recentLearning.completedLessons}}/{{recentLearning.chapterCount}} 节</text><text>{{recentLearning.progress}}%</text></view>
           <view class="recent-progress"><view class="recent-progress-bar" style="width: {{recentLearning.progress}}%;"></view></view>
+          <view class="recent-cta">继续学习 <text>›</text></view>
         </view>
       </view>
           <view wx:else class="recent-empty">暂无学习记录，去学习吧。</view>
@@ -73,10 +75,12 @@
     <view class="me-section function-section">
       <view class="me-section-title">常用功能</view>
       <view class="quick-grid">
-        <view wx:for="{{quickActions}}" wx:key="action" class="quick-action quick-action-{{item.tone}}" data-action="{{item.action}}" bindtap="handleQuickAction">
-          <view class="quick-symbol">{{item.symbol}}</view>
-          <view class="quick-title">{{item.title}}</view>
-        </view>
+        <block wx:for="{{quickActions}}" wx:key="action">
+          <view wx:if="{{item.action === 'schedule' || item.action === 'study' || item.action === 'favorites' || item.action === 'notices'}}" class="quick-action quick-action-{{item.tone}}" data-action="{{item.action}}" bindtap="handleQuickAction">
+            <view class="quick-symbol">{{item.symbol}}</view>
+            <view class="quick-title">{{item.title}}</view>
+          </view>
+        </block>
       </view>
     </view>
 

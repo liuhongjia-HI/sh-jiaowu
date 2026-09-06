@@ -149,10 +149,10 @@ func TestWatermarkPDFPassesCIDFontMapToGhostscript(t *testing.T) {
 	}
 }
 
-func TestProtectPDFUsesEncryptionAndDisablesExtractionAndModification(t *testing.T) {
+func TestProtectPDFUsesEncryptionAllowsPrintingAndDisablesExtractionAndModification(t *testing.T) {
 	args := protectPDFArgs("owner-secret", "/tmp/watermarked.pdf", "/tmp/protected.pdf")
 
-	want := []string{"--encrypt", "", "owner-secret", "256", "--print=none", "--modify=none", "--extract=n", "--", "/tmp/watermarked.pdf", "/tmp/protected.pdf"}
+	want := []string{"--encrypt", "", "owner-secret", "256", "--print=full", "--modify=none", "--extract=n", "--", "/tmp/watermarked.pdf", "/tmp/protected.pdf"}
 	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("protect PDF args = %#v, want %#v", args, want)
 	}
@@ -194,7 +194,7 @@ func TestProtectPDFInvokesQPDFAndCreatesProtectedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read qpdf args: %v", err)
 	}
-	for _, expected := range []string{"--encrypt", "256", "--print=none", "--modify=none", "--extract=n", source, target} {
+	for _, expected := range []string{"--encrypt", "256", "--print=full", "--modify=none", "--extract=n", source, target} {
 		if !strings.Contains(string(args), expected) {
 			t.Fatalf("qpdf args missing %q: %s", expected, args)
 		}

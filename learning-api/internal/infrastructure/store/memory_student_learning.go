@@ -83,13 +83,9 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 // lockedPreviewStations 只返回目录标题和锁定状态，不返回任何资料或习题 ID，
 // 让学生知道后续内容存在，同时避免客户端通过拼接 ID 绕过后端权限。
 func (s *MemoryStore) lockedPreviewStations(course learning.Course) []learning.Station {
-	previewLessonID, ready := s.previewLessonForCourse(course)
-	if !ready {
-		return nil
-	}
 	lessons := make([]learning.CurriculumNode, 0)
 	for _, node := range course.Curriculum {
-		if node.Type == learning.CurriculumLesson && node.ID != previewLessonID {
+		if node.Type == learning.CurriculumLesson {
 			lessons = append(lessons, node)
 		}
 	}
