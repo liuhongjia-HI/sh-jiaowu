@@ -165,6 +165,25 @@ func TestReplaceDirectGrantWithCourseKeepsFullLearningContent(t *testing.T) {
 	}
 }
 
+func TestReplaceDirectGrantReturnsEmptyArraysWhenAllContentIsCancelled(t *testing.T) {
+	store := NewMemoryStore()
+	studentID := "stu-001"
+	spaceID := "space-g05-math-s1-q1"
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID: studentID, LearningSpaceIDs: []string{spaceID}, ContentTypeCodes: []string{"course"},
+	}); err != nil {
+		t.Fatalf("create direct grant: %v", err)
+	}
+
+	result, err := store.ReplaceDirectGrant("运营教务", learning.DirectGrantReplaceRequest{StudentID: studentID})
+	if err != nil {
+		t.Fatalf("cancel direct grants: %v", err)
+	}
+	if result.LearningSpaces == nil || result.ContentTypes == nil || result.OpenCourses == nil || result.OpenMaterials == nil || result.OpenHomework == nil {
+		t.Fatalf("cancel result must expose empty arrays, got %#v", result)
+	}
+}
+
 func TestRevokePackageGrantOnlyRemovesTheSelectedStudentsPackageAccess(t *testing.T) {
 	store := NewMemoryStore()
 	studentID := "stu-001"

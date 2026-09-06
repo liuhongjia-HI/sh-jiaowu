@@ -261,7 +261,13 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 		s.replaceSpaceAccessForGrant(grant)
 	}
 
-	result := learning.DirectGrantResult{StudentID: student.ID, StudentName: student.Name, OpenCourses: []string{}, OpenMaterials: []string{}, OpenHomework: []string{}}
+	// Keep collection fields as empty JSON arrays when all direct grants are
+	// cancelled. The admin UI renders these fields immediately after saving.
+	result := learning.DirectGrantResult{
+		StudentID: student.ID, StudentName: student.Name,
+		LearningSpaces: []string{}, ContentTypes: []string{},
+		OpenCourses: []string{}, OpenMaterials: []string{}, OpenHomework: []string{},
+	}
 	for spaceID, contentTypes := range selections {
 		space, _ := s.findLearningSpace(spaceID)
 		packageID, err := s.ensureDirectGrantPackage(student, space, contentTypes)
