@@ -1665,7 +1665,8 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		if s.studentMaterialDownloadEnabled() && (s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") || s.previewMaterialForStudent(principal.StudentID, material)) {
+		// 首节体验资料始终允许带水印下载；全局下载策略只约束正式资料。
+		if (s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download")) || s.previewMaterialForStudent(principal.StudentID, material) {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}

@@ -23,10 +23,11 @@ func TestNewStudentCanReadFirstChapterLessonOfEachSubjectWithoutPackage(t *testi
 		}
 	}
 	store.materials = append(store.materials,
-		learning.Material{ID: "preview-english-first-material", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第一课节讲义", LessonID: englishCourseID + "-lesson-1", Status: learning.StatusEnabled},
+		learning.Material{ID: "preview-english-first-material", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第一课节讲义", LessonID: englishCourseID + "-lesson-1", FileID: "preview-file", Status: learning.StatusEnabled},
 		learning.Material{ID: "preview-english-later-material", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第二课节讲义", LessonID: englishCourseID + "-lesson-2", Status: learning.StatusEnabled},
 		learning.Material{ID: "preview-math-first-material", CourseID: mathCourseID, LearningSpaceID: "space-g05-math-s1-q1", Title: "数学第一课节讲义", LessonID: mathCourseID + "-lesson-1", Status: learning.StatusEnabled},
 	)
+	store.fileAssets["preview-file"] = learning.FileAsset{ID: "preview-file", FileName: "lesson.pdf", PreviewStatus: "可预览", PreviewPath: "preview.pdf"}
 	store.homework = append(store.homework,
 		learning.Homework{ID: "preview-english-first-homework", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第一课节习题", LessonID: englishCourseID + "-lesson-1", Status: string(learning.StatusEnabled)},
 		learning.Homework{ID: "preview-english-later-homework", CourseID: englishCourseID, LearningSpaceID: "space-g05-english-s1-q1", Title: "英文第二课节习题", LessonID: englishCourseID + "-lesson-2", Status: string(learning.StatusEnabled)},
@@ -54,6 +55,10 @@ func TestNewStudentCanReadFirstChapterLessonOfEachSubjectWithoutPackage(t *testi
 	}
 	if containsMaterialID(study.Materials, "preview-english-later-material") {
 		t.Fatalf("later-chapter handout must stay locked, got %#v", study.Materials)
+	}
+	first, err := store.StudentMaterial(student, "preview-english-first-material")
+	if err != nil || first.DownloadURL == "" {
+		t.Fatalf("preview first handout must expose download url under preview-only policy: material=%#v err=%v", first, err)
 	}
 	home, err := store.StudentHome(student)
 	if err != nil {
