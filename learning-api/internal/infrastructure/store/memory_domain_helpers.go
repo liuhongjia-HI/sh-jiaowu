@@ -1665,11 +1665,20 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		if s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
+		if s.studentMaterialDownloadEnabled() && (s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") || s.previewMaterialForStudent(principal.StudentID, material)) {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}
 	return material
+}
+
+func (s *MemoryStore) previewMaterialForStudent(studentID string, material learning.Material) bool {
+	for _, course := range s.previewCoursesForStudent(studentID) {
+		if _, ok := s.previewLessonForCourse(course); ok && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) {
+			return true
+		}
+	}
+	return false
 }
 
 // studentHasActiveContentGrantForLearningSpace 判断学生当前有效授权是否包含指定内容类型。
