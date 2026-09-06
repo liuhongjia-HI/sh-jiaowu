@@ -246,7 +246,8 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 		}
 	}
 
-	for _, grant := range s.grants {
+	for index := range s.grants {
+		grant := s.grants[index]
 		if grant.StudentID != student.ID || !isDirectGrantPackage(grant.PackageID) {
 			continue
 		}
@@ -258,6 +259,7 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 			continue
 		}
 		grant.Status = "revoked"
+		s.grants[index] = grant
 		s.replaceSpaceAccessForGrant(grant)
 	}
 

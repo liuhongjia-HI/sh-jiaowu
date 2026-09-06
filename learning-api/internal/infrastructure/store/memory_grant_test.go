@@ -182,6 +182,16 @@ func TestReplaceDirectGrantReturnsEmptyArraysWhenAllContentIsCancelled(t *testin
 	if result.LearningSpaces == nil || result.ContentTypes == nil || result.OpenCourses == nil || result.OpenMaterials == nil || result.OpenHomework == nil {
 		t.Fatalf("cancel result must expose empty arrays, got %#v", result)
 	}
+	grantWasRevoked := false
+	for _, grant := range store.grants {
+		if grant.StudentID == studentID && isDirectGrantPackage(grant.PackageID) && grant.Status == "revoked" {
+			grantWasRevoked = true
+			break
+		}
+	}
+	if !grantWasRevoked {
+		t.Fatalf("cancelled direct grant must be persisted as revoked: %#v", store.grants)
+	}
 }
 
 func TestRevokePackageGrantOnlyRemovesTheSelectedStudentsPackageAccess(t *testing.T) {

@@ -1250,7 +1250,15 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 		// 此时课程仍可能存在已发布的首章讲义/练习，按空 lesson_id 作为体验内容。
 		return "", s.previewLessonHasContent(course.ID, "")
 	}
-	return lessonID, s.previewLessonHasContent(course.ID, lessonID)
+	if s.previewLessonHasContent(course.ID, lessonID) {
+		return lessonID, true
+	}
+	// 部分历史数据已经补了课程目录，但旧讲义/练习仍保留空 lesson_id。
+	// 首节目录找不到对应内容时，继续兼容这类数据，避免有讲义的学科被误判为“暂未开通”。
+	if s.previewLessonHasContent(course.ID, "") {
+		return "", true
+	}
+	return lessonID, false
 }
 
 func (s *MemoryStore) previewLessonHasContent(courseID, lessonID string) bool {

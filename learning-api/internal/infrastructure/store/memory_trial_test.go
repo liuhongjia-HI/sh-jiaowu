@@ -198,6 +198,21 @@ func TestPreviewLessonSupportsLegacyCourseWithoutCurriculumNodes(t *testing.T) {
 	}
 }
 
+func TestPreviewLessonFallsBackToLegacyBlankLessonIDWhenCurriculumExists(t *testing.T) {
+	store := NewMemoryStore()
+	course := learning.Course{ID: "course-legacy-nodes-preview", Curriculum: []learning.CurriculumNode{
+		{ID: "chapter-first", Type: learning.CurriculumChapter, Name: "第一章", SortOrder: 1},
+		{ID: "lesson-first", ParentID: "chapter-first", Type: learning.CurriculumLesson, Name: "第一节", SortOrder: 1},
+	}}
+	store.materials = append(store.materials, learning.Material{
+		ID: "legacy-nodes-material", CourseID: course.ID, LessonID: "", Chapter: "基础巩固", Status: learning.StatusEnabled,
+	})
+	lessonID, ok := store.previewLessonForCourse(course)
+	if !ok || lessonID != "" {
+		t.Fatalf("preview lesson = %q, %v; want blank lesson id fallback", lessonID, ok)
+	}
+}
+
 func TestUnopenedDetailShowsFirstLessonAndLocksLaterLessons(t *testing.T) {
 	store := NewMemoryStore()
 	student, err := store.PrincipalByUserID("user-student-001")
