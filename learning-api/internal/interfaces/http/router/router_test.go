@@ -1107,8 +1107,8 @@ func TestStudentMaterialDetailIncludesSecurityWatermark(t *testing.T) {
 	var material learning.Material
 	app.doJSON(t, http.MethodGet, "/api/student/materials/mat-g05-english-s1-q1", token, nil, http.StatusOK, &material)
 
-	if material.WatermarkText == "" || !strings.Contains(material.WatermarkText, "小明") || !strings.Contains(material.WatermarkText, "9069") {
-		t.Fatalf("expected student watermark with name and phone tail, got %#v", material.WatermarkText)
+	if material.WatermarkText == "" || !strings.Contains(material.WatermarkText, "小明") || !strings.Contains(material.WatermarkText, "STARLINE") {
+		t.Fatalf("expected student watermark with name and STARLINE, got %#v", material.WatermarkText)
 	}
 	if material.SecurityNotice == "" {
 		t.Fatalf("expected security notice, got %#v", material)
