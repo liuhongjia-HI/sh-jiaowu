@@ -213,6 +213,19 @@ func TestPreviewLessonFallsBackToLegacyBlankLessonIDWhenCurriculumExists(t *test
 	}
 }
 
+func TestPreviewLessonMatchesContentByLearningSpaceWhenCourseIDIsBlank(t *testing.T) {
+	store := NewMemoryStore()
+	course := learning.Course{ID: "course-space-preview", LearningSpaceID: "space-space-preview"}
+	store.courses = append(store.courses, course)
+	store.materials = append(store.materials, learning.Material{
+		ID: "space-preview-material", CourseID: "", LearningSpaceID: course.LearningSpaceID, LessonID: "", Status: learning.StatusEnabled,
+	})
+	lessonID, ok := store.previewLessonForCourse(course)
+	if !ok || lessonID != "" {
+		t.Fatalf("preview lesson = %q, %v; want learning-space fallback", lessonID, ok)
+	}
+}
+
 func TestUnopenedDetailShowsFirstLessonAndLocksLaterLessons(t *testing.T) {
 	store := NewMemoryStore()
 	student, err := store.PrincipalByUserID("user-student-001")
