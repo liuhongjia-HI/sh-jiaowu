@@ -53,6 +53,15 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 		}
 	}
 	if !found {
+		for _, item := range s.previewCoursesForStudent(principal.StudentID) {
+			if item.ID == courseID {
+				course = item
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
 		return learning.StudentCourseDetail{}, errors.New("课程不存在或未开通")
 	}
 	materials := make([]learning.Material, 0)
@@ -83,9 +92,10 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 // lockedPreviewStations 只返回目录标题和锁定状态，不返回任何资料或习题 ID，
 // 让学生知道后续内容存在，同时避免客户端通过拼接 ID 绕过后端权限。
 func (s *MemoryStore) lockedPreviewStations(course learning.Course) []learning.Station {
+	previewLessonID, hasPreview := s.previewLessonForCourse(course)
 	lessons := make([]learning.CurriculumNode, 0)
 	for _, node := range course.Curriculum {
-		if node.Type == learning.CurriculumLesson {
+		if node.Type == learning.CurriculumLesson && (!hasPreview || node.ID != previewLessonID) {
 			lessons = append(lessons, node)
 		}
 	}

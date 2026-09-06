@@ -125,7 +125,7 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
     return Promise.resolve({
       student: { id: "stu-001", grade: "五年级", openedPackages: [] },
       subjects: [
-        { id: "g5-math", displayName: "数学", subject: "数学", grade: "五年级", accessState: "locked", accessLabel: "暂未开通", canOpen: false },
+        { id: "g5-geography", displayName: "地理", subject: "地理", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-g05-geography-s1-q1", materialNum: 1 },
         { id: "g5-chinese", displayName: "语文", subject: "语文", grade: "五年级", accessState: "locked", accessLabel: "暂未开通", canOpen: false }
       ],
       courses: [], materials: []
@@ -137,12 +137,12 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
   page.loadStudy();
   await flushPromises();
   assert.equal(page.data.visibleCourses.length, 2);
-  assert.equal(page.data.visibleCourses[0].displayName, "数学");
-  assert.equal(page.data.visibleCourses[0].accessLabel, "暂未开通");
+  assert.equal(page.data.visibleCourses[0].displayName, "地理");
+  assert.equal(page.data.visibleCourses[0].accessLabel, "首节可体验");
   page.goDetail({ currentTarget: { dataset: { id: "", canOpen: false } } });
   assert.equal(toasts[0].title, "开通后即可学习全部内容");
-  page.goDetail({ currentTarget: { dataset: { id: "", canOpen: false } } });
-  assert.equal(navigations.length, 0);
+  page.goDetail({ currentTarget: { dataset: { id: "course-g05-geography-s1-q1", canOpen: true } } });
+  assert.equal(navigations[0].url, "/pages/study-detail/index?id=course-g05-geography-s1-q1");
 });
 
 test("点击可学习课程卡片时，即使事件未携带权限字段也能进入课程", async () => {

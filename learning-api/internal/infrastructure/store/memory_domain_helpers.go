@@ -1194,7 +1194,7 @@ func (s *MemoryStore) previewCourseOrder(course learning.Course) string {
 	return semester + phase + level + course.ID
 }
 
-// previewLessonForCourse 仅在首个 Lesson 同时具备已发布讲义和习题时返回。
+// previewLessonForCourse 返回课程第一章第一节；该节有任一已发布内容时即可体验。
 func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bool) {
 	children := map[string][]learning.CurriculumNode{}
 	for _, node := range course.Curriculum {
@@ -1208,7 +1208,7 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 			return children[parentID][i].Name < children[parentID][j].Name
 		})
 	}
-	// 体验必须从第一单元开始，而不是把所有 Lesson 拍平后按编号挑一个；
+	// 体验必须从第一单元的第一章开始，而不是把所有 Lesson 拍平后按编号挑一个；
 	// 这样后续即使不同单元里的课节编号重复，也不会跳到第二单元。
 	var firstUnit *learning.CurriculumNode
 	for index := range children[""] {
@@ -1219,6 +1219,16 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 	}
 	var firstLesson func(string) string
 	firstLesson = func(parentID string) string {
+		for _, node := range children[parentID] {
+			if node.Type != learning.CurriculumChapter {
+				continue
+			}
+			for _, lesson := range children[node.ID] {
+				if lesson.Type == learning.CurriculumLesson {
+					return lesson.ID
+				}
+			}
+		}
 		for _, node := range children[parentID] {
 			if node.Type == learning.CurriculumLesson {
 				return node.ID
@@ -1255,7 +1265,7 @@ func (s *MemoryStore) previewLessonHasContent(courseID, lessonID string) bool {
 			break
 		}
 	}
-	return hasMaterial && hasHomework
+	return hasMaterial || hasHomework
 }
 
 // hasContentGrantForLearningSpace 判断学生是否已有过该学习空间、该内容类型的正式授权。

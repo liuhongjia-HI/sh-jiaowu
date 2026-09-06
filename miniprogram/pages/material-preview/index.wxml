@@ -5,7 +5,6 @@
   <view class="hero">
     <view class="eyebrow">资料预览</view>
     <view class="hero-title">{{pageTitle}}</view>
-    <view class="badge">{{material.downloadUrl ? '可打开并打印' : '仅支持在线查看'}}</view>
   </view>
   <view class="section">
     <view class="card">
@@ -14,7 +13,6 @@
       <view class="sub">学习进度已自动保存</view>
       <view class="sub">已添加专属水印</view>
     </view>
-    <view class="security-notice">{{securityNotice}}</view>
 
     <view wx:if="{{recordingWarning}}" class="recording-warning">
       <view class="recording-guard-icon">⚠️</view>

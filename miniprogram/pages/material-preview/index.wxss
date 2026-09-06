@@ -37,14 +37,6 @@
   line-height: 1.16;
 }
 
-.material-preview-page .hero .badge {
-  margin-top: 24rpx;
-  padding: 14rpx 24rpx;
-  background: #fff0e9;
-  color: #f15a2b;
-  font-size: 26rpx;
-}
-
 .material-preview-page .section {
   padding: 34rpx 64rpx 48rpx;
 }
@@ -143,16 +135,6 @@
 .challenge-button,
 .solo-secondary {
   grid-column: 1 / -1;
-}
-
-.security-notice {
-  margin-top: 18rpx;
-  padding: 18rpx 22rpx;
-  border-radius: 22rpx;
-  background: #fff2ea;
-  color: #9a5b3d;
-  font-size: 24rpx;
-  line-height: 1.5;
 }
 
 .recording-guard,

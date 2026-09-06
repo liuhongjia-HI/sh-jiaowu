@@ -7,7 +7,7 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
-func TestNewStudentCannotReadPreviewContentWithoutPackage(t *testing.T) {
+func TestNewStudentCanReadFirstChapterLessonOfEachSubjectWithoutPackage(t *testing.T) {
 	store := NewMemoryStore()
 	store.grants = nil
 	store.spaceAccess = nil
@@ -48,8 +48,8 @@ func TestNewStudentCannotReadPreviewContentWithoutPackage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load study: %v", err)
 	}
-	if containsMaterialID(study.Materials, "preview-english-first-material") || containsMaterialID(study.Materials, "preview-math-first-material") {
-		t.Fatalf("unopened courses must not expose preview handouts, got %#v", study.Materials)
+	if !containsMaterialID(study.Materials, "preview-english-first-material") || !containsMaterialID(study.Materials, "preview-math-first-material") {
+		t.Fatalf("expected first-chapter handouts, got %#v", study.Materials)
 	}
 	if containsMaterialID(study.Materials, "preview-english-later-material") {
 		t.Fatalf("later-chapter handout must stay locked, got %#v", study.Materials)
@@ -58,8 +58,8 @@ func TestNewStudentCannotReadPreviewContentWithoutPackage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load home: %v", err)
 	}
-	if containsHomeworkID(home.PendingHomework, "preview-english-first-homework") || containsHomeworkID(home.PendingHomework, "preview-math-first-homework") {
-		t.Fatalf("unopened courses must not expose preview exercises, got %#v", home.PendingHomework)
+	if !containsHomeworkID(home.PendingHomework, "preview-english-first-homework") || !containsHomeworkID(home.PendingHomework, "preview-math-first-homework") {
+		t.Fatalf("expected first-chapter exercises, got %#v", home.PendingHomework)
 	}
 	if containsHomeworkID(home.PendingHomework, "preview-english-later-homework") {
 		t.Fatalf("later-chapter exercise must stay locked, got %#v", home.PendingHomework)
@@ -95,15 +95,24 @@ func TestStudentStudyListsConfiguredGradeSubjectsAndMarksPreview(t *testing.T) {
 	if len(study.Subjects) != 5 {
 		t.Fatalf("five-grade subject catalog = %d, want 5", len(study.Subjects))
 	}
-	var english learning.StudentSubjectCard
+	var english, geography, science learning.StudentSubjectCard
 	for _, item := range study.Subjects {
-		if item.Subject == "英文" {
+		switch item.Subject {
+		case "英文":
 			english = item
-			break
+		case "地理":
+			geography = item
+		case "科学":
+			science = item
 		}
 	}
-	if english.ID == "" || english.AccessState != "locked" || english.AccessLabel != "暂未开通" || english.CanOpen {
-		t.Fatalf("english unopened card = %#v", english)
+	if english.ID == "" || english.AccessState != "preview" || english.AccessLabel != "首节可体验" || !english.CanOpen {
+		t.Fatalf("english preview card = %#v", english)
+	}
+	for _, card := range []learning.StudentSubjectCard{geography, science} {
+		if card.ID == "" || card.AccessState != "preview" || card.AccessLabel != "首节可体验" || !card.CanOpen || card.MaterialNum == 0 {
+			t.Fatalf("subject with first-chapter handout must be previewable: %#v", card)
+		}
 	}
 }
 
@@ -161,8 +170,28 @@ func TestPreviewLessonUsesFirstUnitFirstLesson(t *testing.T) {
 	}
 }
 
+func TestPreviewLessonUsesFirstChapterFirstLessonWhenOnlyHandoutExists(t *testing.T) {
+	store := NewMemoryStore()
+	course := learning.Course{ID: "course-preview-chapter", Curriculum: []learning.CurriculumNode{
+		{ID: "unit-first", Type: learning.CurriculumUnit, Name: "第一单元", SortOrder: 1},
+		{ID: "chapter-first", ParentID: "unit-first", Type: learning.CurriculumChapter, Name: "第一章", SortOrder: 1},
+		{ID: "lesson-first", ParentID: "chapter-first", Type: learning.CurriculumLesson, Name: "第一节", SortOrder: 1},
+		{ID: "chapter-later", ParentID: "unit-first", Type: learning.CurriculumChapter, Name: "第二章", SortOrder: 2},
+		{ID: "lesson-later", ParentID: "chapter-later", Type: learning.CurriculumLesson, Name: "第一节", SortOrder: 1},
+	}}
+	store.materials = append(store.materials, learning.Material{ID: "chapter-first-material", CourseID: course.ID, LessonID: "lesson-first", Status: learning.StatusEnabled})
+	lessonID, ok := store.previewLessonForCourse(course)
+	if !ok || lessonID != "lesson-first" {
+		t.Fatalf("preview lesson = %q, %v; want first chapter first lesson with handout only", lessonID, ok)
+	}
+}
+
 func TestUnopenedDetailShowsAllLessonsAsLockedWithoutContentIDs(t *testing.T) {
 	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
 	store.grants = nil
 	store.spaceAccess = nil
 	for index := range store.courses {
@@ -170,16 +199,12 @@ func TestUnopenedDetailShowsAllLessonsAsLockedWithoutContentIDs(t *testing.T) {
 			store.courses[index].Curriculum = append(store.courses[index].Curriculum, learning.CurriculumNode{ID: "preview-locked-lesson", ParentID: "course-g05-english-s1-q1-chapter-1", Type: learning.CurriculumLesson, Name: "第二节", SortOrder: 2})
 		}
 	}
-	var course learning.Course
-	for _, item := range store.courses {
-		if item.ID == "course-g05-english-s1-q1" {
-			course = item
-			break
-		}
+	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
+	if err != nil {
+		t.Fatalf("preview detail: %v", err)
 	}
-	stations := store.lockedPreviewStations(course)
 	var first, locked learning.Station
-	for _, station := range stations {
+	for _, station := range detail.Stations {
 		if station.Title == "基础巩固" {
 			first = station
 		}
@@ -190,6 +215,15 @@ func TestUnopenedDetailShowsAllLessonsAsLockedWithoutContentIDs(t *testing.T) {
 	}
 	if first.Status != "未开通" || first.MaterialID != "" || first.HomeworkID != "" {
 		t.Fatalf("first station must also stay locked without package: %#v", first)
+	}
+	firstCount := 0
+	for _, station := range detail.Stations {
+		if station.Title == "基础巩固" {
+			firstCount++
+		}
+	}
+	if firstCount != 1 {
+		t.Fatalf("first chapter first lesson should appear once in preview detail, got %d", firstCount)
 	}
 	if locked.Status != "未开通" || locked.MaterialID != "" || locked.HomeworkID != "" {
 		t.Fatalf("locked station must not expose content IDs: %#v", locked)
