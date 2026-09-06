@@ -153,7 +153,8 @@ func normalizeMaterialStatus(status learning.Status) learning.Status {
 }
 
 func materialPublished(status learning.Status) bool {
-	return normalizeMaterialStatus(status) == learning.StatusEnabled
+	// 管理端“可预览”表示已对学生开放查看，也应计入首节体验内容。
+	return normalizeMaterialStatus(status) == learning.StatusEnabled || strings.TrimSpace(string(status)) == "可预览"
 }
 
 func publishStatus(status learning.Status) string {
