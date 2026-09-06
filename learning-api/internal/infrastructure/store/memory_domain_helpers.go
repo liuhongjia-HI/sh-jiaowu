@@ -1140,11 +1140,8 @@ func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Cour
 		if course.Grade != grade {
 			continue
 		}
-		// 首课预览只面向尚未获得该类内容授权的学生。已存在未来或已过期
-		// 授权时，不能用永久预览绕开授权生效期或到期日。
-		if s.hasCourseGrantForSubject(studentID, course.Grade, course.Subject) {
-			continue
-		}
+		// 体验入口由学科卡片在“无有效学习内容”时决定；课程授权本身
+		// 不能阻断首章体验，否则历史套餐数据会把课程误判为未开通。
 		space, exists := s.findLearningSpace(course.LearningSpaceID)
 		if !exists || space.Grade != grade {
 			continue
