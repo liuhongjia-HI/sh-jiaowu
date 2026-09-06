@@ -1246,9 +1246,13 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 		lessonID = firstLesson("") // 兼容旧数据没有 Unit 的扁平目录。
 	}
 	if lessonID == "" {
-		// 兼容早期生产数据：课程目录节点和内容 lesson_id 可能为空，
-		// 此时课程仍可能存在已发布的首章讲义/练习，按空 lesson_id 作为体验内容。
-		return "", s.previewLessonHasContent(course.ID, "")
+		// 兼容早期生产数据：课程目录节点可能完全没有落库。旧讲义
+		// 有时仍带具体 lesson_id，这时按内容排序推断首个可体验课节；
+		// lesson_id 为空的记录继续沿用旧的空值兼容规则。
+		if inferred, ok := s.inferPreviewLessonFromContent(course.ID); ok {
+			return inferred, true
+		}
+		return "", false
 	}
 	if s.previewLessonHasContent(course.ID, lessonID) {
 		return lessonID, true
@@ -1259,6 +1263,42 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 		return "", true
 	}
 	return lessonID, false
+}
+
+// inferPreviewLessonFromContent 为没有课程目录的历史课程推断首个体验课节。
+// 数据导入时 sort_order 越小越靠前；同序时用 lesson_id 保证结果稳定。
+func (s *MemoryStore) inferPreviewLessonFromContent(courseID string) (string, bool) {
+	type candidate struct {
+		lessonID string
+		sortOrder int
+	}
+	var selected *candidate
+	consider := func(lessonID string, sortOrder int, published bool) {
+		if !published || !s.courseContentMatches(courseID, "", "") && strings.TrimSpace(lessonID) == "" {
+			return
+		}
+		// courseContentMatches 需要内容的 course_id/learning_space_id；这里
+		// 通过逐条调用方传入的记录完成匹配，避免把其他课程的内容混入。
+		item := candidate{lessonID: lessonID, sortOrder: sortOrder}
+		if selected == nil || item.sortOrder < selected.sortOrder ||
+			(item.sortOrder == selected.sortOrder && item.lessonID < selected.lessonID) {
+			selected = &item
+		}
+	}
+	for _, material := range s.materials {
+		if s.courseContentMatches(courseID, material.CourseID, material.LearningSpaceID) {
+			consider(material.LessonID, material.SortOrder, materialPublished(material.Status))
+		}
+	}
+	for _, homework := range s.homework {
+		if s.courseContentMatches(courseID, homework.CourseID, homework.LearningSpaceID) {
+			consider(homework.LessonID, homework.SortOrder, homeworkVisible(homework.Status))
+		}
+	}
+	if selected == nil {
+		return "", false
+	}
+	return selected.lessonID, true
 }
 
 func (s *MemoryStore) previewLessonHasContent(courseID, lessonID string) bool {
