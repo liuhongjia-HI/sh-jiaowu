@@ -38,6 +38,7 @@ import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils
 import type {
   CurrentUser,
   DirectGrantReplaceRequest,
+  DirectGrantPeriodDefault,
   DirectGrantResult,
   DirectGrantSelection,
   GrantRevokeResult,
@@ -177,6 +178,11 @@ export default function Students({ user }: { user: CurrentUser }) {
   });
   const allStudents = useQuery({ queryKey: ['students', 'summary'], queryFn: () => getData<Student[]>('/students') });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
+	const directGrantPeriod = useQuery({
+	  queryKey: ['grants', 'direct', 'default-period'],
+	  enabled: writable,
+	  queryFn: () => getData<DirectGrantPeriodDefault>('/grants/direct/default')
+	});
 	const teachers = useQuery({ queryKey: ['teachers', 'tutoring-assignment'], enabled: writable, queryFn: () => getData<Teacher[]>('/teachers') });
 	const subjects = useQuery({ queryKey: ['subjects', 'tutoring-assignment'], enabled: writable, queryFn: () => getData<SubjectMetadata[]>('/subjects') });
   const detail = useQuery({
@@ -196,6 +202,12 @@ export default function Students({ user }: { user: CurrentUser }) {
     setDirectSelections(selections);
     setInitialDirectSelections(selections);
   }, [detail.data, selected]);
+
+  useEffect(() => {
+    if (!selected || studentDrawerTab !== 'courses' || directPeriodChanged || !directGrantPeriod.data) return;
+    setDirectStartsAt(directGrantPeriod.data.startsAt);
+    setDirectEndsAt(directGrantPeriod.data.endsAt);
+  }, [directGrantPeriod.data, directPeriodChanged, selected, studentDrawerTab]);
 
   const saveStudent = useMutation({
     mutationFn: (values: StudentFormValues) => {
@@ -426,8 +438,8 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerTab('courses');
     setDirectSelections([]);
     setInitialDirectSelections([]);
-    setDirectStartsAt(toDateTimeInput(new Date()));
-    setDirectEndsAt('');
+    setDirectStartsAt(directGrantPeriod.data?.startsAt || new Date().toISOString().slice(0, 10));
+    setDirectEndsAt(directGrantPeriod.data?.endsAt || '');
     setDirectPeriodChanged(false);
   }
 
@@ -697,6 +709,8 @@ export default function Students({ user }: { user: CurrentUser }) {
                     writable={writable}
                     loadingLearningSpaces={learningSpaces.isLoading}
                     learningSpacesError={Boolean(learningSpaces.error)}
+                    periodLoading={directGrantPeriod.isLoading}
+                    periodError={Boolean(directGrantPeriod.error)}
                     selections={directSelections}
                     startsAt={directStartsAt}
                     endsAt={directEndsAt}
@@ -1098,6 +1112,8 @@ function CourseOpeningPanel({
   writable,
   loadingLearningSpaces,
   learningSpacesError,
+  periodLoading,
+  periodError,
   selections,
   startsAt,
   endsAt,
@@ -1113,6 +1129,8 @@ function CourseOpeningPanel({
   writable: boolean;
   loadingLearningSpaces: boolean;
   learningSpacesError: boolean;
+  periodLoading: boolean;
+  periodError: boolean;
   selections: DirectGrantSelection[];
   startsAt: string;
   endsAt: string;
@@ -1132,6 +1150,8 @@ function CourseOpeningPanel({
       matrix={detail.openingMatrix}
       loadingLearningSpaces={loadingLearningSpaces}
       learningSpacesError={learningSpacesError}
+      periodLoading={periodLoading}
+      periodError={periodError}
       selections={selections}
       startsAt={startsAt}
       endsAt={endsAt}
@@ -1237,6 +1257,8 @@ function DirectGrantPanel({
   matrix,
   loadingLearningSpaces,
   learningSpacesError,
+  periodLoading,
+  periodError,
   selections,
   startsAt,
   endsAt,
@@ -1251,6 +1273,8 @@ function DirectGrantPanel({
   matrix: StudentOpeningScope[];
   loadingLearningSpaces: boolean;
   learningSpacesError: boolean;
+  periodLoading: boolean;
+  periodError: boolean;
   selections: DirectGrantSelection[];
   startsAt: string;
   endsAt: string;
@@ -1342,9 +1366,39 @@ function DirectGrantPanel({
       <section className="student-opening-period">
         <Typography.Text strong>生效时间</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          有效期按当前校历的期中、期末节点自动计算，开通后立即生效，无需手动填写日期。
+          已带入当前校历的时间范围；如本次开通有特殊安排，可在保存前调整。
         </Typography.Paragraph>
-        <Alert type="success" showIcon message="系统将自动使用当前校历节点" description="如需调整校历，请前往系统设置中的校历维护。" />
+        {periodLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : (
+          <>
+            <div className="student-opening-period-grid">
+              <label className="student-opening-field">
+                <Typography.Text type="secondary">开通日期</Typography.Text>
+                <Input
+                  type="date"
+                  aria-label="开通日期"
+                  value={startsAt.slice(0, 10)}
+                  onChange={(event) => onStartsAtChange(event.target.value)}
+                />
+              </label>
+              <label className="student-opening-field">
+                <Typography.Text type="secondary">结束日期</Typography.Text>
+                <Input
+                  type="date"
+                  aria-label="结束日期"
+                  value={endsAt.slice(0, 10)}
+                  min={startsAt.slice(0, 10) || undefined}
+                  onChange={(event) => onEndsAtChange(event.target.value)}
+                />
+              </label>
+            </div>
+            <Alert
+              type={periodError ? 'warning' : 'success'}
+              showIcon
+              message={periodError ? '暂未读取到校历时间，已使用默认日期' : '日期已按当前校历带入'}
+              description={periodError ? '请确认校历配置后再保存，系统也会在服务端按校历重新校验。' : '未手动调整时，保存将继续使用服务端按校历计算的时间。'}
+            />
+          </>
+        )}
       </section>
       <div className="student-opening-actions">
         <div className="student-opening-actions-summary">
@@ -1363,11 +1417,6 @@ function DirectGrantPanel({
       </div>
     </div>
   );
-}
-
-function toDateTimeInput(value: Date) {
-  const offset = value.getTimezoneOffset() * 60_000;
-  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function contentTypeCode(value: string) {

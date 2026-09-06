@@ -309,6 +309,11 @@ export type DirectGrantReplaceRequest = {
   endsAt?: string;
 };
 
+export type DirectGrantPeriodDefault = {
+  startsAt: string;
+  endsAt: string;
+};
+
 export type DirectGrantResult = {
   studentId: string;
   studentName: string;

@@ -147,6 +147,11 @@ func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.S
 			card.AccessState, card.AccessLabel, card.CanOpen = "full", "可学习", true
 			card.MaterialNum, card.HomeworkNum = fullMaterials, fullHomework
 			card.EntryCourseID = s.firstAccessibleCourseID(student.ID, meta.Grade, meta.Subject)
+		} else if previewCourse, ok := s.previewCourseForGradeSubject(student.ID, meta); ok {
+			card.AccessState, card.AccessLabel, card.CanOpen = "preview", "首节可体验", true
+			card.PreviewCourseID = previewCourse.ID
+			card.EntryCourseID = previewCourse.ID
+			card.MaterialNum, card.HomeworkNum = s.previewContentCounts(previewCourse)
 		} else if len(courseIDs) == 0 {
 			card.AccessState, card.AccessLabel = "pending", "内容准备中"
 		}
