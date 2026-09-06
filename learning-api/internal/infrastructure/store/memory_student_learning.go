@@ -310,12 +310,12 @@ func (s *MemoryStore) studentMaterialUnlocked(principal learning.Principal, mate
 		if hadHandoutGrant && !hadActiveHandoutGrant {
 			continue
 		}
-		lessonID, ok := s.previewLessonForCourse(course)
+		_, ok := s.previewLessonForCourse(course)
 		if !ok {
 			continue
 		}
 		for _, material := range s.materials {
-			if material.ID == materialID && material.LessonID == lessonID && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && materialPublished(material.Status) {
+			if material.ID == materialID && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && materialPublished(material.Status) {
 				return s.decorateStudentMaterial(principal, material), nil
 			}
 		}
