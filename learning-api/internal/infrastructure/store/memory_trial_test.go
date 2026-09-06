@@ -186,6 +186,18 @@ func TestPreviewLessonUsesFirstChapterFirstLessonWhenOnlyHandoutExists(t *testin
 	}
 }
 
+func TestPreviewLessonSupportsLegacyCourseWithoutCurriculumNodes(t *testing.T) {
+	store := NewMemoryStore()
+	course := learning.Course{ID: "course-legacy-preview"}
+	store.materials = append(store.materials, learning.Material{
+		ID: "legacy-first-material", CourseID: course.ID, LessonID: "", Chapter: "基础巩固", Status: learning.StatusEnabled,
+	})
+	lessonID, ok := store.previewLessonForCourse(course)
+	if !ok || lessonID != "" {
+		t.Fatalf("legacy preview lesson = %q, %v; want empty lesson id accepted", lessonID, ok)
+	}
+}
+
 func TestUnopenedDetailShowsFirstLessonAndLocksLaterLessons(t *testing.T) {
 	store := NewMemoryStore()
 	student, err := store.PrincipalByUserID("user-student-001")
