@@ -1134,9 +1134,10 @@ func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Cour
 	if !ok || student.AccountStatus != "正常" {
 		return nil
 	}
+	grade := effectiveStudentGrade(student)
 	selected := make(map[string]learning.Course)
 	for _, course := range s.courses {
-		if course.Grade != student.Grade {
+		if course.Grade != grade {
 			continue
 		}
 		// 首课预览只面向尚未获得该类内容授权的学生。已存在未来或已过期
@@ -1145,7 +1146,7 @@ func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Cour
 			continue
 		}
 		space, exists := s.findLearningSpace(course.LearningSpaceID)
-		if !exists || space.Grade != student.Grade {
+		if !exists || space.Grade != grade {
 			continue
 		}
 		if _, ready := s.previewLessonForCourse(course); !ready {
