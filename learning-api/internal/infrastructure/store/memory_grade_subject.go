@@ -136,8 +136,13 @@ func (s *MemoryStore) updateGradeSubjectsUnlocked(operator string, req learning.
 
 func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.StudentSubjectCard {
 	cards := make([]learning.StudentSubjectCard, 0)
+	grade := strings.TrimSpace(student.Grade)
+	if grade == "" || grade == "待完善" {
+		grade = strings.TrimSpace(student.EnrollmentGrade)
+	}
+	student.Grade = grade
 	for _, meta := range s.gradeSubjectCatalogUnlocked() {
-		if meta.Grade != student.Grade || meta.Status != "启用" {
+		if meta.Grade != grade || meta.Status != "启用" {
 			continue
 		}
 		card := learning.StudentSubjectCard{GradeSubjectMetadata: meta, AccessState: "locked", AccessLabel: "暂未开通"}
