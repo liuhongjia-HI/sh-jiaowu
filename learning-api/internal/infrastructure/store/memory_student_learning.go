@@ -300,14 +300,14 @@ func (s *MemoryStore) studentMaterialUnlocked(principal learning.Principal, mate
 		}
 	}
 	for _, course := range s.previewCoursesForStudent(principal.StudentID) {
-		hadHandoutGrant := false
+		hadHandoutGrant, hadActiveHandoutGrant := false, false
 		for _, grant := range s.grants {
 			if grant.StudentID == principal.StudentID && containsString(s.contentTypesForPackage(grant.PackageID), "handout") && containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
 				hadHandoutGrant = true
-				break
+				hadActiveHandoutGrant = hadActiveHandoutGrant || grantActive(grant)
 			}
 		}
-		if hadHandoutGrant {
+		if hadHandoutGrant && !hadActiveHandoutGrant {
 			continue
 		}
 		lessonID, ok := s.previewLessonForCourse(course)
