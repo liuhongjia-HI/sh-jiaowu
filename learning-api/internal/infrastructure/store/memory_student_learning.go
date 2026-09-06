@@ -70,6 +70,15 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 			materials = append(materials, material)
 		}
 	}
+	if len(materials) == 0 {
+		if lessonID, ok := s.previewLessonForCourse(course); ok {
+			for _, material := range s.materials {
+				if material.CourseID == courseID && material.LessonID == lessonID && materialPublished(material.Status) {
+					materials = append(materials, material)
+				}
+			}
+		}
+	}
 	homework := make([]learning.Homework, 0)
 	for _, item := range s.studentHomeworkForPrincipal(principal) {
 		if item.CourseID == courseID {
