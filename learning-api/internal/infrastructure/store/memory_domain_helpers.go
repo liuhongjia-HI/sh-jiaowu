@@ -1274,11 +1274,10 @@ func (s *MemoryStore) inferPreviewLessonFromContent(courseID string) (string, bo
 	}
 	var selected *candidate
 	consider := func(lessonID string, sortOrder int, published bool) {
-		if !published || !s.courseContentMatches(courseID, "", "") && strings.TrimSpace(lessonID) == "" {
+		if !published {
 			return
 		}
-		// courseContentMatches 需要内容的 course_id/learning_space_id；这里
-		// 通过逐条调用方传入的记录完成匹配，避免把其他课程的内容混入。
+		// 调用方已按 course_id/learning_space_id 完成匹配，避免把其他课程的内容混入。
 		item := candidate{lessonID: lessonID, sortOrder: sortOrder}
 		if selected == nil || item.sortOrder < selected.sortOrder ||
 			(item.sortOrder == selected.sortOrder && item.lessonID < selected.lessonID) {
