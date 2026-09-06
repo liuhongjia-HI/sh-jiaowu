@@ -1341,7 +1341,7 @@ func (s *MemoryStore) courseContentMatches(courseID, itemCourseID, itemSpaceID s
 	}
 	for _, course := range s.courses {
 		if course.ID == courseID {
-			if strings.TrimSpace(itemCourseID) != "" && (strings.EqualFold(strings.TrimSpace(course.Name), strings.TrimSpace(itemCourseID)) || strings.Contains(strings.TrimSpace(course.Name), strings.TrimSpace(itemCourseID))) {
+			if strings.TrimSpace(itemCourseID) != "" && (strings.EqualFold(strings.TrimSpace(course.Name), strings.TrimSpace(itemCourseID)) || strings.Contains(strings.TrimSpace(course.Name), strings.TrimSpace(itemCourseID)) || strings.Contains(strings.ToLower(strings.TrimSpace(itemCourseID)), strings.ToLower(subjectSlug(course.Subject)))) {
 				return true
 			}
 			// 历史导入可能把课程名称写入 course_id；学习空间才是稳定关联键。
