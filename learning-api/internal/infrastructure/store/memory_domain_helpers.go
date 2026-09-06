@@ -1341,12 +1341,13 @@ func (s *MemoryStore) courseContentMatches(courseID, itemCourseID, itemSpaceID s
 	if itemCourseID == courseID {
 		return true
 	}
-	if strings.TrimSpace(itemCourseID) != "" {
-		return false
-	}
 	for _, course := range s.courses {
 		if course.ID == courseID {
-			return course.LearningSpaceID == itemSpaceID
+			if strings.TrimSpace(itemCourseID) != "" && (strings.EqualFold(strings.TrimSpace(course.Name), strings.TrimSpace(itemCourseID)) || strings.Contains(strings.TrimSpace(course.Name), strings.TrimSpace(itemCourseID))) {
+				return true
+			}
+			// 历史导入可能把课程名称写入 course_id；学习空间才是稳定关联键。
+			return strings.TrimSpace(itemSpaceID) != "" && course.LearningSpaceID == itemSpaceID
 		}
 	}
 	return false
