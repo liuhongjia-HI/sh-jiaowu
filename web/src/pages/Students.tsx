@@ -193,11 +193,11 @@ export default function Students({ user }: { user: CurrentUser }) {
 
   useEffect(() => {
     if (!selected || detail.data?.student.id !== selected.id) return;
-    const selections = detail.data.grants
+    const selections = (detail.data.grants ?? [])
       .filter((grant) => grant.isDirect && grant.permissionState !== '已到期')
-      .flatMap((grant) => grant.learningSpaceIds.map((learningSpaceId) => ({
+      .flatMap((grant) => (grant.learningSpaceIds ?? []).map((learningSpaceId) => ({
         learningSpaceId,
-        contentTypeCodes: grant.contentTypes.map(contentTypeCode)
+        contentTypeCodes: (grant.contentTypes ?? []).map(contentTypeCode)
       })));
     setDirectSelections(selections);
     setInitialDirectSelections(selections);
@@ -291,7 +291,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       return putData<DirectGrantResult>('/grants/direct', body);
     },
     onSuccess: (result) => {
-      message.success(result.learningSpaces.length ? `已保存 ${result.studentName} 的直接开通内容。` : `已取消 ${result.studentName} 的全部直接开通内容。`);
+      message.success((result.learningSpaces ?? []).length ? `已保存 ${result.studentName} 的直接开通内容。` : `已取消 ${result.studentName} 的全部直接开通内容。`);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
@@ -1141,13 +1141,14 @@ function CourseOpeningPanel({
   onSubmit: () => void;
   onRevokePackage: (packageId: string, packageName: string) => void;
 }) {
+  const matrix = detail.openingMatrix ?? [];
   if (!writable) {
-    return <CourseOpeningMatrix matrix={detail.openingMatrix} selections={selections} onSelectionsChange={onSelectionsChange} readOnly />;
+    return <CourseOpeningMatrix matrix={matrix} selections={selections} onSelectionsChange={onSelectionsChange} readOnly />;
   }
   return (
     <DirectGrantPanel
       student={student}
-      matrix={detail.openingMatrix}
+      matrix={matrix}
       loadingLearningSpaces={loadingLearningSpaces}
       learningSpacesError={learningSpacesError}
       periodLoading={periodLoading}
@@ -1206,9 +1207,11 @@ function CourseOpeningMatrix({
               const checked = cell.packageOpened ? cell.opened : directSelected;
               const locked = cell.packageOpened;
               const label = openingContentLabels[cell.contentTypeCode];
-              const previewItems = cell.items.slice(0, 5);
+              const items = cell.items ?? [];
+              const previewItems = items.slice(0, 5);
+              const packageNames = cell.packageNames ?? [];
               const sourceText = cell.packageOpened
-                ? `由 ${cell.packageNames.join('、')} 开通`
+                ? `由 ${packageNames.join('、')} 开通`
                 : directSelected ? '单独开通' : '尚未开通';
               return (
                 <Popover
@@ -1218,9 +1221,9 @@ function CourseOpeningMatrix({
                   content={(
                     <Space direction="vertical" size={6} style={{ maxWidth: 300 }}>
                       <Typography.Text type="secondary">{sourceText}</Typography.Text>
-                      <Typography.Text strong>{checked ? `已开通内容（${cell.items.length}）` : `可开通内容（${cell.items.length}）`}</Typography.Text>
+                      <Typography.Text strong>{checked ? `已开通内容（${items.length}）` : `可开通内容（${items.length}）`}</Typography.Text>
                       {previewItems.length > 0 ? previewItems.map((item) => <Typography.Text key={item.id}>· {item.title}</Typography.Text>) : <Typography.Text type="secondary">暂未配置具体内容</Typography.Text>}
-                      {cell.items.length > previewItems.length && <Typography.Text type="secondary">还有 {cell.items.length - previewItems.length} 项内容</Typography.Text>}
+                      {items.length > previewItems.length && <Typography.Text type="secondary">还有 {items.length - previewItems.length} 项内容</Typography.Text>}
                       {!readOnly && locked && directSelected && (
                         <Button type="link" size="small" danger onClick={() => changeSelection(scope.learningSpaceId, cell.contentTypeCode, false)}>撤销单独开通</Button>
                       )}
@@ -1468,10 +1471,11 @@ function publicPackageRefs(values?: StudentPackageRef[]) {
 }
 
 function RecordTable({ detail }: { detail: StudentDetail }) {
-  if (detail.learningRecords.length === 0) return <Empty description="还没有学习记录。" />;
+  const records = detail.learningRecords ?? [];
+  if (records.length === 0) return <Empty description="还没有学习记录。" />;
   return (
     <CardList
-      rows={detail.learningRecords}
+      rows={records}
       rowKey={(record) => record.id}
       emptyText="还没有学习记录。"
       renderCard={(record) => (
@@ -1491,10 +1495,12 @@ function RecordTable({ detail }: { detail: StudentDetail }) {
 }
 
 function LogTable({ detail }: { detail: StudentDetail }) {
-  if (detail.logs.length === 0 && detail.notices.length === 0) return <Empty description="还没有操作记录。" />;
+  const logs = detail.logs ?? [];
+  const notices = detail.notices ?? [];
+  if (logs.length === 0 && notices.length === 0) return <Empty description="还没有操作记录。" />;
   const rows = [
-    ...detail.notices.map((record) => ({ kind: 'notice' as const, record })),
-    ...detail.logs.map((record) => ({ kind: 'log' as const, record }))
+    ...notices.map((record) => ({ kind: 'notice' as const, record })),
+    ...logs.map((record) => ({ kind: 'log' as const, record }))
   ];
 
   return (

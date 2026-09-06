@@ -186,7 +186,7 @@ func TestPreviewLessonUsesFirstChapterFirstLessonWhenOnlyHandoutExists(t *testin
 	}
 }
 
-func TestUnopenedDetailShowsAllLessonsAsLockedWithoutContentIDs(t *testing.T) {
+func TestUnopenedDetailShowsFirstLessonAndLocksLaterLessons(t *testing.T) {
 	store := NewMemoryStore()
 	student, err := store.PrincipalByUserID("user-student-001")
 	if err != nil {
@@ -205,7 +205,7 @@ func TestUnopenedDetailShowsAllLessonsAsLockedWithoutContentIDs(t *testing.T) {
 	}
 	var first, locked learning.Station
 	for _, station := range detail.Stations {
-		if station.Title == "基础巩固" {
+		if first.Title == "" && station.MaterialID != "" {
 			first = station
 		}
 		if station.Title == "第二节" {
@@ -213,12 +213,12 @@ func TestUnopenedDetailShowsAllLessonsAsLockedWithoutContentIDs(t *testing.T) {
 			break
 		}
 	}
-	if first.Status != "未开通" || first.MaterialID != "" || first.HomeworkID != "" {
-		t.Fatalf("first station must also stay locked without package: %#v", first)
+	if first.Status == "未开通" || first.MaterialID == "" {
+		t.Fatalf("first chapter first lesson should be previewable: %#v", first)
 	}
 	firstCount := 0
 	for _, station := range detail.Stations {
-		if station.Title == "基础巩固" {
+		if station.MaterialID == "mat-g05-english-s1-q1" {
 			firstCount++
 		}
 	}
