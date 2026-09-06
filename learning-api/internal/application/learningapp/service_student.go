@@ -84,6 +84,13 @@ func (s *Service) StudentCourseDetail(principal learning.Principal, courseID str
 func (s *Service) StudentMaterial(principal learning.Principal, materialID string) (learning.Material, error) {
 	return s.student.StudentMaterial(principal, materialID)
 }
+
+func (s *Service) StudentDownloadPolicyEnabled() bool {
+	return s.student.StudentDownloadPolicyEnabled()
+}
+func (s *Service) StudentMaterialPreviewDownloadAllowed(p learning.Principal, id string) bool {
+	return s.student.StudentMaterialPreviewDownloadAllowed(p, id)
+}
 func (s *Service) StudentMaterialPreviewFile(principal learning.Principal, materialID string) (learning.FileAsset, error) {
 	return s.student.StudentMaterialPreviewFile(principal, materialID)
 }

@@ -419,6 +419,11 @@ func (h *LearningHandler) StudentMaterialDownload(c *gin.Context) {
 	}
 	watermarkedPath, err := makeWatermarkedPDF(c.Request.Context(), asset)
 	if err != nil {
+		if !h.service.StudentDownloadPolicyEnabled() && h.service.StudentMaterialPreviewDownloadAllowed(principal, c.Param("id")) && strings.TrimSpace(asset.PreviewPath) != "" {
+			c.Header("Cache-Control", "private, no-store")
+			c.FileAttachment(asset.PreviewPath, studentWatermarkedFileName(asset.FileName))
+			return
+		}
 		secureWatermarkFailure(c, err)
 		return
 	}

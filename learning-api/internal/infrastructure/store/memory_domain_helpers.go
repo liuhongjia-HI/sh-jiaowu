@@ -1700,6 +1700,16 @@ func (s *MemoryStore) studentMaterialDownloadEnabled() bool {
 	return strings.TrimSpace(s.settings["downloadPolicy"]) == "允许下载带水印PDF"
 }
 
+func (s *MemoryStore) StudentDownloadPolicyEnabled() bool { return s.studentMaterialDownloadEnabled() }
+func (s *MemoryStore) StudentMaterialPreviewDownloadAllowed(p learning.Principal, id string) bool {
+	for _, m := range s.materials {
+		if m.ID == id {
+			return s.previewMaterialForStudent(p.StudentID, m)
+		}
+	}
+	return false
+}
+
 func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, homework learning.Homework) learning.Homework {
 	if homework.AssessmentType == "" {
 		homework.AssessmentType = "practice"

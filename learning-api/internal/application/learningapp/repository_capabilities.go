@@ -33,6 +33,8 @@ type StudentRepository interface {
 	StudentCourseDetail(learning.Principal, string) (learning.StudentCourseDetail, error)
 	StudentMaterial(learning.Principal, string) (learning.Material, error)
 	StudentMaterialPreviewFile(learning.Principal, string) (learning.FileAsset, error)
+	StudentDownloadPolicyEnabled() bool
+	StudentMaterialPreviewDownloadAllowed(learning.Principal, string) bool
 	StudentHomework(learning.Principal, string) (learning.Homework, error)
 	StudentHomeworkPreviewFile(learning.Principal, string) (learning.FileAsset, error)
 	RecordStudentSecurityEvent(string, learning.Principal, learning.SecurityEventRequest) error
