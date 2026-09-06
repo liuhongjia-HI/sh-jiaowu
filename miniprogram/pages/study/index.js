@@ -159,9 +159,10 @@ function decorateCourses(courses, favorites) {
       newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
       entryCourseId: course.entryCourseId || course.id,
-      accessLabel: course.accessLabel || (isOpened ? "已开通" : ""),
-      canOpen: course.accessState !== "locked" && course.accessState !== "pending" && (typeof course.canOpen === "boolean" ? course.canOpen : Boolean(course.id)),
-      isLocked: course.accessState === "locked" || course.accessState === "pending",
+      accessLabel: course.accessLabel || (isOpened ? "已开通" : ((Number(course.materialNum) > 0 || Number(course.homeworkNum) > 0) ? "首节可体验" : "")),
+      // 兼容旧接口未返回 accessState/canOpen 的情况：有首节内容就应允许进入体验。
+      canOpen: course.accessState !== "pending" && (course.accessState === "preview" || (typeof course.canOpen === "boolean" ? course.canOpen : Boolean(course.id)) || Number(course.materialNum) > 0 || Number(course.homeworkNum) > 0),
+      isLocked: course.accessState === "locked" && Number(course.materialNum) <= 0 && Number(course.homeworkNum) <= 0,
       imageUrl: course.imageUrl || "",
       isOpened
     };

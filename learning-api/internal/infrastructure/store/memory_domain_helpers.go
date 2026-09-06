@@ -1262,14 +1262,33 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 	if s.previewLessonHasContent(course.ID, "") {
 		return "", true
 	}
+	// 历史课程可能存在目录首节编号与讲义 lesson_id 不一致的情况；课程确有
+	// 已发布讲义时仍提供体验入口，详情页再按首节内容权限过滤。
+	if s.previewCourseHasPublishedContent(course.ID) {
+		// 返回实际讲义的 lesson_id，详情页才能继续取到该体验内容。
+		for _, material := range s.materials {
+			if s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && materialPublished(material.Status) {
+				return material.LessonID, true
+			}
+		}
+	}
 	return lessonID, false
+}
+
+func (s *MemoryStore) previewCourseHasPublishedContent(courseID string) bool {
+	for _, material := range s.materials {
+		if s.courseContentMatches(courseID, material.CourseID, material.LearningSpaceID) && materialPublished(material.Status) {
+			return true
+		}
+	}
+	return false
 }
 
 // inferPreviewLessonFromContent 为没有课程目录的历史课程推断首个体验课节。
 // 数据导入时 sort_order 越小越靠前；同序时用 lesson_id 保证结果稳定。
 func (s *MemoryStore) inferPreviewLessonFromContent(courseID string) (string, bool) {
 	type candidate struct {
-		lessonID string
+		lessonID  string
 		sortOrder int
 	}
 	var selected *candidate

@@ -117,6 +117,22 @@ func TestStudentStudyListsConfiguredGradeSubjectsAndMarksPreview(t *testing.T) {
 	}
 }
 
+func TestPreviewIgnoresStaleConfiguredCourseID(t *testing.T) {
+	store := NewMemoryStore()
+	store.settings[gradeSubjectCatalogSetting] = `[{"id":"g5-geography","grade":"五年级","subject":"地理","displayName":"地理","status":"启用","previewCourseId":"deleted-course"}]`
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	study, err := store.StudentStudy(student)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(study.Subjects) != 1 || study.Subjects[0].AccessState != "preview" || !study.Subjects[0].CanOpen {
+		t.Fatalf("stale preview course id must fall back to current course: %#v", study.Subjects)
+	}
+}
+
 func TestFutureCourseGrantStillAllowsFirstLessonPreview(t *testing.T) {
 	store := NewMemoryStore()
 	studentID := "stu-001"
