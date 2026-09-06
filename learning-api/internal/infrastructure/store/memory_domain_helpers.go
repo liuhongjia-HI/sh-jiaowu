@@ -1246,7 +1246,9 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 		lessonID = firstLesson("") // 兼容旧数据没有 Unit 的扁平目录。
 	}
 	if lessonID == "" {
-		return "", false
+		// 兼容早期生产数据：课程目录节点和内容 lesson_id 可能为空，
+		// 此时课程仍可能存在已发布的首章讲义/练习，按空 lesson_id 作为体验内容。
+		return "", s.previewLessonHasContent(course.ID, "")
 	}
 	return lessonID, s.previewLessonHasContent(course.ID, lessonID)
 }
