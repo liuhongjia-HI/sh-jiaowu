@@ -1264,18 +1264,34 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 func (s *MemoryStore) previewLessonHasContent(courseID, lessonID string) bool {
 	hasMaterial, hasHomework := false, false
 	for _, material := range s.materials {
-		if material.CourseID == courseID && material.LessonID == lessonID && materialPublished(material.Status) {
+		if s.courseContentMatches(courseID, material.CourseID, material.LearningSpaceID) && material.LessonID == lessonID && materialPublished(material.Status) {
 			hasMaterial = true
 			break
 		}
 	}
 	for _, homework := range s.homework {
-		if homework.CourseID == courseID && homework.LessonID == lessonID && homeworkVisible(homework.Status) {
+		if s.courseContentMatches(courseID, homework.CourseID, homework.LearningSpaceID) && homework.LessonID == lessonID && homeworkVisible(homework.Status) {
 			hasHomework = true
 			break
 		}
 	}
 	return hasMaterial || hasHomework
+}
+
+// courseContentMatches 兼容早期记录只保存 learning_space_id、未回填 course_id 的情况。
+func (s *MemoryStore) courseContentMatches(courseID, itemCourseID, itemSpaceID string) bool {
+	if itemCourseID == courseID {
+		return true
+	}
+	if strings.TrimSpace(itemCourseID) != "" {
+		return false
+	}
+	for _, course := range s.courses {
+		if course.ID == courseID {
+			return course.LearningSpaceID == itemSpaceID
+		}
+	}
+	return false
 }
 
 // hasContentGrantForLearningSpace 判断学生是否已有过该学习空间、该内容类型的正式授权。
@@ -1427,7 +1443,11 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			continue
 		}
 		for _, material := range s.materials {
-			if material.CourseID == course.ID && material.LessonID == lessonID && materialPublished(material.Status) {
+			if s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && material.LessonID == lessonID && materialPublished(material.Status) {
+				if strings.TrimSpace(material.CourseID) == "" {
+					material.CourseID = course.ID
+					material.Course = course.Name
+				}
 				out = appendMaterialUnique(out, s.decorateMaterial(material))
 			}
 		}
@@ -1468,7 +1488,11 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 			continue
 		}
 		for _, item := range s.homework {
-			if item.CourseID == course.ID && item.LessonID == lessonID && homeworkVisible(item.Status) {
+			if s.courseContentMatches(course.ID, item.CourseID, item.LearningSpaceID) && item.LessonID == lessonID && homeworkVisible(item.Status) {
+				if strings.TrimSpace(item.CourseID) == "" {
+					item.CourseID = course.ID
+					item.Course = course.Name
+				}
 				out = appendHomeworkUnique(out, item)
 			}
 		}

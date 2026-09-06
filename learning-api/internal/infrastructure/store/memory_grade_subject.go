@@ -233,12 +233,12 @@ func (s *MemoryStore) previewContentCounts(course learning.Course) (int, int) {
 	}
 	materials, homework := 0, 0
 	for _, item := range s.materials {
-		if item.CourseID == course.ID && item.LessonID == lessonID && materialPublished(item.Status) {
+		if s.courseContentMatches(course.ID, item.CourseID, item.LearningSpaceID) && item.LessonID == lessonID && materialPublished(item.Status) {
 			materials++
 		}
 	}
 	for _, item := range s.homework {
-		if item.CourseID == course.ID && item.LessonID == lessonID && homeworkVisible(item.Status) {
+		if s.courseContentMatches(course.ID, item.CourseID, item.LearningSpaceID) && item.LessonID == lessonID && homeworkVisible(item.Status) {
 			homework++
 		}
 	}
