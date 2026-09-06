@@ -1317,11 +1317,11 @@ func (s *MemoryStore) hasAnyContentGrantForLearningSpace(studentID, learningSpac
 	return false
 }
 
-// hasCourseGrantForSubject 按学生已经购买或获授的课程包判断。套餐覆盖的是一门
-// 学科的学习安排，而不是单个课节；因此未来/到期套餐都不应再显示同学科的永久预览。
+// hasCourseGrantForSubject 只判断当前生效的课程授权。未开始或已到期的套餐不应
+// 阻止学生体验仍有首章内容的课程。
 func (s *MemoryStore) hasCourseGrantForSubject(studentID, grade, subject string) bool {
 	for _, grant := range s.grants {
-		if grant.StudentID != studentID || grant.Status == "revoked" || !containsString(s.contentTypesForPackage(grant.PackageID), "course") {
+		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") {
 			continue
 		}
 		pkg, ok := s.findPackage(grant.PackageID)

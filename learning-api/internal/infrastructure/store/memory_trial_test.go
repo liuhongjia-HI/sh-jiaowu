@@ -3,6 +3,7 @@ package store
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"starline/learning-api/internal/domain/learning"
 )
@@ -114,6 +115,31 @@ func TestStudentStudyListsConfiguredGradeSubjectsAndMarksPreview(t *testing.T) {
 			t.Fatalf("subject with first-chapter handout must be previewable: %#v", card)
 		}
 	}
+}
+
+func TestFutureCourseGrantStillAllowsFirstLessonPreview(t *testing.T) {
+	store := NewMemoryStore()
+	studentID := "stu-001"
+	futureStart := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	futureEnd := time.Now().AddDate(0, 1, 1).Format("2006-01-02")
+	store.grants = append(store.grants, packageGrant{
+		ID: "future-geography-grant", StudentID: studentID,
+		PackageID: packageID(4, "地理", 0, "full"), StartsAt: futureStart, EndsAt: futureEnd, Status: "active",
+	})
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	study, err := store.StudentStudy(student)
+	if err != nil {
+		t.Fatalf("load study: %v", err)
+	}
+	for _, card := range study.Subjects {
+		if card.Subject == "地理" && card.AccessState == "preview" && card.CanOpen {
+			return
+		}
+	}
+	t.Fatal("future course grant must not block first-lesson preview")
 }
 
 func TestSevenDayTrialIsNoLongerAvailable(t *testing.T) {
