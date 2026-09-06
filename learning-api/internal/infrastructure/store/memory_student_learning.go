@@ -73,7 +73,7 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 	if len(materials) == 0 {
 		if lessonID, ok := s.previewLessonForCourse(course); ok {
 			for _, material := range s.materials {
-				if material.CourseID == courseID && material.LessonID == lessonID && materialPublished(material.Status) {
+				if (material.CourseID == courseID || material.LearningSpaceID == course.LearningSpaceID) && material.LessonID == lessonID && materialPublished(material.Status) {
 					materials = append(materials, material)
 				}
 			}
@@ -297,6 +297,27 @@ func (s *MemoryStore) studentMaterialUnlocked(principal learning.Principal, mate
 	for _, material := range s.materialsForStudent(principal.StudentID) {
 		if material.ID == materialID {
 			return s.decorateStudentMaterial(principal, material), nil
+		}
+	}
+	for _, course := range s.previewCoursesForStudent(principal.StudentID) {
+		hadHandoutGrant := false
+		for _, grant := range s.grants {
+			if grant.StudentID == principal.StudentID && containsString(s.contentTypesForPackage(grant.PackageID), "handout") && containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
+				hadHandoutGrant = true
+				break
+			}
+		}
+		if hadHandoutGrant {
+			continue
+		}
+		lessonID, ok := s.previewLessonForCourse(course)
+		if !ok {
+			continue
+		}
+		for _, material := range s.materials {
+			if material.ID == materialID && material.LessonID == lessonID && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && materialPublished(material.Status) {
+				return s.decorateStudentMaterial(principal, material), nil
+			}
 		}
 	}
 	return learning.Material{}, errors.New("资料不存在或未开通")
