@@ -500,6 +500,7 @@ func makeWatermarkedPDF(ctx context.Context, asset learning.FileAsset) (string, 
 }
 
 func secureWatermarkFailure(c *gin.Context, err error) {
+	log.Printf("event=student_watermark_failed error=%q", err.Error())
 	if errors.Is(err, errGhostscriptUnavailable) {
 		BadRequest(c, "课件安全水印服务暂不可用，请稍后再试")
 		return
