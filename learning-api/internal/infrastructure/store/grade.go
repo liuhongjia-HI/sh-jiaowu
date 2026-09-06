@@ -79,6 +79,15 @@ func applyDerivedGrade(student *learning.Student, currentAcademicYear string) {
 	student.Grade, student.Graduated = resolveGrade(student.EnrollmentAcademicYear, student.EnrollmentGrade, currentAcademicYear)
 }
 
+// effectiveStudentGrade 兼容历史档案：当前年级缺失时使用入学年级。
+func effectiveStudentGrade(student learning.Student) string {
+	grade := strings.TrimSpace(student.Grade)
+	if grade == "" || grade == "待完善" {
+		grade = strings.TrimSpace(student.EnrollmentGrade)
+	}
+	return grade
+}
+
 // refreshStudentGrades 在学生集合上重新推导年级，用于加载和跨学年刷新。
 func refreshStudentGrades(students []learning.Student, now time.Time) {
 	currentAcademicYear := academicYearForDate(now)
