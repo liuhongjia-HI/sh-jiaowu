@@ -8,7 +8,6 @@
   </view>
   <view class="section">
     <view class="card">
-    <view class="bubble">学习提示：先看例子，再做练习。</view>
     <view class="row preview-meta">
       <view class="sub">学习进度已自动保存</view>
       <view class="sub">已添加专属水印</view>

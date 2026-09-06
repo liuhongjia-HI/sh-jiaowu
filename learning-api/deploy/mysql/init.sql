@@ -666,7 +666,7 @@ CREATE TABLE IF NOT EXISTS class_reservation_intents (
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('grades', 'G1-G12'),
   ('semesters', 'S1 / S2'),
-  ('watermarkRule', '姓名/昵称 + 手机尾号 + 时间 + 学生ID后缀'),
+  ('watermarkRule', '姓名/昵称 + STARLINE'),
   ('downloadPolicy', '学生端仅安全预览，不提供下载'),
   ('miniProgramDomainStatus', '待确认'),
   ('officialAccountBindingStatus', '待确认'),

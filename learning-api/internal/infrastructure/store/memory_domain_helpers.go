@@ -1624,23 +1624,8 @@ func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, home
 }
 
 func (s *MemoryStore) studentWatermarkText(principal learning.Principal) string {
-	name := s.studentWatermarkName(principal)
-	phone := strings.TrimSpace(principal.Phone)
-	studentID := strings.TrimSpace(principal.StudentID)
-	if student, ok := s.findStudent(principal.StudentID); ok {
-		if strings.TrimSpace(student.Phone) != "" {
-			phone = strings.TrimSpace(student.Phone)
-		}
-	}
-	parts := []string{name}
-	if tail := phoneTail(phone); tail != "" {
-		parts = append(parts, tail)
-	}
-	parts = append(parts, time.Now().Format("2006-01-02 15:04"))
-	if suffix := idSuffix(studentID); suffix != "" {
-		parts = append(parts, suffix)
-	}
-	return strings.Join(parts, " · ")
+	// 可见水印只用于明确归属，不展示手机号、时间或追踪号等个人标识。
+	return fmt.Sprintf("%s STARLINE", s.studentWatermarkName(principal))
 }
 
 func (s *MemoryStore) studentWatermarkName(principal learning.Principal) string {
@@ -1670,34 +1655,6 @@ func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, ma
 
 func studentSecurityNotice() string {
 	return "这份资料仅供你本人学习，已添加专属水印。请不要分享、截图或录屏。"
-}
-
-func phoneTail(phone string) string {
-	digits := make([]rune, 0, 4)
-	for _, value := range phone {
-		if value >= '0' && value <= '9' {
-			digits = append(digits, value)
-		}
-	}
-	if len(digits) == 0 {
-		return ""
-	}
-	if len(digits) > 4 {
-		digits = digits[len(digits)-4:]
-	}
-	return "尾号" + string(digits)
-}
-
-func idSuffix(id string) string {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return ""
-	}
-	runes := []rune(id)
-	if len(runes) > 6 {
-		runes = runes[len(runes)-6:]
-	}
-	return "ID" + string(runes)
 }
 
 func studentAuditOperator(principal learning.Principal) string {

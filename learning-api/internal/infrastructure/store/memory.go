@@ -252,7 +252,7 @@ func defaultSettings() map[string]string {
 		"gradeSubjectCatalog":          "",
 		"grades":                       "G1-G12",
 		"semesters":                    "S1 / S2",
-		"watermarkRule":                "学生专属：姓名/昵称、手机尾号、时间、追溯码（服务端写入）",
+		"watermarkRule":                "学生专属：姓名/昵称 + STARLINE（服务端写入）",
 		"downloadPolicy":               "仅在线预览",
 		"miniProgramDomainStatus":      "待确认",
 		"officialAccountBindingStatus": "待确认",

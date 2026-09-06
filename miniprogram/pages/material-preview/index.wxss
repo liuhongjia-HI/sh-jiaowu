@@ -47,11 +47,6 @@
   background: #fff;
 }
 
-.material-preview-page .bubble {
-  padding: 22rpx 24rpx;
-  font-size: 26rpx;
-}
-
 .global-watermark-layer {
   position: fixed;
   inset: 0;
