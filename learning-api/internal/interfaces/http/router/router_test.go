@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,8 +23,24 @@ import (
 )
 
 type testApp struct {
-	server *httptest.Server
+	server *testServer
 	store  *store.MemoryStore
+}
+
+type testServer struct {
+	URL      string
+	client   *http.Client
+	server   *http.Server
+	listener net.Listener
+}
+
+func (s *testServer) Client() *http.Client {
+	return s.client
+}
+
+func (s *testServer) Close() {
+	_ = s.server.Close()
+	_ = s.listener.Close()
 }
 
 type apiResponse struct {
@@ -68,13 +84,27 @@ func newTestAppWithStorageRoot(t *testing.T, storageRoot string) *testApp {
 		Logger:  logger.New("test"),
 		Service: service,
 	})
-	server := httptest.NewUnstartedServer(engine)
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen test server: %v", err)
 	}
-	server.Listener = listener
-	server.Start()
+	srv := &http.Server{Handler: engine}
+	done := make(chan error, 1)
+	go func() {
+		done <- srv.Serve(listener)
+	}()
+	server := &testServer{
+		URL:      "http://" + listener.Addr().String(),
+		client:   &http.Client{},
+		server:   srv,
+		listener: listener,
+	}
+	t.Cleanup(func() {
+		server.Close()
+		if err := <-done; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			t.Fatalf("test server stopped unexpectedly: %v", err)
+		}
+	})
 	return &testApp{server: server, store: repo}
 }
 
