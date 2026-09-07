@@ -1665,8 +1665,11 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		// 首节体验资料始终允许带水印下载；全局下载策略只约束正式资料。
-		if (s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download")) || s.previewMaterialForStudent(principal.StudentID, material) {
+		// 正式课程只有在下载策略和对应课程授权都满足时才暴露下载地址；
+		// 首节体验资料在没有任何该课程范围授权时，仍保留体验下载入口。
+		if s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
+			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
+		} else if !s.hasAnyContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID) && s.previewMaterialForStudent(principal.StudentID, material) {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}
