@@ -456,23 +456,20 @@ func TestUpdateSettingValidatesAndLogs(t *testing.T) {
 	store := NewMemoryStore()
 
 	settings, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{
-		Key:   "downloadPolicy",
-		Value: "允许下载带水印PDF",
+		Key:   "watermarkRule",
+		Value: "学生专属：姓名/昵称 + STARLINE",
 	})
 	if err != nil {
 		t.Fatalf("expected setting update to succeed: %v", err)
 	}
-	if settings["downloadPolicy"] != "允许下载带水印PDF" {
+	if settings["watermarkRule"] != "学生专属：姓名/昵称 + STARLINE" {
 		t.Fatalf("expected updated setting, got %#v", settings)
 	}
-	if store.logs[0].Action != "修改系统设置" || store.logs[0].Target != "下载规则" {
+	if store.logs[0].Action != "修改系统设置" || store.logs[0].Target != "水印规则" {
 		t.Fatalf("expected setting update log, got %#v", store.logs[0])
 	}
-	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy"}); err == nil {
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "watermarkRule"}); err == nil {
 		t.Fatal("expected empty setting value to be rejected")
-	}
-	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "允许下载原文件"}); err == nil {
-		t.Fatal("expected unsafe download policy to be rejected")
 	}
 	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "unknown", Value: "x"}); err == nil {
 		t.Fatal("expected unknown setting key to be rejected")

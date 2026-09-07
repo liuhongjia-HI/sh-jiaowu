@@ -795,8 +795,6 @@ func settingLabel(key string) string {
 		return "学期设置"
 	case "watermarkRule":
 		return "水印规则"
-	case "downloadPolicy":
-		return "下载规则"
 	case "academicCalendar":
 		return "校历（按学年学期）"
 	case "miniProgramDomainStatus":

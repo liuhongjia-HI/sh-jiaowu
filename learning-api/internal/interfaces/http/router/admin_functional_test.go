@@ -285,10 +285,10 @@ func TestAdminSystemManagementThroughAPI(t *testing.T) {
 
 	var settings map[string]string
 	app.doJSON(t, http.MethodPut, "/api/settings", campusToken, learning.SettingUpdateRequest{
-		Key:   "downloadPolicy",
-		Value: "允许下载带水印PDF",
+		Key:   "watermarkRule",
+		Value: "学生专属：姓名/昵称 + STARLINE",
 	}, http.StatusOK, &settings)
-	if settings["downloadPolicy"] != "允许下载带水印PDF" || settings["academicCalendar"] == "" {
+	if settings["watermarkRule"] != "学生专属：姓名/昵称 + STARLINE" || settings["academicCalendar"] == "" {
 		t.Fatalf("unexpected settings: %#v", settings)
 	}
 

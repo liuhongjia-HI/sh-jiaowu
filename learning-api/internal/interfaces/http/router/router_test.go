@@ -1281,9 +1281,6 @@ func TestStudentHomeworkDownloadUsesStudentSecureRoute(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("grant student download permission: %v", err)
 	}
-	if _, err := app.store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "允许下载带水印PDF"}); err != nil {
-		t.Fatalf("enable watermarked download: %v", err)
-	}
 
 	studentToken := app.loginStudent(t)
 	var visible learning.Homework

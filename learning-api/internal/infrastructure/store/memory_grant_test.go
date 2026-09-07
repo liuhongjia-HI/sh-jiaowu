@@ -282,7 +282,6 @@ func TestCourseGrantEnablesSecureHandoutDownload(t *testing.T) {
 			store.materials[index].FileName = "lesson.pdf"
 		}
 	}
-	store.settings["downloadPolicy"] = "允许下载带水印PDF"
 
 	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
 		StudentID:        studentID,

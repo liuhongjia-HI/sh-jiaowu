@@ -13,14 +13,13 @@ const SPRING_LABEL = 'S2 第二学期';
 
 // 三个 Tab 分组：系统设置项一多，摊平成一张大表格谁都懒得找。分组按“运营会想在什么场景下打开这一项”来划，
 // 不按数据类型分——校历天天要看，接入状态一年调一次，放在一起只会互相淹没。
-const contentKeys = ['grades', 'semesters', 'watermarkRule', 'downloadPolicy'];
+const contentKeys = ['grades', 'semesters', 'watermarkRule'];
 const integrationKeys = ['miniProgramDomainStatus', 'officialAccountBindingStatus', 'templateMessageStatus', 'miniProgramSubscribeStatus', 'productionApiDomain'];
 
 const labels: Record<string, string> = {
   grades: '适用年级',
   semesters: '学期设置',
   watermarkRule: '水印规则',
-  downloadPolicy: '下载规则',
   miniProgramDomainStatus: '小程序域名状态',
   miniProgramSubscribeStatus: '小程序订阅消息状态',
   productionApiDomain: '生产接口域名',
@@ -391,7 +390,7 @@ export default function SettingsPage() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>系统设置</Typography.Title>
-          <Typography.Text type="secondary">维护学年、水印、访问和提醒规则。</Typography.Text>
+          <Typography.Text type="secondary">维护学年、水印和提醒规则。</Typography.Text>
         </div>
       </div>
       {settings.isLoading ? (
@@ -437,14 +436,7 @@ export default function SettingsPage() {
             <Form form={form} layout="vertical" onFinish={(values) => save.mutate(values)}>
               <Form.Item name="key" hidden><Input /></Form.Item>
               <Form.Item name="value" label="当前值" rules={[{ required: true, message: '请输入设置值' }]}>
-                {editing?.key === 'downloadPolicy' ? (
-                  <Select
-                    options={[
-                      { label: '仅在线预览（推荐）', value: '仅在线预览' },
-                      { label: '允许下载带水印 PDF', value: '允许下载带水印PDF' }
-                    ]}
-                  />
-                ) : <Input.TextArea rows={4} />}
+                <Input.TextArea rows={4} />
               </Form.Item>
             </Form>
           </FormDrawer>

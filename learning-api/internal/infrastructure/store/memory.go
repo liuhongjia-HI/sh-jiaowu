@@ -205,7 +205,7 @@ func (s *MemoryStore) seedBaseDictionaries() {
 // defaultSettings 里缺的键，从不删除多余的键，所以旧版本写过的值会一直留在
 // 数据库里、留在系统设置列表里，即使代码早就不读它们了。这里显式清掉，
 // 每加一个新的“取代关系”就在这补一条。
-var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd", "academicYear", "academicPeriods", "subjectColors"}
+var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd", "academicYear", "academicPeriods", "subjectColors", "downloadPolicy"}
 
 // 综合科学和历史仅为旧数据保留展示元数据，不再进入新课程矩阵。
 func defaultSubjectMetadata() []learning.SubjectMetadata {
@@ -253,7 +253,6 @@ func defaultSettings() map[string]string {
 		"grades":                       "G1-G12",
 		"semesters":                    "S1 / S2",
 		"watermarkRule":                "学生专属：姓名/昵称 + STARLINE（服务端写入）",
-		"downloadPolicy":               "仅在线预览",
 		"miniProgramDomainStatus":      "待确认",
 		"officialAccountBindingStatus": "待确认",
 		"templateMessageStatus":        "待确认",

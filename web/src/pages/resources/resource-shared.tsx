@@ -36,7 +36,7 @@ export const config: Record<Kind, { title: string; desc: string; path: string }>
   review: { title: '批改反馈', desc: '处理分数、评语和学习反馈。', path: '/reviews/pending' },
   notices: { title: '通知提醒', desc: '发送练习、批改、资料和到期提醒。', path: '/notices' },
   logs: { title: '操作记录', desc: '查看开通、访问和后台操作。', path: '/logs' },
-  settings: { title: '系统设置', desc: '维护学年、水印、访问和提醒规则。', path: '/settings' }
+  settings: { title: '系统设置', desc: '维护学年、水印和提醒规则。', path: '/settings' }
 };
 
 export const emptyTextByKind: Record<Kind, string> = {
@@ -56,7 +56,6 @@ export const settingOrder = [
   'grades',
   'semesters',
   'watermarkRule',
-  'downloadPolicy',
   'miniProgramDomainStatus',
   'productionApiDomain',
   'officialAccountBindingStatus',
@@ -273,7 +272,6 @@ export function settingLabel(key: string) {
     grades: '年级范围',
     semesters: '学期设置',
     watermarkRule: '水印规则',
-    downloadPolicy: '下载规则',
     miniProgramDomainStatus: '小程序域名备案',
     productionApiDomain: '生产接口域名',
     officialAccountBindingStatus: '微信公众号关联',

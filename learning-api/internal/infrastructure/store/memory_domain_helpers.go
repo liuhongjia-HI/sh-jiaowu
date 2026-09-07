@@ -1665,9 +1665,9 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material.SecurityNotice = studentSecurityNotice()
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		// 正式课程只有在下载策略和对应课程授权都满足时才暴露下载地址；
+		// 正式课程只有在对应课程授权包含下载权限时才暴露下载地址；
 		// 首节体验资料在没有任何该课程范围授权时，仍保留体验下载入口。
-		if s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
+		if s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		} else if !s.hasAnyContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID) && s.previewMaterialForStudent(principal.StudentID, material) {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
@@ -1699,20 +1699,6 @@ func (s *MemoryStore) studentHasActiveContentGrantForLearningSpace(studentID, le
 	return false
 }
 
-func (s *MemoryStore) studentMaterialDownloadEnabled() bool {
-	return strings.TrimSpace(s.settings["downloadPolicy"]) == "允许下载带水印PDF"
-}
-
-func (s *MemoryStore) StudentDownloadPolicyEnabled() bool { return s.studentMaterialDownloadEnabled() }
-func (s *MemoryStore) StudentMaterialPreviewDownloadAllowed(p learning.Principal, id string) bool {
-	for _, m := range s.materials {
-		if m.ID == id {
-			return s.previewMaterialForStudent(p.StudentID, m)
-		}
-	}
-	return false
-}
-
 func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, homework learning.Homework) learning.Homework {
 	if homework.AssessmentType == "" {
 		homework.AssessmentType = "practice"
@@ -1729,7 +1715,7 @@ func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, home
 	homework.WatermarkText = s.studentWatermarkText(principal)
 	homework.SecurityNotice = studentSecurityNotice()
 	homework.DownloadURL = ""
-	if homework.FileID != "" && s.studentMaterialDownloadEnabled() && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, homework.LearningSpaceID, "download") {
+	if homework.FileID != "" && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, homework.LearningSpaceID, "download") {
 		homework.DownloadURL = "/api/student/homework/" + homework.ID + "/download"
 	}
 	return homework

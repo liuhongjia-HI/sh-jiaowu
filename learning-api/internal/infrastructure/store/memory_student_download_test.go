@@ -20,9 +20,14 @@ func TestStudentMaterialDownloadURLOnlyExistsDuringActiveGrant(t *testing.T) {
 			break
 		}
 	}
-	store.contentTypes = append(store.contentTypes, packageContentType{PackageID: packageID(4, "英文", 0, "full"), ContentType: "download"})
-	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "允许下载带水印PDF"}); err != nil {
-		t.Fatalf("enable watermarked download: %v", err)
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        principal.StudentID,
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+		ContentTypeCodes: []string{"course"},
+		StartsAt:         "2026-01-01",
+		EndsAt:           "2027-12-31",
+	}); err != nil {
+		t.Fatalf("enable secure course download: %v", err)
 	}
 	material, err := store.StudentMaterial(principal, "mat-g05-english-s1-q1")
 	if err != nil {
@@ -55,9 +60,14 @@ func TestStudentHomeworkDownloadURLOnlyExistsDuringActiveGrant(t *testing.T) {
 			break
 		}
 	}
-	store.contentTypes = append(store.contentTypes, packageContentType{PackageID: packageID(4, "英文", 0, "full"), ContentType: "download"})
-	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "允许下载带水印PDF"}); err != nil {
-		t.Fatalf("enable watermarked download: %v", err)
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        principal.StudentID,
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+		ContentTypeCodes: []string{"course"},
+		StartsAt:         "2026-01-01",
+		EndsAt:           "2027-12-31",
+	}); err != nil {
+		t.Fatalf("enable secure homework download: %v", err)
 	}
 	homework, err := store.StudentHomework(principal, "hw-g05-english-s1-q1")
 	if err != nil {
@@ -168,8 +178,10 @@ func TestStudentPreviewFileReturnsAuthorizedAssetWhilePreviewIsProcessing(t *tes
 	}
 }
 
-func TestStudentMaterialHidesDownloadWhenPolicyIsOnlinePreviewOnly(t *testing.T) {
+func TestStudentMaterialHidesDownloadWhenOnlyHandoutPermissionExists(t *testing.T) {
 	store := NewMemoryStore()
+	store.grants = nil
+	store.spaceAccess = nil
 	principal, err := store.PrincipalByUserID("user-student-001")
 	if err != nil {
 		t.Fatalf("expected student principal: %v", err)
@@ -180,8 +192,14 @@ func TestStudentMaterialHidesDownloadWhenPolicyIsOnlinePreviewOnly(t *testing.T)
 			break
 		}
 	}
-	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "downloadPolicy", Value: "仅在线预览"}); err != nil {
-		t.Fatalf("set online preview policy: %v", err)
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        principal.StudentID,
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+		ContentTypeCodes: []string{"handout"},
+		StartsAt:         "2026-01-01",
+		EndsAt:           "2027-12-31",
+	}); err != nil {
+		t.Fatalf("set handout-only grant: %v", err)
 	}
 
 	material, err := store.StudentMaterial(principal, "mat-g05-english-s1-q1")
@@ -189,6 +207,6 @@ func TestStudentMaterialHidesDownloadWhenPolicyIsOnlinePreviewOnly(t *testing.T)
 		t.Fatalf("expected active material access: %v", err)
 	}
 	if material.DownloadURL != "" {
-		t.Fatalf("online preview policy must hide student download URL, got %q", material.DownloadURL)
+		t.Fatalf("handout-only grant must hide student download URL, got %q", material.DownloadURL)
 	}
 }
