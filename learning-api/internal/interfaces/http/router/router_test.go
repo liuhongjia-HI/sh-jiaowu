@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -67,7 +68,14 @@ func newTestAppWithStorageRoot(t *testing.T, storageRoot string) *testApp {
 		Logger:  logger.New("test"),
 		Service: service,
 	})
-	return &testApp{server: httptest.NewServer(engine), store: repo}
+	server := httptest.NewUnstartedServer(engine)
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen test server: %v", err)
+	}
+	server.Listener = listener
+	server.Start()
+	return &testApp{server: server, store: repo}
 }
 
 func (a *testApp) close() {
