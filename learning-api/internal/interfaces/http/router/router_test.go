@@ -5,13 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"starline/learning-api/internal/application/learningapp"
@@ -28,12 +27,21 @@ type testApp struct {
 }
 
 type testServer struct {
-	URL      string
-	client   *http.Client
-	server   *http.Server
-	listener net.Listener
-	done     chan error
-	once     sync.Once
+	URL          string
+	client       *http.Client
+	transport    *inProcessTransport
+	previousTransport http.RoundTripper
+	once         bool
+}
+
+type inProcessTransport struct {
+	handler http.Handler
+}
+
+func (t *inProcessTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	recorder := httptest.NewRecorder()
+	t.handler.ServeHTTP(recorder, req)
+	return recorder.Result(), nil
 }
 
 func (s *testServer) Client() *http.Client {
@@ -41,11 +49,11 @@ func (s *testServer) Client() *http.Client {
 }
 
 func (s *testServer) Close() {
-	s.once.Do(func() {
-		_ = s.server.Close()
-		_ = s.listener.Close()
-		<-s.done
-	})
+	if s.once {
+		return
+	}
+	s.once = true
+	http.DefaultClient.Transport = s.previousTransport
 }
 
 type apiResponse struct {
@@ -89,21 +97,14 @@ func newTestAppWithStorageRoot(t *testing.T, storageRoot string) *testApp {
 		Logger:  logger.New("test"),
 		Service: service,
 	})
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen test server: %v", err)
-	}
-	srv := &http.Server{Handler: engine}
-	done := make(chan error, 1)
-	go func() {
-		done <- srv.Serve(listener)
-	}()
+	transport := &inProcessTransport{handler: engine}
+	previousTransport := http.DefaultClient.Transport
+	http.DefaultClient.Transport = transport
 	server := &testServer{
-		URL:      "http://" + listener.Addr().String(),
-		client:   &http.Client{},
-		server:   srv,
-		listener: listener,
-		done:     done,
+		URL:               "http://starline.test",
+		client:            http.DefaultClient,
+		transport:         transport,
+		previousTransport: previousTransport,
 	}
 	return &testApp{server: server, store: repo}
 }
