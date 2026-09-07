@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"starline/learning-api/internal/application/learningapp"
@@ -32,6 +32,8 @@ type testServer struct {
 	client   *http.Client
 	server   *http.Server
 	listener net.Listener
+	done     chan error
+	once     sync.Once
 }
 
 func (s *testServer) Client() *http.Client {
@@ -39,8 +41,11 @@ func (s *testServer) Client() *http.Client {
 }
 
 func (s *testServer) Close() {
-	_ = s.server.Close()
-	_ = s.listener.Close()
+	s.once.Do(func() {
+		_ = s.server.Close()
+		_ = s.listener.Close()
+		<-s.done
+	})
 }
 
 type apiResponse struct {
@@ -98,13 +103,8 @@ func newTestAppWithStorageRoot(t *testing.T, storageRoot string) *testApp {
 		client:   &http.Client{},
 		server:   srv,
 		listener: listener,
+		done:     done,
 	}
-	t.Cleanup(func() {
-		server.Close()
-		if err := <-done; err != nil && !errors.Is(err, http.ErrServerClosed) {
-			t.Fatalf("test server stopped unexpectedly: %v", err)
-		}
-	})
 	return &testApp{server: server, store: repo}
 }
 
