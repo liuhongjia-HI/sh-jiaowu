@@ -59,7 +59,8 @@
     </view>
     <view class="button-row">
       <button class="button light {{material.downloadUrl ? '' : 'solo-secondary'}}" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
-      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">打开并打印</button>
+      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="printMaterial">打开打印</button>
+      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
       <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
     </view>
     </view>

@@ -86,12 +86,12 @@ Page({
     })).then((savedFilePath) => {
       wx.showModal({
         title: "课件已保存",
-        content: "课件已保存。点击“立即打开”查看并打印；打开 PDF 后，点右上角“…”可发送到文件传输助手或选择打印。",
+        content: "课件已保存。点击“立即打开”查看并打印。文件已添加专属水印，仅限本人学习使用，请勿转发。",
         confirmText: "打开课件",
         cancelText: "知道了",
         success: (result) => {
           if (!result || !result.confirm) {
-            wx.showToast({ title: "已保存，打开 PDF 后可发送或打印", icon: "none", duration: 2600 });
+            wx.showToast({ title: "已保存，打开 PDF 后可打印", icon: "none", duration: 2600 });
             return;
           }
           openDocument(savedFilePath).catch((error) => showFileError("课件打开失败", error));
@@ -100,6 +100,18 @@ Page({
     }).catch((error) => {
       showFileError("课件下载失败", error);
     }).finally(() => wx.hideLoading());
+  },
+  printMaterial() {
+    const downloadUrl = this.data.material && this.data.material.downloadUrl;
+    if (!downloadUrl) {
+      wx.showToast({ title: "当前资料未开放打印", icon: "none" });
+      return;
+    }
+    wx.showLoading({ title: "正在打开课件" });
+    downloadWithAuth(stripApiPrefix(downloadUrl))
+      .then((tempFilePath) => openDocument(tempFilePath))
+      .catch((error) => showFileError("课件无法打开", error))
+      .finally(() => wx.hideLoading());
   },
   // 分页图片在上传后由服务端预生成；详情页只下载第一页作为预览，完整内容交给文档查看器。
   // 缩略图不可用时保留整份 PDF 入口，避免模拟内容冒充真实预览。
