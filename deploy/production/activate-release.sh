@@ -47,8 +47,19 @@ if [ ! -f "$RELEASE_DIR/web/dist/index.html" ]; then
     mkdir -p "$RELEASE_DIR/web/dist"
     cp -a "$CURRENT_DIR/web/dist/." "$RELEASE_DIR/web/dist/"
   else
-    echo "Missing web entry: $RELEASE_DIR/web/dist/index.html" >&2
-    exit 1
+    # current 可能已经指向一个被历史增量上传破坏的 release；继续从
+    # 最近一个仍包含完整前端入口的历史 release 恢复，避免故障自我延续。
+    while IFS= read -r candidate; do
+      if [ -f "$candidate/web/dist/index.html" ]; then
+        mkdir -p "$RELEASE_DIR/web/dist"
+        cp -a "$candidate/web/dist/." "$RELEASE_DIR/web/dist/"
+        break
+      fi
+    done < <(find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d ! -path "$RELEASE_DIR" -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+    if [ ! -f "$RELEASE_DIR/web/dist/index.html" ]; then
+      echo "Missing web entry: $RELEASE_DIR/web/dist/index.html" >&2
+      exit 1
+    fi
   fi
 fi
 

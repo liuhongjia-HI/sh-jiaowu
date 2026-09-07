@@ -147,7 +147,10 @@ jobs:
             LINK_DEST_ARGS=(--link-dest="$DEPLOY_PATH/current")
           fi
           if timeout 60s "${SSH_CMD[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "command -v rsync >/dev/null 2>&1"; then
-            timeout 10m rsync -az --delete --human-readable --stats "${LINK_DEST_ARGS[@]}" -e "$RSYNC_RSH" \
+            # 发布包按改动范围可能只包含 API 或前端其中一部分。这里不能使用
+            # --delete，否则会把本次未构建的另一部分从 release 目录删除，
+            # 使 activate-release.sh 无法从 current 继承静态文件。
+            timeout 10m rsync -az --human-readable --stats "${LINK_DEST_ARGS[@]}" -e "$RSYNC_RSH" \
               "$RELEASE_DIR/" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/releases/${GITHUB_SHA}/"
           else
             timeout 10m tar -C "$RELEASE_DIR" -czf - . | timeout 10m "${SSH_CMD[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "tar -xzf - -C '$DEPLOY_PATH/releases/${GITHUB_SHA}'"
