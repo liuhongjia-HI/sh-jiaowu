@@ -145,6 +145,7 @@ type Homework struct {
 	PreviewError     string         `json:"previewError,omitempty"`
 	PreviewURL       string         `json:"previewUrl,omitempty"`
 	DownloadURL      string         `json:"downloadUrl,omitempty"`
+	AllowDownload    bool           `json:"allowDownload"`
 	WatermarkText    string         `json:"watermarkText,omitempty"`
 	SecurityNotice   string         `json:"securityNotice,omitempty"`
 	SortOrder        int            `json:"sortOrder"`
