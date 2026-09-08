@@ -63,6 +63,7 @@ Page({
     };
   },
   onShow() {
+    this.homeHidden = false;
     this.refreshGreeting();
     if (!hasStudentToken()) {
       this.showVisitorHome();
@@ -85,10 +86,12 @@ Page({
     this.loadRecommendations();
   },
   onHide() {
+    this.homeHidden = true;
     this.stopTodoRotation();
     this.stopRecommendationRotation();
   },
   onUnload() {
+    this.homeHidden = true;
     this.stopTodoRotation();
     this.stopRecommendationRotation();
   },
@@ -234,7 +237,7 @@ Page({
   },
   startRecommendationRotation() {
     this.stopRecommendationRotation();
-    if ((this.data.visibleRecommendations || []).length <= 2) return;
+    if (this.homeHidden || (this.data.visibleRecommendations || []).length <= 2) return;
     this.recommendationRotationTimer = setInterval(() => {
       const list = this.data.visibleRecommendations || [];
       const index = ((this.data.recommendationIndex || 0) + 2) % list.length;

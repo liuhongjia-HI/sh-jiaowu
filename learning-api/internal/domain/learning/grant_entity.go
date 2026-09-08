@@ -62,26 +62,26 @@ type StudentTrialStartResult struct {
 }
 
 // StudentSubjectRecommendation 是本年级未开通学科的公开摘要。
-// 仅返回用于了解套餐的信息，不授予课程或资料访问权限。
+// 仅返回统计和公开教学信息，不授予课程或资料访问权限。
 type StudentSubjectRecommendation struct {
 	QuestionCount        int      `json:"questionCount"`
 	HomeworkCount        int      `json:"homeworkCount"`
 	TeacherName          string   `json:"teacherName"`
 	TeacherIntro         string   `json:"teacherIntro"`
-	PackageID            string   `json:"packageId"`
-	PackageName          string   `json:"packageName"`
-	AcademicYear         string   `json:"academicYear"`
+	PackageID            string   `json:"packageId,omitempty"`
+	PackageName          string   `json:"packageName,omitempty"`
+	AcademicYear         string   `json:"academicYear,omitempty"`
 	Grade                string   `json:"grade"`
-	Semester             string   `json:"semester"`
+	Semester             string   `json:"semester,omitempty"`
 	Subject              string   `json:"subject"`
-	Level                string   `json:"level"`
-	Summary              string   `json:"summary"`
-	LearningSpaces       []string `json:"learningSpaces"`
+	Level                string   `json:"level,omitempty"`
+	Summary              string   `json:"summary,omitempty"`
+	LearningSpaces       []string `json:"learningSpaces,omitempty"`
 	CourseCount          int      `json:"courseCount"`
 	MaterialCount        int      `json:"materialCount"`
-	ContentSamples       []string `json:"contentSamples"`
+	ContentSamples       []string `json:"contentSamples,omitempty"`
 	RecommendationReason string   `json:"recommendationReason"`
-	SameLearningSpace    bool     `json:"sameLearningSpace"`
+	SameLearningSpace    bool     `json:"sameLearningSpace,omitempty"`
 }
 
 // StudentPackageRecommendation 保留 Go 调用兼容，接口内容已改为学科摘要。
