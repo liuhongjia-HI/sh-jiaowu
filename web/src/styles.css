@@ -3058,3 +3058,14 @@ button.schedule-block:hover {
 .schedule-timeline-block:hover .schedule-timeline-resize::after {
   opacity: 0.7;
 }
+
+.student-opening-actions-summary details {
+  max-height: 180px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.student-opening-actions-summary summary {
+  cursor: pointer;
+  color: #45947d;
+}

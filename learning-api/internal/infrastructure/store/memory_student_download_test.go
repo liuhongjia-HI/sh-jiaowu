@@ -16,6 +16,7 @@ func TestStudentMaterialDownloadURLOnlyExistsDuringActiveGrant(t *testing.T) {
 	for index := range store.materials {
 		if store.materials[index].ID == "mat-g05-english-s1-q1" {
 			store.materials[index].FileID = "file-student-download"
+			store.materials[index].AllowDownload = true
 			store.materials[index].FileName = "lesson.pdf"
 			break
 		}
@@ -208,5 +209,58 @@ func TestStudentMaterialHidesDownloadWhenOnlyHandoutPermissionExists(t *testing.
 	}
 	if material.DownloadURL != "" {
 		t.Fatalf("handout-only grant must hide student download URL, got %q", material.DownloadURL)
+	}
+}
+
+func TestStudentMaterialDownloadRecomputesPermission(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		allow   bool
+		grant   bool
+		expired bool
+		file    bool
+		want    bool
+	}{
+		{"authorized", true, true, false, true, true},
+		{"material disallows", false, true, false, true, false},
+		{"no grant", true, false, false, true, false},
+		{"expired", true, true, true, true, false},
+		{"missing file", true, true, false, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := NewMemoryStore()
+			store.grants = nil
+			store.spaceAccess = nil
+			principal, err := store.PrincipalByUserID("user-student-001")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.grant {
+				_, err = store.CreateDirectGrant("测试", learning.DirectGrantCreateRequest{
+					StudentID: principal.StudentID, LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+					ContentTypeCodes: []string{"course"}, StartsAt: "2026-01-01", EndsAt: "2099-12-31",
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.expired {
+				for i := range store.grants {
+					store.grants[i].EndsAt = "2000-01-01"
+					store.grants[i].EffectiveUntil = "2000-01-01"
+				}
+			}
+			material := learning.Material{ID: "permission-check", LearningSpaceID: "space-g05-english-s1-q1", AllowDownload: tc.allow, DownloadURL: "https://old.example/unsafe.pdf"}
+			if tc.file {
+				material.FileID = "file"
+			}
+			result := store.decorateStudentMaterial(principal, material)
+			if (result.DownloadURL != "") != tc.want {
+				t.Fatalf("download URL = %q, want allowed=%v", result.DownloadURL, tc.want)
+			}
+			if tc.want && result.DownloadURL != "/api/student/materials/permission-check/download" {
+				t.Fatalf("must use secure student route: %q", result.DownloadURL)
+			}
+		})
 	}
 }

@@ -499,7 +499,6 @@ export type Material = {
   createdAt?: string;
   sortOrder: number;
   status: string;
-  allowDownload?: boolean;
 };
 
 export type MaterialUpdateRequest = {

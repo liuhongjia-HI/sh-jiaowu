@@ -279,6 +279,7 @@ func TestCourseGrantEnablesSecureHandoutDownload(t *testing.T) {
 	for index := range store.materials {
 		if store.materials[index].LearningSpaceID == spaceID {
 			store.materials[index].FileID = "file-course-permission"
+			store.materials[index].AllowDownload = true
 			store.materials[index].FileName = "lesson.pdf"
 		}
 	}

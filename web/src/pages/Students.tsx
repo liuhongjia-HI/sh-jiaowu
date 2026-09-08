@@ -452,8 +452,8 @@ export default function Students({ user }: { user: CurrentUser }) {
       return;
     }
     Modal.confirm({
-      title: '确认取消已开通内容？',
-      content: `将取消 ${removed.length} 项直接开通内容；这不会影响套餐或其他学生。`,
+      title: '确认取消学科权限？',
+      content: `将取消 ${new Set(removed.map((key) => key.split(':')[0])).size} 个学科的部分或全部单独开通权限；这不会影响套餐或其他学生。`,
       okText: '确认取消',
       okButtonProps: { danger: true },
       cancelText: '暂不取消',
@@ -712,6 +712,8 @@ export default function Students({ user }: { user: CurrentUser }) {
                     periodLoading={directGrantPeriod.isLoading}
                     periodError={Boolean(directGrantPeriod.error)}
                     selections={directSelections}
+                    initialSelections={initialDirectSelections}
+                    periodChanged={directPeriodChanged && (directStartsAt !== directGrantPeriod.data?.startsAt || directEndsAt !== directGrantPeriod.data?.endsAt)}
                     startsAt={directStartsAt}
                     endsAt={directEndsAt}
                     submitting={createDirectGrant.isPending}
@@ -1115,6 +1117,8 @@ function CourseOpeningPanel({
   periodLoading,
   periodError,
   selections,
+  initialSelections,
+  periodChanged,
   startsAt,
   endsAt,
   submitting,
@@ -1132,6 +1136,8 @@ function CourseOpeningPanel({
   periodLoading: boolean;
   periodError: boolean;
   selections: DirectGrantSelection[];
+  initialSelections: DirectGrantSelection[];
+  periodChanged: boolean;
   startsAt: string;
   endsAt: string;
   submitting: boolean;
@@ -1154,6 +1160,8 @@ function CourseOpeningPanel({
       periodLoading={periodLoading}
       periodError={periodError}
       selections={selections}
+      initialSelections={initialSelections}
+      periodChanged={periodChanged}
       startsAt={startsAt}
       endsAt={endsAt}
       submitting={submitting}
@@ -1167,9 +1175,9 @@ function CourseOpeningPanel({
 }
 
 const openingContentLabels: Record<StudentOpeningCell['contentTypeCode'], string> = {
-  course: '课程',
-  handout: '讲义',
-  question: '习题',
+  course: '课程学习',
+  handout: '讲义查看',
+  question: '习题练习',
   download: '下载讲义'
 };
 
@@ -1201,29 +1209,34 @@ function CourseOpeningMatrix({
     <Space direction="vertical" size={10} style={{ width: '100%' }}>
       {matrix.map((scope) => (
         <Card size="small" key={scope.learningSpaceId} title={scope.name}>
-          <Space wrap size={[20, 8]} aria-label={`${scope.name}课程开通`}>
+          <Space wrap size={[20, 8]} aria-label={`${scope.name}学科权限`}>
+            <Typography.Text type="secondary">开通权限</Typography.Text>
             {scope.content.filter((cell) => cell.contentTypeCode !== 'download').map((cell) => {
               const directSelected = selectionFor(scope.learningSpaceId).includes(cell.contentTypeCode);
               const checked = cell.packageOpened ? cell.opened : directSelected;
               const locked = cell.packageOpened;
               const label = openingContentLabels[cell.contentTypeCode];
+              const resourceLabel = { course: '课程', handout: '讲义', question: '习题', download: '讲义' }[cell.contentTypeCode];
+              const resourceUnit = { course: '节', handout: '份', question: '道', download: '份' }[cell.contentTypeCode];
+              const permissionStatus = checked ? (cell.opened ? '已开通' : '待开通') : (cell.opened ? '待取消' : '未开通');
               const items = cell.items ?? [];
               const previewItems = items.slice(0, 5);
               const packageNames = cell.packageNames ?? [];
               const sourceText = cell.packageOpened
                 ? `由 ${packageNames.join('、')} 开通`
-                : directSelected ? '单独开通' : '尚未开通';
+                : directSelected || cell.directOpened ? '单独开通' : '尚未开通';
               return (
                 <Popover
                   key={cell.contentTypeCode}
                   trigger={['hover', 'click', 'focus']}
-                  title={`${label}明细`}
+                  title={`${resourceLabel}明细`}
                   content={(
                     <Space direction="vertical" size={6} style={{ maxWidth: 300 }}>
                       <Typography.Text type="secondary">{sourceText}</Typography.Text>
-                      <Typography.Text strong>{checked ? `已开通内容（${items.length}）` : `可开通内容（${items.length}）`}</Typography.Text>
-                      {previewItems.length > 0 ? previewItems.map((item) => <Typography.Text key={item.id}>· {item.title}</Typography.Text>) : <Typography.Text type="secondary">暂未配置具体内容</Typography.Text>}
-                      {items.length > previewItems.length && <Typography.Text type="secondary">还有 {items.length - previewItems.length} 项内容</Typography.Text>}
+                      <Typography.Text>权限状态：{permissionStatus}</Typography.Text>
+                      <Typography.Text strong>当前{resourceLabel}：{items.length} {resourceUnit}</Typography.Text>
+                      {previewItems.length > 0 ? previewItems.map((item) => <Typography.Text key={item.id}>· {item.title}</Typography.Text>) : <Typography.Text type="secondary">暂未配置{resourceLabel}</Typography.Text>}
+                      {items.length > previewItems.length && <Typography.Text type="secondary">还有 {items.length - previewItems.length} {resourceUnit}{resourceLabel}</Typography.Text>}
                       {!readOnly && locked && directSelected && (
                         <Button type="link" size="small" danger onClick={() => changeSelection(scope.learningSpaceId, cell.contentTypeCode, false)}>撤销单独开通</Button>
                       )}
@@ -1235,7 +1248,7 @@ function CourseOpeningMatrix({
                     </Space>
                   )}
                 >
-                  <span aria-label={`${scope.name}${label}明细`} tabIndex={0}>
+                  <span aria-label={`${scope.name}${resourceLabel}明细`} tabIndex={0}>
                     <Checkbox
                       checked={checked}
                       disabled={readOnly || locked}
@@ -1263,6 +1276,8 @@ function DirectGrantPanel({
   periodLoading,
   periodError,
   selections,
+  initialSelections,
+  periodChanged,
   startsAt,
   endsAt,
   submitting,
@@ -1279,6 +1294,8 @@ function DirectGrantPanel({
   periodLoading: boolean;
   periodError: boolean;
   selections: DirectGrantSelection[];
+  initialSelections: DirectGrantSelection[];
+  periodChanged: boolean;
   startsAt: string;
   endsAt: string;
   submitting: boolean;
@@ -1295,32 +1312,34 @@ function DirectGrantPanel({
     matrix.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
     return Array.from(counts, ([subject, count]) => ({ subject, count }));
   }, [matrix]);
-  const openedSpaceIds = useMemo(() => new Set(matrix.filter((space) => space.content.some((cell) => cell.opened || selections.find((selection) => selection.learningSpaceId === space.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode))).map((space) => space.learningSpaceId)), [matrix, selections]);
-  const visibleMatrix = useMemo(() => {
-    const filtered = matrix.filter((space) => (!selectedSubject || space.subject === selectedSubject) && (!selectedOnly || openedSpaceIds.has(space.learningSpaceId)));
-    return [...filtered].sort((a, b) => Number(openedSpaceIds.has(b.learningSpaceId)) - Number(openedSpaceIds.has(a.learningSpaceId)));
-  }, [matrix, selectedSubject, selectedOnly, openedSpaceIds]);
-  const selectedContentCount = matrix.reduce((count, scope) => count + scope.content.filter((cell) => {
-    const directSelected = selections.find((selection) => selection.learningSpaceId === scope.learningSpaceId)?.contentTypeCodes.includes(cell.contentTypeCode);
-    return cell.opened || directSelected;
-  }).length, 0);
+  const openedSpaceIds = new Set(matrix.filter((space) => space.content.some((cell) => cell.opened)).map((space) => space.learningSpaceId));
+  const selectedSpaceIds = new Set(matrix.filter((space) => space.content.some((cell) =>
+    cell.packageOpened ? cell.opened : selections.some((selection) => selection.learningSpaceId === space.learningSpaceId && selection.contentTypeCodes.includes(cell.contentTypeCode))
+  )).map((space) => space.learningSpaceId));
+  const visibleMatrix = matrix.filter((space) => (!selectedSubject || space.subject === selectedSubject) && (!selectedOnly || openedSpaceIds.has(space.learningSpaceId)))
+    .sort((a, b) => Number(openedSpaceIds.has(b.learningSpaceId)) - Number(openedSpaceIds.has(a.learningSpaceId)));
+  const previousKeys = selectionKeys(initialSelections);
+  const nextKeys = selectionKeys(selections);
+  const changedSpaceIds = new Set([...previousKeys, ...nextKeys].filter((key) => previousKeys.has(key) !== nextKeys.has(key)).map((key) => key.split(':')[0]));
+  const hasPeriodChange = periodChanged && nextKeys.size > 0;
+  const hasChanges = changedSpaceIds.size > 0 || hasPeriodChange;
   return (
     <div className="student-opening-panel">
       <Alert
         type="info"
         showIcon
-        message="选择要开通的内容"
+        message="选择要开通的学科及权限"
         description="套餐已开通的内容会自动勾选；可点击名称查看来源，误开套餐可撤销该学生的套餐权限。单独开通内容可直接勾选或取消。"
       />
       <div>
-        <Typography.Text strong>课程范围</Typography.Text>
+        <Typography.Text strong>学科范围</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          勾选课程、讲义或习题即可开通；经过或点击名称可查看具体内容。
+          按学科选择课程学习、讲义查看或习题练习权限，保存后生效。选择课程学习会同时勾选讲义、习题并包含讲义下载权限；经过或点击名称可查看资源明细。
         </Typography.Paragraph>
         <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
           <Space wrap size={[8, 8]}>
             <Tag color="blue">当前年级：{student.grade}</Tag>
-            <Button type="link" size="small" aria-label="筛选已开通课程" onClick={() => { setSelectedSubject(undefined); setSelectedOnly(true); }}>已选 {selectedContentCount} 项内容</Button>
+            <Typography.Text strong style={{ color: '#45947d' }}>已选 {selectedSpaceIds.size} 个学科</Typography.Text>
           </Space>
           <div role="group" aria-label="科目筛选">
             <Space wrap size={[8, 8]}>
@@ -1339,15 +1358,16 @@ function DirectGrantPanel({
                 </Button>
               ))}
               <Button size="small" type={selectedOnly ? 'primary' : 'default'} onClick={() => setSelectedOnly((value) => !value)}>
-                仅看已开通（{openedSpaceIds.size}）
+                仅看已开通学科（{openedSpaceIds.size}）
               </Button>
             </Space>
           </div>
-          {openedSpaceIds.size > 0 && (
-            <Space wrap size={[6, 6]} aria-label="已选项目快捷筛选">
-              <Typography.Text type="secondary">已选项目：</Typography.Text>
-              {matrix.filter((space) => openedSpaceIds.has(space.learningSpaceId)).map((space) => (
-                <Button key={space.learningSpaceId} size="small" type={selectedSubject === space.subject && selectedOnly ? 'primary' : 'default'} onClick={() => { setSelectedSubject(space.subject); setSelectedOnly(true); }}>
+          <Typography.Text type="secondary">括号内为学科数量</Typography.Text>
+          {selectedSpaceIds.size > 0 && (
+            <Space wrap size={[6, 6]} aria-label="已选学科快捷筛选">
+              <Typography.Text type="secondary">已选学科：</Typography.Text>
+              {matrix.filter((space) => selectedSpaceIds.has(space.learningSpaceId)).map((space) => (
+                <Button key={space.learningSpaceId} size="small" type={selectedSubject === space.subject && selectedOnly ? 'primary' : 'default'} onClick={() => { setSelectedSubject(space.subject); setSelectedOnly(false); }}>
                   {space.name}
                 </Button>
               ))}
@@ -1355,11 +1375,11 @@ function DirectGrantPanel({
           )}
         </Space>
         {loadingLearningSpaces ? <Skeleton active paragraph={{ rows: 3 }} /> : learningSpacesError ? (
-          <Alert type="error" showIcon message="课程范围加载失败，请关闭抽屉后重试。" />
+          <Alert type="error" showIcon message="学科范围加载失败，请关闭抽屉后重试。" />
         ) : matrix.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该年级还没有可开通的课程范围。" />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该年级还没有可开通的学科。" />
         ) : visibleMatrix.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该科目暂无可开通课程范围。" />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选条件下暂无学科。" />
         ) : (
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
             <CourseOpeningMatrix matrix={visibleMatrix} selections={selections} onSelectionsChange={onSelectionsChange} onRevokePackage={onRevokePackage} />
@@ -1405,14 +1425,19 @@ function DirectGrantPanel({
       </section>
       <div className="student-opening-actions">
         <div className="student-opening-actions-summary">
-          <Typography.Text strong aria-live="polite">{selectedContentCount} 项内容将生效</Typography.Text>
-          <Typography.Text type="secondary">确认后立即更新学生权限</Typography.Text>
+          <Typography.Text strong aria-live="polite">{hasChanges ? (changedSpaceIds.size > 0 ? `将修改 ${changedSpaceIds.size} 个学科的权限` : '将更新单独开通权限的生效时间') : '暂无变更'}</Typography.Text>
+          <Typography.Text type="secondary">{hasPeriodChange ? '本次同时更新单独开通权限的生效时间' : hasChanges ? '保存后生效' : '勾选或取消权限后可保存'}</Typography.Text>
+          {changedSpaceIds.size > 0 && <details><summary>查看变更明细</summary>{matrix.filter((scope) => changedSpaceIds.has(scope.learningSpaceId)).map((scope) => {
+            const added = scope.content.filter((cell) => !previousKeys.has(`${scope.learningSpaceId}:${cell.contentTypeCode}`) && nextKeys.has(`${scope.learningSpaceId}:${cell.contentTypeCode}`));
+            const removed = scope.content.filter((cell) => previousKeys.has(`${scope.learningSpaceId}:${cell.contentTypeCode}`) && !nextKeys.has(`${scope.learningSpaceId}:${cell.contentTypeCode}`));
+            return <div key={scope.learningSpaceId}>{scope.name}：{added.length > 0 && `新增 ${added.map((cell) => openingContentLabels[cell.contentTypeCode]).join('、')}`}{added.length > 0 && removed.length > 0 && '；'}{removed.length > 0 && `取消单独开通 ${removed.map((cell) => openingContentLabels[cell.contentTypeCode]).join('、')}`}</div>;
+          })}</details>}
         </div>
         <Button
           type="primary"
           icon={<UnlockOutlined />}
           loading={submitting}
-          disabled={loadingLearningSpaces || learningSpacesError}
+          disabled={loadingLearningSpaces || learningSpacesError || periodLoading || !hasChanges}
           onClick={onSubmit}
         >
           保存变更
