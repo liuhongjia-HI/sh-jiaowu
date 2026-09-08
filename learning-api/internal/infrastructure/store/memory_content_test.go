@@ -115,8 +115,11 @@ func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) 
 	if err != nil {
 		t.Fatalf("student detail: %v", err)
 	}
-	if !stationHasTag(detail.Stations, material.ID, "HD") || !stationHasTag(detail.Stations, homework.ID, "HW") {
-		t.Fatalf("student stations missing tag: %#v", detail.Stations)
+	if !stationHasTag(detail.Stations, material.ID, "HD") {
+		t.Fatalf("student stations missing lecture tag: %#v", detail.Stations)
+	}
+	if len(detail.Homework) == 0 || detail.Homework[0].ID != homework.ID {
+		t.Fatalf("homework should remain attached to the lecture detail, got %#v", detail.Homework)
 	}
 }
 

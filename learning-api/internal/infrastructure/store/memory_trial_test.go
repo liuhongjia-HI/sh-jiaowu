@@ -273,7 +273,7 @@ func TestPreviewLessonMatchesContentByLearningSpaceWhenCourseIDIsBlank(t *testin
 	}
 }
 
-func TestUnopenedDetailShowsFirstLessonAndLocksLaterLessons(t *testing.T) {
+func TestUnopenedDetailShowsOnlyPublishedFirstLesson(t *testing.T) {
 	store := NewMemoryStore()
 	student, err := store.PrincipalByUserID("user-student-001")
 	if err != nil {
@@ -290,14 +290,10 @@ func TestUnopenedDetailShowsFirstLessonAndLocksLaterLessons(t *testing.T) {
 	if err != nil {
 		t.Fatalf("preview detail: %v", err)
 	}
-	var first, locked learning.Station
+	var first learning.Station
 	for _, station := range detail.Stations {
 		if first.Title == "" && station.MaterialID != "" {
 			first = station
-		}
-		if station.Title == "第二节" {
-			locked = station
-			break
 		}
 	}
 	if first.Status == "未开通" || first.MaterialID == "" {
@@ -312,8 +308,10 @@ func TestUnopenedDetailShowsFirstLessonAndLocksLaterLessons(t *testing.T) {
 	if firstCount != 1 {
 		t.Fatalf("first chapter first lesson should appear once in preview detail, got %d", firstCount)
 	}
-	if locked.Status != "未开通" || locked.MaterialID != "" || locked.HomeworkID != "" {
-		t.Fatalf("locked station must not expose content IDs: %#v", locked)
+	for _, station := range detail.Stations {
+		if station.Title == "第二节" || station.Status == "未开通" {
+			t.Fatalf("unpublished curriculum lesson must not appear in preview detail: %#v", station)
+		}
 	}
 }
 

@@ -88,10 +88,9 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 			homework = append(homework, item)
 		}
 	}
-	stations := s.buildStations(principal.StudentID, materials, homework)
-	if !s.hasActiveSubjectContent(principal.StudentID, course.Grade, course.Subject) {
-		stations = append(stations, s.lockedPreviewStations(course)...)
-	}
+	// 课程目录只展示已发布讲义。练习从讲义详情页按 course_id + lesson_id 进入，
+	// 未开通且没有后台内容的目录节点不应混入学生的内容列表。
+	stations := s.buildMaterialStations(principal.StudentID, course, materials)
 	return learning.StudentCourseDetail{
 		Course:    course,
 		Materials: materials,
@@ -117,6 +116,33 @@ func (s *MemoryStore) lockedPreviewStations(course learning.Course) []learning.S
 		out = append(out, learning.Station{Icon: "🔒", Title: lesson.Name, Desc: "开通后可查看讲义和练习", Status: "未开通"})
 	}
 	return out
+}
+
+func (s *MemoryStore) buildMaterialStations(studentID string, course learning.Course, materials []learning.Material) []learning.Station {
+	ordered := append([]learning.Material(nil), materials...)
+	ranks := make(map[string]int, len(course.Curriculum))
+	for _, node := range course.Curriculum {
+		if node.Type == learning.CurriculumLesson {
+			ranks[node.ID] = node.SortOrder
+		}
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		left, right := ranks[ordered[i].LessonID], ranks[ordered[j].LessonID]
+		if left == 0 {
+			left = 1 << 30
+		}
+		if right == 0 {
+			right = 1 << 30
+		}
+		if left != right {
+			return left < right
+		}
+		if ordered[i].SortOrder != ordered[j].SortOrder {
+			return ordered[i].SortOrder < ordered[j].SortOrder
+		}
+		return ordered[i].ID < ordered[j].ID
+	})
+	return s.buildStations(studentID, ordered, nil)
 }
 
 // StudentGrowth 返回成长轨迹：提交记录 + 已学资料，按时间倒序。
