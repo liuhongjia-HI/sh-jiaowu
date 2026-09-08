@@ -335,12 +335,14 @@ test("home summary cards expose direct actions for todos, materials, and notices
   assert.match(template, /<view class="status-item"\s+data-action="study"\s+bindtap="handleShortcut">\s*<view class="status-value">\{\{materialCount\}\}<\/view>\s*<view class="status-label">在学课程<\/view>/);
 });
 
-test("home page displays unopened package recommendations", async () => {
+test("home page displays unopened subject recommendations", async () => {
   const page = loadHomePage((path) => {
     if (path === "/student/recommendations") {
       return Promise.resolve([{
-        packageId: "pkg-english-reading",
-        packageName: "五年级英语阅读提升",
+        teacherName: "王老师",
+        teacherIntro: "教学范围：五年级 · 英语",
+        questionCount: 8,
+        homeworkCount: 2,
         grade: "五年级",
         semester: "S1",
         subject: "英语",
@@ -366,7 +368,8 @@ test("home page displays unopened package recommendations", async () => {
   await flushPromises();
 
   assert.equal(page.data.recommendations.length, 1);
-  assert.equal(page.data.visibleRecommendations[0].contentSampleText, "阅读课程、阅读讲义");
+  assert.equal(page.data.displayedRecommendations[0].subject, "英语");
+  assert.equal(page.data.displayedRecommendations[0].teacherName, "王老师");
   assert.equal(page.data.visibleRecommendations[0].recommendationReason, "同学习空间推荐");
 });
 
@@ -594,4 +597,25 @@ test("home page ignores promo banner requests that fail instead of breaking the 
   await flushPromises();
 
   assert.deepEqual(page.data.promoBanners, []);
+});
+
+test("recommendations rotate at most two subjects and stop when hidden", () => {
+ const originalSet = global.setInterval, originalClear = global.clearInterval;
+ let rotate, stopped = 0;
+ global.setInterval = (fn) => { rotate = fn; return 99; };
+ global.clearInterval = () => { stopped++; };
+ try {
+  const page = loadHomePage(() => Promise.resolve([]));
+  page.setData({ recommendations: ["地理", "科学", "英文"].map(subject => ({subject,grade:"五年级"})) });
+  page.applySearch();
+  assert.deepEqual(page.data.displayedRecommendations.map(x=>x.subject), ["地理","科学"]);
+  rotate();
+  assert.deepEqual(page.data.displayedRecommendations.map(x=>x.subject), ["英文","地理"]);
+  page.setData({keyword:"科学"});
+  page.applySearch();
+  assert.deepEqual(page.data.displayedRecommendations.map(x=>x.subject), ["科学"]);
+  page.onHide();
+  assert.ok(stopped > 0);
+  assert.equal(page.recommendationRotationTimer, null);
+ } finally { global.setInterval=originalSet; global.clearInterval=originalClear; }
 });

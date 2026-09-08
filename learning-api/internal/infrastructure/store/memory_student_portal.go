@@ -66,7 +66,7 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 	}, nil
 }
 
-// StudentRecommendations 返回学生当前可了解、但尚未有效开通的套餐。
+// StudentRecommendations 返回本年级尚未开通的学科，每个学科一条。
 func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principal) ([]learning.StudentPackageRecommendation, error) {
 	if principal.StudentID == "" {
 		return nil, errors.New("student account is not bound")
@@ -79,96 +79,71 @@ func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principa
 		return nil, errors.New("账号已停用，请联系老师或管理员")
 	}
 
-	activeSpaceIDs := s.studentAccessibleSpaceIDs(student.ID)
-	activeSpaces := make([]learningSpace, 0, len(activeSpaceIDs))
-	for _, spaceID := range activeSpaceIDs {
-		for _, space := range s.learningSpaces {
-			if space.ID == spaceID {
-				activeSpaces = append(activeSpaces, space)
-				break
+	// 学习空间跨学年复用；以学生年级聚合，不用套餐学年筛掉目录。
+	opened := map[string]bool{}
+	spaces := map[string][]string{}
+	for _, space := range s.learningSpaces {
+		if space.Grade != student.Grade || space.Status != learning.StatusEnabled {
+			continue
+		}
+		spaces[space.Subject] = appendUnique(spaces[space.Subject], space.ID)
+		for _, code := range []string{"course", "handout", "question"} {
+			if s.studentHasActiveContentGrantForLearningSpace(student.ID, space.ID, code) {
+				opened[space.Subject] = true
 			}
 		}
 	}
-	if len(activeSpaces) == 0 {
-		return []learning.StudentPackageRecommendation{}, nil
-	}
-	openedCourseIDs := map[string]bool{}
-	// Course cards remain visible when a student only has handout/question
-	// access, but recommendations must still treat the course content itself
-	// as unopened so a package that adds the course can be suggested.
-	for _, grant := range s.grants {
-		if grant.StudentID != student.ID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "course") {
+	out := []learning.StudentPackageRecommendation{}
+	for subject, ids := range spaces {
+		if opened[subject] {
 			continue
 		}
+		item := learning.StudentPackageRecommendation{Subject: subject, Grade: student.Grade, RecommendationReason: "本年级未开通学科"}
+		courses, materials, questions, homework := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 		for _, course := range s.courses {
-			if containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
-				openedCourseIDs[course.ID] = true
+			if containsString(ids, course.LearningSpaceID) && course.Status == learning.StatusEnabled {
+				courses[course.ID] = true
 			}
 		}
+		for _, material := range s.materials {
+			if containsString(ids, material.LearningSpaceID) && materialPublished(material.Status) && (material.PublishStatus == "" || material.PublishStatus == "已发布") {
+				materials[material.ID] = true
+			}
+		}
+		for _, task := range s.homework {
+			if containsString(ids, task.LearningSpaceID) && task.Status == string(learning.StatusEnabled) && (task.PublishStatus == "" || task.PublishStatus == "已发布") {
+				homework[task.ID] = true
+			}
+		}
+		for _, question := range s.questionBank {
+			if question.Grade == student.Grade && question.Subject == subject && question.Status == string(learning.StatusEnabled) {
+				questions[question.ID] = true
+			}
+		}
+		item.CourseCount, item.MaterialCount, item.QuestionCount, item.HomeworkCount = len(courses), len(materials), len(questions), len(homework)
+		if item.CourseCount+item.MaterialCount+item.QuestionCount+item.HomeworkCount == 0 {
+			continue
+		}
+		names := []string{}
+		for _, user := range s.users {
+			teacher := false
+			for _, role := range user.Roles {
+				if role == learning.RoleTeacher {
+					teacher = true
+				}
+			}
+			if teacher && user.AccountStatus == "正常" && overlaps(ids, user.LearningSpaceIDs) {
+				names = appendUnique(names, user.Name)
+			}
+		}
+		sort.Strings(names)
+		item.TeacherName = strings.Join(names, "、")
+		if len(names) > 0 {
+			item.TeacherIntro = "教学范围：" + student.Grade + " · " + subject
+		}
+		out = append(out, item)
 	}
-	openedMaterialIDs := map[string]bool{}
-	for _, material := range s.materialsForStudent(student.ID) {
-		openedMaterialIDs[material.ID] = true
-	}
-
-	out := make([]learning.StudentPackageRecommendation, 0)
-	for _, pkg := range s.packages {
-		if isDirectGrantPackage(pkg.ID) {
-			continue
-		}
-		if strings.TrimSpace(pkg.Level) == "" {
-			pkg.Level = "S"
-		}
-		if pkg.Status != learning.StatusEnabled || !containsRecommendationContent(s.contentTypesForPackage(pkg.ID)) {
-			continue
-		}
-		if opened, _, _ := s.activeGrantState(student.ID, pkg.ID); opened {
-			continue
-		}
-		courses, materials := s.recommendationContentForPackage(pkg, openedCourseIDs, openedMaterialIDs)
-		if len(courses) == 0 && len(materials) == 0 {
-			continue
-		}
-		sameSpace := overlaps(s.learningSpaceIDsForPackage(pkg.ID), activeSpaceIDs)
-		sameTerm := sameRecommendationTerm(pkg, activeSpaces)
-		if !sameSpace && !sameTerm {
-			continue
-		}
-		reason := "同年级同学期推荐"
-		if sameSpace {
-			reason = "同学习空间推荐"
-		}
-		out = append(out, learning.StudentPackageRecommendation{
-			PackageID:            pkg.ID,
-			PackageName:          pkg.Name,
-			AcademicYear:         pkg.AcademicYear,
-			Grade:                pkg.Grade,
-			Semester:             pkg.Semester,
-			Subject:              pkg.Subject,
-			Level:                pkg.Level,
-			Summary:              pkg.Summary,
-			LearningSpaces:       s.learningSpaceNamesForPackage(pkg.ID),
-			CourseCount:          len(courses),
-			MaterialCount:        len(materials),
-			ContentSamples:       recommendationSamples(courses, materials),
-			RecommendationReason: reason,
-			SameLearningSpace:    sameSpace,
-		})
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].SameLearningSpace != out[j].SameLearningSpace {
-			return out[i].SameLearningSpace
-		}
-		leftCount := out[i].CourseCount + out[i].MaterialCount
-		rightCount := out[j].CourseCount + out[j].MaterialCount
-		if leftCount != rightCount {
-			return leftCount > rightCount
-		}
-		return out[i].PackageName < out[j].PackageName
-	})
-	if len(out) > 3 {
-		out = out[:3]
-	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Subject < out[j].Subject })
 	return out, nil
 }
 

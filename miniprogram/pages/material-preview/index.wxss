@@ -128,7 +128,7 @@
 .preview-processing { border-style: dashed; }
 
 .challenge-button,
-.solo-secondary {
+.download-permission-hint {
   grid-column: 1 / -1;
 }
 
@@ -185,3 +185,15 @@
 .preview-unavailable-title { margin-top: 18rpx; font-size: 30rpx; font-weight: 800; color: #46352d; }
 .preview-unavailable-message { margin-top: 12rpx; color: #8a6554; font-size: 24rpx; line-height: 1.6; }
 .preview-retry { margin-top: 24rpx; }
+
+.download-print[disabled] {
+  color: #a5a5a5;
+  background: #f3f3f3;
+  border-color: #e4e4e4;
+}
+
+.download-permission-hint {
+  color: #8b8e98;
+  font-size: 24rpx;
+  text-align: center;
+}

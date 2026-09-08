@@ -112,7 +112,7 @@
       <view class="section-head">
         <view>
           <view class="section-title tight">推荐课程</view>
-          <view class="section-sub">{{keyword ? "根据搜索结果为你推荐" : "看看还可以学习什么"}}</view>
+          <view class="section-sub">{{keyword ? "根据搜索结果为你推荐" : "看看本年级还可以学习哪些学科"}}</view>
         </view>
       </view>
 
@@ -125,8 +125,8 @@
         <button class="button light" bindtap="loadRecommendations">重新加载</button>
       </view>
       <view wx:elif="{{recommendations.length === 0}}" class="empty-card home-empty">
-        <view class="title">暂时没有推荐课程</view>
-        <view class="sub">老师发布课程后，会显示在这里。</view>
+        <view class="title">本年级暂时没有可推荐的学科</view>
+        <view class="sub">未开通的学科会显示在这里。</view>
       </view>
       <view wx:elif="{{visibleRecommendations.length === 0}}" class="empty-card home-empty">
         <view class="title">没有找到匹配课程</view>
@@ -134,17 +134,18 @@
         <button class="button light" bindtap="clearKeyword">清除搜索</button>
       </view>
       <view wx:else class="recommendation-list">
-        <view wx:for="{{visibleRecommendations}}" wx:key="packageId" class="recommendation-card" data-package-id="{{item.packageId}}" bindtap="showRecommendation">
+        <view wx:for="{{displayedRecommendations}}" wx:key="subject" class="recommendation-card" data-subject="{{item.subject}}" bindtap="showRecommendation">
           <view class="content-main">
             <view class="content-top">
               <view class="content-type">{{item.recommendationReason}}</view>
               <view class="content-tag">{{item.subject}}</view>
             </view>
-            <view class="content-title">{{item.packageName}}</view>
-            <view class="content-meta">{{item.grade}} · {{item.semester}} · {{item.courseCount}} 项内容 · {{item.materialCount}} 份资料</view>
-            <view wx:if="{{item.contentSamples.length}}" class="recommendation-samples">{{item.contentSampleText}}</view>
-            <view wx:if="{{item.summary}}" class="recommendation-summary">{{item.summary}}</view>
-            <button class="recommendation-action" data-name="{{item.packageName}}" catchtap="contactTeacher">联系老师</button>
+            <view class="content-title">{{item.subject}}</view>
+            <view class="content-meta">{{item.grade}} · {{item.courseCount}} 门课程 · {{item.materialCount}} 份讲义</view>
+            <view class="content-meta">{{item.questionCount}} 道习题 · {{item.homeworkCount}} 份练习</view>
+            <view class="recommendation-summary">教学老师：{{item.teacherName || "暂未配置"}}</view>
+            <view wx:if="{{item.teacherIntro}}" class="recommendation-summary">{{item.teacherIntro}}</view>
+            <button class="recommendation-action" data-name="{{item.subject}}" catchtap="contactTeacher">联系老师</button>
           </view>
         </view>
       </view>

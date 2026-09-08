@@ -1663,13 +1663,12 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	material = s.decorateMaterial(material)
 	material.WatermarkText = s.studentWatermarkText(principal)
 	material.SecurityNotice = studentSecurityNotice()
+	// 不沿用资料中持久化的下载地址，始终按当前学生授权重新计算。
+	material.DownloadURL = ""
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
-		// 正式课程只有在对应课程授权包含下载权限时才暴露下载地址；
-		// 首节体验资料在没有任何该课程范围授权时，仍保留体验下载入口。
+		// 包括首节体验在内，下载打印必须同时满足资料允许下载和学生有效下载授权。
 		if material.AllowDownload && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
-			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
-		} else if material.AllowDownload && !s.hasAnyContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID) && s.previewMaterialForStudent(principal.StudentID, material) {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}

@@ -514,8 +514,8 @@ test('点击学生课程标签进入课程开通矩阵', async ({ page }) => {
   await expect(drawer).toBeVisible();
   await expect(drawer.getByText(studentName, { exact: true }).first()).toBeVisible();
   await expect(drawer.getByRole('tab', { name: '课程开通' })).toHaveAttribute('aria-selected', 'true');
-  await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
-  await expect(drawer.getByText('选择要开通的内容', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('学科范围', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('选择要开通的学科及权限', { exact: true })).toBeVisible();
 });
 
 test('学生详情以卡片列表展示学习记录', async ({ page }) => {
@@ -592,15 +592,15 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   const drawer = page.locator('.ant-drawer-content').last();
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole('tab', { name: '课程开通' })).toHaveAttribute('aria-selected', 'true');
-  await expect(drawer.getByText('选择要开通的内容', { exact: true })).toBeVisible();
-  await expect(drawer.getByText('课程范围', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('选择要开通的学科及权限', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('学科范围', { exact: true })).toBeVisible();
   await expect(drawer.getByText(/当前年级：/)).toBeVisible();
   await expect(drawer.getByLabel('开通日期')).toBeVisible();
   await expect(drawer.getByLabel('结束日期')).toBeVisible();
-  const openedFilter = drawer.getByRole('button', { name: '筛选已开通课程' });
+  const openedFilter = drawer.getByRole('button', { name: /仅看已开通学科（\d+）/ });
   await expect(openedFilter).toBeVisible();
   await openedFilter.click();
-  const openedOnly = drawer.getByRole('button', { name: /仅看已开通（\d+）/ });
+  const openedOnly = drawer.getByRole('button', { name: /仅看已开通学科（\d+）/ });
   await expect(openedOnly).toHaveClass(/ant-btn-primary/);
   const subjectFilter = drawer.getByRole('group', { name: '科目筛选' });
   await expect(subjectFilter).toBeVisible();
@@ -609,14 +609,14 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   await expect(englishFilter).toBeVisible();
 
   await englishFilter.click();
-  const firstEnglishContent = drawer.getByLabel(/^五年级英文.*课程开通$/).first();
-  const firstEnglishCourse = firstEnglishContent.getByRole('checkbox', { name: '课程', exact: true });
+  const firstEnglishContent = drawer.getByLabel(/^五年级英文.*学科权限$/).first();
+  const firstEnglishCourse = firstEnglishContent.getByRole('checkbox', { name: '课程学习', exact: true });
   await firstEnglishContent.getByLabel(/课程明细$/).hover();
   await expect(page.getByText('课程明细', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /撤销套餐“.+”/ }).first()).toBeVisible();
-  await expect(firstEnglishContent.getByRole('checkbox', { name: '课程', exact: true })).toBeVisible();
-  await expect(firstEnglishContent.getByRole('checkbox', { name: '习题', exact: true })).toBeVisible();
-  await expect(firstEnglishContent.getByRole('checkbox', { name: '讲义', exact: true })).toBeVisible();
+  await expect(firstEnglishContent.getByRole('checkbox', { name: '课程学习', exact: true })).toBeVisible();
+  await expect(firstEnglishContent.getByRole('checkbox', { name: '习题练习', exact: true })).toBeVisible();
+  await expect(firstEnglishContent.getByRole('checkbox', { name: '讲义查看', exact: true })).toBeVisible();
   await expect(drawer.getByRole('tab', { name: '开通学习内容' })).toHaveCount(0);
 });
 

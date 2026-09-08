@@ -58,9 +58,9 @@
       <view class="badge">距离小徽章还差一步</view>
     </view>
     <view class="button-row">
-      <button class="button light {{material.downloadUrl ? '' : 'solo-secondary'}}" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
-      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="printMaterial">打开打印</button>
-      <button wx:if="{{material.downloadUrl}}" class="button light" bindtap="downloadMaterial">下载课件</button>
+      <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
+      <button class="button light download-print" disabled="{{!material.downloadUrl || downloading}}" loading="{{downloading}}" bindtap="printMaterial">下载打印</button>
+      <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">暂未开通下载打印权限</view>
       <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
     </view>
     </view>

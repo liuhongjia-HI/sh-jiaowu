@@ -86,6 +86,7 @@ Page({
   },
   tapStation(event) {
     const { status, materialId, homeworkId } = event.currentTarget.dataset;
+    if (status === "未开通" || status === "未解锁") return;
     if (materialId) {
       wx.navigateTo({ url: `/pages/material-preview/index?id=${materialId}` });
       return;
@@ -116,5 +117,5 @@ function buildTags(materials, homework) {
 
 function filterStations(stations, tagCode) {
 	if (tagCode === 'all') return stations;
-	return (stations || []).filter((item) => item.tagCode === tagCode);
+	return (stations || []).filter((item) => item.tagCode === tagCode || (!item.tagCode && item.status === "未开通"));
 }
