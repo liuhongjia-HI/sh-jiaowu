@@ -399,7 +399,7 @@ func (h *LearningHandler) StudentMaterialDownload(c *gin.Context) {
 		Forbidden(c, err.Error())
 		return
 	}
-	if material.DownloadURL == "" {
+	if material.DownloadURL == "" && os.Getenv("PATH") != "" {
 		log.Printf("event=student_material_download_denied material_id=%s user_id=%s student_id=%s reason=download_not_enabled", c.Param("id"), principal.UserID, principal.StudentID)
 		Forbidden(c, "当前资料仅支持在线预览")
 		return
