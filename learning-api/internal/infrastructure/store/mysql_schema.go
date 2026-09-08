@@ -443,6 +443,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"operation_logs", "detail", "TEXT NOT NULL"},
 		{"question_bank_items", "title", "VARCHAR(128) NOT NULL DEFAULT ''"},
 		{"materials", "allow_download", "TINYINT(1) NOT NULL DEFAULT 0"},
+		{"homework_tasks", "allow_download", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"pending_reviews", "reviewer_teacher_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"pending_reviews", "reviewer_teacher_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"pending_reviews", "tutoring_assignment_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
