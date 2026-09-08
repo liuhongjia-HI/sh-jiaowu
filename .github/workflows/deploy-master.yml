@@ -165,5 +165,16 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
         run: |
-          ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "$DEPLOY_USER@$DEPLOY_HOST" \
-            "if ! '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/check-preview-runtime.sh'; then '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/provision-preview-runtime.sh'; fi; STARLINE_API_PORT='$API_PORT' '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/activate-release.sh' '$DEPLOY_PATH' '${GITHUB_SHA}'"
+          set -euo pipefail
+          remote_command="if ! '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/check-preview-runtime.sh'; then '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/provision-preview-runtime.sh'; fi; STARLINE_API_PORT='$API_PORT' '$DEPLOY_PATH/releases/${GITHUB_SHA}/deploy/production/activate-release.sh' '$DEPLOY_PATH' '${GITHUB_SHA}'"
+          for attempt in 1 2 3; do
+            if ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 "$DEPLOY_USER@$DEPLOY_HOST" "$remote_command"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "SSH activation attempt $attempt failed; retrying in 5 seconds."
+              sleep 5
+            fi
+          done
+          echo "SSH activation failed after 3 attempts." >&2
+          exit 1
