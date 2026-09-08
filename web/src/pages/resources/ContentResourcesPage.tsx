@@ -83,7 +83,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     mutationFn: async (values: UploadValues) => {
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
       if (!course) throw new Error('请选择课程');
-	  if (kind === 'homework') return postData<Homework>('/homework', { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId || '', lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: '启用', questionIds: values.questionIds ?? [] });
+	  if (kind === 'homework') return postData<Homework>('/homework', { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId || '', lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: '启用', questionIds: values.questionIds ?? [], allowDownload: Boolean(values.allowDownload) });
       const files = (values.fileList ?? []).map((item) => item.originFileObj).filter(Boolean) as File[];
       if (files.length === 0) throw new Error('请选择文件');
       const uploaded: Material[] = [];
@@ -114,7 +114,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
       if (!course) throw new Error('请选择课程范围');
 	  if (kind === 'materials') return putData<Material>(`/materials/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', status: values.status || '已发布', allowDownload: Boolean(values.allowDownload) });
-	  return putData<Homework>(`/homework/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: values.status || '启用', questionIds: values.questionIds ?? [] });
+	  return putData<Homework>(`/homework/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: values.status || '启用', questionIds: values.questionIds ?? [], allowDownload: Boolean(values.allowDownload) });
     },
     onSuccess: () => {
       message.success(kind === 'materials' ? '课程讲义已保存。' : '课后练习已保存。');
@@ -208,6 +208,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       courseId: item.courseId || '',
 	  lessonId: item.lessonId || '',
       tagCode: item.tagCode || '',
+	  allowDownload: 'allowDownload' in item ? Boolean(item.allowDownload) : false,
       deadline: 'deadline' in item ? item.deadline : '',
 		deadlineAt: 'deadlineAt' in item ? item.deadlineAt?.slice(0, 16) : '',
 		assessmentType: 'assessmentType' in item ? (item.assessmentType || 'practice') : 'practice',

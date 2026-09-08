@@ -1104,6 +1104,7 @@ export function UploadDialog({
         {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
           <>
             <LessonSelect course={selectedCourse} />
+            <Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item>
             <Alert
               type="info"
               showIcon
@@ -1206,9 +1207,11 @@ export function ContentEditDialog({
         <Form.Item name="tagCode" label="主标签">
           <Select allowClear placeholder="选择一个主标签" options={contentTagOptions} />
         </Form.Item>
-        {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked"><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
+        <>
+          <LessonSelect course={selectedCourse} />
+          <Form.Item name="allowDownload" valuePropName="checked"><Checkbox>允许学生下载</Checkbox></Form.Item>
+          {kind === 'materials' ? null : (
           <>
-            <LessonSelect course={selectedCourse} />
             <Form.Item name="assessmentType" label="类型">
               <Radio.Group options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} />
             </Form.Item>
@@ -1224,7 +1227,8 @@ export function ContentEditDialog({
               <Alert type="warning" showIcon message="当前课程暂无可用题目，请先到题库新增同年级、同学期、同学科的启用题目。" />
             )}
           </>
-        )}
+          )}
+        </>
         <Form.Item name="status" label="状态">
           <Select
             options={kind === 'materials'

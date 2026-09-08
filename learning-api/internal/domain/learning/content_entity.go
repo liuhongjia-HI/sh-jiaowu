@@ -163,6 +163,7 @@ type HomeworkUpdateRequest struct {
 	AssessmentType  string   `json:"assessmentType"`
 	Status          string   `json:"status"`
 	QuestionIDs     []string `json:"questionIds"`
+	AllowDownload   bool     `json:"allowDownload"`
 }
 
 type SecurityEventRequest struct {
@@ -350,6 +351,7 @@ type HomeworkUploadRequest struct {
 	AssessmentType  string    `json:"assessmentType"`
 	Status          string    `json:"status"`
 	QuestionIDs     []string  `json:"questionIds"`
+	AllowDownload   bool      `json:"allowDownload"`
 	File            FileAsset `json:"-"`
 }
 

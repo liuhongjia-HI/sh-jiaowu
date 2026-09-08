@@ -790,6 +790,7 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 		Deadline:         req.Deadline,
 		DeadlineAt:       deadlineAt,
 		AssessmentType:   req.AssessmentType,
+		AllowDownload:    req.AllowDownload,
 		OwnerTeacherID:   principal.UserID,
 		OwnerTeacherName: principal.Name,
 		PublishStatus:    publishStatus(status),
@@ -881,6 +882,7 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 		s.homework[index].Deadline = req.Deadline
 		s.homework[index].DeadlineAt = deadlineAt
 		s.homework[index].AssessmentType = req.AssessmentType
+		s.homework[index].AllowDownload = req.AllowDownload
 		s.homework[index].Status = string(status)
 		s.homework[index].PublishStatus = publishStatus(status)
 		if before.Status != string(learning.StatusEnabled) && status == learning.StatusEnabled {

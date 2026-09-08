@@ -483,7 +483,7 @@ func (s *MemoryStore) loadQuestionBankFromDB() error {
 }
 
 func (s *MemoryStore) loadHomeworkFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, grade, semester, subject, question_ids_json, deadline, deadline_at, assessment_type, owner_teacher_id, owner_teacher_name, publish_status, status, sort_order, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url FROM homework_tasks ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, grade, semester, subject, question_ids_json, deadline, deadline_at, assessment_type, owner_teacher_id, owner_teacher_name, publish_status, status, sort_order, package_name, question_num, submitted_num, total_num, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, allow_download FROM homework_tasks ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, id`)
 	if err != nil {
 		return err
 	}
@@ -494,7 +494,7 @@ func (s *MemoryStore) loadHomeworkFromDB() error {
 		var questionIDsJSON string
 		var deadline sql.NullTime
 		var deadlineAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.LessonID, &item.Title, &item.Chapter, &item.TagCode, &item.Grade, &item.Semester, &item.Subject, &questionIDsJSON, &deadline, &deadlineAt, &item.AssessmentType, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.SortOrder, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL); err != nil {
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.LessonID, &item.Title, &item.Chapter, &item.TagCode, &item.Grade, &item.Semester, &item.Subject, &questionIDsJSON, &deadline, &deadlineAt, &item.AssessmentType, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.SortOrder, &item.PackageName, &item.QuestionNum, &item.SubmittedNum, &item.TotalNum, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &item.AllowDownload); err != nil {
 			return err
 		}
 		item.Deadline = dateString(deadline)
