@@ -74,6 +74,7 @@ type Material struct {
 	PreviewError     string         `json:"previewError,omitempty"`
 	PreviewURL       string         `json:"previewUrl,omitempty"`
 	DownloadURL      string         `json:"downloadUrl,omitempty"`
+	AllowDownload    bool           `json:"allowDownload"`
 	WatermarkText    string         `json:"watermarkText,omitempty"`
 	SecurityNotice   string         `json:"securityNotice,omitempty"`
 	CreatedAt        string         `json:"createdAt,omitempty"`
@@ -97,6 +98,7 @@ type MaterialUpdateRequest struct {
 	LessonID        string `json:"lessonId"`
 	Chapter         string `json:"-"`
 	TagCode         string `json:"tagCode"`
+	AllowDownload   bool   `json:"allowDownload"`
 	Status          Status `json:"status"`
 }
 
@@ -332,6 +334,7 @@ type MaterialUploadRequest struct {
 	LessonID        string
 	Chapter         string
 	TagCode         string
+	AllowDownload   bool
 	File            FileAsset
 }
 

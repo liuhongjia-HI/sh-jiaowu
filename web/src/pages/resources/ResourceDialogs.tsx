@@ -28,6 +28,7 @@ type ContentFormValues = {
 	assessmentType?: 'practice' | 'mock_exam';
   status: string;
   questionIds?: string[];
+  allowDownload?: boolean;
 };
 type QuestionFormValues = QuestionBankUpsertRequest;
 
@@ -1061,7 +1062,7 @@ export function UploadDialog({
   learningSpaces: LearningSpace[];
   onManageCurriculum?: (course: Course) => void;
   onCancel: () => void;
-  onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
+  onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
 }) {
   const [form] = Form.useForm();
   const courseId = Form.useWatch('courseId', form);
@@ -1100,7 +1101,7 @@ export function UploadDialog({
         <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
         </Form.Item>
-        {kind === 'materials' ? <LessonSelect course={selectedCourse} /> : (
+        {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
           <>
             <LessonSelect course={selectedCourse} />
             <Alert
@@ -1205,7 +1206,7 @@ export function ContentEditDialog({
         <Form.Item name="tagCode" label="主标签">
           <Select allowClear placeholder="选择一个主标签" options={contentTagOptions} />
         </Form.Item>
-        {kind === 'materials' ? <LessonSelect course={selectedCourse} /> : (
+        {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked"><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
           <>
             <LessonSelect course={selectedCourse} />
             <Form.Item name="assessmentType" label="类型">

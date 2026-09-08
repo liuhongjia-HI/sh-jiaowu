@@ -46,6 +46,7 @@ func (h *LearningHandler) CreateMaterial(c *gin.Context) {
 		CourseID:        strings.TrimSpace(c.PostForm("courseId")),
 		LessonID:        strings.TrimSpace(c.PostForm("lessonId")),
 		TagCode:         strings.TrimSpace(c.PostForm("tagCode")),
+		AllowDownload:   strings.EqualFold(strings.TrimSpace(c.PostForm("allowDownload")), "true"),
 		File:            asset,
 	})
 	if err != nil {

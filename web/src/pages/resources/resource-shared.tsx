@@ -24,6 +24,7 @@ type ContentFormValues = {
   deadline?: string;
   status: string;
   questionIds?: string[];
+  allowDownload?: boolean;
 };
 type QuestionFormValues = QuestionBankUpsertRequest;
 

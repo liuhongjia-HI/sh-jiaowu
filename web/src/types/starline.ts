@@ -493,11 +493,13 @@ export type Material = {
   previewError?: string;
   previewUrl?: string;
   downloadUrl?: string;
+  allowDownload: boolean;
   watermarkText?: string;
   securityNotice?: string;
   createdAt?: string;
   sortOrder: number;
   status: string;
+  allowDownload?: boolean;
 };
 
 export type MaterialUpdateRequest = {

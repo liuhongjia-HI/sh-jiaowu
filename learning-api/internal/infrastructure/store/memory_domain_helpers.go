@@ -1667,9 +1667,9 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
 		// 正式课程只有在对应课程授权包含下载权限时才暴露下载地址；
 		// 首节体验资料在没有任何该课程范围授权时，仍保留体验下载入口。
-		if s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
+		if material.AllowDownload && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
-		} else if !s.hasAnyContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID) && s.previewMaterialForStudent(principal.StudentID, material) {
+		} else if material.AllowDownload && !s.hasAnyContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID) && s.previewMaterialForStudent(principal.StudentID, material) {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}

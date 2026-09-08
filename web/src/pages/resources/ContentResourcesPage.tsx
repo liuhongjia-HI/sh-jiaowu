@@ -10,7 +10,7 @@ import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmis
 import type { UploadFile } from 'antd';
 
 type ResourceKind = 'materials' | 'homework';
-type UploadValues = { title: string; courseId: string; lessonId: string; tagCode?: string; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
+type UploadValues = { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
 type ContentValues = Omit<UploadValues, 'fileList'> & { status: string };
 
 function materialTitleFromFile(fileName: string) {
@@ -94,6 +94,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         data.append('learningSpaceId', course.learningSpaceId || '');
 		data.append('lessonId', values.lessonId);
         data.append('tagCode', values.tagCode || suggestTagCode(file.name));
+		data.append('allowDownload', values.allowDownload ? 'true' : 'false');
         data.append('file', file);
         uploaded.push(await postForm<Material>('/materials', data));
       }
@@ -112,7 +113,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       if (!editing) throw new Error('请选择要维护的内容');
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
       if (!course) throw new Error('请选择课程范围');
-	  if (kind === 'materials') return putData<Material>(`/materials/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', status: values.status || '已发布' });
+	  if (kind === 'materials') return putData<Material>(`/materials/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', status: values.status || '已发布', allowDownload: Boolean(values.allowDownload) });
 	  return putData<Homework>(`/homework/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: values.status || '启用', questionIds: values.questionIds ?? [] });
     },
     onSuccess: () => {

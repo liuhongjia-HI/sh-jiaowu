@@ -255,6 +255,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 		LessonID:         req.LessonID,
 		Curriculum:       curriculum,
 		TagCode:          tagCode,
+		AllowDownload:    req.AllowDownload,
 		Type:             "课程讲义",
 		OwnerTeacherID:   principal.UserID,
 		OwnerTeacherName: principal.Name,
@@ -425,6 +426,7 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 		s.materials[index].LessonID = req.LessonID
 		s.materials[index].Curriculum = curriculum
 		s.materials[index].TagCode = tagCode
+		s.materials[index].AllowDownload = req.AllowDownload
 		s.materials[index].Status = req.Status
 		s.materials[index].PublishStatus = publishStatus(req.Status)
 		s.prependLogDetail(operator, "编辑学习资料", req.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(s.materials[index])))

@@ -157,6 +157,27 @@ func TestHistoricalContentWithBlankTagIsVisibleInStudentTagFilter(t *testing.T) 
 	}
 }
 
+func TestStudentCourseDetailMatchesLegacyContentByLearningSpace(t *testing.T) {
+	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.materials = append(store.materials, learning.Material{
+		ID: "material-legacy-space-only", Title: "历史讲义", CourseID: "",
+		LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1",
+		Status: learning.StatusEnabled,
+	})
+
+	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
+	if err != nil {
+		t.Fatalf("student detail: %v", err)
+	}
+	if !stationHasTag(detail.Stations, "material-legacy-space-only", "") {
+		t.Fatalf("legacy space-only material should appear in the matching course: %#v", detail.Materials)
+	}
+}
+
 func TestExplicitContentTagWinsOverTitlePrefix(t *testing.T) {
 	if tag := contentTagCodeOrInferred("HD", "Blank_G5S1Q1_1.1.2 Elements of a Map"); tag != "HD" {
 		t.Fatalf("expected explicit tag to win, got %q", tag)

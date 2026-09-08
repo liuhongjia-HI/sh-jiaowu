@@ -183,11 +183,11 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, material := range s.materials {
 		if _, err := tx.Exec(
-			`INSERT INTO materials (id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, sort_order)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO materials (id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, allow_download, sort_order)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			material.ID, material.LearningSpaceID, material.CourseID, material.LessonID, material.Title, material.Chapter, material.TagCode, material.Type, material.OwnerTeacherID,
 			material.OwnerTeacherName, material.PublishStatus, material.Status, material.ViewCount, material.FileID, material.FileName,
-			material.FileSize, material.FileType, material.PreviewStatus, material.PreviewURL, material.DownloadURL, material.SortOrder,
+			material.FileSize, material.FileType, material.PreviewStatus, material.PreviewURL, material.DownloadURL, material.AllowDownload, material.SortOrder,
 		); err != nil {
 			return err
 		}

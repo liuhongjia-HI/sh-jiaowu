@@ -66,7 +66,10 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 	}
 	materials := make([]learning.Material, 0)
 	for _, material := range s.studentMaterialsForPrincipal(principal) {
-		if material.CourseID == courseID {
+		// 兼容历史讲义只保存 learning_space_id、未回填 course_id 的记录。
+		// 后台按学习空间展示这类讲义；详情页也必须使用同一关联规则，
+		// 否则后台能看到而小程序课程详情会漏掉。
+		if s.courseContentMatches(courseID, material.CourseID, material.LearningSpaceID) {
 			materials = append(materials, material)
 		}
 	}
@@ -81,7 +84,7 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 	}
 	homework := make([]learning.Homework, 0)
 	for _, item := range s.studentHomeworkForPrincipal(principal) {
-		if item.CourseID == courseID {
+		if s.courseContentMatches(courseID, item.CourseID, item.LearningSpaceID) {
 			homework = append(homework, item)
 		}
 	}
