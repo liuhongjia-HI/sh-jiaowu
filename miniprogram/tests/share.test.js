@@ -102,3 +102,37 @@ test("study detail renders every lecture returned by the API", async () => {
 
   assert.deepEqual(page.data.materials.map((item) => item.id), ["mat-1", "mat-2", "mat-3"]);
 });
+
+test("未开通章节在讲义和习题标签均保留锁，点击不跳转；授权刷新后可进入", async () => {
+  const navigations = [];
+  let full = false;
+  const page = loadStudyDetailPage(() => Promise.resolve({
+    materials: [{ id: "first", tagCode: "HD" }],
+    stations: [
+      { title: "首节讲义", status: "学习中", materialId: "first", tagCode: "HD" },
+      full ? { title: "第二节", status: "待挑战", materialId: "later", tagCode: "HD" }
+        : { title: "第二节", status: "未开通", icon: "🔒" }
+    ]
+  }), { navigateTo: (value) => navigations.push(value.url) });
+  page.courseId = "course";
+  page.loadDetail();
+  await flushPromises();
+  for (const code of ["HD", "HW"]) {
+    page.selectTag({ currentTarget: { dataset: { code } } });
+    assert.ok(page.data.visibleStations.some((s) => s.icon === "🔒"));
+  }
+  page.tapStation({ currentTarget: { dataset: { status: "未开通", materialId: "later" } } });
+  assert.equal(navigations.length, 0);
+  page.tapStation({ currentTarget: { dataset: { status: "学习中", materialId: "first" } } });
+  assert.equal(navigations[0], "/pages/material-preview/index?id=first");
+  full = true;
+  page.onShow();
+  await flushPromises();
+  assert.ok(page.data.stations.some((s) => s.materialId === "later"));
+  page.tapStation({ currentTarget: { dataset: { status: "待挑战", materialId: "later" } } });
+  assert.equal(navigations[1], "/pages/material-preview/index?id=later");
+  full = false;
+  page.onShow();
+  await flushPromises();
+  assert.ok(page.data.stations.some((s) => s.icon === "🔒"));
+});

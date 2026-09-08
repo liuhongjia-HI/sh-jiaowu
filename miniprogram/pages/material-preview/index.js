@@ -19,6 +19,7 @@ Page({
     pagesLoading: false,
     previewMessage: "",
     openingPreview: false,
+    downloading: false,
     recordingWarning: false
   },
   onLoad(options) {
@@ -74,44 +75,22 @@ Page({
       this.stopContentSecurity = null;
     }
   },
-  downloadMaterial() {
-    const downloadUrl = this.data.material && this.data.material.downloadUrl;
-    if (!downloadUrl) {
-      wx.showToast({ title: "当前不在课件开放期", icon: "none" });
-      return;
-    }
-    wx.showLoading({ title: "正在下载" });
-    downloadWithAuth(stripApiPrefix(downloadUrl)).then((tempFilePath) => new Promise((resolve, reject) => {
-      wx.saveFile({ tempFilePath, success: (result) => resolve(result && result.savedFilePath ? result.savedFilePath : tempFilePath), fail: reject });
-    })).then((savedFilePath) => {
-      wx.showModal({
-        title: "课件已保存",
-        content: "课件已保存。点击“立即打开”查看并打印。文件已添加专属水印，仅限本人学习使用，请勿转发。",
-        confirmText: "打开课件",
-        cancelText: "知道了",
-        success: (result) => {
-          if (!result || !result.confirm) {
-            wx.showToast({ title: "已保存，打开 PDF 后可打印", icon: "none", duration: 2600 });
-            return;
-          }
-          openDocument(savedFilePath).catch((error) => showFileError("课件打开失败", error));
-        }
-      });
-    }).catch((error) => {
-      showFileError("课件下载失败", error);
-    }).finally(() => wx.hideLoading());
-  },
   printMaterial() {
+    if (this.data.downloading) return;
     const downloadUrl = this.data.material && this.data.material.downloadUrl;
     if (!downloadUrl) {
-      wx.showToast({ title: "当前资料未开放打印", icon: "none" });
+      wx.showToast({ title: "暂未开通下载打印权限", icon: "none" });
       return;
     }
-    wx.showLoading({ title: "正在打开课件" });
-    downloadWithAuth(stripApiPrefix(downloadUrl))
+    this.setData({ downloading: true });
+    wx.showLoading({ title: "正在下载课件" });
+    return downloadWithAuth(stripApiPrefix(downloadUrl))
       .then((tempFilePath) => openDocument(tempFilePath))
       .catch((error) => showFileError("课件无法打开", error))
-      .finally(() => wx.hideLoading());
+      .finally(() => {
+        this.setData({ downloading: false });
+        wx.hideLoading();
+      });
   },
   // 分页图片在上传后由服务端预生成；详情页只下载第一页作为预览，完整内容交给文档查看器。
   // 缩略图不可用时保留整份 PDF 入口，避免模拟内容冒充真实预览。
@@ -259,7 +238,7 @@ Page({
     this.setData({ openingPreview: true });
     wx.showLoading({ title: "正在打开课件" });
     downloadWithAuth(stripApiPrefix(previewUrl))
-      .then((tempFilePath) => openDocument(tempFilePath))
+      .then((tempFilePath) => openDocument(tempFilePath, Boolean(this.data.material.downloadUrl)))
       .catch((error) => {
         showFileError("课件无法打开", error);
       })
@@ -329,14 +308,14 @@ function showFileError(title, error) {
   wx.showToast({ title: content, icon: "none" });
 }
 
-function openDocument(filePath) {
+function openDocument(filePath, showMenu = true) {
   return new Promise((resolve, reject) => {
     wx.openDocument({
       filePath,
       fileType: "pdf",
       // 打开右上角文档菜单，客户可从菜单转发到文件传输助手或选择支持打印的应用。
       // 小程序无法强制指定系统浏览器，showMenu 是微信侧可用的兼容入口。
-      showMenu: true,
+      showMenu,
       success: resolve,
       fail(error) {
         reject(new Error((error && error.errMsg) || "资料打开失败，请稍后再试"));

@@ -16,6 +16,7 @@ function loadStudyPage(requestImpl) {
     exports: { request: requestImpl }
   };
   global.wx = {
+    getStorageSync() { return "test-student-token"; },
     showToast() {},
     navigateTo() {}
   };
@@ -82,7 +83,7 @@ test("study page refreshes opened courses when tab is shown again", async () => 
   assert.equal(page.data.visibleCourses[0].name, "四年级地理S1Q1课程");
 });
 
-test("未登录点击学习导航只提示一次，取消登录后可以停留在学习页", () => {
+test("未登录可停留在学习页，主动点击登录入口才跳转", () => {
   const navigations = [];
   const page = loadStudyPage(() => Promise.resolve({}));
   global.wx.getStorageSync = () => "";
@@ -91,9 +92,11 @@ test("未登录点击学习导航只提示一次，取消登录后可以停留�
   page.onLoad();
   page.onShow();
 
-  assert.deepEqual(navigations, ["/pages/login/index"]);
+  assert.deepEqual(navigations, []);
   assert.equal(page.data.authRequired, true);
   assert.equal(page.data.loginPrompted, true);
+  page.goLogin();
+  assert.deepEqual(navigations, ["/pages/login/index"]);
 });
 
 test("study page puts a newly opened course first and keeps its new marker", async () => {

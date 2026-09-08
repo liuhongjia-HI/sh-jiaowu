@@ -36,6 +36,8 @@ Page({
     shortcuts: buildShortcuts(),
     recommendations: [],
     visibleRecommendations: [],
+    recommendationIndex: 0,
+    recommendationRotationTimer: null,
     recommendationsLoading: true,
     recommendationError: "",
     promoBanners: [],
@@ -83,9 +85,11 @@ Page({
   },
   onHide() {
     this.stopTodoRotation();
+    this.stopRecommendationRotation();
   },
   onUnload() {
     this.stopTodoRotation();
+    this.stopRecommendationRotation();
   },
   showVisitorHome() {
     this.setData({
@@ -227,6 +231,19 @@ Page({
   clearKeyword() {
     this.setData({ keyword: "" }, () => this.applySearch());
   },
+  startRecommendationRotation() {
+    this.stopRecommendationRotation();
+    if ((this.data.visibleRecommendations || []).length <= 2) return;
+    this.recommendationRotationTimer = setInterval(() => {
+      const list = this.data.visibleRecommendations || [];
+      const index = ((this.data.recommendationIndex || 0) + 2) % list.length;
+      this.setData({ recommendationIndex: index, displayedRecommendations: list.slice(index, index + 2).concat(index + 2 >= list.length ? list.slice(0, Math.max(0, index + 2 - list.length)) : []) });
+    }, 4200);
+  },
+  stopRecommendationRotation() {
+    if (this.recommendationRotationTimer) clearInterval(this.recommendationRotationTimer);
+    this.recommendationRotationTimer = null;
+  },
   applySearch() {
     const keyword = (this.data.keyword || "").trim().toLowerCase();
     const visibleRecommendations = this.data.recommendations.filter((item) => {
@@ -238,7 +255,7 @@ Page({
         .toLowerCase()
         .includes(keyword);
     });
-    this.setData({ visibleRecommendations });
+    this.setData({ visibleRecommendations, recommendationIndex: 0, displayedRecommendations: visibleRecommendations.slice(0, 2) }, () => this.startRecommendationRotation());
   },
   loadRecommendations() {
     this.setData({ recommendationsLoading: true, recommendationError: "" });

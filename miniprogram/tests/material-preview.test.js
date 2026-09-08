@@ -208,7 +208,7 @@ test("openSecurePreview strips the redundant /api prefix from previewUrl before 
 
   assert.deepEqual(downloadedUrls, ["https://gate.example.com/api/student/materials/mat-1/preview"]);
   assert.equal(openedPath, "secure-preview.pdf#local");
-  assert.equal(openedOptions.showMenu, true);
+  assert.equal(openedOptions.showMenu, false);
 });
 
 test("openSecurePreview ignores repeated taps while the document is opening", async () => {
@@ -455,4 +455,57 @@ test("small challenge opens the task list when the lesson has no matching task",
 
   assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
   assert.deepEqual(toastTitles, ["本课节暂无练习"]);
+});
+
+test("download print is a single disabled-capable entry", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.wxml"), "utf8");
+  assert.doesNotMatch(template, /打开打印|下载课件|bindtap="downloadMaterial"/);
+  assert.match(template, /disabled="{{!material.downloadUrl \|\| downloading}}".*bindtap="printMaterial">下载打印/);
+});
+
+test("download print without permission never requests or opens a file", () => {
+  const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock({
+    downloadFile() { assert.fail("unauthorized download"); },
+    openDocument() { assert.fail("unauthorized document open"); }
+  }));
+  page.printMaterial();
+  assert.equal(page.data.downloading, false);
+});
+
+test("download print opens authorized document once and resets busy state", async () => {
+  let downloads = 0;
+  let finish;
+  let opened;
+  const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock({
+    downloadFile(opts) {
+      downloads++;
+      assert.equal(opts.url, "https://gate.example.com/api/student/materials/mat-1/download");
+      assert.equal(opts.header.Authorization, "Bearer token-abc");
+      finish = () => opts.success({statusCode: 200, tempFilePath: "watermarked.pdf"});
+    },
+    openDocument(opts) { opened = opts; opts.success(); }
+  }));
+  page.setData({material: {downloadUrl: "/api/student/materials/mat-1/download"}});
+  const pending = page.printMaterial();
+  page.printMaterial();
+  assert.equal(downloads, 1);
+  assert.equal(page.data.downloading, true);
+  finish();
+  await pending;
+  assert.equal(opened.filePath, "watermarked.pdf");
+  assert.equal(opened.showMenu, true);
+  assert.equal(page.data.downloading, false);
+});
+
+test("download print handles revoked permission without opening a file", async () => {
+  let modal;
+  const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock({
+    downloadFile(opts) { opts.success({statusCode: 403, data: {message: "下载权限已失效"}}); },
+    openDocument() { assert.fail("must not open denied response"); },
+    showModal(opts) { modal = opts; }
+  }));
+  page.setData({material: {downloadUrl: "/api/student/materials/mat-1/download"}});
+  await page.printMaterial();
+  assert.equal(modal.content, "下载权限已失效");
+  assert.equal(page.data.downloading, false);
 });
