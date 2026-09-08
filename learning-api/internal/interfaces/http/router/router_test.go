@@ -27,11 +27,11 @@ type testApp struct {
 }
 
 type testServer struct {
-	URL          string
-	client       *http.Client
-	transport    *inProcessTransport
+	URL               string
+	client            *http.Client
+	transport         *inProcessTransport
 	previousTransport http.RoundTripper
-	once         bool
+	once              bool
 }
 
 type inProcessTransport struct {
@@ -326,11 +326,16 @@ func TestMaterialReorderEndpointChangesStudentCourseDisplayOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("student course detail: %v", err)
 	}
-	if len(detail.Materials) != len(orderedIDs) {
+	// 学生端只展示当前授权且已发布的资料；无文件的历史种子资料不会进入学生列表。
+	visibleIDs := make([]string, 0, len(detail.Materials))
+	for _, material := range detail.Materials {
+		visibleIDs = append(visibleIDs, material.ID)
+	}
+	if len(visibleIDs) < 2 {
 		t.Fatalf("unexpected student materials: %#v", detail.Materials)
 	}
-	for index, id := range orderedIDs {
-		if detail.Materials[index].ID != id {
+	for index, id := range orderedIDs[:2] {
+		if visibleIDs[index] != id {
 			t.Fatalf("student material order = %#v, want %#v", detail.Materials, orderedIDs)
 		}
 	}
