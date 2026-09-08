@@ -28,73 +28,72 @@ func TestLoginWithDemoStudentPassword(t *testing.T) {
 	}
 }
 
-func TestStudentRecommendationsExcludeOpenedAndRankEligiblePackages(t *testing.T) {
+func TestStudentRecommendationsExcludeOpenedSubjects(t *testing.T) {
 	store := NewMemoryStore()
-	principal, err := store.PrincipalByUserID("user-student-003")
+	principal, err := store.PrincipalByUserID("user-student-001")
 	if err != nil {
-		t.Fatalf("load student principal: %v", err)
+		t.Fatal(err)
 	}
-
-	activePackageID := packageID(4, "语文", 0, "full")
-	store.grants = append(store.grants, packageGrant{
-		ID: "grant-recommendation-active", StudentID: "stu-003", PackageID: activePackageID,
-		StartsAt: "2026-01-01", EndsAt: "2027-01-01", EffectiveUntil: "2027-01-01", Status: "active",
-	})
-	store.syncSpaceAccessForGrant(store.grants[len(store.grants)-1])
-	store.packages = append(store.packages,
-		learning.Package{ID: "pkg-recommend-disabled", Name: "停用课程套餐", AcademicYear: "2025.2026学年", Grade: "五年级", Semester: "S1", Subject: "英语", Status: learning.StatusDisabled},
-		learning.Package{ID: "pkg-recommend-empty", Name: "空课程套餐", AcademicYear: "2025.2026学年", Grade: "五年级", Semester: "S1", Subject: "科学", Status: learning.StatusEnabled},
-	)
-	store.learningSpaces = append(store.learningSpaces, learningSpace{ID: "space-g05-science-s1-q1", AcademicYear: "2025.2026学年", Grade: "五年级", Semester: "S1", Subject: "科学", Phase: "Q1 期中", Name: "五年级科学S1Q1期中", Status: learning.StatusEnabled})
-	store.packageSpaces = append(store.packageSpaces,
-		packageSpace{PackageID: "pkg-recommend-disabled", LearningSpaceID: "space-g05-english-s1-q1"},
-		packageSpace{PackageID: "pkg-recommend-empty", LearningSpaceID: "space-g05-science-s1-q1"},
-	)
-	store.contentTypes = append(store.contentTypes,
-		packageContentType{PackageID: "pkg-recommend-disabled", ContentType: "course"},
-		packageContentType{PackageID: "pkg-recommend-empty", ContentType: "course"},
-	)
-
-	recommendations, err := store.StudentRecommendations(principal)
+	store.grants = nil
+	store.spaceAccess = nil
+	before, err := store.StudentRecommendations(principal)
+	if err != nil || len(before) == 0 {
+		t.Fatalf("unopened student needs recommendations: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, item := range before {
+		if seen[item.Subject] || item.Grade != "五年级" {
+			t.Fatalf("invalid subject: %#v", item)
+		}
+		seen[item.Subject] = true
+	}
+	_, err = store.CreateDirectGrant("测试", learning.DirectGrantCreateRequest{StudentID: principal.StudentID, LearningSpaceIDs: []string{"space-g05-english-s1-q1"}, ContentTypeCodes: []string{"handout"}, StartsAt: "2026-01-01", EndsAt: "2099-01-01"})
 	if err != nil {
-		t.Fatalf("student recommendations: %v", err)
+		t.Fatal(err)
 	}
-	if len(recommendations) == 0 {
-		t.Fatal("expected recommendations")
-	}
-	if len(recommendations) > 3 {
-		t.Fatalf("expected at most 3 recommendations, got %d", len(recommendations))
-	}
-	if !recommendations[0].SameLearningSpace {
-		t.Fatalf("expected same-space recommendation first, got %#v", recommendations[0])
-	}
-	for _, item := range recommendations {
-		if item.PackageID == packageID(4, "英语", 0, "question_handout") || item.PackageID == activePackageID {
-			t.Fatalf("active package must not be recommended: %#v", item)
-		}
-		if item.PackageID == packageID(4, "语文", 0, "question") {
-			t.Fatalf("question-only package must not be recommended: %#v", item)
-		}
-		if item.PackageID == "pkg-recommend-disabled" || item.PackageID == "pkg-recommend-empty" {
-			t.Fatalf("disabled or empty package must not be recommended: %#v", item)
-		}
-		if item.CourseCount+item.MaterialCount == 0 {
-			t.Fatalf("empty package must not be recommended: %#v", item)
+	after, _ := store.StudentRecommendations(principal)
+	for _, item := range after {
+		if item.Subject == "英文" {
+			t.Fatal("active handout subject must be excluded")
 		}
 	}
+	for i := range store.grants {
+		store.grants[i].EndsAt = "2000-01-01"
+		store.grants[i].EffectiveUntil = "2000-01-01"
+	}
+	expired, _ := store.StudentRecommendations(principal)
+	found := false
+	for _, item := range expired {
+		if item.Subject == "英文" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expired subject should be recommendable")
+	}
+}
 
-	for index := range store.grants {
-		if store.grants[index].ID == "grant-recommendation-active" {
-			store.grants[index].EndsAt = "2025-01-01"
-			store.grants[index].EffectiveUntil = "2025-01-01"
-		}
+func TestSubjectRecommendationCountsAndTeacher(t *testing.T) {
+	store := NewMemoryStore()
+	principal, _ := store.PrincipalByUserID("user-student-001")
+	store.grants = nil
+	store.spaceAccess = nil
+	store.learningSpaces = []learningSpace{{ID: "s1", Grade: "五年级", Subject: "地理", Status: learning.StatusEnabled}, {ID: "s2", Grade: "五年级", Subject: "地理", Status: learning.StatusEnabled}}
+	store.courses = []learning.Course{{ID: "c", LearningSpaceID: "s1", Status: learning.StatusEnabled}}
+	store.materials = []learning.Material{{ID: "m", LearningSpaceID: "s1", Status: learning.StatusEnabled, PublishStatus: "已发布"}, {ID: "draft", LearningSpaceID: "s1", Status: learning.StatusEnabled, PublishStatus: "草稿"}}
+	store.homework = []learning.Homework{{ID: "h", LearningSpaceID: "s2", Status: "启用", PublishStatus: "已发布"}}
+	store.questionBank = []learning.QuestionBankItem{{ID: "q", Grade: "五年级", Subject: "地理", Status: "启用"}}
+	store.users = append(store.users, learning.User{ID: "teacher-count", Name: "测试老师", Roles: []learning.Role{learning.RoleTeacher}, AccountStatus: "正常", LearningSpaceIDs: []string{"s1"}, Remark: "内部备注不可公开"})
+	got, err := store.StudentRecommendations(principal)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("got=%#v err=%v", got, err)
 	}
-	recommendations, err = store.StudentRecommendations(principal)
-	if err != nil {
-		t.Fatalf("student recommendations after expiry: %v", err)
+	item := got[0]
+	if item.CourseCount != 1 || item.MaterialCount != 1 || item.QuestionCount != 1 || item.HomeworkCount != 1 {
+		t.Fatalf("wrong counts: %#v", item)
 	}
-	if !hasRecommendation(recommendations, activePackageID) {
-		t.Fatalf("expired package should be recommendable again, got %#v", recommendations)
+	if item.TeacherName != "测试老师" || item.TeacherIntro != "教学范围：五年级 · 地理" {
+		t.Fatalf("wrong teacher: %#v", item)
 	}
 }
 

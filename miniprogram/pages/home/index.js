@@ -37,7 +37,7 @@ Page({
     recommendations: [],
     visibleRecommendations: [],
     recommendationIndex: 0,
-    recommendationRotationTimer: null,
+    displayedRecommendations: [],
     recommendationsLoading: true,
     recommendationError: "",
     promoBanners: [],
@@ -82,6 +82,7 @@ Page({
       this.loadHome();
     }
     this.startTodoRotation();
+    this.loadRecommendations();
   },
   onHide() {
     this.stopTodoRotation();
@@ -250,7 +251,7 @@ Page({
       if (!keyword) {
         return true;
       }
-      return [item.packageName, item.subject, item.grade, item.semester, item.summary, ...(item.contentSamples || [])]
+      return [item.subject, item.grade, item.teacherName, item.teacherIntro]
         .join(" ")
         .toLowerCase()
         .includes(keyword);
@@ -258,6 +259,7 @@ Page({
     this.setData({ visibleRecommendations, recommendationIndex: 0, displayedRecommendations: visibleRecommendations.slice(0, 2) }, () => this.startRecommendationRotation());
   },
   loadRecommendations() {
+    this.stopRecommendationRotation();
     this.setData({ recommendationsLoading: true, recommendationError: "" });
     request("/student/recommendations", { silent: true })
       .then((recommendations) => {
@@ -480,21 +482,21 @@ Page({
     wx.navigateTo({ url: `/pages/result/index?id=${id}` });
   },
   showRecommendation(event) {
-    const packageId = event.currentTarget.dataset.packageId;
-    const recommendation = this.data.recommendations.find((item) => item.packageId === packageId);
+    const subject = event.currentTarget.dataset.subject;
+    const recommendation = this.data.recommendations.find((item) => item.subject === subject);
     if (!recommendation) {
-      wx.showToast({ title: "套餐信息缺失", icon: "none" });
+      wx.showToast({ title: "学科信息缺失", icon: "none" });
       return;
     }
     wx.showModal({
-      title: recommendation.packageName,
-      content: recommendation.summary || "该套餐包含课程和资料，开通后即可使用。",
+      title: recommendation.subject,
+      content: `${recommendation.courseCount} 门课程 · ${recommendation.materialCount} 份讲义 · ${recommendation.questionCount} 道习题 · ${recommendation.homeworkCount} 份练习\n教学老师：${recommendation.teacherName || "暂未配置"}\n${recommendation.teacherIntro || ""}`,
       showCancel: false,
       confirmText: "我知道了"
     });
   },
   contactTeacher(event) {
-    const name = event.currentTarget.dataset.name || "该套餐";
+    const name = event.currentTarget.dataset.name || "该学科";
     wx.showModal({
       title: "联系老师",
       content: `请联系老师或教务开通“${name}”。开通后，课程、资料和练习会自动出现在学习中心。`,

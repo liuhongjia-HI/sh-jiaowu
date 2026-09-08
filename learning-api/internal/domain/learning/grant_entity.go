@@ -61,9 +61,13 @@ type StudentTrialStartResult struct {
 	FirstCourseID string       `json:"firstCourseId,omitempty"`
 }
 
-// StudentPackageRecommendation 是学生端可见的未开通套餐摘要。
+// StudentSubjectRecommendation 是本年级未开通学科的公开摘要。
 // 仅返回用于了解套餐的信息，不授予课程或资料访问权限。
-type StudentPackageRecommendation struct {
+type StudentSubjectRecommendation struct {
+	QuestionCount        int      `json:"questionCount"`
+	HomeworkCount        int      `json:"homeworkCount"`
+	TeacherName          string   `json:"teacherName"`
+	TeacherIntro         string   `json:"teacherIntro"`
 	PackageID            string   `json:"packageId"`
 	PackageName          string   `json:"packageName"`
 	AcademicYear         string   `json:"academicYear"`
@@ -79,6 +83,9 @@ type StudentPackageRecommendation struct {
 	RecommendationReason string   `json:"recommendationReason"`
 	SameLearningSpace    bool     `json:"sameLearningSpace"`
 }
+
+// StudentPackageRecommendation 保留 Go 调用兼容，接口内容已改为学科摘要。
+type StudentPackageRecommendation = StudentSubjectRecommendation
 
 type StudentGrant struct {
 	StudentID        string   `json:"studentId"`
