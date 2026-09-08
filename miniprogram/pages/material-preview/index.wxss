@@ -128,7 +128,7 @@
 .preview-processing { border-style: dashed; }
 
 .challenge-button,
-.download-permission-hint {
+.download-print-wrap {
   grid-column: 1 / -1;
 }
 
@@ -193,7 +193,12 @@
 }
 
 .download-permission-hint {
+	display: none;
   color: #8b8e98;
   font-size: 24rpx;
   text-align: center;
+}
+
+.download-print-wrap:hover .download-permission-hint {
+  display: block;
 }

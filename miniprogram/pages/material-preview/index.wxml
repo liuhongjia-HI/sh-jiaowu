@@ -59,8 +59,10 @@
     </view>
     <view class="button-row">
       <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
-      <button class="button light download-print" disabled="{{!material.downloadUrl || downloading}}" loading="{{downloading}}" bindtap="printMaterial">下载打印</button>
-      <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">暂未开通下载打印权限</view>
+      <view class="download-print-wrap">
+        <button class="button light download-print" disabled="{{!material.downloadUrl || downloading}}" loading="{{downloading}}" bindtap="printMaterial">下载打印</button>
+        <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">暂未开通下载打印权限</view>
+      </view>
       <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
     </view>
     </view>
