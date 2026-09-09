@@ -2970,7 +2970,7 @@ button.schedule-block:hover {
 .curriculum-node-main,
 .curriculum-lesson-row {
   display: grid;
-  grid-template-columns: 28px 64px minmax(180px, 1fr) max-content 44px;
+  grid-template-columns: 28px 64px 76px minmax(180px, 1fr) max-content 44px;
   align-items: center;
   gap: 8px;
 }
@@ -3006,12 +3006,12 @@ button.schedule-block:hover {
 }
 
 .curriculum-lesson-row {
-  grid-template-columns: 64px minmax(180px, 1fr) 44px;
+  grid-template-columns: 64px 76px minmax(180px, 1fr) 44px;
 }
 
 @media (max-width: 680px) {
   .curriculum-node-main {
-    grid-template-columns: 28px 58px minmax(120px, 1fr) 44px;
+    grid-template-columns: 28px 58px 68px minmax(120px, 1fr) 44px;
   }
 
   .curriculum-node-count {
