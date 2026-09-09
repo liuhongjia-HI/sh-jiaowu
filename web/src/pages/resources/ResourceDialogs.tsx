@@ -390,6 +390,9 @@ export function CourseDialog({
   const updateCurriculumSortOrder = (nodeId: string, sortOrder: number) => {
     updateCurriculum(curriculumNodes.map((node) => node.id === nodeId ? { ...node, sortOrder: Math.max(1, Math.floor(sortOrder || 1)) } : node));
   };
+  const curriculumChildren = (type: CourseFormValues['curriculum'][number]['type'], parentId?: string) => curriculumNodes
+    .filter((node) => node.type === type && (node.parentId || '') === (parentId || ''))
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
   const curriculumNodeIsLeaf = (nodeId: string) => !curriculumNodes.some((node) => node.parentId === nodeId);
   const missingCurriculumTypes = () => ['unit'].filter((type) => !curriculumNodes.some((node) => node.type === type));
 
@@ -479,37 +482,37 @@ export function CourseDialog({
             <Button htmlType="button" onClick={() => generateCurriculumChildren('unit', unitCount)}>生成 Unit</Button>
           </Space.Compact>
           {!curriculumNodes.some((node) => node.type === 'unit') && <Typography.Text type="secondary">还没有课程目录，请先新增 Unit。</Typography.Text>}
-          {curriculumNodes.filter((node) => node.type === 'unit').map((unit) => <div key={unit.id} data-testid="curriculum-unit" className="curriculum-unit-card">
+          {curriculumChildren('unit').map((unit) => <div key={unit.id} data-testid="curriculum-unit" className="curriculum-unit-card">
             <div className="curriculum-node-main">
               <Button type="text" size="small" htmlType="button" aria-label={`${collapsedUnits.has(unit.id) ? '展开' : '收起'} Unit`} onClick={() => setCollapsedUnits((current) => { const next = new Set(current); next.has(unit.id) ? next.delete(unit.id) : next.add(unit.id); return next; })}>{collapsedUnits.has(unit.id) ? '▸' : '▾'}</Button>
               <Typography.Text strong className="curriculum-node-type">Unit</Typography.Text>
               <InputNumber min={1} max={200} aria-label="Unit序号" value={unit.sortOrder} onChange={(value) => updateCurriculumSortOrder(unit.id, value || 1)} />
               <Input aria-label={`Unit名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder={`Unit 名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(unit.id) && !unit.name.trim() ? 'error' : undefined} />
-              <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} 个 Chapter</Typography.Text>
+              <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('chapter', unit.id).length} 个 Chapter</Typography.Text>
               <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
             </div>
             <div className="curriculum-node-actions">
               <span>批量创建 Chapter</span>
-              <InputNumber min={0} max={200} size="small" aria-label={`${unit.name} Chapter数量`} value={chapterCounts[unit.id] ?? curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} onChange={(value) => setChapterCounts((current) => ({ ...current, [unit.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)} />
+              <InputNumber min={0} max={200} size="small" aria-label={`${unit.name} Chapter数量`} value={chapterCounts[unit.id] ?? curriculumChildren('chapter', unit.id).length} onChange={(value) => setChapterCounts((current) => ({ ...current, [unit.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)} />
               <Button size="small" htmlType="button" onClick={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)}>生成</Button>
               <Button type="link" size="small" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('chapter', unit.id)}>新增 Chapter</Button>
             </div>
-            {!collapsedUnits.has(unit.id) && curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).map((chapter) => <div key={chapter.id} data-testid="curriculum-chapter" className="curriculum-chapter-card">
+            {!collapsedUnits.has(unit.id) && curriculumChildren('chapter', unit.id).map((chapter) => <div key={chapter.id} data-testid="curriculum-chapter" className="curriculum-chapter-card">
               <div className="curriculum-node-main">
                 <Button type="text" size="small" htmlType="button" aria-label={`${collapsedChapters.has(chapter.id) ? '展开' : '收起'} Chapter`} onClick={() => setCollapsedChapters((current) => { const next = new Set(current); next.has(chapter.id) ? next.delete(chapter.id) : next.add(chapter.id); return next; })}>{collapsedChapters.has(chapter.id) ? '▸' : '▾'}</Button>
                 <Typography.Text strong className="curriculum-node-type">Chapter</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Chapter序号" value={chapter.sortOrder} onChange={(value) => updateCurriculumSortOrder(chapter.id, value || 1)} />
                 <Input aria-label={`Chapter名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder={`Chapter 名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(chapter.id) && !chapter.name.trim() ? 'error' : undefined} />
-                <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} 个 Lesson</Typography.Text>
+                <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('lesson', chapter.id).length} 个 Lesson</Typography.Text>
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
               </div>
               <div className="curriculum-node-actions">
                 <span>批量创建 Lesson</span>
-                <InputNumber min={0} max={200} size="small" aria-label={`${chapter.name} Lesson数量`} value={lessonCounts[chapter.id] ?? curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} onChange={(value) => setLessonCounts((current) => ({ ...current, [chapter.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)} />
+                <InputNumber min={0} max={200} size="small" aria-label={`${chapter.name} Lesson数量`} value={lessonCounts[chapter.id] ?? curriculumChildren('lesson', chapter.id).length} onChange={(value) => setLessonCounts((current) => ({ ...current, [chapter.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)} />
                 <Button size="small" htmlType="button" onClick={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)}>生成</Button>
                 <Button type="link" size="small" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('lesson', chapter.id)}>新增 Lesson</Button>
               </div>
-              {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
+              {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumChildren('lesson', chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Lesson序号" value={lesson.sortOrder} onChange={(value) => updateCurriculumSortOrder(lesson.id, value || 1)} />
                 <Input aria-label="Lesson名称（叶子必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（叶子必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
