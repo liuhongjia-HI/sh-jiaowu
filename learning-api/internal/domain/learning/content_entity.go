@@ -8,7 +8,7 @@ const (
 	CurriculumLesson  CurriculumNodeType = "lesson"
 )
 
-// CurriculumNode 是课程目录的标准节点。内容只能绑定 type=lesson 的叶子节点。
+// CurriculumNode 是课程目录的标准节点。内容绑定没有子节点的叶子节点，叶子类型可以是 Lesson 或较浅目录中的其他节点。
 type CurriculumNode struct {
 	ID        string             `json:"id"`
 	ParentID  string             `json:"parentId,omitempty"`

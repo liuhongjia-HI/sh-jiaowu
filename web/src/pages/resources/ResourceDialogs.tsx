@@ -387,6 +387,11 @@ export function CourseDialog({
   const updateCurriculumName = (nodeId: string, name: string) => {
     updateCurriculum(curriculumNodes.map((node) => node.id === nodeId ? { ...node, name } : node));
   };
+  const curriculumNodeSequence = (nodeId: string) => {
+    const node = curriculumNodes.find((item) => item.id === nodeId);
+    if (!node) return 0;
+    return curriculumNodes.filter((item) => item.type === node.type && (item.parentId || '') === (node.parentId || '')).sort((left, right) => left.sortOrder - right.sortOrder).findIndex((item) => item.id === nodeId) + 1;
+  };
   const curriculumNodeIsLeaf = (nodeId: string) => !curriculumNodes.some((node) => node.parentId === nodeId);
   const missingCurriculumTypes = () => ['unit'].filter((type) => !curriculumNodes.some((node) => node.type === type));
 
@@ -480,6 +485,7 @@ export function CourseDialog({
             <div className="curriculum-node-main">
               <Button type="text" size="small" htmlType="button" aria-label={`${collapsedUnits.has(unit.id) ? '展开' : '收起'} Unit`} onClick={() => setCollapsedUnits((current) => { const next = new Set(current); next.has(unit.id) ? next.delete(unit.id) : next.add(unit.id); return next; })}>{collapsedUnits.has(unit.id) ? '▸' : '▾'}</Button>
               <Typography.Text strong className="curriculum-node-type">Unit</Typography.Text>
+              <Typography.Text type="secondary">序号 {curriculumNodeSequence(unit.id)}</Typography.Text>
               <Input aria-label={`Unit名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder={`Unit 名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(unit.id) && !unit.name.trim() ? 'error' : undefined} />
               <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} 个 Chapter</Typography.Text>
               <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
@@ -494,6 +500,7 @@ export function CourseDialog({
               <div className="curriculum-node-main">
                 <Button type="text" size="small" htmlType="button" aria-label={`${collapsedChapters.has(chapter.id) ? '展开' : '收起'} Chapter`} onClick={() => setCollapsedChapters((current) => { const next = new Set(current); next.has(chapter.id) ? next.delete(chapter.id) : next.add(chapter.id); return next; })}>{collapsedChapters.has(chapter.id) ? '▸' : '▾'}</Button>
                 <Typography.Text strong className="curriculum-node-type">Chapter</Typography.Text>
+                <Typography.Text type="secondary">序号 {curriculumNodeSequence(chapter.id)}</Typography.Text>
                 <Input aria-label={`Chapter名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder={`Chapter 名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(chapter.id) && !chapter.name.trim() ? 'error' : undefined} />
                 <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} 个 Lesson</Typography.Text>
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
@@ -506,6 +513,7 @@ export function CourseDialog({
               </div>
               {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
+                <Typography.Text type="secondary">序号 {curriculumNodeSequence(lesson.id)}</Typography.Text>
                 <Input aria-label="Lesson名称（叶子必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（叶子必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
               </div>)}</div>}
