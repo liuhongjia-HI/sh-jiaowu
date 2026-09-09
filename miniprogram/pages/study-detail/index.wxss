@@ -168,10 +168,7 @@
   padding: 4rpx 0;
 }
 
-.catalog-unit { margin-top: 16rpx; overflow: hidden; border: 1rpx solid #ededf0; border-radius: 22rpx; background: #fff; }
-.catalog-unit-title { padding: 22rpx 24rpx; color: #27282d; font-size: 27rpx; font-weight: 850; background: #fff8f4; }
-.catalog-chapter { padding: 0 20rpx 10rpx; border-top: 1rpx solid #f1f1f3; }
-.catalog-chapter-title { padding: 18rpx 10rpx 8rpx; color: #777a83; font-size: 22rpx; font-weight: 700; }
+.catalog-list { overflow: hidden; padding: 4rpx 18rpx; border: 1rpx solid #ededf0; border-radius: 22rpx; background: #fff; }
 
 .lesson-row {
   position: relative;

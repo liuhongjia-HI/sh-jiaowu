@@ -57,12 +57,16 @@ test("study detail top-right affordance is a native share button", () => {
   assert.match(wxml, /<button class="detail-share" open-type="share"/);
 });
 
-test("study detail builds the directory from Unit Chapter and Lesson instead of content tags", async () => {
+test("study detail flattens all Lesson leaves in curriculum order", async () => {
   const page = loadStudyDetailPage(() => Promise.resolve({
     course: { name: "五年级英语S1Q1课程", curriculum: [
+      { id: "unit-2", type: "unit", name: "Unit 2", sortOrder: 2 },
       { id: "unit-1", type: "unit", name: "Unit 1", sortOrder: 1 },
       { id: "chapter-1", parentId: "unit-1", type: "chapter", name: "Chapter 1", sortOrder: 1 },
-      { id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "Themes and Elements", sortOrder: 1 }
+      { id: "chapter-2", parentId: "unit-2", type: "chapter", name: "Chapter 2", sortOrder: 1 },
+      { id: "lesson-3", parentId: "chapter-2", type: "lesson", name: "第三节", sortOrder: 1 },
+      { id: "lesson-2", parentId: "chapter-1", type: "lesson", name: "第二节", sortOrder: 2 },
+      { id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "第一节", sortOrder: 1 }
     ] },
     materials: [{ id: "mat-hd", lessonId: "lesson-1", tagCode: "HD" }],
     homework: [{ id: "hw-exam", lessonId: "lesson-1", tagCode: "Exam" }],
@@ -74,21 +78,22 @@ test("study detail builds the directory from Unit Chapter and Lesson instead of 
 
   page.loadDetail();
   await flushPromises();
-  assert.equal(page.data.lessonCount, 1);
-  assert.equal(page.data.catalogUnits[0].name, "Unit 1");
-  assert.equal(page.data.catalogUnits[0].chapters[0].name, "Chapter 1");
-  assert.deepEqual(page.data.catalogUnits[0].chapters[0].lessons[0], {
-    id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "Themes and Elements", sortOrder: 1,
+  assert.equal(page.data.lessonCount, 3);
+  assert.deepEqual(page.data.catalogLessons.map((item) => item.displayName), ["Chapter 1 · 第一节", "Chapter 1 · 第二节", "Chapter 2 · 第三节"]);
+  assert.deepEqual(page.data.catalogLessons[0], {
+    id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "第一节", sortOrder: 1,
+    displayName: "Chapter 1 · 第一节",
     icon: "📖", status: "学习中", statusClass: "is-active", desc: "2 项学习内容", materialId: "mat-hd", homeworkId: "hw-exam"
   });
 });
 
-test("study detail renders the configured curriculum without a duplicate lecture list", () => {
+test("study detail renders one flat leaf list without Unit or Chapter groups", () => {
   const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
 
   assert.doesNotMatch(wxml, /下载全部/);
   assert.doesNotMatch(wxml, /收起/);
-  assert.match(wxml, /wx:for="\{\{catalogUnits\}\}"/);
+  assert.match(wxml, /wx:for="\{\{catalogLessons\}\}"/);
+  assert.doesNotMatch(wxml, /catalog-unit|catalog-chapter/);
   assert.doesNotMatch(wxml, /wx:for="\{\{materials\}\}"/);
 });
 
@@ -137,7 +142,7 @@ test("未开通课节保留锁且不跳转，授权刷新后可进入带课节�
   page.courseId = "course";
   page.loadDetail();
   await flushPromises();
-  assert.equal(page.data.catalogUnits[0].chapters[0].lessons[1].status, "未开通");
+  assert.equal(page.data.catalogLessons[1].status, "未开通");
   page.tapLesson({ currentTarget: { dataset: { status: "未开通", lessonId: "lesson-2", materialId: "later" } } });
   assert.equal(navigations.length, 0);
   page.tapLesson({ currentTarget: { dataset: { status: "学习中", lessonId: "lesson-1", materialId: "first" } } });
@@ -145,11 +150,11 @@ test("未开通课节保留锁且不跳转，授权刷新后可进入带课节�
   full = true;
   page.onShow();
   await flushPromises();
-  assert.equal(page.data.catalogUnits[0].chapters[0].lessons[1].materialId, "later");
+  assert.equal(page.data.catalogLessons[1].materialId, "later");
   page.tapLesson({ currentTarget: { dataset: { status: "待挑战", lessonId: "lesson-2", materialId: "later" } } });
   assert.equal(navigations[1], "/pages/material-preview/index?id=later&courseId=course&lessonId=lesson-2");
   full = false;
   page.onShow();
   await flushPromises();
-  assert.equal(page.data.catalogUnits[0].chapters[0].lessons[1].icon, "🔒");
+  assert.equal(page.data.catalogLessons[1].icon, "🔒");
 });

@@ -6,7 +6,7 @@ Page({
     materials: [],
     homework: [],
     stations: [],
-    catalogUnits: [],
+    catalogLessons: [],
     lessonCount: 0,
     progress: 0,
     teacherText: "",
@@ -49,8 +49,8 @@ Page({
         materials,
         homework,
         stations,
-        catalogUnits: catalog.units,
-        lessonCount: catalog.lessonCount,
+        catalogLessons: catalog,
+        lessonCount: catalog.length,
         progress: data.progress || 0,
         teacherText:
           (materials[0] && materials[0].ownerTeacherName) ||
@@ -93,32 +93,34 @@ function buildCatalog(nodes, stations, materials, homework) {
   const stationByLesson = groupByLesson(stations);
   const materialByLesson = groupByLesson(materials);
   const homeworkByLesson = groupByLesson(homework);
-  const units = (byParent.root || []).filter((node) => node.type === 'unit').map((unit) => ({
-    ...unit,
-    chapters: (byParent[unit.id] || []).filter((node) => node.type === 'chapter').map((chapter) => ({
-      ...chapter,
-      lessons: (byParent[chapter.id] || []).filter((node) => node.type === 'lesson').map((lesson) => {
-        const lessonStations = stationByLesson[lesson.id] || [];
-        const lessonMaterials = materialByLesson[lesson.id] || [];
-        const lessonHomework = homeworkByLesson[lesson.id] || [];
-        const active = lessonStations.find((item) => item.status === '学习中') || lessonStations.find((item) => item.status === '已完成') || lessonStations.find((item) => item.status === '待挑战');
-        const locked = lessonStations.some((item) => item.status === '未开通' || item.status === '未解锁');
-        const count = lessonMaterials.length + lessonHomework.length;
-        const contentStatus = lessonMaterials.length ? '学习中' : (lessonHomework.length ? '待挑战' : '');
-        const status = active ? active.status : (contentStatus || (locked ? '未开通' : '暂无内容'));
-        return {
-          ...lesson,
-          icon: status === '未开通' ? '🔒' : (status === '暂无内容' ? '·' : '📖'),
-          status,
-          statusClass: status === '已完成' ? 'is-done' : (status === '学习中' ? 'is-active' : 'is-locked'),
-          desc: count ? `${count} 项学习内容` : (status === '未开通' ? '开通后可查看讲义和练习' : '老师尚未发布内容'),
-          materialId: (lessonMaterials[0] && lessonMaterials[0].id) || (active && active.materialId) || '',
-          homeworkId: (lessonHomework[0] && lessonHomework[0].id) || (active && active.homeworkId) || ''
-        };
-      })
-    }))
-  }));
-  return { units, lessonCount: units.reduce((sum, unit) => sum + unit.chapters.reduce((chapterSum, chapter) => chapterSum + chapter.lessons.length, 0), 0) };
+  const orderedLessons = [];
+  (byParent.root || []).filter((node) => node.type === 'unit').forEach((unit) => {
+    (byParent[unit.id] || []).filter((node) => node.type === 'chapter').forEach((chapter) => {
+      (byParent[chapter.id] || []).filter((node) => node.type === 'lesson').forEach((lesson) => orderedLessons.push({
+        ...lesson,
+        displayName: chapter.name ? `${chapter.name} · ${lesson.name}` : lesson.name
+      }));
+    });
+  });
+  return orderedLessons.map((lesson) => {
+    const lessonStations = stationByLesson[lesson.id] || [];
+    const lessonMaterials = materialByLesson[lesson.id] || [];
+    const lessonHomework = homeworkByLesson[lesson.id] || [];
+    const active = lessonStations.find((item) => item.status === '学习中') || lessonStations.find((item) => item.status === '已完成') || lessonStations.find((item) => item.status === '待挑战');
+    const locked = lessonStations.some((item) => item.status === '未开通' || item.status === '未解锁');
+    const count = lessonMaterials.length + lessonHomework.length;
+    const contentStatus = lessonMaterials.length ? '学习中' : (lessonHomework.length ? '待挑战' : '');
+    const status = active ? active.status : (contentStatus || (locked ? '未开通' : '暂无内容'));
+    return {
+      ...lesson,
+      icon: status === '未开通' ? '🔒' : (status === '暂无内容' ? '·' : '📖'),
+      status,
+      statusClass: status === '已完成' ? 'is-done' : (status === '学习中' ? 'is-active' : 'is-locked'),
+      desc: count ? `${count} 项学习内容` : (status === '未开通' ? '开通后可查看讲义和练习' : '老师尚未发布内容'),
+      materialId: (lessonMaterials[0] && lessonMaterials[0].id) || (active && active.materialId) || '',
+      homeworkId: (lessonHomework[0] && lessonHomework[0].id) || (active && active.homeworkId) || ''
+    };
+  });
 }
 
 function groupByLesson(items) {

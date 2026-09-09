@@ -19,24 +19,18 @@
   <view class="detail-section-head">
     <view class="detail-section-title">课程目录 <text>· {{lessonCount}} 节</text></view>
   </view>
-  <view wx:for="{{catalogUnits}}" wx:for-item="unit" wx:key="id" class="catalog-unit">
-    <view class="catalog-unit-title">{{unit.name}}</view>
-    <view wx:for="{{unit.chapters}}" wx:for-item="chapter" wx:key="id" class="catalog-chapter">
-      <view class="catalog-chapter-title">{{chapter.name}}</view>
-      <view class="lesson-list">
-        <view wx:for="{{chapter.lessons}}" wx:for-item="lesson" wx:key="id" class="lesson-row {{lesson.statusClass}}" data-status="{{lesson.status}}" data-lesson-id="{{lesson.id}}" data-material-id="{{lesson.materialId}}" data-homework-id="{{lesson.homeworkId}}" bindtap="tapLesson">
-          <view class="lesson-line"></view>
-          <view class="lesson-state">{{lesson.icon}}</view>
-          <view class="lesson-copy">
-            <view class="lesson-title">{{lesson.name}}</view>
-            <view class="lesson-desc">{{lesson.desc}}</view>
-          </view>
-          <view class="lesson-status">{{lesson.status}}</view>
-        </view>
+  <view class="lesson-list catalog-list">
+    <view wx:for="{{catalogLessons}}" wx:for-item="lesson" wx:key="id" class="lesson-row {{lesson.statusClass}}" data-status="{{lesson.status}}" data-lesson-id="{{lesson.id}}" data-material-id="{{lesson.materialId}}" data-homework-id="{{lesson.homeworkId}}" bindtap="tapLesson">
+      <view class="lesson-line"></view>
+      <view class="lesson-state">{{lesson.icon}}</view>
+      <view class="lesson-copy">
+        <view class="lesson-title">{{lesson.displayName || lesson.name}}</view>
+        <view class="lesson-desc">{{lesson.desc}}</view>
       </view>
+      <view class="lesson-status">{{lesson.status}}</view>
     </view>
   </view>
-  <view wx:if="{{!catalogUnits.length}}" class="detail-empty-line">老师配置课程目录后会显示在这里</view>
+  <view wx:if="{{!catalogLessons.length}}" class="detail-empty-line">老师配置课程目录后会显示在这里</view>
 
   <view class="detail-feedback">
     <view class="detail-section-head">
