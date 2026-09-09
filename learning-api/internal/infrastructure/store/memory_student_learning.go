@@ -419,11 +419,11 @@ func (s *MemoryStore) studentMaterialPreviewFileUnlocked(principal learning.Prin
 	if !ok {
 		return learning.FileAsset{}, errors.New("资料预览文件不存在")
 	}
-	asset.WatermarkText = s.studentWatermarkText(principal)
+	generatedAt := time.Now().Truncate(5 * time.Minute)
+	asset.WatermarkText = s.studentWatermarkText(principal, generatedAt)
 	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
 		return asset, nil
 	}
-	generatedAt := time.Now().Truncate(5 * time.Minute)
 	stampText, traceCode := s.studentWatermarkStampText(principal, material.ID, generatedAt)
 	asset.WatermarkStampText = stampText
 	s.prependLogDetail(studentAuditOperator(principal), "内容防盗版风控", material.Title, "eventType=material_preview; targetType=material; targetId="+material.ID+"; watermarkTrace="+traceCode)
@@ -447,11 +447,11 @@ func (s *MemoryStore) studentHomeworkPreviewFileUnlocked(principal learning.Prin
 	if !ok {
 		return learning.FileAsset{}, errors.New("练习下载文件不存在")
 	}
-	asset.WatermarkText = s.studentWatermarkText(principal)
+	generatedAt := time.Now().Truncate(5 * time.Minute)
+	asset.WatermarkText = s.studentWatermarkText(principal, generatedAt)
 	if asset.PreviewStatus != "可预览" || strings.TrimSpace(asset.PreviewPath) == "" {
 		return asset, nil
 	}
-	generatedAt := time.Now().Truncate(5 * time.Minute)
 	stampText, traceCode := s.studentWatermarkStampText(principal, homework.ID, generatedAt)
 	asset.WatermarkStampText = stampText
 	s.prependLogDetail(studentAuditOperator(principal), "内容防盗版风控", homework.Title, "eventType=homework_download; targetType=homework; targetId="+homework.ID+"; watermarkTrace="+traceCode)

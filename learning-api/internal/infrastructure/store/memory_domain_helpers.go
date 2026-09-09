@@ -1719,9 +1719,13 @@ func (s *MemoryStore) decorateStudentHomework(principal learning.Principal, home
 	return homework
 }
 
-func (s *MemoryStore) studentWatermarkText(principal learning.Principal) string {
-	// 可见水印只用于明确归属，不展示手机号、时间或追踪号等个人标识。
-	return fmt.Sprintf("%s STARLINE", s.studentWatermarkName(principal))
+func (s *MemoryStore) studentWatermarkText(principal learning.Principal, generatedAt ...time.Time) string {
+	// 可见水印只用于明确归属和生成日期，不展示手机号或追踪号等个人标识。
+	at := time.Now()
+	if len(generatedAt) > 0 {
+		at = generatedAt[0]
+	}
+	return fmt.Sprintf("%s STARLINE %s", s.studentWatermarkName(principal), at.Format("2006-01-02"))
 }
 
 func (s *MemoryStore) studentWatermarkName(principal learning.Principal) string {
@@ -1743,9 +1747,9 @@ func (s *MemoryStore) studentWatermarkStampText(principal learning.Principal, ma
 	name := s.studentWatermarkName(principal)
 	digest := sha256.Sum256([]byte(principal.StudentID + "|" + materialID + "|" + generatedAt.Format(time.RFC3339Nano)))
 	traceCode := fmt.Sprintf("%X", digest[:])[:10]
-	// 页面和下载文件上的可见水印只保留“学生姓名 + STARLINE”，
+	// 页面和下载文件上的可见水印保留“学生姓名 + STARLINE + 生成日期”，
 	// 追溯串只写入审计日志，避免长串把平铺水印挤成少数几行。
-	stamp := fmt.Sprintf("%s STARLINE", name)
+	stamp := fmt.Sprintf("%s STARLINE %s", name, generatedAt.Format("2006-01-02"))
 	return stamp, traceCode
 }
 
