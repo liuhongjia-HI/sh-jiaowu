@@ -88,9 +88,10 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 			homework = append(homework, item)
 		}
 	}
-	// 课程目录只展示已发布讲义。练习从讲义详情页按 course_id + lesson_id 进入，
-	// 未开通且没有后台内容的目录节点不应混入学生的内容列表。
-	stations := s.buildMaterialStations(principal.StudentID, course, materials)
+	// 课程目录展示该课程的全部已发布资料；权限只决定能否进入详情。
+	// 未开通的资料只返回标题和锁定状态，不返回 material_id，避免客户端绕过入口访问。
+	catalogMaterials := s.publishedMaterialsForCourse(course)
+	stations := s.buildMaterialStations(course, catalogMaterials, materials)
 	return learning.StudentCourseDetail{
 		Course:    course,
 		Materials: materials,
@@ -98,6 +99,21 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 		Stations:  stations,
 		Progress:  stationProgress(stations),
 	}, nil
+}
+
+func (s *MemoryStore) publishedMaterialsForCourse(course learning.Course) []learning.Material {
+	out := make([]learning.Material, 0)
+	for _, material := range s.materials {
+		if !materialPublished(material.Status) || !s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) {
+			continue
+		}
+		if strings.TrimSpace(material.CourseID) == "" {
+			material.CourseID = course.ID
+			material.Course = course.Name
+		}
+		out = append(out, s.decorateMaterial(material))
+	}
+	return out
 }
 
 // lockedPreviewStations 只返回目录标题和锁定状态，不返回任何资料或习题 ID，
@@ -118,8 +134,12 @@ func (s *MemoryStore) lockedPreviewStations(course learning.Course) []learning.S
 	return out
 }
 
-func (s *MemoryStore) buildMaterialStations(studentID string, course learning.Course, materials []learning.Material) []learning.Station {
-	ordered := append([]learning.Material(nil), materials...)
+func (s *MemoryStore) buildMaterialStations(course learning.Course, catalogMaterials, readableMaterials []learning.Material) []learning.Station {
+	ordered := append([]learning.Material(nil), catalogMaterials...)
+	readableIDs := make(map[string]struct{}, len(readableMaterials))
+	for _, material := range readableMaterials {
+		readableIDs[material.ID] = struct{}{}
+	}
 	ranks := make(map[string]int, len(course.Curriculum))
 	for _, node := range course.Curriculum {
 		if node.Type == learning.CurriculumLesson {
@@ -142,7 +162,37 @@ func (s *MemoryStore) buildMaterialStations(studentID string, course learning.Co
 		}
 		return ordered[i].ID < ordered[j].ID
 	})
-	return s.buildStations(studentID, ordered, nil)
+	stations := make([]learning.Station, 0, len(ordered))
+	readableCount := 0
+	for _, material := range ordered {
+		title := "第 " + strconv.Itoa(len(stations)+1) + " 站 " + material.Title
+		if _, readable := readableIDs[material.ID]; !readable {
+			stations = append(stations, learning.Station{
+				Icon:    "🔒",
+				Title:   title,
+				Desc:    "开通后可查看讲义和练习",
+				Status:  "未开通",
+				TagCode: material.TagCode,
+			})
+			continue
+		}
+		status := "学习中"
+		desc := "正在学习，继续加油"
+		if readableCount > 0 {
+			status = "待挑战"
+			desc = "完成上一站后继续阅读"
+		}
+		stations = append(stations, learning.Station{
+			Icon:       "📖",
+			Title:      title,
+			Desc:       desc,
+			Status:     status,
+			TagCode:    material.TagCode,
+			MaterialID: material.ID,
+		})
+		readableCount++
+	}
+	return stations
 }
 
 // StudentGrowth 返回成长轨迹：提交记录 + 已学资料，按时间倒序。
