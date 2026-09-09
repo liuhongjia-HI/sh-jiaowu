@@ -42,8 +42,8 @@ Page({
       const materials = data.materials || [];
       const homework = data.homework || [];
       this.loaded = true;
-        const stations = (data.stations || []).map(decorateStation);
-        const catalog = buildCatalog(course.curriculum || [], stations, materials, homework);
+      const stations = (data.stations || []).map(decorateStation);
+      const catalog = buildCatalog(course.curriculum || [], stations, materials, homework);
       this.setData({
         course,
         materials,
@@ -60,22 +60,6 @@ Page({
         homeworkText: homework.length ? `${homework.length} 个挑战` : "可得徽章"
       });
     });
-  },
-  previewMaterial(event) {
-    const id = event.currentTarget.dataset.id;
-    if (!id) {
-      wx.showToast({ title: "暂无课程讲义", icon: "none" });
-      return;
-    }
-    wx.navigateTo({ url: `/pages/material-preview/index?id=${id}` });
-  },
-  goAnswer() {
-    const homework = this.data.homework[0];
-    if (!homework) {
-      wx.showToast({ title: "暂无练习", icon: "none" });
-      return;
-    }
-    wx.navigateTo({ url: `/pages/answer/index?id=${homework.id}` });
   },
   tapLesson(event) {
     const { status, lessonId, materialId, homeworkId } = event.currentTarget.dataset;
