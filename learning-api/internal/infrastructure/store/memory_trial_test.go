@@ -245,7 +245,7 @@ func TestPreviewLessonSupportsLegacyCourseWithoutCurriculumNodes(t *testing.T) {
 	}
 }
 
-func TestPreviewLessonFallsBackToLegacyBlankLessonIDWhenCurriculumExists(t *testing.T) {
+func TestPreviewLessonRejectsUnassignedContentWhenCurriculumExists(t *testing.T) {
 	store := NewMemoryStore()
 	course := learning.Course{ID: "course-legacy-nodes-preview", Curriculum: []learning.CurriculumNode{
 		{ID: "chapter-first", Type: learning.CurriculumChapter, Name: "第一章", SortOrder: 1},
@@ -255,8 +255,8 @@ func TestPreviewLessonFallsBackToLegacyBlankLessonIDWhenCurriculumExists(t *test
 		ID: "legacy-nodes-material", CourseID: course.ID, LessonID: "", Chapter: "基础巩固", Status: learning.StatusEnabled,
 	})
 	lessonID, ok := store.previewLessonForCourse(course)
-	if !ok || lessonID != "" {
-		t.Fatalf("preview lesson = %q, %v; want blank lesson id fallback", lessonID, ok)
+	if ok || lessonID != "lesson-first" {
+		t.Fatalf("preview lesson = %q, %v; unassigned content must not grant preview", lessonID, ok)
 	}
 }
 

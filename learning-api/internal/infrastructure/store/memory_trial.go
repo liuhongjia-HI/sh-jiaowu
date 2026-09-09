@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"sort"
 
 	"starline/learning-api/internal/domain/learning"
 )
@@ -37,22 +36,8 @@ func (s *MemoryStore) trialFirstLessonForGrant(grant packageGrant, courseID stri
 		if course.ID != courseID {
 			continue
 		}
-		lessons := make([]learning.CurriculumNode, 0)
-		for _, node := range course.Curriculum {
-			if node.Type == learning.CurriculumLesson {
-				lessons = append(lessons, node)
-			}
-		}
-		sort.SliceStable(lessons, func(i, j int) bool {
-			if lessons[i].SortOrder != lessons[j].SortOrder {
-				return lessons[i].SortOrder < lessons[j].SortOrder
-			}
-			return lessons[i].ID < lessons[j].ID
-		})
-		if len(lessons) > 0 {
-			return lessons[0].ID, true
-		}
-		return "", false
+		nodeID, _ := s.previewLessonForCourse(course)
+		return nodeID, true
 	}
 	return "", false
 }

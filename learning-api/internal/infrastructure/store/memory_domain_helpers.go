@@ -846,6 +846,18 @@ func curriculumPathForLesson(course learning.Course, lessonID string) (learning.
 		byID[node.ID] = node
 	}
 	lesson, ok := byID[lessonID]
+	if ok && lesson.Type == learning.CurriculumChapter {
+		for _, node := range course.Curriculum {
+			if node.ParentID == lesson.ID {
+				return learning.CurriculumPath{}, errors.New("该节包含小节，请选择具体课节")
+			}
+		}
+		unit, exists := byID[lesson.ParentID]
+		if !exists || unit.Type != learning.CurriculumUnit {
+			return learning.CurriculumPath{}, errors.New("课节目录不完整")
+		}
+		return learning.CurriculumPath{Unit: unit.Name, Chapter: lesson.Name}, nil
+	}
 	if !ok || lesson.Type != learning.CurriculumLesson {
 		return learning.CurriculumPath{}, errors.New("请选择当前课程下的有效课节")
 	}
@@ -1192,7 +1204,7 @@ func (s *MemoryStore) previewCourseOrder(course learning.Course) string {
 	return semester + phase + level + course.ID
 }
 
-// previewLessonForCourse 返回课程第一章第一节；该节有任一已发布内容时即可体验。
+// previewLessonForCourse 沿首个目录分支选择体验节点：优先小节，无小节则选节。
 func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bool) {
 	children := map[string][]learning.CurriculumNode{}
 	for _, node := range course.Curriculum {
@@ -1215,24 +1227,21 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 			break
 		}
 	}
+	// 只沿第一条目录分支选择：有小节选首小节，没有小节选节本身。
 	var firstLesson func(string) string
 	firstLesson = func(parentID string) string {
 		for _, node := range children[parentID] {
-			if node.Type != learning.CurriculumChapter {
-				continue
-			}
-			for _, lesson := range children[node.ID] {
-				if lesson.Type == learning.CurriculumLesson {
-					return lesson.ID
+			if node.Type == learning.CurriculumUnit || node.Type == learning.CurriculumChapter {
+				if len(children[node.ID]) > 0 {
+					return firstLesson(node.ID)
 				}
+				if node.Type == learning.CurriculumChapter {
+					return node.ID
+				}
+				return ""
 			}
-		}
-		for _, node := range children[parentID] {
 			if node.Type == learning.CurriculumLesson {
 				return node.ID
-			}
-			if lessonID := firstLesson(node.ID); lessonID != "" {
-				return lessonID
 			}
 		}
 		return ""
@@ -1244,6 +1253,9 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 		lessonID = firstLesson("") // 兼容旧数据没有 Unit 的扁平目录。
 	}
 	if lessonID == "" {
+		if len(course.Curriculum) > 0 {
+			return "", false
+		}
 		// 兼容早期生产数据：课程目录节点可能完全没有落库。旧讲义
 		// 有时仍带具体 lesson_id，这时按内容排序推断首个可体验课节；
 		// lesson_id 为空的记录继续沿用旧的空值兼容规则。
@@ -1255,21 +1267,7 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 	if s.previewLessonHasContent(course.ID, lessonID) {
 		return lessonID, true
 	}
-	// 部分历史数据已经补了课程目录，但旧讲义/练习仍保留空 lesson_id。
-	// 首节目录找不到对应内容时，继续兼容这类数据，避免有讲义的学科被误判为“暂未开通”。
-	if s.previewLessonHasContent(course.ID, "") {
-		return "", true
-	}
-	// 历史课程可能存在目录首节编号与讲义 lesson_id 不一致的情况；课程确有
-	// 已发布讲义时仍提供体验入口，详情页再按首节内容权限过滤。
-	if s.previewCourseHasPublishedContent(course.ID) {
-		// 返回实际讲义的 lesson_id，详情页才能继续取到该体验内容。
-		for _, material := range s.materials {
-			if s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && materialPublished(material.Status) {
-				return material.LessonID, true
-			}
-		}
-	}
+
 	return lessonID, false
 }
 
@@ -1678,7 +1676,7 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 
 func (s *MemoryStore) previewMaterialForStudent(studentID string, material learning.Material) bool {
 	for _, course := range s.previewCoursesForStudent(studentID) {
-		if _, ok := s.previewLessonForCourse(course); ok && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) {
+		if lessonID, ok := s.previewLessonForCourse(course); ok && material.LessonID == lessonID && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) {
 			return true
 		}
 	}

@@ -1098,9 +1098,9 @@ export function UploadDialog({
             维护本课程的 Unit · Chapter · Lesson
           </Button>
         )}
-        <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
+        {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
-        </Form.Item>
+        </Form.Item>}
         {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
           <>
             <LessonSelect course={selectedCourse} />
@@ -1149,6 +1149,9 @@ export function UploadDialog({
               </Upload>
             </Form.Item>
             <Typography.Text type="secondary">支持 PDF、PPT、Word，上传后自动生成 PDF 预览，暂不支持在线编辑；单个文件不超过 50MB。</Typography.Text>
+            <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
+              <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
+            </Form.Item>
           </>
         )}
       </Form>
@@ -1251,7 +1254,8 @@ export function ContentEditDialog({
 function LessonSelect({ course }: { course?: Course }) {
 	const nodes = course?.curriculum ?? [];
 	const byID = new Map(nodes.map((node) => [node.id, node]));
-	const options = nodes.filter((node) => node.type === 'lesson').map((lesson) => {
+	const options = nodes.filter((node) => node.type === 'lesson' || (node.type === 'chapter' && !nodes.some((child) => child.parentId === node.id))).map((lesson) => {
+		if (lesson.type === 'chapter') return { value: lesson.id, label: `${byID.get(lesson.parentId || '')?.name || 'Unit'} · ${lesson.name}` };
 		const chapter = byID.get(lesson.parentId || '');
 		const unit = chapter ? byID.get(chapter.parentId || '') : undefined;
 		return { value: lesson.id, label: `${unit?.name || 'Unit'} · ${chapter?.name || 'Chapter'} · ${lesson.name}` };
