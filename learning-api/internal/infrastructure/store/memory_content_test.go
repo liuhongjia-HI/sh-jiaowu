@@ -187,6 +187,26 @@ func TestExplicitContentTagWinsOverTitlePrefix(t *testing.T) {
 	}
 }
 
+func TestContentTagKindsRejectCrossCategoryTags(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := learning.MaterialUploadRequest{
+		Title: "错误分类讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "HW",
+	}
+	if _, err := store.CreateMaterial("英语老师", teacher, base); err == nil || !strings.Contains(err.Error(), "HD 或 Blank") {
+		t.Fatalf("material should reject homework tag, got %v", err)
+	}
+
+	if _, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
+		Title: "错误分类练习", CourseID: base.CourseID, LearningSpaceID: base.LearningSpaceID, LessonID: base.LessonID, TagCode: "HD",
+	}); err == nil || !strings.Contains(err.Error(), "HW、Exam 或 Special") {
+		t.Fatalf("homework should reject material tag, got %v", err)
+	}
+}
+
 func stationHasTag(stations []learning.Station, id, tag string) bool {
 	for _, station := range stations {
 		if (station.MaterialID == id || station.HomeworkID == id) && station.TagCode == tag {

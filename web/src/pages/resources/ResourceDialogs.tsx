@@ -38,9 +38,12 @@ const CONTENT_TYPE_NAME: Record<string, string> = {
   handout: '课程讲义'
 };
 
-const contentTagOptions = [
+const materialTagOptions = [
   { label: 'HD · 课程讲义', value: 'HD' },
-  { label: 'Blank · 空白练习', value: 'Blank' },
+  { label: 'Blank · 空白练习', value: 'Blank' }
+];
+
+const homeworkTagOptions = [
   { label: 'HW · 课后作业', value: 'HW' },
   { label: 'Exam · 测试卷', value: 'Exam' },
   { label: 'Special · 专题资料', value: 'Special' }
@@ -1098,8 +1101,8 @@ export function UploadDialog({
             维护本课程的 Unit · Chapter · Lesson
           </Button>
         )}
-        {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
-          <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
+        {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="标题以 HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
+          <Select allowClear placeholder="未识别时请补充标签" options={homeworkTagOptions} />
         </Form.Item>}
         {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
           <>
@@ -1149,8 +1152,8 @@ export function UploadDialog({
               </Upload>
             </Form.Item>
             <Typography.Text type="secondary">支持 PDF、PPT、Word，上传后自动生成 PDF 预览，暂不支持在线编辑；单个文件不超过 50MB。</Typography.Text>
-            <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别；也可手动选择。">
-              <Select allowClear placeholder="未识别时请补充标签" options={contentTagOptions} />
+            <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_ 开头时会自动识别；也可手动选择。">
+              <Select allowClear placeholder="未识别时请补充标签" options={materialTagOptions} />
             </Form.Item>
           </>
         )}
@@ -1208,7 +1211,7 @@ export function ContentEditDialog({
           />
         </Form.Item>
         <Form.Item name="tagCode" label="主标签">
-          <Select allowClear placeholder="选择一个主标签" options={contentTagOptions} />
+          <Select allowClear placeholder="选择一个主标签" options={kind === 'materials' ? materialTagOptions : homeworkTagOptions} />
         </Form.Item>
         <>
           <LessonSelect course={selectedCourse} />
