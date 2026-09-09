@@ -305,7 +305,7 @@ func TestCourseGrantEnablesSecureHandoutDownload(t *testing.T) {
 	}
 	mathMaterial := findMaterialByLearningSpace(study.Materials, spaceID)
 	if mathMaterial == nil || mathMaterial.DownloadURL != "" {
-		t.Fatalf("handout should be previewable but not downloadable without course permission: %#v", study.Materials)
+		t.Fatalf("handout without material download setting should remain unavailable for download: %#v", study.Materials)
 	}
 
 	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{

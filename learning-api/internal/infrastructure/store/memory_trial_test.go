@@ -57,8 +57,8 @@ func TestNewStudentCanReadFirstChapterLessonOfEachSubjectWithoutPackage(t *testi
 		t.Fatalf("later-chapter handout must stay locked, got %#v", study.Materials)
 	}
 	first, err := store.StudentMaterial(student, "preview-english-first-material")
-	if err != nil || first.DownloadURL != "" {
-		t.Fatalf("preview first handout must not expose download url without download permission: material=%#v err=%v", first, err)
+	if err != nil || first.DownloadURL == "" {
+		t.Fatalf("preview first handout must expose download url when material allows it: material=%#v err=%v", first, err)
 	}
 	home, err := store.StudentHome(student)
 	if err != nil {

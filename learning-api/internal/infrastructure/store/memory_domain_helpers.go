@@ -1668,7 +1668,8 @@ func (s *MemoryStore) decorateStudentMaterial(principal learning.Principal, mate
 	if material.FileID != "" {
 		material.PreviewURL = "/api/student/materials/" + material.ID + "/preview"
 		// 包括首节体验在内，下载打印必须同时满足资料允许下载和学生有效下载授权。
-		if material.AllowDownload && s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") {
+		// 首节体验权限不创建套餐授权记录；资料自身已允许下载时，体验学生也可以下载。
+		if material.AllowDownload && (s.studentHasActiveContentGrantForLearningSpace(principal.StudentID, material.LearningSpaceID, "download") || s.previewMaterialForStudent(principal.StudentID, material)) {
 			material.DownloadURL = "/api/student/materials/" + material.ID + "/download"
 		}
 	}
