@@ -17,41 +17,26 @@
   </view>
 
   <view class="detail-section-head">
-    <view class="detail-section-title">课程目录 <text>· {{stations.length}} 节</text></view>
+    <view class="detail-section-title">课程目录 <text>· {{lessonCount}} 节</text></view>
   </view>
-  <scroll-view class="tag-filter" scroll-x="true" enable-flex="true" wx:if="{{tags.length}}">
-    <view class="tag-filter-inner">
-      <view class="tag-chip {{activeTag === 'all' ? 'is-active' : ''}}" data-code="all" bindtap="selectTag">全部</view>
-      <view wx:for="{{tags}}" wx:key="code" class="tag-chip {{activeTag === item.code ? 'is-active' : ''}}" data-code="{{item.code}}" bindtap="selectTag">{{item.code}} · {{item.label}} {{item.count}}</view>
-    </view>
-  </scroll-view>
-  <view class="lesson-list">
-    <view wx:for="{{visibleStations}}" wx:key="title" class="lesson-row {{item.statusClass}}" data-status="{{item.status}}" data-material-id="{{item.materialId}}" data-homework-id="{{item.homeworkId}}" bindtap="tapStation">
-      <view class="lesson-line"></view>
-      <view class="lesson-state">{{item.icon}}</view>
-      <view class="lesson-copy">
-        <view class="lesson-title">{{item.title}}</view>
-        <view class="lesson-desc">{{item.desc}}</view>
+  <view wx:for="{{catalogUnits}}" wx:for-item="unit" wx:key="id" class="catalog-unit">
+    <view class="catalog-unit-title">{{unit.name}}</view>
+    <view wx:for="{{unit.chapters}}" wx:for-item="chapter" wx:key="id" class="catalog-chapter">
+      <view class="catalog-chapter-title">{{chapter.name}}</view>
+      <view class="lesson-list">
+        <view wx:for="{{chapter.lessons}}" wx:for-item="lesson" wx:key="id" class="lesson-row {{lesson.statusClass}}" data-status="{{lesson.status}}" data-lesson-id="{{lesson.id}}" data-material-id="{{lesson.materialId}}" data-homework-id="{{lesson.homeworkId}}" bindtap="tapLesson">
+          <view class="lesson-line"></view>
+          <view class="lesson-state">{{lesson.icon}}</view>
+          <view class="lesson-copy">
+            <view class="lesson-title">{{lesson.name}}</view>
+            <view class="lesson-desc">{{lesson.desc}}</view>
+          </view>
+          <view class="lesson-status">{{lesson.status}}</view>
+        </view>
       </view>
-      <view class="lesson-status">{{item.status}}</view>
     </view>
   </view>
-	<view wx:if="{{!visibleStations.length}}" class="detail-empty-line">这个标签下暂时没有内容</view>
-
-  <view class="detail-section-head material-head">
-    <view class="detail-section-title">课程讲义 <text>· {{materials.length}} 份</text></view>
-  </view>
-  <view wx:if="{{materials.length}}" class="material-list">
-    <view wx:for="{{materials}}" wx:key="id" class="material-row" data-id="{{item.id}}" bindtap="previewMaterial">
-      <view class="material-icon">{{item.fileType || "PDF"}}</view>
-      <view class="material-copy">
-        <view class="material-title">{{item.title}}</view>
-        <view class="material-meta">{{item.fileType || item.type || "课程讲义"}} · {{item.fileSize || "讲义"}}</view>
-      </view>
-      <view class="material-arrow">{{item.downloadUrl ? "↓" : "›"}}</view>
-    </view>
-  </view>
-  <view wx:else class="detail-empty-line">老师发布讲义后会显示在这里</view>
+  <view wx:if="{{!catalogUnits.length}}" class="detail-empty-line">老师配置课程目录后会显示在这里</view>
 
   <view class="detail-feedback">
     <view class="detail-section-head">

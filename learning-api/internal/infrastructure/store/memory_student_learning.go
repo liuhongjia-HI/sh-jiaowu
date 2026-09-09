@@ -168,11 +168,12 @@ func (s *MemoryStore) buildMaterialStations(course learning.Course, catalogMater
 		title := "第 " + strconv.Itoa(len(stations)+1) + " 站 " + material.Title
 		if _, readable := readableIDs[material.ID]; !readable {
 			stations = append(stations, learning.Station{
-				Icon:    "🔒",
-				Title:   title,
-				Desc:    "开通后可查看讲义和练习",
-				Status:  "未开通",
-				TagCode: material.TagCode,
+				Icon:     "🔒",
+				Title:    title,
+				Desc:     "开通后可查看讲义和练习",
+				Status:   "未开通",
+				LessonID: material.LessonID,
+				TagCode:  material.TagCode,
 			})
 			continue
 		}
@@ -187,6 +188,7 @@ func (s *MemoryStore) buildMaterialStations(course learning.Course, catalogMater
 			Title:      title,
 			Desc:       desc,
 			Status:     status,
+			LessonID:   material.LessonID,
 			TagCode:    material.TagCode,
 			MaterialID: material.ID,
 		})

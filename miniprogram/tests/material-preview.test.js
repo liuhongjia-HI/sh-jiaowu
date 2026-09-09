@@ -12,6 +12,60 @@ test("material preview keeps only the preview card as the full-courseware entry"
   assert.match(template, /class="button challenge-button" bindtap="goAnswer"/);
 });
 
+test("material preview shows five fixed tags and filters content within the current lesson", async () => {
+  const navigatedUrls = [];
+  const requestImpl = (path) => {
+    if (path === "/student/materials/mat-hd") return Promise.resolve({ id: "mat-hd", title: "课程讲义", courseId: "course-1", lessonId: "lesson-1", tagCode: "HD", curriculum: { lesson: "Themes and Elements" } });
+    if (path === "/student/materials/mat-hd/preview/pages") return Promise.resolve({ imageMode: false, pageCount: 0 });
+    if (path === "/student/favorites") return Promise.resolve([]);
+    if (path === "/student/study/course-1") return Promise.resolve({
+      course: { curriculum: [{ id: "lesson-1", type: "lesson", name: "Themes and Elements" }] },
+      materials: [
+        { id: "mat-hd", title: "课程讲义", lessonId: "lesson-1", tagCode: "HD" },
+        { id: "mat-other", title: "其他课讲义", lessonId: "lesson-2", tagCode: "Blank" }
+      ],
+      homework: [{ id: "homework-1", title: "课后作业", lessonId: "lesson-1", tagCode: "HW", questionNum: 8 }]
+    });
+    return Promise.reject(new Error("unexpected path " + path));
+  };
+  const page = loadMaterialPreviewPage(requestImpl, baseWxMock({ navigateTo({ url }) { navigatedUrls.push(url); } }));
+
+  page.onLoad({ id: "mat-hd", courseId: "course-1", lessonId: "lesson-1" });
+  await flushPromises();
+  await flushPromises();
+  await flushPromises();
+
+  assert.deepEqual(page.data.tags.map((item) => [item.code, item.count]), [["HD", 1], ["Blank", 0], ["HW", 1], ["Exam", 0], ["Special", 0]]);
+  page.selectTag({ currentTarget: { dataset: { code: "HW" } } });
+  assert.equal(page.data.contentMode, "homework");
+  assert.equal(page.data.activeHomework.id, "homework-1");
+  page.goAnswer();
+  assert.deepEqual(navigatedUrls, ["/pages/answer/index?id=homework-1"]);
+
+  page.selectTag({ currentTarget: { dataset: { code: "Blank" } } });
+  assert.equal(page.data.contentMode, "empty");
+  assert.equal(page.data.tagItems.length, 0);
+});
+
+test("homework-only lesson can enter the tagged content page without a material id", async () => {
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/study/course-1") return Promise.resolve({
+      course: { curriculum: [{ id: "lesson-1", type: "lesson", name: "课节一" }] },
+      materials: [],
+      homework: [{ id: "homework-1", title: "测试卷", lessonId: "lesson-1", tagCode: "Exam", questionNum: 5 }]
+    });
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock());
+
+  page.onLoad({ courseId: "course-1", lessonId: "lesson-1" });
+  await flushPromises();
+
+  assert.equal(page.data.activeTag, "Exam");
+  assert.equal(page.data.contentMode, "homework");
+  assert.equal(page.data.activeHomework.id, "homework-1");
+  assert.equal(page.data.lessonTitle, "课节一");
+});
+
 function loadMaterialPreviewPage(requestImpl, wxMock) {
   const pages = [];
   const requestPath = require.resolve("../utils/request");

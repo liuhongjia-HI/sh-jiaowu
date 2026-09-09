@@ -6,9 +6,8 @@ Page({
     materials: [],
     homework: [],
     stations: [],
-	visibleStations: [],
-	tags: [],
-	activeTag: 'all',
+    catalogUnits: [],
+    lessonCount: 0,
     progress: 0,
     teacherText: "",
     materialCountText: "0 份资料",
@@ -43,17 +42,15 @@ Page({
       const materials = data.materials || [];
       const homework = data.homework || [];
       this.loaded = true;
-		const stations = (data.stations || []).map(decorateStation);
-		const tags = buildTags(materials, homework);
-		const activeTag = this.data.activeTag === 'all' || tags.some((item) => item.code === this.data.activeTag) ? this.data.activeTag : 'all';
+        const stations = (data.stations || []).map(decorateStation);
+        const catalog = buildCatalog(course.curriculum || [], stations, materials, homework);
       this.setData({
         course,
         materials,
         homework,
-		stations,
-		tags,
-		activeTag,
-		visibleStations: filterStations(stations, activeTag),
+        stations,
+        catalogUnits: catalog.units,
+        lessonCount: catalog.lessonCount,
         progress: data.progress || 0,
         teacherText:
           (materials[0] && materials[0].ownerTeacherName) ||
@@ -64,10 +61,6 @@ Page({
       });
     });
   },
-  selectTag(event) {
-		const code = event.currentTarget.dataset.code || 'all';
-		this.setData({ activeTag: code, visibleStations: filterStations(this.data.stations, code) });
-	},
   previewMaterial(event) {
     const id = event.currentTarget.dataset.id;
     if (!id) {
@@ -84,15 +77,15 @@ Page({
     }
     wx.navigateTo({ url: `/pages/answer/index?id=${homework.id}` });
   },
-  tapStation(event) {
-    const { status, materialId, homeworkId } = event.currentTarget.dataset;
-    if (status === "未开通" || status === "未解锁") return;
+  tapLesson(event) {
+    const { status, lessonId, materialId, homeworkId } = event.currentTarget.dataset;
+    if (status === "未开通" || status === "未解锁" || status === "暂无内容") return;
     if (materialId) {
-      wx.navigateTo({ url: `/pages/material-preview/index?id=${materialId}` });
+      wx.navigateTo({ url: `/pages/material-preview/index?id=${materialId}&courseId=${encodeURIComponent(this.courseId)}&lessonId=${encodeURIComponent(lessonId || '')}` });
       return;
     }
-    if (homeworkId && status !== "已完成") {
-      wx.navigateTo({ url: `/pages/answer/index?id=${homeworkId}` });
+    if (homeworkId) {
+      wx.navigateTo({ url: `/pages/material-preview/index?courseId=${encodeURIComponent(this.courseId)}&lessonId=${encodeURIComponent(lessonId || '')}` });
     }
   }
 });
@@ -105,17 +98,54 @@ function decorateStation(item) {
   };
 }
 
-const tagLabels = { HD: '课程讲义', Blank: '空白练习', HW: '课后作业', Exam: '测试卷', Special: '专题资料' };
-
-function buildTags(materials, homework) {
-	const counts = {};
-	[...(materials || []), ...(homework || [])].forEach((item) => {
-		if (item.tagCode && tagLabels[item.tagCode]) counts[item.tagCode] = (counts[item.tagCode] || 0) + 1;
-	});
-	return Object.keys(tagLabels).map((code) => ({ code, label: tagLabels[code], count: counts[code] || 0 }));
+function buildCatalog(nodes, stations, materials, homework) {
+  const byParent = {};
+  (nodes || []).forEach((node) => {
+    const key = node.parentId || 'root';
+    if (!byParent[key]) byParent[key] = [];
+    byParent[key].push(node);
+  });
+  Object.keys(byParent).forEach((key) => byParent[key].sort(compareNode));
+  const stationByLesson = groupByLesson(stations);
+  const materialByLesson = groupByLesson(materials);
+  const homeworkByLesson = groupByLesson(homework);
+  const units = (byParent.root || []).filter((node) => node.type === 'unit').map((unit) => ({
+    ...unit,
+    chapters: (byParent[unit.id] || []).filter((node) => node.type === 'chapter').map((chapter) => ({
+      ...chapter,
+      lessons: (byParent[chapter.id] || []).filter((node) => node.type === 'lesson').map((lesson) => {
+        const lessonStations = stationByLesson[lesson.id] || [];
+        const lessonMaterials = materialByLesson[lesson.id] || [];
+        const lessonHomework = homeworkByLesson[lesson.id] || [];
+        const active = lessonStations.find((item) => item.status === '学习中') || lessonStations.find((item) => item.status === '已完成') || lessonStations.find((item) => item.status === '待挑战');
+        const locked = lessonStations.some((item) => item.status === '未开通' || item.status === '未解锁');
+        const count = lessonMaterials.length + lessonHomework.length;
+        const contentStatus = lessonMaterials.length ? '学习中' : (lessonHomework.length ? '待挑战' : '');
+        const status = active ? active.status : (contentStatus || (locked ? '未开通' : '暂无内容'));
+        return {
+          ...lesson,
+          icon: status === '未开通' ? '🔒' : (status === '暂无内容' ? '·' : '📖'),
+          status,
+          statusClass: status === '已完成' ? 'is-done' : (status === '学习中' ? 'is-active' : 'is-locked'),
+          desc: count ? `${count} 项学习内容` : (status === '未开通' ? '开通后可查看讲义和练习' : '老师尚未发布内容'),
+          materialId: (lessonMaterials[0] && lessonMaterials[0].id) || (active && active.materialId) || '',
+          homeworkId: (lessonHomework[0] && lessonHomework[0].id) || (active && active.homeworkId) || ''
+        };
+      })
+    }))
+  }));
+  return { units, lessonCount: units.reduce((sum, unit) => sum + unit.chapters.reduce((chapterSum, chapter) => chapterSum + chapter.lessons.length, 0), 0) };
 }
 
-function filterStations(stations, tagCode) {
-	if (tagCode === 'all') return stations;
-	return (stations || []).filter((item) => item.tagCode === tagCode || (!item.tagCode && item.status === "未开通"));
+function groupByLesson(items) {
+  return (items || []).reduce((result, item) => {
+    if (!item.lessonId) return result;
+    if (!result[item.lessonId]) result[item.lessonId] = [];
+    result[item.lessonId].push(item);
+    return result;
+  }, {});
+}
+
+function compareNode(left, right) {
+  return (left.sortOrder || 0) - (right.sortOrder || 0);
 }

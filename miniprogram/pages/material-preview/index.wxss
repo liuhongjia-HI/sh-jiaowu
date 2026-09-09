@@ -41,6 +41,22 @@
   padding: 34rpx 64rpx 48rpx;
 }
 
+.lesson-tag-filter { padding: 22rpx 0 8rpx; background: #fff; white-space: nowrap; }
+.lesson-tag-filter-inner { display: inline-flex; gap: 14rpx; padding: 0 32rpx; }
+.lesson-tag { min-width: 116rpx; padding: 14rpx 18rpx; border-radius: 18rpx; background: #f0f1f4; color: #696d77; text-align: center; }
+.lesson-tag.is-active { background: #ff5a1f; color: #fff; box-shadow: 0 8rpx 18rpx rgba(255, 90, 31, .2); }
+.lesson-tag-code { font-size: 24rpx; font-weight: 850; }
+.lesson-tag-name { margin-top: 3rpx; font-size: 18rpx; }
+.tag-item-filter { padding: 12rpx 0; background: #fff; white-space: nowrap; }
+.tag-item-filter-inner { display: inline-flex; gap: 12rpx; padding: 0 32rpx; }
+.tag-item { max-width: 360rpx; overflow: hidden; padding: 10rpx 16rpx; border: 1rpx solid #e4e5e9; border-radius: 999rpx; color: #777a83; font-size: 20rpx; text-overflow: ellipsis; white-space: nowrap; }
+.tag-item.is-active { border-color: #ffb69b; background: #fff4ef; color: #ff5a1f; }
+
+.lesson-content-state { padding: 78rpx 28rpx 34rpx; text-align: center; }
+.lesson-content-icon { font-size: 72rpx; }
+.lesson-content-title { margin-top: 24rpx; color: #35363b; font-size: 30rpx; font-weight: 800; }
+.lesson-content-desc { margin: 14rpx 0 34rpx; color: #92959e; font-size: 23rpx; }
+
 .material-preview-page .card {
   padding: 34rpx;
   border-radius: 28rpx;

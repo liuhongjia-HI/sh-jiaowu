@@ -57,35 +57,39 @@ test("study detail top-right affordance is a native share button", () => {
   assert.match(wxml, /<button class="detail-share" open-type="share"/);
 });
 
-test("study detail filters its ordered directory by the selected content tag", async () => {
+test("study detail builds the directory from Unit Chapter and Lesson instead of content tags", async () => {
   const page = loadStudyDetailPage(() => Promise.resolve({
-    course: { name: "五年级英语S1Q1课程" },
-    materials: [{ id: "mat-hd", tagCode: "HD" }],
-    homework: [{ id: "hw-exam", tagCode: "Exam" }],
+    course: { name: "五年级英语S1Q1课程", curriculum: [
+      { id: "unit-1", type: "unit", name: "Unit 1", sortOrder: 1 },
+      { id: "chapter-1", parentId: "unit-1", type: "chapter", name: "Chapter 1", sortOrder: 1 },
+      { id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "Themes and Elements", sortOrder: 1 }
+    ] },
+    materials: [{ id: "mat-hd", lessonId: "lesson-1", tagCode: "HD" }],
+    homework: [{ id: "hw-exam", lessonId: "lesson-1", tagCode: "Exam" }],
     stations: [
-      { title: "第 1 站 讲义", materialId: "mat-hd", tagCode: "HD" },
-      { title: "第 2 站 测试", homeworkId: "hw-exam", tagCode: "Exam" }
+      { lessonId: "lesson-1", status: "学习中", materialId: "mat-hd", tagCode: "HD" }
     ]
   }), { showToast() {} });
   page.courseId = "course-1";
 
   page.loadDetail();
   await flushPromises();
-  assert.deepEqual(page.data.tags.map((tag) => tag.code), ["HD", "Blank", "HW", "Exam", "Special"]);
-  assert.deepEqual(page.data.tags.map((tag) => tag.count), [1, 0, 0, 1, 0]);
-  assert.equal(page.data.visibleStations.length, 2);
-
-  page.selectTag({ currentTarget: { dataset: { code: "Exam" } } });
-  assert.equal(page.data.activeTag, "Exam");
-  assert.deepEqual(page.data.visibleStations.map((station) => station.homeworkId), ["hw-exam"]);
+  assert.equal(page.data.lessonCount, 1);
+  assert.equal(page.data.catalogUnits[0].name, "Unit 1");
+  assert.equal(page.data.catalogUnits[0].chapters[0].name, "Chapter 1");
+  assert.deepEqual(page.data.catalogUnits[0].chapters[0].lessons[0], {
+    id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "Themes and Elements", sortOrder: 1,
+    icon: "📖", status: "学习中", statusClass: "is-active", desc: "2 项学习内容", materialId: "mat-hd", homeworkId: "hw-exam"
+  });
 });
 
-test("study detail shows all lectures without bulk controls", () => {
+test("study detail renders the configured curriculum without a duplicate lecture list", () => {
   const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
 
   assert.doesNotMatch(wxml, /下载全部/);
   assert.doesNotMatch(wxml, /收起/);
-  assert.match(wxml, /wx:for="\{\{materials\}\}"/);
+  assert.match(wxml, /wx:for="\{\{catalogUnits\}\}"/);
+  assert.doesNotMatch(wxml, /wx:for="\{\{materials\}\}"/);
 });
 
 test("study detail renders every lecture returned by the API", async () => {
@@ -103,36 +107,49 @@ test("study detail renders every lecture returned by the API", async () => {
   assert.deepEqual(page.data.materials.map((item) => item.id), ["mat-1", "mat-2", "mat-3"]);
 });
 
-test("未开通章节在讲义和习题标签均保留锁，点击不跳转；授权刷新后可进入", async () => {
+test("homework-only lesson opens the tagged lesson content page", async () => {
+  const navigations = [];
+  const page = loadStudyDetailPage(() => Promise.resolve({}), { navigateTo: ({ url }) => navigations.push(url) });
+  page.courseId = "course-1";
+
+  page.tapLesson({ currentTarget: { dataset: { status: "待挑战", lessonId: "lesson-1", homeworkId: "homework-1" } } });
+
+  assert.deepEqual(navigations, ["/pages/material-preview/index?courseId=course-1&lessonId=lesson-1"]);
+});
+
+test("未开通课节保留锁且不跳转，授权刷新后可进入带课节上下文的预览页", async () => {
   const navigations = [];
   let full = false;
   const page = loadStudyDetailPage(() => Promise.resolve({
-    materials: [{ id: "first", tagCode: "HD" }],
+    course: { curriculum: [
+      { id: "unit", type: "unit", name: "Unit", sortOrder: 1 },
+      { id: "chapter", parentId: "unit", type: "chapter", name: "Chapter", sortOrder: 1 },
+      { id: "lesson-1", parentId: "chapter", type: "lesson", name: "第一节", sortOrder: 1 },
+      { id: "lesson-2", parentId: "chapter", type: "lesson", name: "第二节", sortOrder: 2 }
+    ] },
+    materials: [{ id: "first", lessonId: "lesson-1", tagCode: "HD" }].concat(full ? [{ id: "later", lessonId: "lesson-2", tagCode: "HD" }] : []),
     stations: [
-      { title: "首节讲义", status: "学习中", materialId: "first", tagCode: "HD" },
-      full ? { title: "第二节", status: "待挑战", materialId: "later", tagCode: "HD" }
-        : { title: "第二节", status: "未开通", icon: "🔒" }
+      { lessonId: "lesson-1", status: "学习中", materialId: "first", tagCode: "HD" },
+      full ? { lessonId: "lesson-2", status: "待挑战", materialId: "later", tagCode: "HD" }
+        : { lessonId: "lesson-2", status: "未开通", icon: "🔒" }
     ]
   }), { navigateTo: (value) => navigations.push(value.url) });
   page.courseId = "course";
   page.loadDetail();
   await flushPromises();
-  for (const code of ["HD", "HW"]) {
-    page.selectTag({ currentTarget: { dataset: { code } } });
-    assert.ok(page.data.visibleStations.some((s) => s.icon === "🔒"));
-  }
-  page.tapStation({ currentTarget: { dataset: { status: "未开通", materialId: "later" } } });
+  assert.equal(page.data.catalogUnits[0].chapters[0].lessons[1].status, "未开通");
+  page.tapLesson({ currentTarget: { dataset: { status: "未开通", lessonId: "lesson-2", materialId: "later" } } });
   assert.equal(navigations.length, 0);
-  page.tapStation({ currentTarget: { dataset: { status: "学习中", materialId: "first" } } });
-  assert.equal(navigations[0], "/pages/material-preview/index?id=first");
+  page.tapLesson({ currentTarget: { dataset: { status: "学习中", lessonId: "lesson-1", materialId: "first" } } });
+  assert.equal(navigations[0], "/pages/material-preview/index?id=first&courseId=course&lessonId=lesson-1");
   full = true;
   page.onShow();
   await flushPromises();
-  assert.ok(page.data.stations.some((s) => s.materialId === "later"));
-  page.tapStation({ currentTarget: { dataset: { status: "待挑战", materialId: "later" } } });
-  assert.equal(navigations[1], "/pages/material-preview/index?id=later");
+  assert.equal(page.data.catalogUnits[0].chapters[0].lessons[1].materialId, "later");
+  page.tapLesson({ currentTarget: { dataset: { status: "待挑战", lessonId: "lesson-2", materialId: "later" } } });
+  assert.equal(navigations[1], "/pages/material-preview/index?id=later&courseId=course&lessonId=lesson-2");
   full = false;
   page.onShow();
   await flushPromises();
-  assert.ok(page.data.stations.some((s) => s.icon === "🔒"));
+  assert.equal(page.data.catalogUnits[0].chapters[0].lessons[1].icon, "🔒");
 });

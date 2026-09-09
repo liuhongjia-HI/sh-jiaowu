@@ -6,8 +6,22 @@
     <view class="eyebrow">资料预览</view>
     <view class="hero-title">{{pageTitle}}</view>
   </view>
+  <scroll-view class="lesson-tag-filter" scroll-x="true" enable-flex="true">
+    <view class="lesson-tag-filter-inner">
+      <view wx:for="{{tags}}" wx:key="code" class="lesson-tag {{activeTag === item.code ? 'is-active' : ''}}" data-code="{{item.code}}" bindtap="selectTag">
+        <view class="lesson-tag-code">{{item.code}}</view>
+        <view class="lesson-tag-name">{{item.label}}{{item.count ? ' ' + item.count : ''}}</view>
+      </view>
+    </view>
+  </scroll-view>
+  <scroll-view wx:if="{{tagItems.length > 1}}" class="tag-item-filter" scroll-x="true" enable-flex="true">
+    <view class="tag-item-filter-inner">
+      <view wx:for="{{tagItems}}" wx:key="id" class="tag-item {{(item.contentType === 'material' && material.id === item.id) || (item.contentType === 'homework' && activeHomework.id === item.id) ? 'is-active' : ''}}" data-id="{{item.id}}" bindtap="selectTagItem">{{item.title}}</view>
+    </view>
+  </scroll-view>
   <view class="section">
     <view class="card">
+    <block wx:if="{{contentMode === 'material'}}">
     <view class="row preview-meta">
       <view class="sub">学习进度已自动保存</view>
       <view class="sub">已添加专属水印</view>
@@ -64,6 +78,18 @@
         <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">暂未开通下载打印权限</view>
       </view>
       <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
+    </view>
+    </block>
+    <view wx:elif="{{contentMode === 'homework'}}" class="lesson-content-state">
+      <view class="lesson-content-icon">✍️</view>
+      <view class="lesson-content-title">{{activeHomework.title}}</view>
+      <view class="lesson-content-desc">{{activeHomework.questionNum || 0}} 道题，完成后可查看结果</view>
+      <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
+    </view>
+    <view wx:else class="lesson-content-state">
+      <view class="lesson-content-icon">📭</view>
+      <view class="lesson-content-title">这个标签下暂时没有内容</view>
+      <view class="lesson-content-desc">老师发布后会显示在这里</view>
     </view>
     </view>
   </view>

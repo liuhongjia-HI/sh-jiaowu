@@ -234,6 +234,7 @@ type Station struct {
 	Title      string `json:"title"`
 	Desc       string `json:"desc"`
 	Status     string `json:"status"`
+	LessonID   string `json:"lessonId,omitempty"`
 	TagCode    string `json:"tagCode,omitempty"`
 	MaterialID string `json:"materialId,omitempty"`
 	HomeworkID string `json:"homeworkId,omitempty"`
