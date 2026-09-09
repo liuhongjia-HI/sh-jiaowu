@@ -778,8 +778,11 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 		node.ID = strings.TrimSpace(node.ID)
 		node.ParentID = strings.TrimSpace(node.ParentID)
 		node.Name = strings.TrimSpace(node.Name)
-		if node.ID == "" || node.Name == "" {
-			return nil, errors.New("目录节点名称不能为空")
+		if node.ID == "" {
+			return nil, errors.New("目录节点 ID 不能为空")
+		}
+		if node.Type == learning.CurriculumLesson && node.Name == "" {
+			return nil, errors.New("Lesson 名称不能为空")
 		}
 		if _, exists := byID[node.ID]; exists {
 			return nil, errors.New("目录节点 ID 不能重复")
@@ -790,10 +793,12 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 		if nameByParent[node.ParentID] == nil {
 			nameByParent[node.ParentID] = map[string]bool{}
 		}
-		if nameByParent[node.ParentID][node.Name] {
+		if node.Name != "" && nameByParent[node.ParentID][node.Name] {
 			return nil, errors.New("同一级目录名称不能重复")
 		}
-		nameByParent[node.ParentID][node.Name] = true
+		if node.Name != "" {
+			nameByParent[node.ParentID][node.Name] = true
+		}
 		if node.SortOrder <= 0 {
 			node.SortOrder = index + 1
 		}

@@ -418,8 +418,8 @@ export function CourseDialog({
           setCurriculumError(`请至少添加 1 个 ${missing.map((type) => ({ unit: 'Unit' })[type]).join('、')}`);
           return;
         }
-        if (curriculumNodes.some((node) => !node.name.trim())) {
-          setCurriculumError('请填写所有目录名称。');
+        if (curriculumNodes.some((node) => node.type === 'lesson' && !node.name.trim())) {
+          setCurriculumError('请填写所有 Lesson 名称。');
           return;
         }
         onSubmit({ ...values, curriculum: curriculumNodes });
@@ -483,7 +483,7 @@ export function CourseDialog({
             <div className="curriculum-node-main">
               <Button type="text" size="small" htmlType="button" aria-label={`${collapsedUnits.has(unit.id) ? '展开' : '收起'} Unit`} onClick={() => setCollapsedUnits((current) => { const next = new Set(current); next.has(unit.id) ? next.delete(unit.id) : next.add(unit.id); return next; })}>{collapsedUnits.has(unit.id) ? '▸' : '▾'}</Button>
               <Typography.Text strong className="curriculum-node-type">Unit</Typography.Text>
-              <Input aria-label="Unit名称" value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder="输入 Unit 名称" />
+              <Input aria-label="Unit名称（选填）" value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder="Unit 名称（选填）" />
               <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} 个 Chapter</Typography.Text>
               <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
             </div>
@@ -497,7 +497,7 @@ export function CourseDialog({
               <div className="curriculum-node-main">
                 <Button type="text" size="small" htmlType="button" aria-label={`${collapsedChapters.has(chapter.id) ? '展开' : '收起'} Chapter`} onClick={() => setCollapsedChapters((current) => { const next = new Set(current); next.has(chapter.id) ? next.delete(chapter.id) : next.add(chapter.id); return next; })}>{collapsedChapters.has(chapter.id) ? '▸' : '▾'}</Button>
                 <Typography.Text strong className="curriculum-node-type">Chapter</Typography.Text>
-                <Input aria-label="Chapter名称" value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder="输入 Chapter 名称" />
+                <Input aria-label="Chapter名称（选填）" value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder="Chapter 名称（选填）" />
                 <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} 个 Lesson</Typography.Text>
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
               </div>
@@ -509,7 +509,7 @@ export function CourseDialog({
               </div>
               {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
-                <Input aria-label="Lesson名称" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="输入 Lesson 名称" />
+                <Input aria-label="Lesson名称（必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（必填）" status={!lesson.name.trim() ? 'error' : undefined} />
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
               </div>)}</div>}
             </div>)}

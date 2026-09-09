@@ -126,6 +126,29 @@ func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) 
 	}
 }
 
+func TestNormalizeCurriculumOnlyRequiresLessonNames(t *testing.T) {
+	nodes := []learning.CurriculumNode{
+		{ID: "unit-1", Type: learning.CurriculumUnit, Name: "", SortOrder: 1},
+		{ID: "unit-2", Type: learning.CurriculumUnit, Name: "", SortOrder: 2},
+		{ID: "chapter-1", ParentID: "unit-1", Type: learning.CurriculumChapter, Name: "", SortOrder: 1},
+		{ID: "chapter-2", ParentID: "unit-1", Type: learning.CurriculumChapter, Name: "", SortOrder: 2},
+		{ID: "lesson-1", ParentID: "chapter-1", Type: learning.CurriculumLesson, Name: "第一课", SortOrder: 1},
+	}
+
+	result, err := normalizeCurriculum(nodes)
+	if err != nil {
+		t.Fatalf("blank Unit and Chapter names should be allowed: %v", err)
+	}
+	if result[0].Name != "" || result[2].Name != "" || result[4].Name != "第一课" {
+		t.Fatalf("curriculum names changed unexpectedly: %#v", result)
+	}
+
+	nodes[4].Name = "  "
+	if _, err := normalizeCurriculum(nodes); err == nil || !strings.Contains(err.Error(), "Lesson 名称不能为空") {
+		t.Fatalf("blank Lesson name must be rejected, got %v", err)
+	}
+}
+
 func TestContentTagIsInferredFromTitleWhenUploadOmitsIt(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")
