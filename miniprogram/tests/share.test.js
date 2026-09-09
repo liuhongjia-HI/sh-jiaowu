@@ -87,6 +87,26 @@ test("study detail flattens all Lesson leaves in curriculum order", async () => 
   });
 });
 
+test("study detail flattens Chapter and Unit leaves when a curriculum has fewer levels", async () => {
+  const page = loadStudyDetailPage(() => Promise.resolve({
+    course: { curriculum: [
+      { id: "unit-2", type: "unit", name: "第二单元", sortOrder: 2 },
+      { id: "unit-1", type: "unit", name: "第一单元", sortOrder: 1 },
+      { id: "chapter-1", parentId: "unit-1", type: "chapter", name: "第一章", sortOrder: 1 }
+    ] },
+    stations: [
+      { lessonId: "chapter-1", status: "学习中" },
+      { lessonId: "unit-2", status: "待挑战" }
+    ]
+  }), { showToast() {} });
+  page.courseId = "course-2";
+
+  page.loadDetail();
+  await flushPromises();
+  assert.deepEqual(page.data.catalogLessons.map((item) => item.displayName), ["第一单元 · 第一章", "第二单元"]);
+  assert.deepEqual(page.data.catalogLessons.map((item) => item.id), ["chapter-1", "unit-2"]);
+});
+
 test("study detail renders one flat leaf list without Unit or Chapter groups", () => {
   const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
 

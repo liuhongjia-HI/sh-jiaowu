@@ -344,9 +344,8 @@ export function CourseDialog({
     setCurriculumError('');
   };
   const addCurriculumNode = (type: 'unit' | 'chapter' | 'lesson', parentId?: string) => {
-    const siblingCount = curriculumNodes.filter((node) => node.type === type && (type === 'unit' ? !node.parentId : node.parentId === parentId)).length;
     const id = `node-${Date.now()}-${curriculumNodes.length}`;
-    updateCurriculum([...curriculumNodes, { id, parentId, type, name: String(siblingCount + 1), sortOrder: curriculumNodes.length + 1 }]);
+    updateCurriculum([...curriculumNodes, { id, parentId, type, name: '', sortOrder: curriculumNodes.length + 1 }]);
     if (type === 'chapter' && parentId) setCollapsedUnits((current) => new Set([...current].filter((item) => item !== parentId)));
     if (type === 'lesson' && parentId) setCollapsedChapters((current) => new Set([...current].filter((item) => item !== parentId)));
   };
@@ -357,18 +356,14 @@ export function CourseDialog({
       setCurriculumError(`当前已有 ${existing.length} 个 ${type === 'unit' ? 'Unit' : type === 'chapter' ? 'Chapter' : 'Lesson'}，数量不能直接减少，请先删除多余目录。`);
       return;
     }
-    const numberedExisting = curriculumNodes.map((node) => {
-      const siblingIndex = existing.findIndex((item) => item.id === node.id);
-      return siblingIndex >= 0 && !node.name.trim() ? { ...node, name: String(siblingIndex + 1) } : node;
-    });
     const additions = Array.from({ length: safeCount - existing.length }, (_, index) => ({
       id: `node-${Date.now()}-${curriculumNodes.length + index}`,
       parentId: type === 'unit' ? undefined : parentId,
       type,
-      name: String(existing.length + index + 1),
+      name: '',
       sortOrder: curriculumNodes.length + index + 1
     }));
-    if (additions.length || numberedExisting.some((node, index) => node !== curriculumNodes[index])) updateCurriculum([...numberedExisting, ...additions]);
+    if (additions.length) updateCurriculum([...curriculumNodes, ...additions]);
     if (type === 'unit') setUnitCount(safeCount);
     if (type === 'chapter' && parentId) setChapterCounts((current) => ({ ...current, [parentId]: safeCount }));
     if (type === 'lesson' && parentId) setLessonCounts((current) => ({ ...current, [parentId]: safeCount }));
@@ -392,6 +387,7 @@ export function CourseDialog({
   const updateCurriculumName = (nodeId: string, name: string) => {
     updateCurriculum(curriculumNodes.map((node) => node.id === nodeId ? { ...node, name } : node));
   };
+  const curriculumNodeIsLeaf = (nodeId: string) => !curriculumNodes.some((node) => node.parentId === nodeId);
   const missingCurriculumTypes = () => ['unit'].filter((type) => !curriculumNodes.some((node) => node.type === type));
 
   return (
@@ -418,8 +414,9 @@ export function CourseDialog({
           setCurriculumError(`请至少添加 1 个 ${missing.map((type) => ({ unit: 'Unit' })[type]).join('、')}`);
           return;
         }
-        if (curriculumNodes.some((node) => node.type === 'lesson' && !node.name.trim())) {
-          setCurriculumError('请填写所有 Lesson 名称。');
+        const parentIds = new Set(curriculumNodes.map((node) => node.parentId).filter(Boolean));
+        if (curriculumNodes.some((node) => !parentIds.has(node.id) && !node.name.trim())) {
+          setCurriculumError('请填写所有叶子节点名称。');
           return;
         }
         onSubmit({ ...values, curriculum: curriculumNodes });
@@ -463,7 +460,7 @@ export function CourseDialog({
             options={spaceOptions}
           />
         </Form.Item>
-        <Form.Item label="课程目录" extra="Unit 必填，Chapter 和 Lesson 可按实际教学需求选择填写；讲义和作业需绑定 Lesson。">
+        <Form.Item label="课程目录" extra="支持一至三级目录；没有下级节点的叶子节点必须填写名称，上级节点名称可选。">
           <div className="curriculum-toolbar">
             <Typography.Text type="secondary">共 {curriculumNodes.filter((node) => node.type === 'unit').length} 个 Unit · {curriculumNodes.filter((node) => node.type === 'chapter').length} 个 Chapter · {curriculumNodes.filter((node) => node.type === 'lesson').length} 个 Lesson</Typography.Text>
             {curriculumNodes.length > 0 && <Button type="link" size="small" htmlType="button" onClick={() => {
@@ -483,7 +480,7 @@ export function CourseDialog({
             <div className="curriculum-node-main">
               <Button type="text" size="small" htmlType="button" aria-label={`${collapsedUnits.has(unit.id) ? '展开' : '收起'} Unit`} onClick={() => setCollapsedUnits((current) => { const next = new Set(current); next.has(unit.id) ? next.delete(unit.id) : next.add(unit.id); return next; })}>{collapsedUnits.has(unit.id) ? '▸' : '▾'}</Button>
               <Typography.Text strong className="curriculum-node-type">Unit</Typography.Text>
-              <Input aria-label="Unit名称（选填）" value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder="Unit 名称（选填）" />
+              <Input aria-label={`Unit名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder={`Unit 名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(unit.id) && !unit.name.trim() ? 'error' : undefined} />
               <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'chapter' && node.parentId === unit.id).length} 个 Chapter</Typography.Text>
               <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
             </div>
@@ -497,7 +494,7 @@ export function CourseDialog({
               <div className="curriculum-node-main">
                 <Button type="text" size="small" htmlType="button" aria-label={`${collapsedChapters.has(chapter.id) ? '展开' : '收起'} Chapter`} onClick={() => setCollapsedChapters((current) => { const next = new Set(current); next.has(chapter.id) ? next.delete(chapter.id) : next.add(chapter.id); return next; })}>{collapsedChapters.has(chapter.id) ? '▸' : '▾'}</Button>
                 <Typography.Text strong className="curriculum-node-type">Chapter</Typography.Text>
-                <Input aria-label="Chapter名称（选填）" value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder="Chapter 名称（选填）" />
+                <Input aria-label={`Chapter名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder={`Chapter 名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(chapter.id) && !chapter.name.trim() ? 'error' : undefined} />
                 <Typography.Text type="secondary" className="curriculum-node-count">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).length} 个 Lesson</Typography.Text>
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
               </div>
@@ -509,7 +506,7 @@ export function CourseDialog({
               </div>
               {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumNodes.filter((node) => node.type === 'lesson' && node.parentId === chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
-                <Input aria-label="Lesson名称（必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（必填）" status={!lesson.name.trim() ? 'error' : undefined} />
+                <Input aria-label="Lesson名称（叶子必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（叶子必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
               </div>)}</div>}
             </div>)}

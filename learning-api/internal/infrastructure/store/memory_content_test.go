@@ -7,7 +7,7 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
-func TestCourseCurriculumOnlyRequiresUnit(t *testing.T) {
+func TestCourseCurriculumCountsAnyLeafNode(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")
 	if err != nil {
@@ -21,7 +21,7 @@ func TestCourseCurriculumOnlyRequiresUnit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unit-only curriculum should be accepted: %v", err)
 	}
-	if course.LessonCount != 0 || len(course.Curriculum) != 1 {
+	if course.LessonCount != 1 || len(course.Curriculum) != 1 {
 		t.Fatalf("unexpected unit-only course: %#v", course)
 	}
 }
@@ -63,6 +63,37 @@ func TestContentMustBindToLeafLessonInItsCourseCurriculum(t *testing.T) {
 	}
 	if material.LessonID != "lesson-symbol" || material.Curriculum.Lesson != "地图符号" {
 		t.Fatalf("material curriculum = %#v", material)
+	}
+}
+
+func TestContentCanBindToAChapterLeafInATwoLevelCurriculum(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	course, err := store.CreateCourse("英语老师", teacher, learning.CourseUpsertRequest{
+		Name: "两级目录课程", LearningSpaceID: "space-g05-english-s1-q1", Status: learning.StatusEnabled,
+		Curriculum: []learning.CurriculumNode{
+			{ID: "unit-two-level", Type: learning.CurriculumUnit, Name: "第一单元"},
+			{ID: "chapter-leaf", ParentID: "unit-two-level", Type: learning.CurriculumChapter, Name: "第一章"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create two-level course: %v", err)
+	}
+	if course.LessonCount != 1 {
+		t.Fatalf("lesson count = %d, want 1", course.LessonCount)
+	}
+	material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "第一章讲义", CourseID: course.ID, LearningSpaceID: course.LearningSpaceID, LessonID: "chapter-leaf",
+	})
+	if err != nil {
+		t.Fatalf("create material for chapter leaf: %v", err)
+	}
+	if material.Curriculum.Lesson != "第一章" || material.Curriculum.Unit != "第一单元" {
+		t.Fatalf("material curriculum = %#v", material.Curriculum)
 	}
 }
 
@@ -126,13 +157,14 @@ func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) 
 	}
 }
 
-func TestNormalizeCurriculumOnlyRequiresLessonNames(t *testing.T) {
+func TestNormalizeCurriculumRequiresLeafNames(t *testing.T) {
 	nodes := []learning.CurriculumNode{
 		{ID: "unit-1", Type: learning.CurriculumUnit, Name: "", SortOrder: 1},
-		{ID: "unit-2", Type: learning.CurriculumUnit, Name: "", SortOrder: 2},
+		{ID: "unit-2", Type: learning.CurriculumUnit, Name: "第二单元", SortOrder: 2},
 		{ID: "chapter-1", ParentID: "unit-1", Type: learning.CurriculumChapter, Name: "", SortOrder: 1},
 		{ID: "chapter-2", ParentID: "unit-1", Type: learning.CurriculumChapter, Name: "", SortOrder: 2},
 		{ID: "lesson-1", ParentID: "chapter-1", Type: learning.CurriculumLesson, Name: "第一课", SortOrder: 1},
+		{ID: "lesson-2", ParentID: "chapter-2", Type: learning.CurriculumLesson, Name: "第二课", SortOrder: 1},
 	}
 
 	result, err := normalizeCurriculum(nodes)
@@ -144,8 +176,8 @@ func TestNormalizeCurriculumOnlyRequiresLessonNames(t *testing.T) {
 	}
 
 	nodes[4].Name = "  "
-	if _, err := normalizeCurriculum(nodes); err == nil || !strings.Contains(err.Error(), "Lesson 名称不能为空") {
-		t.Fatalf("blank Lesson name must be rejected, got %v", err)
+	if _, err := normalizeCurriculum(nodes); err == nil || !strings.Contains(err.Error(), "叶子节点名称不能为空") {
+		t.Fatalf("blank leaf name must be rejected, got %v", err)
 	}
 }
 

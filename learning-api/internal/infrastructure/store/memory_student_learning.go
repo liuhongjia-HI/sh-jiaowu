@@ -122,7 +122,7 @@ func (s *MemoryStore) lockedPreviewStations(course learning.Course) []learning.S
 	previewLessonID, hasPreview := s.previewLessonForCourse(course)
 	lessons := make([]learning.CurriculumNode, 0)
 	for _, node := range course.Curriculum {
-		if node.Type == learning.CurriculumLesson && (!hasPreview || node.ID != previewLessonID) {
+		if curriculumLeaf(course.Curriculum, node.ID) && (!hasPreview || node.ID != previewLessonID) {
 			lessons = append(lessons, node)
 		}
 	}
@@ -142,7 +142,7 @@ func (s *MemoryStore) buildMaterialStations(course learning.Course, catalogMater
 	}
 	ranks := make(map[string]int, len(course.Curriculum))
 	for _, node := range course.Curriculum {
-		if node.Type == learning.CurriculumLesson {
+		if curriculumLeaf(course.Curriculum, node.ID) {
 			ranks[node.ID] = node.SortOrder
 		}
 	}

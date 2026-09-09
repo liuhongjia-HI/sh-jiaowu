@@ -769,7 +769,7 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 
 func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.CurriculumNode, error) {
 	if len(nodes) == 0 {
-		return nil, errors.New("请至少维护一个 Unit")
+		return nil, errors.New("请至少维护一个课程目录节点")
 	}
 	result := make([]learning.CurriculumNode, 0, len(nodes))
 	byID := make(map[string]learning.CurriculumNode, len(nodes))
@@ -780,9 +780,6 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 		node.Name = strings.TrimSpace(node.Name)
 		if node.ID == "" {
 			return nil, errors.New("目录节点 ID 不能为空")
-		}
-		if node.Type == learning.CurriculumLesson && node.Name == "" {
-			return nil, errors.New("Lesson 名称不能为空")
 		}
 		if _, exists := byID[node.ID]; exists {
 			return nil, errors.New("目录节点 ID 不能重复")
@@ -805,28 +802,50 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 		byID[node.ID] = node
 		result = append(result, node)
 	}
+	children := make(map[string]int, len(result))
 	unitCount := 0
 	for _, node := range result {
+		parent, hasParent := byID[node.ParentID]
 		switch node.Type {
 		case learning.CurriculumUnit:
+			unitCount++
 			if node.ParentID != "" {
 				return nil, errors.New("Unit 不能设置上级目录")
 			}
-			unitCount++
 		case learning.CurriculumChapter:
-			parent, ok := byID[node.ParentID]
-			if !ok || parent.Type != learning.CurriculumUnit {
+			if !hasParent || parent.Type != learning.CurriculumUnit {
 				return nil, errors.New("Chapter 必须归属 Unit")
 			}
 		case learning.CurriculumLesson:
-			parent, ok := byID[node.ParentID]
-			if !ok || parent.Type != learning.CurriculumChapter {
-				return nil, errors.New("Lesson 必须归属 Chapter")
+			if !hasParent || (parent.Type != learning.CurriculumUnit && parent.Type != learning.CurriculumChapter) {
+				return nil, errors.New("Lesson 必须归属 Unit 或 Chapter")
 			}
+		}
+		if node.ParentID != "" {
+			children[node.ParentID]++
 		}
 	}
 	if unitCount == 0 {
 		return nil, errors.New("课程目录必须包含至少一个 Unit")
+	}
+	for _, node := range result {
+		seen := map[string]bool{}
+		for current := node; current.ParentID != ""; {
+			if seen[current.ID] {
+				return nil, errors.New("课程目录不能包含循环引用")
+			}
+			seen[current.ID] = true
+			parent, ok := byID[current.ParentID]
+			if !ok {
+				return nil, errors.New("目录节点上级不存在")
+			}
+			current = parent
+		}
+	}
+	for _, node := range result {
+		if children[node.ID] == 0 && node.Name == "" {
+			return nil, errors.New("叶子节点名称不能为空")
+		}
 	}
 	return result, nil
 }
@@ -834,7 +853,7 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 func countCurriculumLessons(nodes []learning.CurriculumNode) int {
 	count := 0
 	for _, node := range nodes {
-		if node.Type == learning.CurriculumLesson {
+		if curriculumLeaf(nodes, node.ID) {
 			count++
 		}
 	}
@@ -851,30 +870,47 @@ func curriculumPathForLesson(course learning.Course, lessonID string) (learning.
 		byID[node.ID] = node
 	}
 	lesson, ok := byID[lessonID]
-	if ok && lesson.Type == learning.CurriculumChapter {
-		for _, node := range course.Curriculum {
-			if node.ParentID == lesson.ID {
-				return learning.CurriculumPath{}, errors.New("该节包含小节，请选择具体课节")
-			}
-		}
-		unit, exists := byID[lesson.ParentID]
-		if !exists || unit.Type != learning.CurriculumUnit {
-			return learning.CurriculumPath{}, errors.New("课节目录不完整")
-		}
-		return learning.CurriculumPath{Unit: unit.Name, Chapter: lesson.Name}, nil
-	}
-	if !ok || lesson.Type != learning.CurriculumLesson {
+	if !ok || !curriculumLeaf(course.Curriculum, lessonID) {
 		return learning.CurriculumPath{}, errors.New("请选择当前课程下的有效课节")
 	}
-	chapter, ok := byID[lesson.ParentID]
-	if !ok || chapter.Type != learning.CurriculumChapter {
-		return learning.CurriculumPath{}, errors.New("课节目录不完整")
+	path := []string{}
+	for current := lesson; ; {
+		if current.Name != "" {
+			path = append([]string{current.Name}, path...)
+		}
+		if current.ParentID == "" {
+			break
+		}
+		parent, exists := byID[current.ParentID]
+		if !exists {
+			return learning.CurriculumPath{}, errors.New("课节目录不完整")
+		}
+		current = parent
 	}
-	unit, ok := byID[chapter.ParentID]
-	if !ok || unit.Type != learning.CurriculumUnit {
-		return learning.CurriculumPath{}, errors.New("课节目录不完整")
+	result := learning.CurriculumPath{}
+	switch len(path) {
+	case 0:
+		return result, nil
+	case 1:
+		result.Lesson = path[0]
+	case 2:
+		// 两级目录仍把叶子作为 Lesson，上级作为 Unit，避免把目录层级误判为固定类型。
+		result.Unit, result.Lesson = path[0], path[1]
+	default:
+		result.Unit = path[len(path)-3]
+		result.Chapter = path[len(path)-2]
+		result.Lesson = path[len(path)-1]
 	}
-	return learning.CurriculumPath{Unit: unit.Name, Chapter: chapter.Name, Lesson: lesson.Name}, nil
+	return result, nil
+}
+
+func curriculumLeaf(nodes []learning.CurriculumNode, id string) bool {
+	for _, node := range nodes {
+		if node.ParentID == id {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *MemoryStore) courseNameExists(currentID, name string) bool {
@@ -1236,17 +1272,11 @@ func (s *MemoryStore) previewLessonForCourse(course learning.Course) (string, bo
 	var firstLesson func(string) string
 	firstLesson = func(parentID string) string {
 		for _, node := range children[parentID] {
-			if node.Type == learning.CurriculumUnit || node.Type == learning.CurriculumChapter {
-				if len(children[node.ID]) > 0 {
-					return firstLesson(node.ID)
-				}
-				if node.Type == learning.CurriculumChapter {
-					return node.ID
-				}
-				return ""
-			}
-			if node.Type == learning.CurriculumLesson {
+			if curriculumLeaf(course.Curriculum, node.ID) {
 				return node.ID
+			}
+			if lessonID := firstLesson(node.ID); lessonID != "" {
+				return lessonID
 			}
 		}
 		return ""

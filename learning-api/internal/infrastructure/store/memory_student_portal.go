@@ -538,7 +538,7 @@ func (s *MemoryStore) firstPendingLessonPerCourse(items []learning.Homework) []l
 				continue
 			}
 			for index, node := range course.Curriculum {
-				if node.Type == learning.CurriculumLesson && node.ID == item.LessonID {
+				if curriculumLeaf(course.Curriculum, node.ID) && node.ID == item.LessonID {
 					rank = index + 1
 					break
 				}

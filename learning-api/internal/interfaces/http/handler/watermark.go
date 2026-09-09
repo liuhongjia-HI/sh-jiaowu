@@ -156,13 +156,13 @@ func watermarkPageScript(watermarkText string) string {
   pageTop pageBottom add 2 div
   translate
   35 rotate
-	halfWidth neg 1200 sub
-	100
-	halfWidth 1200 add
+	 halfWidth neg 1200 sub
+	 180
+	 halfWidth 1200 add
   {
     /column exch def
 	  halfHeight neg 1200 sub
-	  60
+	  110
 	  halfHeight 1200 add
     {
       /row exch def

@@ -41,6 +41,9 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	if count := strings.Count(script, "WatermarkText show"); count != 1 {
 		t.Fatalf("watermark should draw from a tiled loop, got %d show calls", count)
 	}
+	if !strings.Contains(script, "180") || !strings.Contains(script, "110") {
+		t.Fatalf("watermark tiles should leave enough spacing for the date suffix, got %s", script)
+	}
 }
 
 func TestWatermarkScriptEncodesChineseStudentName(t *testing.T) {

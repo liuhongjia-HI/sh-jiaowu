@@ -94,14 +94,18 @@ function buildCatalog(nodes, stations, materials, homework) {
   const materialByLesson = groupByLesson(materials);
   const homeworkByLesson = groupByLesson(homework);
   const orderedLessons = [];
-  (byParent.root || []).filter((node) => node.type === 'unit').forEach((unit) => {
-    (byParent[unit.id] || []).filter((node) => node.type === 'chapter').forEach((chapter) => {
-      (byParent[chapter.id] || []).filter((node) => node.type === 'lesson').forEach((lesson) => orderedLessons.push({
-        ...lesson,
-        displayName: chapter.name ? `${chapter.name} · ${lesson.name}` : lesson.name
-      }));
+  const walk = (parentId, ancestors) => {
+    (byParent[parentId] || []).forEach((node) => {
+      const children = byParent[node.id] || [];
+      if (!children.length) {
+        const parentName = ancestors.length ? ancestors[ancestors.length - 1] : '';
+        orderedLessons.push({ ...node, displayName: parentName ? `${parentName} · ${node.name}` : node.name });
+        return;
+      }
+      walk(node.id, node.name ? [...ancestors, node.name] : ancestors);
     });
-  });
+  };
+  walk('root', []);
   return orderedLessons.map((lesson) => {
     const lessonStations = stationByLesson[lesson.id] || [];
     const lessonMaterials = materialByLesson[lesson.id] || [];
