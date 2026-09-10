@@ -372,12 +372,17 @@
 .todo-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
+  justify-content: flex-start;
+  gap: 10rpx;
+  min-width: 0;
 }
 
 .todo-title {
+  flex: 0 1 auto;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #1f2933;
   font-size: 28rpx;
   font-weight: 850;
@@ -407,9 +412,64 @@
 
 .todo-action {
   flex: none;
+  margin-left: 12rpx;
   color: #2f7de1;
   font-size: 23rpx;
   font-weight: 850;
+  white-space: nowrap;
+}
+
+.subscribe-prompt {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 112rpx;
+  padding: 18rpx;
+  border: 1rpx solid #dce8fb;
+  border-radius: 20rpx;
+  background: #f5f9ff;
+  box-shadow: 0 8rpx 22rpx rgba(30, 31, 35, .035);
+}
+
+.subscribe-prompt-icon {
+  flex: none;
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef4ff;
+  color: #397eea;
+  font-size: 26rpx;
+  font-weight: 900;
+}
+
+.subscribe-prompt-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.subscribe-prompt-title {
+  color: #17181b;
+  font-size: 28rpx;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.subscribe-prompt-summary {
+  margin-top: 8rpx;
+  color: #8d9099;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.subscribe-prompt-action {
+  flex: none;
+  color: #397eea;
+  font-size: 23rpx;
+  font-weight: 850;
+  white-space: nowrap;
 }
 
 .feedback-card {
@@ -900,6 +960,10 @@
 
 .todo-action {
   color: #ff5a1f;
+}
+
+.subscribe-prompt {
+  border-color: #e4ecf8;
 }
 
 .feedback-score {

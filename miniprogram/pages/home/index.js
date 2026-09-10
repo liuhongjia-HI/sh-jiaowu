@@ -30,6 +30,7 @@ Page({
     feedbackItems: [],
     subscriptionReminder: null,
     subscribeEnabled: false,
+    showSubscribePrompt: false,
     courseTitle: "待开通课程",
     courseMeta: "",
     bannerTag: "继续学习",
@@ -112,6 +113,7 @@ Page({
       visibleTodoGroup: [],
       todoGroupIndex: 0,
       feedbackItems: [],
+      showSubscribePrompt: false,
       recommendations: [],
       visibleRecommendations: [],
       recommendationsLoading: false,
@@ -142,11 +144,11 @@ Page({
         const notices = home.notices || [];
         const feedbackItems = home.classroomFeedback || [];
         const subscribeEnabled = wx.getStorageSync("starline_subscribe_enabled") === "1" || !!(home.subscriptionReminder && home.subscriptionReminder.enabled);
-        const todoItems = decorateTodos(normalizeTodayTodos(home, {
+        const todoItems = excludeSubscribeTodos(decorateTodos(normalizeTodayTodos(home, {
           pendingHomework,
           continueCourse,
           subscribeEnabled
-        }));
+        })));
         const openedPackages = Array.isArray(student.openedPackages) ? student.openedPackages : [];
         const pendingTask = pendingHomework[0] || null;
         const firstMaterial = materials[0] || null;
@@ -180,6 +182,7 @@ Page({
           feedbackItems,
           subscriptionReminder: decorateSubscription(home.subscriptionReminder, subscribeEnabled),
           subscribeEnabled,
+          showSubscribePrompt: !subscribeEnabled,
           courseTitle: selectedCourse.name || "待开通课程",
           courseMeta: formatCourseMeta(selectedCourse),
           bannerTag: pendingTask ? "今日题目" : "继续学习",
@@ -204,6 +207,7 @@ Page({
         visibleTodoGroup: [],
         todoGroupIndex: 0,
         feedbackItems: [],
+        showSubscribePrompt: false,
         loading: false
       }));
   },
@@ -392,12 +396,14 @@ Page({
             data: { templateIds: acceptedIds }
           }).then((reminder) => {
             wx.setStorageSync("starline_subscribe_enabled", "1");
+            const todoItems = excludeSubscribeTodos(this.data.todoItems);
             this.setData({
               subscribeEnabled: true,
+              showSubscribePrompt: false,
               subscriptionReminder: decorateSubscription(reminder || this.data.subscriptionReminder, true),
-              todoItems: this.data.todoItems.filter((item) => item.type !== "subscribe"),
-              todoGroups: buildTodoGroups(this.data.todoItems.filter((item) => item.type !== "subscribe")),
-              visibleTodoGroup: buildTodoGroups(this.data.todoItems.filter((item) => item.type !== "subscribe"))[0] || [],
+              todoItems,
+              todoGroups: buildTodoGroups(todoItems),
+              visibleTodoGroup: buildTodoGroups(todoItems)[0] || [],
               todoGroupIndex: 0
             });
             wx.showToast({ title: "已开启学习提醒", icon: "success" });
@@ -536,6 +542,10 @@ function decorateTodos(todos) {
   }));
 }
 
+function excludeSubscribeTodos(todos) {
+  return (todos || []).filter((item) => item && item.type !== "subscribe");
+}
+
 function buildTodoGroups(todos) {
   const items = Array.isArray(todos) ? todos : [];
   const groups = [];
@@ -633,7 +643,7 @@ function normalizeTodayTodos(home, context) {
   return buildFallbackTodos(context);
 }
 
-function buildFallbackTodos({ pendingHomework, continueCourse, subscribeEnabled }) {
+function buildFallbackTodos({ pendingHomework, continueCourse }) {
   const homeworkTodos = (pendingHomework || []).slice(0, 3).map((item, index) => ({
     id: `todo-homework-${item.id || index}`,
     type: "homework",
@@ -654,16 +664,7 @@ function buildFallbackTodos({ pendingHomework, continueCourse, subscribeEnabled 
     priority: 60,
     status: "进行中"
   }] : [];
-  const subscribeTodo = subscribeEnabled ? [] : [{
-    id: "todo-subscribe-learning",
-    type: "subscribe",
-    title: "开启学习提醒",
-    summary: "接收上课、作业和批改完成提醒，避免错过关键学习安排。",
-    actionText: "开启提醒",
-    priority: 50,
-    status: "建议开启"
-  }];
-  return homeworkTodos.concat(courseTodo, subscribeTodo);
+  return homeworkTodos.concat(courseTodo);
 }
 
 function decorateSubscription(reminder, enabled) {

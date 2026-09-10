@@ -70,13 +70,24 @@
           <view class="todo-icon">{{item.icon}}</view>
           <view class="todo-main">
             <view class="todo-top">
-          <view class="todo-title">{{item.type === 'subscribe' ? '学习提醒' : item.title}}</view>
-              <view class="todo-status">{{item.type === 'subscribe' ? '建议开启' : item.status}}</view>
+              <view class="todo-title">{{item.title}}</view>
+              <view wx:if="{{item.status}}" class="todo-status">{{item.status}}</view>
             </view>
-          <view class="todo-summary">{{item.type === 'subscribe' ? '接收上课、作业和批改完成提醒。' : item.summary}}</view>
+            <view wx:if="{{item.summary}}" class="todo-summary">{{item.summary}}</view>
           </view>
-          <view class="todo-action">{{item.type === 'subscribe' ? '开启提醒' : item.actionText}}</view>
+          <view class="todo-action">{{item.actionText}} ›</view>
         </view>
+      </view>
+    </view>
+
+    <view class="section" wx:if="{{showSubscribePrompt}}">
+      <view class="subscribe-prompt" bindtap="requestLearningSubscribe">
+        <view class="subscribe-prompt-icon">醒</view>
+        <view class="subscribe-prompt-main">
+          <view class="subscribe-prompt-title">{{subscriptionReminder.title || '学习提醒'}}</view>
+          <view class="subscribe-prompt-summary">{{subscriptionReminder.summary || '接收上课、作业和批改完成提醒。'}}</view>
+        </view>
+        <view class="subscribe-prompt-action">{{subscriptionReminder.actionText || '开启提醒'}} ›</view>
       </view>
     </view>
 

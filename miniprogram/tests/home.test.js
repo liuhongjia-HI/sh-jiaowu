@@ -48,6 +48,15 @@ test("home does not render a course card that duplicates today's todos", () => {
   assert.doesNotMatch(template, /class="home-banner"/);
 });
 
+test("home renders learning reminder as a standalone prompt instead of a todo card", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
+
+  assert.match(template, /class="subscribe-prompt"/);
+  assert.match(template, /bindtap="requestLearningSubscribe"/);
+  assert.match(template, /todo-action.*›/);
+  assert.doesNotMatch(template, /item\.type === 'subscribe'/);
+});
+
 test("home empty course card provides a teacher-contact activation path without progress details", async () => {
   const page = loadHomePage(() => Promise.resolve({
     student: { id: "stu-001", openedPackages: [] },
@@ -232,9 +241,9 @@ test("home page renders today todos and classroom feedback from student home", a
   await flushPromises();
 
   assert.equal(page.data.loading, false);
-  assert.equal(page.data.todoItems.length, 2);
+  assert.equal(page.data.todoItems.length, 1);
   assert.equal(page.data.todoItems[0].icon, "练");
-  assert.equal(page.data.todoItems[1].icon, "醒");
+  assert.equal(page.data.showSubscribePrompt, true);
   assert.equal(page.data.feedbackItems.length, 1);
   assert.equal(page.data.feedbackItems[0].score, 95);
   assert.equal(page.data.subscriptionReminder.actionText, "开启提醒");
@@ -259,6 +268,7 @@ test("home page shows two todos at a time and groups the rest for rotation", asy
   await flushPromises();
 
   assert.equal(page.data.todoItems.length, 6);
+  assert.equal(page.data.showSubscribePrompt, false);
   assert.equal(page.data.todoGroups.length, 3);
   assert.deepEqual(page.data.visibleTodoGroup.map((item) => item.id), ["todo-1", "todo-2"]);
   page.onHide();
@@ -499,11 +509,12 @@ test("home page derives today todos when student home has legacy fields only", a
   page.loadHome();
   await flushPromises();
 
-  assert.equal(page.data.todoItems.length, 3);
+  assert.equal(page.data.todoItems.length, 2);
   assert.equal(page.data.todoItems[0].type, "homework");
   assert.equal(page.data.todoItems[0].title, "英语阅读挑战");
   assert.equal(page.data.todoItems[1].type, "schedule");
-  assert.equal(page.data.todoItems[2].type, "subscribe");
+  assert.equal(page.data.showSubscribePrompt, true);
+  assert.equal(page.data.todoItems.some((item) => item.type === "subscribe"), false);
 });
 
 test("home page requests mini program subscription messages from todo action", async () => {
@@ -530,6 +541,7 @@ test("home page requests mini program subscription messages from todo action", a
   });
   page.setData({
     todoItems: [{ id: "todo-subscribe", type: "subscribe" }],
+    showSubscribePrompt: true,
     subscriptionReminder: { title: "学习提醒", actionText: "开启提醒", templateIds: [SUBSCRIBE_TEMPLATE_ID] }
   });
 
@@ -541,6 +553,7 @@ test("home page requests mini program subscription messages from todo action", a
   assert.deepEqual(calls.find((item) => item[0] === "request"), ["request", "/student/subscription", { templateIds: [SUBSCRIBE_TEMPLATE_ID] }]);
   assert.deepEqual(calls.find((item) => item[0] === "setStorageSync"), ["setStorageSync", "starline_subscribe_enabled", "1"]);
   assert.equal(page.data.subscribeEnabled, true);
+  assert.equal(page.data.showSubscribePrompt, false);
   assert.equal(page.data.todoItems.length, 0);
 });
 
