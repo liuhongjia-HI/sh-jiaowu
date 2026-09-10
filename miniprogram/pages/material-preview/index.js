@@ -15,7 +15,7 @@ Page({
   data: {
     material: {},
     activeHomework: {},
-    contentMode: "material",
+    contentMode: "list",
     tags: TAG_DEFINITIONS.map((item) => ({ ...item, count: 0 })),
     activeTag: "ALL",
     activeTagLabel: "All",
@@ -47,12 +47,13 @@ Page({
     this.lessonId = options.lessonId || "";
     this.pageLoadToken = 0;
     this.previewRetryCount = 0;
-    if (!id && (!this.courseId || !this.lessonId)) {
+    this.listFirst = !!(this.courseId && this.lessonId);
+    if (!id && !this.listFirst) {
       this.setData({ pageTitle: "课节信息缺失", displayTitle: "课节信息缺失", contentMode: "empty" });
       return;
     }
-    if (!id) {
-      this.setData({ pageTitle: "课节内容", displayTitle: "课节内容", contentMode: "empty" });
+    if (this.listFirst) {
+      this.setData({ pageTitle: "课节内容", displayTitle: "课节内容", contentMode: "list" });
       this.loadLessonContents();
       return;
     }
@@ -132,7 +133,7 @@ Page({
         displayTitle: resolvedLessonTitle || this.data.displayTitle,
         pageTitle: resolvedLessonTitle || this.data.pageTitle
       });
-      this.showTagContents("ALL", true);
+      this.showTagContents("ALL", !this.listFirst, this.listFirst);
     }).catch(() => {});
   },
   selectTag(event) {
@@ -141,6 +142,9 @@ Page({
   selectTagItem(event) {
     const item = (this.lessonContents || []).find((content) => content.id === event.currentTarget.dataset.id);
     if (item) this.showContent(item);
+  },
+  backToList() {
+    this.showTagContents(this.data.activeTag || "ALL", false, true);
   },
   showTagContents(code, preserveCurrent, listOnly) {
     const tagCode = normalizeFilterTag(code);
@@ -152,7 +156,7 @@ Page({
         this.stopContentSecurity();
         this.stopContentSecurity = null;
       }
-      this.setData({ contentMode: "empty", activeHomework: {}, materialCode: "" });
+      this.setData({ contentMode: "empty", activeHomework: {}, materialCode: "", contentTagLabel: tagLabel(tagCode) });
       return;
     }
     if (listOnly) {
@@ -161,7 +165,7 @@ Page({
         this.stopContentSecurity();
         this.stopContentSecurity = null;
       }
-      this.setData({ contentMode: "list", activeHomework: {}, materialCode: "" });
+      this.setData({ contentMode: "list", activeHomework: {}, materialCode: "", contentTagLabel: tagLabel(tagCode) });
       return;
     }
     const current = preserveCurrent && items.find((item) => item.contentType === "material" && item.id === this.materialId);

@@ -1,11 +1,11 @@
 <view class="material-preview-page">
-  <view class="global-watermark-layer" aria-hidden="true">
+  <view wx:if="{{contentMode === 'material'}}" class="global-watermark-layer" aria-hidden="true">
     <view wx:for="{{watermarkTexts}}" wx:key="index" class="global-watermark">{{item}}</view>
   </view>
 
   <view class="preview-header">
     <view class="preview-title">{{displayTitle}}</view>
-    <view class="preview-meta-line">
+    <view wx:if="{{contentMode === 'material' || contentMode === 'homework'}}" class="preview-meta-line">
       <text class="preview-kicker">{{contentTagLabel || activeTagLabel}}</text>
       <text wx:if="{{contentMode === 'material' && materialCode}}" class="preview-code">{{materialCode}}</text>
     </view>
@@ -20,13 +20,9 @@
     </view>
   </scroll-view>
 
-  <scroll-view wx:if="{{contentMode === 'material' && tagItems.length > 1}}" class="tag-item-filter" scroll-x="true" enable-flex="true" show-scrollbar="{{false}}">
-    <view class="tag-item-filter-inner">
-      <view wx:for="{{tagItems}}" wx:key="id" class="tag-item {{(item.contentType === 'material' && material.id === item.id) || (item.contentType === 'homework' && activeHomework.id === item.id) ? 'is-active' : ''}}" data-id="{{item.id}}" bindtap="selectTagItem">{{item.displayName || item.title}}</view>
-    </view>
-  </scroll-view>
 
   <view class="section">
+    <view wx:if="{{(contentMode === 'material' || contentMode === 'homework') && tagItems.length}}" class="back-to-list" bindtap="backToList">‹ 返回列表</view>
     <block wx:if="{{contentMode === 'material'}}">
       <view wx:if="{{recordingWarning}}" class="recording-warning">
         <view class="recording-guard-icon">⚠️</view>
@@ -95,6 +91,7 @@
           <view class="tag-content-list-name">{{item.displayName || item.title}}</view>
           <view class="tag-content-list-desc">{{item.contentType === 'homework' ? (item.questionNum || 0) + ' 道题' : '课程资料'}}</view>
         </view>
+        <view wx:if="{{item.tagCode}}" class="tag-content-list-tag">{{item.tagCode}}</view>
         <view class="tag-content-list-arrow">›</view>
       </view>
     </view>
