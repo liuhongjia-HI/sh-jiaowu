@@ -9,7 +9,10 @@ test("material preview keeps only the preview card as the full-courseware entry"
   assert.doesNotMatch(template, />打开完整课件<\/button>/);
   assert.doesNotMatch(template, /class="preview-action"/);
   assert.doesNotMatch(template, /class="watermark-layer"/);
+  assert.doesNotMatch(template, /tag-item-filter/);
   assert.match(template, /class="button challenge-button" bindtap="goAnswer"/);
+  assert.match(template, /bindtap="backToList"/);
+  assert.match(template, /contentMode === 'list'/);
 });
 
 test("material preview uses English action labels and hides study-count caption", () => {
@@ -48,7 +51,8 @@ test("material preview defaults to All, uses English tags, and filters content w
 
   assert.equal(page.data.activeTag, "ALL");
   assert.equal(page.data.activeTagLabel, "All");
-  assert.equal(page.data.contentTagLabel, "HD");
+  assert.equal(page.data.contentMode, "list");
+  assert.equal(page.data.contentTagLabel, "All");
   assert.deepEqual(page.data.tags.map((item) => [item.code, item.shortLabel, item.count]), [
     ["ALL", "All", 2],
     ["HD", "HD", 1],
@@ -73,6 +77,61 @@ test("material preview defaults to All, uses English tags, and filters content w
   assert.equal(page.data.tagItems.length, 0);
 });
 
+test("lesson entry shows the content list before opening a material", async () => {
+  const requested = [];
+  const page = loadMaterialPreviewPage((path) => {
+    requested.push(path);
+    if (path === "/student/study/course-1") return Promise.resolve({
+      course: { curriculum: [{ id: "lesson-1", type: "lesson", name: "What is Science" }] },
+      materials: [
+        { id: "mat-hd", title: "HD_G5S1Q1_Sci_S_1.1 What is Science", lessonId: "lesson-1", courseId: "course-1", tagCode: "HD" },
+        { id: "mat-blank", title: "Blank_G5S1Q1_Sci_S_1.1 What is Science", lessonId: "lesson-1", courseId: "course-1", tagCode: "Blank" }
+      ],
+      homework: [
+        { id: "hw-1", title: "What is Science", lessonId: "lesson-1", tagCode: "HW", questionNum: 6 },
+        { id: "hw-2", title: "HW_1.1", lessonId: "lesson-1", tagCode: "HW", questionNum: 4 }
+      ]
+    });
+    if (path === "/student/materials/mat-hd") return Promise.resolve({
+      id: "mat-hd",
+      title: "HD_G5S1Q1_Sci_S_1.1 What is Science",
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      tagCode: "HD",
+      curriculum: { lesson: "What is Science" }
+    });
+    if (path === "/student/materials/mat-hd/preview/pages") return Promise.resolve({ imageMode: false, pageCount: 0 });
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock());
+
+  page.onLoad({ id: "mat-hd", courseId: "course-1", lessonId: "lesson-1" });
+  await flushPromises();
+
+  assert.equal(page.data.contentMode, "list");
+  assert.equal(page.data.displayTitle, "What is Science");
+  assert.equal(page.data.activeTag, "ALL");
+  assert.deepEqual(page.data.tagItems.map((item) => [item.id, item.tagCode, item.displayName || item.title]), [
+    ["mat-hd", "HD", "What is Science"],
+    ["mat-blank", "Blank", "What is Science"],
+    ["hw-1", "HW", "What is Science"],
+    ["hw-2", "HW", "HW_1.1"]
+  ]);
+  assert.equal(requested.includes("/student/materials/mat-hd"), false);
+
+  page.selectTagItem({ currentTarget: { dataset: { id: "mat-hd" } } });
+  await flushPromises();
+  await flushPromises();
+  assert.equal(page.data.contentMode, "material");
+  assert.equal(page.data.materialCode, "HD_G5S1Q1_Sci_S_1.1");
+  assert.equal(page.data.contentTagLabel, "HD");
+
+  page.backToList();
+  assert.equal(page.data.contentMode, "list");
+  assert.equal(page.data.materialCode, "");
+  assert.equal(page.data.contentTagLabel, "All");
+});
+
 test("homework-only lesson can enter the tagged content page without a material id", async () => {
   const page = loadMaterialPreviewPage((path) => {
     if (path === "/student/study/course-1") return Promise.resolve({
@@ -87,10 +146,13 @@ test("homework-only lesson can enter the tagged content page without a material 
   await flushPromises();
 
   assert.equal(page.data.activeTag, "ALL");
+  assert.equal(page.data.contentMode, "list");
+  assert.deepEqual(page.data.tagItems.map((item) => item.id), ["homework-1"]);
+  assert.equal(page.data.lessonTitle, "课节一");
+  page.selectTagItem({ currentTarget: { dataset: { id: "homework-1" } } });
   assert.equal(page.data.contentMode, "homework");
   assert.equal(page.data.activeHomework.id, "homework-1");
   assert.equal(page.data.contentTagLabel, "Exam");
-  assert.equal(page.data.lessonTitle, "课节一");
 });
 
 test("material preview shows lesson name instead of file-code title", async () => {
@@ -122,9 +184,15 @@ test("material preview shows lesson name instead of file-code title", async () =
   await flushPromises();
 
   assert.equal(page.data.displayTitle, "Themes and Elements");
-  assert.equal(page.data.materialCode, "HD_G5S1Q1_1.1.2");
+  assert.equal(page.data.contentMode, "list");
+  assert.equal(page.data.materialCode, "");
   assert.equal(page.data.activeTag, "ALL");
   assert.equal(page.data.activeTagLabel, "All");
+  page.selectTagItem({ currentTarget: { dataset: { id: "mat-hd" } } });
+  await flushPromises();
+  await flushPromises();
+  assert.equal(page.data.contentMode, "material");
+  assert.equal(page.data.materialCode, "HD_G5S1Q1_1.1.2");
   assert.equal(page.data.contentTagLabel, "HD");
 });
 

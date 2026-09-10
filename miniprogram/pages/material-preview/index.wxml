@@ -20,7 +20,6 @@
     </view>
   </scroll-view>
 
-
   <view class="section">
     <view wx:if="{{(contentMode === 'material' || contentMode === 'homework') && tagItems.length}}" class="back-to-list" bindtap="backToList">‹ 返回列表</view>
     <block wx:if="{{contentMode === 'material'}}">
