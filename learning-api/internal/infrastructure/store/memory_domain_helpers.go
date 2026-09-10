@@ -791,7 +791,12 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 			nameByParent[node.ParentID] = map[string]bool{}
 		}
 		if node.Name != "" && nameByParent[node.ParentID][node.Name] {
-			return nil, errors.New("同一级目录名称不能重复")
+			label := map[learning.CurriculumNodeType]string{
+				learning.CurriculumUnit:    "Unit",
+				learning.CurriculumChapter: "Chapter",
+				learning.CurriculumLesson:  "Lesson",
+			}[node.Type]
+			return nil, errors.New("同一个上级下的" + label + "名称不能重复：" + node.Name)
 		}
 		if node.Name != "" {
 			nameByParent[node.ParentID][node.Name] = true

@@ -37,6 +37,9 @@ test("material preview shows five fixed tags and filters content within the curr
 
   assert.deepEqual(page.data.tags.map((item) => [item.code, item.count]), [["HD", 1], ["Blank", 0], ["HW", 1], ["Exam", 0], ["Special", 0]]);
   page.selectTag({ currentTarget: { dataset: { code: "HW" } } });
+  assert.equal(page.data.contentMode, "list");
+  assert.equal(page.data.tagItems[0].id, "homework-1");
+  page.selectTagItem({ currentTarget: { dataset: { id: "homework-1" } } });
   assert.equal(page.data.contentMode, "homework");
   assert.equal(page.data.activeHomework.id, "homework-1");
   page.goAnswer();

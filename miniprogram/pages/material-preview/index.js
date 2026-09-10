@@ -16,6 +16,7 @@ Page({
     contentMode: "material",
     tags: TAG_DEFINITIONS.map((item) => ({ ...item, count: 0 })),
     activeTag: "HD",
+    activeTagLabel: "课程讲义",
     tagItems: [],
     lessonTitle: "",
     pageTitle: "资料预览",
@@ -121,15 +122,15 @@ Page({
     }).catch(() => {});
   },
   selectTag(event) {
-    this.showTagContents(event.currentTarget.dataset.code || "HD");
+    this.showTagContents(event.currentTarget.dataset.code || "HD", false, true);
   },
   selectTagItem(event) {
     const item = (this.lessonContents || []).find((content) => content.id === event.currentTarget.dataset.id);
     if (item) this.showContent(item);
   },
-  showTagContents(code, preserveCurrent) {
+  showTagContents(code, preserveCurrent, listOnly) {
     const items = (this.lessonContents || []).filter((item) => item.tagCode === code);
-    this.setData({ activeTag: code, tagItems: items });
+      this.setData({ activeTag: code, activeTagLabel: (TAG_DEFINITIONS.find((tag) => tag.code === code) || {}).label || code, tagItems: items });
     if (!items.length) {
       this.pageLoadToken += 1;
       if (this.stopContentSecurity) {
@@ -137,6 +138,15 @@ Page({
         this.stopContentSecurity = null;
       }
       this.setData({ contentMode: "empty", pageTitle: this.data.lessonTitle || "课节内容", activeHomework: {} });
+      return;
+    }
+    if (listOnly) {
+      this.pageLoadToken += 1;
+      if (this.stopContentSecurity) {
+        this.stopContentSecurity();
+        this.stopContentSecurity = null;
+      }
+      this.setData({ contentMode: "list", activeHomework: {}, pageTitle: `${TAG_DEFINITIONS.find((tag) => tag.code === code)?.label || code}资料` });
       return;
     }
     const current = preserveCurrent && items.find((item) => item.contentType === "material" && item.id === this.materialId);

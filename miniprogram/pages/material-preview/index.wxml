@@ -86,6 +86,14 @@
       <view class="lesson-content-desc">{{activeHomework.questionNum || 0}} 道题，完成后可查看结果</view>
       <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
     </view>
+    <view wx:elif="{{contentMode === 'list'}}" class="tag-content-list">
+      <view class="tag-content-list-title">{{activeTagLabel}}（{{tagItems.length}}）</view>
+      <view wx:for="{{tagItems}}" wx:key="id" class="tag-content-list-item" data-id="{{item.id}}" bindtap="selectTagItem">
+        <view class="tag-content-list-icon">{{item.contentType === 'homework' ? '✍️' : '📄'}}</view>
+        <view class="tag-content-list-main"><view class="tag-content-list-name">{{item.title}}</view><view class="tag-content-list-desc">{{item.contentType === 'homework' ? (item.questionNum || 0) + ' 道题' : '课程资料'}}</view></view>
+        <view class="tag-content-list-arrow">›</view>
+      </view>
+    </view>
     <view wx:else class="lesson-content-state">
       <view class="lesson-content-icon">📭</view>
       <view class="lesson-content-title">这个标签下暂时没有内容</view>

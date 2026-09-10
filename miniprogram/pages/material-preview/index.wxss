@@ -51,6 +51,14 @@
 .tag-item-filter-inner { display: inline-flex; gap: 12rpx; padding: 0 32rpx; }
 .tag-item { max-width: 360rpx; overflow: hidden; padding: 10rpx 16rpx; border: 1rpx solid #e4e5e9; border-radius: 999rpx; color: #777a83; font-size: 20rpx; text-overflow: ellipsis; white-space: nowrap; }
 .tag-item.is-active { border-color: #ffb69b; background: #fff4ef; color: #ff5a1f; }
+.tag-content-list { padding: 28rpx; background: #fff; }
+.tag-content-list-title { margin-bottom: 18rpx; color: #262832; font-size: 30rpx; font-weight: 800; }
+.tag-content-list-item { display: flex; align-items: center; gap: 18rpx; padding: 22rpx 0; border-bottom: 1rpx solid #eceef2; }
+.tag-content-list-icon { width: 58rpx; height: 58rpx; border-radius: 50%; background: #fff0e9; color: #ff5a1f; text-align: center; line-height: 58rpx; }
+.tag-content-list-main { flex: 1; min-width: 0; }
+.tag-content-list-name { overflow: hidden; color: #292b34; font-size: 26rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.tag-content-list-desc { margin-top: 6rpx; color: #9a9da8; font-size: 22rpx; }
+.tag-content-list-arrow { color: #a2a5af; font-size: 40rpx; }
 
 .lesson-content-state { padding: 78rpx 28rpx 34rpx; text-align: center; }
 .lesson-content-icon { font-size: 72rpx; }
