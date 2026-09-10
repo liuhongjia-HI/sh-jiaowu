@@ -28,7 +28,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			course_id VARCHAR(64) NOT NULL,
 			parent_id VARCHAR(64) NOT NULL DEFAULT '',
 			node_type VARCHAR(16) NOT NULL,
-			name VARCHAR(128) NOT NULL,
+			name VARCHAR(128) NULL,
 			sort_order INT NOT NULL DEFAULT 0,
 			UNIQUE KEY uk_course_curriculum_name (course_id, parent_id, name),
 			KEY idx_course_curriculum_parent (course_id, parent_id, sort_order)
@@ -334,6 +334,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			PRIMARY KEY (guardian_id, student_id),
 			KEY idx_guardian_students_student (student_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+	}
+	if _, err := s.db.Exec(`ALTER TABLE course_curriculum_nodes MODIFY COLUMN name VARCHAR(128) NULL`); err != nil {
+		return err
 	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {

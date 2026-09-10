@@ -5,7 +5,7 @@ func contentRows(s *MemoryStore) []persistenceRow {
 	for _, item := range s.courses {
 		rows = append(rows, simpleRow("courses", "id", item.ID, `INSERT INTO courses (id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE learning_space_id=VALUES(learning_space_id), name=VALUES(name), subject=VALUES(subject), grade=VALUES(grade), status=VALUES(status), chapter_count=VALUES(chapter_count), chapters_json=VALUES(chapters_json)`, item.ID, item.LearningSpaceID, item.Name, item.Subject, item.Grade, item.Status, item.ChapterCount, mustJSON(item.Chapters)))
 		for _, node := range item.Curriculum {
-			rows = append(rows, simpleRow("course_curriculum_nodes", "id", node.ID, `INSERT INTO course_curriculum_nodes (id, course_id, parent_id, node_type, name, sort_order) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE course_id=VALUES(course_id), parent_id=VALUES(parent_id), node_type=VALUES(node_type), name=VALUES(name), sort_order=VALUES(sort_order)`, node.ID, item.ID, node.ParentID, node.Type, node.Name, node.SortOrder))
+			rows = append(rows, simpleRow("course_curriculum_nodes", "id", node.ID, `INSERT INTO course_curriculum_nodes (id, course_id, parent_id, node_type, name, sort_order) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE course_id=VALUES(course_id), parent_id=VALUES(parent_id), node_type=VALUES(node_type), name=VALUES(name), sort_order=VALUES(sort_order)`, node.ID, item.ID, node.ParentID, node.Type, nullableCurriculumName(node.Name), node.SortOrder))
 		}
 	}
 	for _, item := range s.materials {

@@ -417,9 +417,11 @@ func (s *MemoryStore) loadCourseCurriculumFromDB() error {
 	for rows.Next() {
 		var node learning.CurriculumNode
 		var courseID string
-		if err := rows.Scan(&node.ID, &courseID, &node.ParentID, &node.Type, &node.Name, &node.SortOrder); err != nil {
+		var name sql.NullString
+		if err := rows.Scan(&node.ID, &courseID, &node.ParentID, &node.Type, &name, &node.SortOrder); err != nil {
 			return err
 		}
+		node.Name = name.String
 		byCourse[courseID] = append(byCourse[courseID], node)
 	}
 	if err := rows.Err(); err != nil {

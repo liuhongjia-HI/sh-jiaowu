@@ -175,7 +175,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		for _, node := range course.Curriculum {
 			if _, err := tx.Exec(
 				`INSERT INTO course_curriculum_nodes (id, course_id, parent_id, node_type, name, sort_order) VALUES (?, ?, ?, ?, ?, ?)`,
-				node.ID, course.ID, node.ParentID, node.Type, node.Name, node.SortOrder,
+				node.ID, course.ID, node.ParentID, node.Type, nullableCurriculumName(node.Name), node.SortOrder,
 			); err != nil {
 				return err
 			}
