@@ -21,8 +21,9 @@ test("material preview shows five fixed tags and filters content within the curr
     if (path === "/student/study/course-1") return Promise.resolve({
       course: { curriculum: [{ id: "lesson-1", type: "lesson", name: "Themes and Elements" }] },
       materials: [
-        { id: "mat-hd", title: "课程讲义", lessonId: "lesson-1", tagCode: "HD" },
-        { id: "mat-other", title: "其他课讲义", lessonId: "lesson-2", tagCode: "Blank" }
+        { id: "mat-hd", title: "课程讲义", lessonId: "lesson-1", courseId: "course-1", tagCode: "HD" },
+        { id: "mat-hd-2", title: "第二份讲义", lessonId: "lesson-2", courseId: "course-1", tagCode: "HD" },
+        { id: "mat-other", title: "空白练习", lessonId: "lesson-2", courseId: "course-1", tagCode: "Blank" }
       ],
       homework: [{ id: "homework-1", title: "课后作业", lessonId: "lesson-1", tagCode: "HW", questionNum: 8 }]
     });
@@ -35,7 +36,7 @@ test("material preview shows five fixed tags and filters content within the curr
   await flushPromises();
   await flushPromises();
 
-  assert.deepEqual(page.data.tags.map((item) => [item.code, item.count]), [["HD", 1], ["Blank", 0], ["HW", 1], ["Exam", 0], ["Special", 0]]);
+  assert.deepEqual(page.data.tags.map((item) => [item.code, item.count]), [["HD", 2], ["Blank", 1], ["HW", 1], ["Exam", 0], ["Special", 0]]);
   page.selectTag({ currentTarget: { dataset: { code: "HW" } } });
   assert.equal(page.data.contentMode, "list");
   assert.equal(page.data.tagItems[0].id, "homework-1");
@@ -46,8 +47,8 @@ test("material preview shows five fixed tags and filters content within the curr
   assert.deepEqual(navigatedUrls, ["/pages/answer/index?id=homework-1"]);
 
   page.selectTag({ currentTarget: { dataset: { code: "Blank" } } });
-  assert.equal(page.data.contentMode, "empty");
-  assert.equal(page.data.tagItems.length, 0);
+  assert.equal(page.data.contentMode, "list");
+  assert.equal(page.data.tagItems.length, 1);
 });
 
 test("homework-only lesson can enter the tagged content page without a material id", async () => {

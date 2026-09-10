@@ -106,9 +106,12 @@ Page({
   loadLessonContents() {
     if (!this.courseId || !this.lessonId) return;
     request(`/student/study/${this.courseId}`).then((detail) => {
+      const courseMaterials = detail.materials || [];
+      const courseHomework = detail.homework || [];
+      // 标签筛选面向当前课程的全部内容；课节只用于从课程详情进入时保留上下文。
       const contents = [
-        ...(detail.materials || []).filter((item) => item.lessonId === this.lessonId).map((item) => ({ ...item, contentType: "material", tagCode: normalizeTagCode(item.tagCode) || "HD" })),
-        ...(detail.homework || []).filter((item) => item.lessonId === this.lessonId).map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "HW" }))
+        ...courseMaterials.map((item) => ({ ...item, contentType: "material", tagCode: normalizeTagCode(item.tagCode) || "HD" })),
+        ...courseHomework.map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "HW" }))
       ];
       const lesson = ((detail.course && detail.course.curriculum) || []).find((node) => node.id === this.lessonId);
       this.lessonContents = contents;
