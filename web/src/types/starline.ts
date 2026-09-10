@@ -173,6 +173,7 @@ export type Student = {
   officialAccountOpenId?: string;
   openedPackages: string[];
   openedPackageRefs: StudentPackageRef[];
+  openedSubjects?: string[];
   learningStatus: string;
   accountStatus: string;
   registrationSource?: string;

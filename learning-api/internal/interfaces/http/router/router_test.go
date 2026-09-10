@@ -1272,7 +1272,7 @@ func TestStudentHomeworkDownloadUsesStudentSecureRoute(t *testing.T) {
 		t.Fatalf("teacher principal: %v", err)
 	}
 	homework, err := app.store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
-		Title: "学生习题下载测试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "HW",
+		Title: "学生习题下载测试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "Exam",
 		File: learning.FileAsset{
 			ID: "file-student-homework-download", FileName: "homework.pdf", FileSize: int64(len(original)), FileType: "PDF",
 			ContentType: "application/pdf", OriginalPath: source, PreviewPath: source, PreviewStatus: "可预览",

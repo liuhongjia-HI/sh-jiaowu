@@ -146,9 +146,11 @@ func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, qu
 	return out
 }
 
-var contentTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "Exam": true, "Special": true}
-var materialTagCodes = map[string]bool{"HD": true, "Blank": true}
-var homeworkTagCodes = map[string]bool{"HW": true, "Exam": true, "Special": true}
+var contentTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "TK": true, "Exam": true, "Special": true}
+var materialTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "TK": true}
+var homeworkTagCodes = map[string]bool{"Exam": true, "Special": true}
+var materialHandoutTags = []string{"HD", "Blank", "HW", "TK"}
+var homeworkQuestionTags = []string{"Exam", "Special"}
 
 var contentTagPrefixes = []struct {
 	prefix string
@@ -157,6 +159,7 @@ var contentTagPrefixes = []struct {
 	{prefix: "hd", code: "HD"},
 	{prefix: "blank", code: "Blank"},
 	{prefix: "hw", code: "HW"},
+	{prefix: "tk", code: "TK"},
 	{prefix: "exam", code: "Exam"},
 	{prefix: "special", code: "Special"},
 }
@@ -236,7 +239,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 		return learning.Material{}, err
 	}
 	tagCode = contentTagCodeOrInferred(tagCode, req.Title, req.File.FileName)
-	if err := validateContentTagCodeForKind(tagCode, materialTagCodes, "课程讲义只能选择 HD 或 Blank 标签"); err != nil {
+	if err := validateContentTagCodeForKind(tagCode, materialTagCodes, "课程讲义只能选择 HD、Blank、HW 或 TK 标签"); err != nil {
 		return learning.Material{}, err
 	}
 	if req.Title == "" {
@@ -405,7 +408,7 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 		return learning.Material{}, err
 	}
 	tagCode = contentTagCodeOrInferred(tagCode, req.Title)
-	if err := validateContentTagCodeForKind(tagCode, materialTagCodes, "课程讲义只能选择 HD 或 Blank 标签"); err != nil {
+	if err := validateContentTagCodeForKind(tagCode, materialTagCodes, "课程讲义只能选择 HD、Blank、HW 或 TK 标签"); err != nil {
 		return learning.Material{}, err
 	}
 	if req.Title == "" {
@@ -752,7 +755,7 @@ func (s *MemoryStore) createHomeworkUnlocked(operator string, principal learning
 		return learning.Homework{}, err
 	}
 	tagCode = contentTagCodeOrInferred(tagCode, req.Title, req.File.FileName)
-	if err := validateContentTagCodeForKind(tagCode, homeworkTagCodes, "课后练习只能选择 HW、Exam 或 Special 标签"); err != nil {
+	if err := validateContentTagCodeForKind(tagCode, homeworkTagCodes, "课后练习只能选择 Exam 或 Special 标签"); err != nil {
 		return learning.Homework{}, err
 	}
 	if req.Title == "" {
@@ -849,7 +852,7 @@ func (s *MemoryStore) updateHomeworkUnlocked(operator string, principal learning
 		return learning.Homework{}, err
 	}
 	tagCode = contentTagCodeOrInferred(tagCode, req.Title)
-	if err := validateContentTagCodeForKind(tagCode, homeworkTagCodes, "课后练习只能选择 HW、Exam 或 Special 标签"); err != nil {
+	if err := validateContentTagCodeForKind(tagCode, homeworkTagCodes, "课后练习只能选择 Exam 或 Special 标签"); err != nil {
 		return learning.Homework{}, err
 	}
 	status := learning.Status(strings.TrimSpace(req.Status))

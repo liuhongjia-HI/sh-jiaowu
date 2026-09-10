@@ -4,14 +4,14 @@ Page({
   data: {
     loading: true,
     error: "",
-    emptyMessage: "开通课程后，这里会显示学习内容。",
+    emptyMessage: "Unlocked courses will appear here.",
     keyword: "",
-    activeFilter: "全部",
+    activeFilter: "all",
     filters: [
-      { label: "全部", className: "active" },
-      { label: "学习中", className: "" },
-      { label: "已收藏", className: "" },
-      { label: "已完成", className: "" }
+      { key: "all", label: "All", className: "active" },
+      { key: "learning", label: "In Progress", className: "" },
+      { key: "saved", label: "Saved", className: "" },
+      { key: "done", label: "Completed", className: "" }
     ],
     courses: [],
     subjects: [],
@@ -31,7 +31,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "我的 Starline 学习内容",
+      title: "My Starline learning",
       path: "/pages/study/index"
     };
   },
@@ -93,8 +93,8 @@ Page({
         }, () => this.applyFilters());
       })
       .catch((error) => this.setData({
-        error: error.message || "加载失败",
-        emptyMessage: error.message || "开通课程后，这里会显示学习内容。",
+        error: error.message || "Failed to load",
+        emptyMessage: error.message || "Unlocked courses will appear here.",
         hasOpenedPackage: false,
         openedCourseCount: 0,
         authRequired: !hasStudentToken(),
@@ -109,7 +109,7 @@ Page({
     const activeFilter = event.currentTarget.dataset.filter;
     this.setData({
       activeFilter,
-      filters: this.data.filters.map((item) => ({ ...item, className: item.label === activeFilter ? "active" : "" }))
+      filters: this.data.filters.map((item) => ({ ...item, className: item.key === activeFilter ? "active" : "" }))
     }, () => this.applyFilters());
   },
   applyFilters() {
@@ -117,7 +117,11 @@ Page({
     const activeFilter = this.data.activeFilter;
     const visibleCourses = this.data.courses.filter((course) => {
       const matchKeyword = !keyword || [course.name, course.displayName, course.subject, course.grade].join(" ").toLowerCase().includes(keyword);
-      const matchFilter = activeFilter === "全部" || (activeFilter === "学习中" && course.status !== "已完成") || (activeFilter === "已收藏" && course.favorited) || (activeFilter === "已完成" && course.status === "已完成");
+      const completed = isCompletedCourse(course);
+      const matchFilter = activeFilter === "all"
+        || (activeFilter === "learning" && !completed)
+        || (activeFilter === "saved" && course.favorited)
+        || (activeFilter === "done" && completed);
       return matchKeyword && matchFilter;
     });
     this.setData({ visibleCourses });
@@ -128,11 +132,11 @@ Page({
     const course = this.data.courses.find((item) => item.entryCourseId === id || item.id === id);
     const canOpen = course ? course.canOpen : dataset.canOpen;
     if (!canOpen) {
-      wx.showToast({ title: dataset.message || "开通后即可学习全部内容", icon: "none" });
+      wx.showToast({ title: dataset.message || "Unlock to access all content", icon: "none" });
       return;
     }
     if (!id) {
-      wx.showToast({ title: "学习内容正在准备", icon: "none" });
+      wx.showToast({ title: "Content is being prepared", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/study-detail/index?id=${id}` });
@@ -143,6 +147,10 @@ function hasStudentToken() {
   return Boolean(wx.getStorageSync && wx.getStorageSync("starline_token"));
 }
 
+function isCompletedCourse(course) {
+  return course.status === "已完成" || Number(course.progress) >= 100;
+}
+
 // decorateCourses 使用接口返回的真实进度，仅补充图标等展示字段。
 function decorateCourses(courses, favorites) {
   const favoriteCourseNames = (favorites || []).map((item) => item.course).filter(Boolean);
@@ -150,16 +158,21 @@ function decorateCourses(courses, favorites) {
     const progress = Number(course.progress) || 0;
     const isNew = Boolean(course.isNew);
     const isOpened = Boolean(course.isOpened);
+    const accessLabel = course.accessLabel || (isOpened ? "已开通" : ((Number(course.materialNum) > 0 || Number(course.homeworkNum) > 0) ? "首节可体验" : ""));
+    const isPreview = course.accessState === "preview" || accessLabel === "首节可体验";
+    const isPreparing = course.accessState === "pending" || accessLabel === "内容准备中";
     return {
       ...course,
       progress,
       favorited: favoriteCourseNames.includes(course.name),
-      badgeText: course.accessLabel || (progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新内容"),
+      badgeText: accessLabel || (progress >= 80 ? "阅读小达人" : progress > 0 ? "继续加油" : "新内容"),
       cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : isOpened ? "opened-course" : "",
       newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
       entryCourseId: course.entryCourseId || course.id,
-      accessLabel: course.accessLabel || (isOpened ? "已开通" : ((Number(course.materialNum) > 0 || Number(course.homeworkNum) > 0) ? "首节可体验" : "")),
+      accessLabel,
+      isPreview,
+      isPreparing,
       // 兼容旧接口未返回 accessState/canOpen 的情况：有首节内容就应允许进入体验。
       canOpen: course.accessState !== "pending" && (course.accessState === "preview" || (typeof course.canOpen === "boolean" ? course.canOpen : Boolean(course.id)) || Number(course.materialNum) > 0 || Number(course.homeworkNum) > 0),
       isLocked: course.accessState === "locked" && Number(course.materialNum) <= 0 && Number(course.homeworkNum) <= 0,
@@ -199,7 +212,7 @@ function formatCourseTime(value) {
 
 function studyEmptyMessage(hasOpenedPackage) {
   if (hasOpenedPackage) {
-    return "课程已开通，内容发布后会显示在这里。";
+    return "Course unlocked. Content will appear here once published.";
   }
-  return "暂时还没有开通课程，请联系老师确认。";
+  return "No courses unlocked yet. Please contact your teacher.";
 }

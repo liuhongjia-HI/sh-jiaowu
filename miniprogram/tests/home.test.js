@@ -332,7 +332,58 @@ test("home summary cards expose direct actions for todos, materials, and notices
   assert.match(template, /class="status-item"\s+data-action="tasks"\s+bindtap="handleShortcut"/);
   assert.match(template, /class="status-item"\s+data-action="study"\s+bindtap="handleShortcut"/);
   assert.match(template, /class="status-item"\s+data-action="notices"\s+bindtap="handleShortcut"/);
-  assert.match(template, /<view class="status-item"\s+data-action="study"\s+bindtap="handleShortcut">\s*<view class="status-value">\{\{materialCount\}\}<\/view>\s*<view class="status-label">在学课程<\/view>/);
+  assert.match(template, /<view class="status-item"\s+data-action="study"\s+bindtap="handleShortcut">\s*<view class="status-value">\{\{openedSubjectCount\}\}<\/view>\s*<view class="status-label">在学课程<\/view>/);
+});
+
+test("home summary card counts unique opened subjects instead of materials", async () => {
+  const page = loadHomePage(() => Promise.resolve({
+    student: {
+      id: "stu-001",
+      openedPackages: ["五年级英语S1", "五年级英语S2", "五年级数学"],
+      openedSubjects: ["英语", "数学"]
+    },
+    courses: [
+      { id: "course-001", name: "五年级英语阅读", subject: "英语" },
+      { id: "course-002", name: "五年级英语听力", subject: "英文" },
+      { id: "course-003", name: "五年级数学思维", subject: "数学" }
+    ],
+    continueCourse: {},
+    pendingHomework: [],
+    materials: [{ id: "mat-1" }, { id: "mat-2" }, { id: "mat-3" }, { id: "mat-4" }, { id: "mat-5" }],
+    notices: []
+  }), {
+    getStorageSync() {
+      return "token";
+    }
+  });
+
+  page.loadHome();
+  await flushPromises();
+
+  assert.equal(page.data.openedSubjectCount, 2);
+});
+
+test("home summary card falls back to unique course subjects when openedSubjects is missing", async () => {
+  const page = loadHomePage(() => Promise.resolve({
+    student: { id: "stu-001", openedPackages: ["五年级英语S1", "五年级英语S2"] },
+    courses: [
+      { id: "course-001", name: "五年级英语阅读", subject: "英语" },
+      { id: "course-002", name: "五年级英语听力", subject: "英文" }
+    ],
+    continueCourse: {},
+    pendingHomework: [],
+    materials: [{ id: "mat-1" }, { id: "mat-2" }, { id: "mat-3" }],
+    notices: []
+  }), {
+    getStorageSync() {
+      return "token";
+    }
+  });
+
+  page.loadHome();
+  await flushPromises();
+
+  assert.equal(page.data.openedSubjectCount, 1);
 });
 
 test("home page displays unopened subject recommendations", async () => {

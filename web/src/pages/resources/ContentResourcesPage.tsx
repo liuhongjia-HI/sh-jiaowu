@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, http, postData, postForm, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
-import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog } from './ResourceDialogs';
+import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog, homeworkTagOptions, materialTagOptions } from './ResourceDialogs';
 import { canUpload } from './resource-shared';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, QuestionBankItem, StudyPackage } from '../../types/starline';
 import type { UploadFile } from 'antd';
@@ -22,6 +22,7 @@ function suggestTagCode(fileName: string) {
   if (normalized.startsWith('hd_')) return 'HD';
   if (normalized.startsWith('blank_')) return 'Blank';
   if (normalized.startsWith('hw_')) return 'HW';
+  if (normalized.startsWith('tk_')) return 'TK';
   if (normalized.startsWith('exam_')) return 'Exam';
   if (normalized.startsWith('special_')) return 'Special';
   return '';
@@ -289,7 +290,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
 
   const subjectOptions = Array.from(new Set((resources.data ?? []).map((row) => row.subject).filter(Boolean))).map((value) => ({ label: value, value }));
   const gradeOptions = Array.from(new Set((courses.data ?? []).map((course) => course.grade).filter(Boolean))).map((value) => ({ label: value, value }));
-  const tagOptions = [{ label: 'HD · 课程讲义', value: 'HD' }, { label: 'Blank · 空白练习', value: 'Blank' }, { label: 'HW · 课后作业', value: 'HW' }, { label: 'Exam · 测试卷', value: 'Exam' }, { label: 'Special · 专题资料', value: 'Special' }];
+  const tagOptions = kind === 'materials' ? materialTagOptions : homeworkTagOptions;
   const courseOptions = (courses.data ?? []).map((course) => ({ label: course.name, value: course.id }));
   const tagQuickFilters = <div className="content-filter-tags" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', width: '100%', paddingTop: 4 }}><Typography.Text type="secondary">主标签</Typography.Text><Button size="small" type={!tagCode ? 'primary' : 'default'} onClick={() => setTagCode(undefined)}>全部</Button>{tagOptions.map((option) => <Button key={option.value} size="small" type={tagCode === option.value ? 'primary' : 'default'} onClick={() => setTagCode(option.value)}>{option.label}</Button>)}</div>;
   const uploaderOptions = Array.from(new Map((resources.data ?? []).filter((row): row is Material => 'ownerTeacherId' in row && Boolean(row.ownerTeacherId)).map((row) => [row.ownerTeacherId as string, { label: row.ownerTeacherName || row.ownerTeacherId as string, value: row.ownerTeacherId as string }])).values());

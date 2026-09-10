@@ -486,6 +486,19 @@ func cleanPhrases(values []string) []string {
 	return out
 }
 
+func appendUniqueSubject(values []string, subject string) []string {
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		return values
+	}
+	for _, value := range values {
+		if subjectsMatch(value, subject) {
+			return values
+		}
+	}
+	return append(values, subject)
+}
+
 func appendUnique(values []string, additions ...string) []string {
 	seen := make(map[string]bool, len(values)+len(additions))
 	for _, value := range values {

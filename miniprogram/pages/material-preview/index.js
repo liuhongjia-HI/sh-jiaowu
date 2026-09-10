@@ -3,9 +3,10 @@ const { activateContentSecurity } = require("../../utils/content-security");
 
 const TAG_DEFINITIONS = [
   { code: "ALL", label: "All", shortLabel: "All" },
-  { code: "HD", label: "Notes", shortLabel: "Notes" },
+  { code: "HD", label: "HD", shortLabel: "HD" },
   { code: "Blank", label: "Blank", shortLabel: "Blank" },
-  { code: "HW", label: "Homework", shortLabel: "Homework" },
+  { code: "HW", label: "HW", shortLabel: "HW" },
+  { code: "TK", label: "TK", shortLabel: "TK" },
   { code: "Exam", label: "Exam", shortLabel: "Exam" },
   { code: "Special", label: "Special", shortLabel: "Special" }
 ];
@@ -18,7 +19,7 @@ Page({
     tags: TAG_DEFINITIONS.map((item) => ({ ...item, count: 0 })),
     activeTag: "ALL",
     activeTagLabel: "All",
-    contentTagLabel: "Notes",
+    contentTagLabel: "HD",
     tagItems: [],
     lessonTitle: "",
     pageTitle: "资料预览",
@@ -117,7 +118,7 @@ Page({
       // 从课程目录进入时，只展示当前课节的讲义和练习，避免串到其他章节。
       const contents = [
         ...courseMaterials.map((item) => ({ ...item, contentType: "material", tagCode: normalizeTagCode(item.tagCode) || "HD", displayName: prettyContentTitle(item.title) })),
-        ...courseHomework.map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "HW", displayName: prettyContentTitle(item.title) }))
+        ...courseHomework.map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "Exam", displayName: prettyContentTitle(item.title) }))
       ].filter((item) => item.lessonId === this.lessonId);
       const lesson = ((detail.course && detail.course.curriculum) || []).find((node) => node.id === this.lessonId);
       this.lessonContents = contents;
@@ -170,7 +171,7 @@ Page({
     if (item.contentType === "homework") {
       this.pageLoadToken += 1;
       this.resetContentSecurity(item.id, "homework");
-      this.setData({ contentMode: "homework", activeHomework: item, materialCode: "", contentTagLabel: tagLabel(item.tagCode || "HW") });
+      this.setData({ contentMode: "homework", activeHomework: item, materialCode: "", contentTagLabel: tagLabel(item.tagCode || "Exam") });
       return;
     }
     if (item.id === this.materialId && this.data.contentMode === "material") return;
@@ -470,6 +471,7 @@ function normalizeTagCode(code) {
   if (value.toUpperCase() === "BLANK") return "Blank";
   if (value.toUpperCase() === "HD") return "HD";
   if (value.toUpperCase() === "HW") return "HW";
+  if (value.toUpperCase() === "TK") return "TK";
   return "";
 }
 
@@ -494,7 +496,7 @@ function countForTag(contents, tag) {
 
 function splitMaterialTitle(title) {
   const raw = String(title || "").trim();
-  const matched = raw.match(/^((?:HD|HW|Blank|Exam|Special)[_-][A-Za-z0-9._-]+)\s+(.+)$/i);
+  const matched = raw.match(/^((?:HD|HW|TK|Blank|Exam|Special)[_-][A-Za-z0-9._-]+)\s+(.+)$/i);
   if (matched) return { code: matched[1], name: matched[2] };
   return { code: "", name: raw };
 }

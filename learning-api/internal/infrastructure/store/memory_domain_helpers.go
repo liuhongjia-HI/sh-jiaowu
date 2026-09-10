@@ -48,6 +48,7 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	effectiveUntil := ""
 	packages := make([]string, 0)
 	packageRefs := make([]learning.StudentPackageRef, 0)
+	subjects := make([]string, 0)
 	hasActiveGrant := false
 	for _, grant := range s.grants {
 		if grant.StudentID != student.ID || grant.Status == "revoked" {
@@ -62,6 +63,7 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 		if pkg, ok := s.findPackage(grant.PackageID); ok {
 			packages = appendUnique(packages, pkg.Name)
 			packageRefs = append(packageRefs, learning.StudentPackageRef{PackageID: pkg.ID, PackageName: pkg.Name})
+			subjects = appendUniqueSubject(subjects, pkg.Subject)
 		}
 	}
 	if effectiveUntil != "" {
@@ -69,6 +71,7 @@ func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student
 	}
 	student.OpenedPackages = packages
 	student.OpenedPackageRefs = packageRefs
+	student.OpenedSubjects = subjects
 	student.FollowUpStatus = ""
 	if len(student.OpenedPackages) == 0 {
 		student.FollowUpStatus = "待跟进"
@@ -1040,12 +1043,12 @@ func (s *MemoryStore) openContentForPackage(pkg learning.Package) ([]string, []s
 		courses = appendUnique(courses, course.Name)
 	}
 	for _, material := range s.materials {
-		if materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
+		if materialPublished(material.Status) && materialTagIn(material.TagCode, materialHandoutTags...) && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
 			materials = appendUnique(materials, material.Title)
 		}
 	}
 	for _, item := range s.homework {
-		if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, "HW", "EXAM", "Exam", "Special") && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
+		if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, homeworkQuestionTags...) && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
 			homework = appendUnique(homework, item.Title)
 		}
 	}
@@ -1064,12 +1067,12 @@ func (s *MemoryStore) openContentForStudentGrant(grant packageGrant) ([]string, 
 		}
 	}
 	for _, material := range s.materials {
-		if materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
+		if materialPublished(material.Status) && materialTagIn(material.TagCode, materialHandoutTags...) && containsString(spaceIDs, material.LearningSpaceID) && containsString(contentTypes, "handout") {
 			materials = appendUnique(materials, material.Title)
 		}
 	}
 	for _, item := range s.homework {
-		if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, "HW", "EXAM", "Exam", "Special") && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
+		if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, homeworkQuestionTags...) && containsString(spaceIDs, item.LearningSpaceID) && containsString(contentTypes, "question") {
 			homework = appendUnique(homework, item.Title)
 		}
 	}
@@ -1524,7 +1527,7 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			if firstLesson, limited := s.trialFirstLessonForGrant(grant, material.CourseID); limited && material.LessonID != firstLesson {
 				continue
 			}
-			if materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") && containsString(spaceIDs, material.LearningSpaceID) {
+			if materialPublished(material.Status) && materialTagIn(material.TagCode, materialHandoutTags...) && containsString(spaceIDs, material.LearningSpaceID) {
 				out = appendMaterialUnique(out, s.decorateMaterial(material))
 			}
 		}
@@ -1569,7 +1572,7 @@ func (s *MemoryStore) homeworkForStudent(studentID string) []learning.Homework {
 			if firstLesson, limited := s.trialFirstLessonForGrant(grant, item.CourseID); limited && item.LessonID != firstLesson {
 				continue
 			}
-			if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, "HW", "EXAM", "Exam", "Special") && containsString(spaceIDs, item.LearningSpaceID) {
+			if homeworkVisible(item.Status) && homeworkTagIn(item.TagCode, homeworkQuestionTags...) && containsString(spaceIDs, item.LearningSpaceID) {
 				out = appendHomeworkUnique(out, item)
 			}
 		}

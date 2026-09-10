@@ -561,7 +561,7 @@
 - `POST /api/student/favorites` — 收藏内容，请求体 `{ "targetType": "material|homework", "targetId": "mat-xxx" }`
 - `DELETE /api/student/favorites/{id}` — 取消收藏
 
-`GET /api/student/study` 返回 `{ student, courses: [{ ...course, progress }], materials }`，`progress` 为真实学习进度；学生端可根据 `student.openedPackages` 区分“未开通套餐”和“已开通但暂无课程内容”。
+`GET /api/student/study` 返回 `{ student, courses: [{ ...course, progress }], materials }`，`progress` 为真实学习进度；学生端可根据 `student.openedPackages` 区分“未开通套餐”和“已开通但暂无课程内容”。`student.openedSubjects` 是已开通套餐对应的去重学科（英文/英语视为同一门），首页“在学课程”数字使用该数量。
 `GET /api/student/tasks` 返回任务数组，`studentStatus`（待完成/已完成）、`score`、`submissionId` 由提交记录派生。
 `GET /api/student/home` 返回学生首页聚合数据，包含：
 

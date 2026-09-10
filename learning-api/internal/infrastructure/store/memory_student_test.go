@@ -321,3 +321,39 @@ func TestStudentsAreSortedByRegistrationTimeDescending(t *testing.T) {
 		t.Fatalf("expected students sorted by registration time descending, got %#v", students)
 	}
 }
+
+func TestStudentOpenedSubjectsAreUniqueBySubject(t *testing.T) {
+	store := NewMemoryStore()
+	student, ok := store.findStudent("stu-001")
+	if !ok {
+		t.Fatal("expected demo student")
+	}
+	if len(student.OpenedSubjects) != 1 || !subjectsMatch(student.OpenedSubjects[0], "英文") {
+		t.Fatalf("expected one opened English subject, got %#v", student.OpenedSubjects)
+	}
+
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: "stu-001", PackageID: packageID(4, "英文", 1, "full")}); err != nil {
+		t.Fatalf("grant second English package: %v", err)
+	}
+	student, _ = store.findStudent("stu-001")
+	if len(student.OpenedSubjects) != 1 {
+		t.Fatalf("second English package should not increase subject count, got %#v", student.OpenedSubjects)
+	}
+
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: "stu-001", PackageID: packageID(4, "数学", 0, "full")}); err != nil {
+		t.Fatalf("grant math package: %v", err)
+	}
+	student, _ = store.findStudent("stu-001")
+	if len(student.OpenedSubjects) != 2 {
+		t.Fatalf("expected English and Math, got %#v", student.OpenedSubjects)
+	}
+	hasMath := false
+	for _, subject := range student.OpenedSubjects {
+		if subjectsMatch(subject, "数学") {
+			hasMath = true
+		}
+	}
+	if !hasMath {
+		t.Fatalf("expected math in opened subjects, got %#v", student.OpenedSubjects)
+	}
+}

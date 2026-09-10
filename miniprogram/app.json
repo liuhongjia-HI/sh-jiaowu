@@ -19,7 +19,7 @@
     "pages/login/index"
   ],
   "window": {
-    "navigationBarTitleText": "Starline 学习",
+    "navigationBarTitleText": "Starline Learning",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f7f7f8"
@@ -32,25 +32,25 @@
     "list": [
       {
         "pagePath": "pages/home/index",
-        "text": "首页",
+        "text": "Home",
         "iconPath": "assets/icons/tab-home.png",
         "selectedIconPath": "assets/icons/tab-home-active.png"
       },
       {
         "pagePath": "pages/study/index",
-        "text": "学习",
+        "text": "Study",
         "iconPath": "assets/icons/tab-study.png",
         "selectedIconPath": "assets/icons/tab-study-active.png"
       },
       {
         "pagePath": "pages/notices/index",
-        "text": "消息",
+        "text": "Messages",
         "iconPath": "assets/icons/tab-notice.png",
         "selectedIconPath": "assets/icons/tab-notice-active.png"
       },
       {
         "pagePath": "pages/me/index",
-        "text": "我的",
+        "text": "Me",
         "iconPath": "assets/icons/tab-me.png",
         "selectedIconPath": "assets/icons/tab-me-active.png"
       }

@@ -8,17 +8,19 @@ type Student struct {
 	// Grade 是按入学基准推导出的当前年级，不直接持久化，也不接受前端写入。
 	Grade string `json:"grade"`
 	// EnrollmentAcademicYear 与 EnrollmentGrade 是年级推导的基准，入学后不再变化。
-	EnrollmentAcademicYear string              `json:"enrollmentAcademicYear,omitempty"`
-	EnrollmentGrade        string              `json:"enrollmentGrade,omitempty"`
-	Graduated              bool                `json:"graduated,omitempty"`
-	Phone                  string              `json:"phone"`
-	SchoolName             string              `json:"schoolName,omitempty"`
-	GuardianName           string              `json:"guardianName,omitempty"`
-	OfficialAccountOpenID  string              `json:"officialAccountOpenId,omitempty"`
-	OpenedPackages         []string            `json:"openedPackages"`
-	OpenedPackageRefs      []StudentPackageRef `json:"openedPackageRefs"`
-	LearningStatus         string              `json:"learningStatus"`
-	AccountStatus          string              `json:"accountStatus"`
+	EnrollmentAcademicYear string `json:"enrollmentAcademicYear,omitempty"`
+	EnrollmentGrade        string `json:"enrollmentGrade,omitempty"`
+	Graduated              bool   `json:"graduated,omitempty"`
+	Phone                  string `json:"phone"`
+	SchoolName             string `json:"schoolName,omitempty"`
+	GuardianName           string `json:"guardianName,omitempty"`
+	OfficialAccountOpenID  string `json:"officialAccountOpenId,omitempty"`
+	// OpenedSubjects 是已开通套餐对应的去重学科；英文/英语视为同一门。
+	OpenedPackages    []string            `json:"openedPackages"`
+	OpenedPackageRefs []StudentPackageRef `json:"openedPackageRefs"`
+	OpenedSubjects    []string            `json:"openedSubjects"`
+	LearningStatus    string              `json:"learningStatus"`
+	AccountStatus     string              `json:"accountStatus"`
 	// RegistrationSource 由服务端写入，用于区分小程序自助建档与后台/导入建档。
 	RegistrationSource string `json:"registrationSource,omitempty"`
 	// FollowUpStatus 是运营视图的派生状态，不影响学生登录或学习权限。

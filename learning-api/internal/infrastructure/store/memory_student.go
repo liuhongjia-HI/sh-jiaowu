@@ -257,19 +257,19 @@ func (s *MemoryStore) openingItemsForSpace(learningSpaceID, contentTypeCode stri
 		}
 	case "handout":
 		for _, material := range s.materials {
-			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") {
+			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) && materialTagIn(material.TagCode, materialHandoutTags...) {
 				items = append(items, learning.StudentOpeningItem{ID: material.ID, Title: material.Title})
 			}
 		}
 	case "download":
 		for _, material := range s.materials {
-			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) && materialTagIn(material.TagCode, "HD", "Blank") {
+			if material.LearningSpaceID == learningSpaceID && materialPublished(material.Status) && materialTagIn(material.TagCode, materialHandoutTags...) {
 				items = append(items, learning.StudentOpeningItem{ID: material.ID, Title: material.Title})
 			}
 		}
 	case "question":
 		for _, homework := range s.homework {
-			if homework.LearningSpaceID == learningSpaceID && homeworkVisible(homework.Status) && homeworkTagIn(homework.TagCode, "HW", "EXAM", "Exam", "Special") {
+			if homework.LearningSpaceID == learningSpaceID && homeworkVisible(homework.Status) && homeworkTagIn(homework.TagCode, homeworkQuestionTags...) {
 				items = append(items, learning.StudentOpeningItem{ID: homework.ID, Title: homework.Title})
 			}
 		}

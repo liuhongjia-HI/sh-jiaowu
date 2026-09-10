@@ -29,7 +29,7 @@ func TestCoursePermissionActivationAndRevocationFlow(t *testing.T) {
 			t.Fatal(err)
 		}
 		materialIDs = append(materialIDs, material.ID)
-		homework, err := app.store.CreateHomework("测试", principal, learning.HomeworkUploadRequest{Title: lesson + "习题", CourseID: courseID, LessonID: courseID + lesson, TagCode: "HW", Status: string(learning.StatusEnabled)})
+		homework, err := app.store.CreateHomework("测试", principal, learning.HomeworkUploadRequest{Title: lesson + "习题", CourseID: courseID, LessonID: courseID + lesson, TagCode: "Exam", Status: string(learning.StatusEnabled)})
 		if err != nil {
 			t.Fatal(err)
 		}

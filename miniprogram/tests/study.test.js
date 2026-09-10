@@ -49,7 +49,7 @@ test("课程卡片整体可点击，学习入口只负责展示状态", () => {
   assert.match(template, /wx:else class="course-card-hit-area">\s*<template is="course-card"/);
   assert.match(template, /wx:if="{{item\.canOpen}}" class="course-action">/);
   assert.match(template, /wx:else class="course-action course-action-disabled">{{item\.accessLabel \|\| '内容准备中'}}<\/view>/);
-  assert.match(template, /item\.accessLabel === '首节可体验' \? '体验' : '进入学习'/);
+  assert.match(template, /item\.isPreview \? 'Try' : 'Start'/);
   assert.doesNotMatch(template, /体验第一节/);
 });
 
@@ -143,7 +143,7 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
   assert.equal(page.data.visibleCourses[0].displayName, "地理");
   assert.equal(page.data.visibleCourses[0].accessLabel, "首节可体验");
   page.goDetail({ currentTarget: { dataset: { id: "", canOpen: false } } });
-  assert.equal(toasts[0].title, "开通后即可学习全部内容");
+  assert.equal(toasts[0].title, "Unlock to access all content");
   page.goDetail({ currentTarget: { dataset: { id: "course-g05-geography-s1-q1", canOpen: true } } });
   assert.equal(navigations[0].url, "/pages/study-detail/index?id=course-g05-geography-s1-q1");
 });

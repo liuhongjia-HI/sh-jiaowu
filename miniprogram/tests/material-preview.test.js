@@ -35,7 +35,7 @@ test("material preview defaults to All, uses English tags, and filters content w
         { id: "mat-hd-2", title: "第二份讲义", lessonId: "lesson-2", courseId: "course-1", tagCode: "HD" },
         { id: "mat-other", title: "空白练习", lessonId: "lesson-2", courseId: "course-1", tagCode: "Blank" }
       ],
-      homework: [{ id: "homework-1", title: "课后作业", lessonId: "lesson-1", tagCode: "HW", questionNum: 8 }]
+      homework: [{ id: "homework-1", title: "课后作业", lessonId: "lesson-1", tagCode: "Exam", questionNum: 8 }]
     });
     return Promise.reject(new Error("unexpected path " + path));
   };
@@ -48,17 +48,18 @@ test("material preview defaults to All, uses English tags, and filters content w
 
   assert.equal(page.data.activeTag, "ALL");
   assert.equal(page.data.activeTagLabel, "All");
-  assert.equal(page.data.contentTagLabel, "Notes");
+  assert.equal(page.data.contentTagLabel, "HD");
   assert.deepEqual(page.data.tags.map((item) => [item.code, item.shortLabel, item.count]), [
     ["ALL", "All", 2],
-    ["HD", "Notes", 1],
+    ["HD", "HD", 1],
     ["Blank", "Blank", 0],
-    ["HW", "Homework", 1],
-    ["Exam", "Exam", 0],
+    ["HW", "HW", 0],
+    ["TK", "TK", 0],
+    ["Exam", "Exam", 1],
     ["Special", "Special", 0]
   ]);
   assert.deepEqual(page.data.tagItems.map((item) => item.id), ["mat-hd", "homework-1"]);
-  page.selectTag({ currentTarget: { dataset: { code: "HW" } } });
+  page.selectTag({ currentTarget: { dataset: { code: "Exam" } } });
   assert.equal(page.data.contentMode, "list");
   assert.equal(page.data.tagItems[0].id, "homework-1");
   page.selectTagItem({ currentTarget: { dataset: { id: "homework-1" } } });
@@ -124,7 +125,7 @@ test("material preview shows lesson name instead of file-code title", async () =
   assert.equal(page.data.materialCode, "HD_G5S1Q1_1.1.2");
   assert.equal(page.data.activeTag, "ALL");
   assert.equal(page.data.activeTagLabel, "All");
-  assert.equal(page.data.contentTagLabel, "Notes");
+  assert.equal(page.data.contentTagLabel, "HD");
 });
 
 function loadMaterialPreviewPage(requestImpl, wxMock) {

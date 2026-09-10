@@ -44,7 +44,7 @@
           <view class="status-label">今日待办</view>
         </view>
         <view class="status-item" data-action="study" bindtap="handleShortcut">
-          <view class="status-value">{{materialCount}}</view>
+          <view class="status-value">{{openedSubjectCount}}</view>
           <view class="status-label">在学课程</view>
         </view>
         <view class="status-item" data-action="notices" bindtap="handleShortcut">

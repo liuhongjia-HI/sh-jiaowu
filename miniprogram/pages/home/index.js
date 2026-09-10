@@ -20,7 +20,7 @@ Page({
     currentCourseIndex: 0,
     progressPercent: 0,
     pendingCount: 0,
-    materialCount: 0,
+    openedSubjectCount: 0,
     noticeCount: 0,
     todoItems: [],
     todoGroups: [],
@@ -115,7 +115,8 @@ Page({
       recommendations: [],
       visibleRecommendations: [],
       recommendationsLoading: false,
-      promoBanners: []
+      promoBanners: [],
+      openedSubjectCount: 0
     });
   },
   redirectToParentOnboarding() {
@@ -170,7 +171,7 @@ Page({
           firstMaterial,
           progressPercent,
           pendingCount: pendingHomework.length,
-          materialCount: materials.length,
+          openedSubjectCount: countOpenedSubjects(student, courses),
           noticeCount: notices.length,
           todoItems,
           todoGroups: buildTodoGroups(todoItems),
@@ -194,6 +195,7 @@ Page({
           emptyMessage: error.message || "请先登录，或联系老师开通课程。",
         hasContent: false,
         hasOpenedPackage: false,
+        openedSubjectCount: 0,
         recommendations: [],
         visibleRecommendations: [],
         recommendationsLoading: false,
@@ -541,6 +543,36 @@ function buildTodoGroups(todos) {
     groups.push(items.slice(index, index + 2));
   }
   return groups;
+}
+
+function countOpenedSubjects(student, courses) {
+  const fromSubjects = uniqueSubjectCount(Array.isArray(student && student.openedSubjects) ? student.openedSubjects : []);
+  if (fromSubjects > 0) {
+    return fromSubjects;
+  }
+  const fromCourses = uniqueSubjectCount((courses || []).map((course) => course && course.subject));
+  if (fromCourses > 0) {
+    return fromCourses;
+  }
+  const packages = Array.isArray(student && student.openedPackages) ? student.openedPackages : [];
+  return packages.length;
+}
+
+function uniqueSubjectCount(values) {
+  const subjects = [];
+  (values || []).forEach((value) => {
+    const subject = String(value || "").trim();
+    if (!subject || subjects.some((item) => subjectsMatchName(item, subject))) {
+      return;
+    }
+    subjects.push(subject);
+  });
+  return subjects.length;
+}
+
+function subjectsMatchName(left, right) {
+  if (left === right) return true;
+  return (left === "英文" && right === "英语") || (left === "英语" && right === "英文");
 }
 
 function normalizeHomeCourses(home, continueCourse) {
