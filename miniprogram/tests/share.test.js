@@ -79,10 +79,10 @@ test("study detail flattens all Lesson leaves in curriculum order", async () => 
   page.loadDetail();
   await flushPromises();
   assert.equal(page.data.lessonCount, 3);
-  assert.deepEqual(page.data.catalogLessons.map((item) => item.displayName), ["Chapter 1 · 第一节", "Chapter 1 · 第二节", "Chapter 2 · 第三节"]);
+  assert.deepEqual(page.data.catalogLessons.map((item) => item.displayName), ["1.1.1 · Chapter 1 · 第一节", "1.1.2 · Chapter 1 · 第二节", "2.1.1 · Chapter 2 · 第三节"]);
   assert.deepEqual(page.data.catalogLessons[0], {
     id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "第一节", sortOrder: 1,
-    displayName: "Chapter 1 · 第一节",
+    displayName: "1.1.1 · Chapter 1 · 第一节",
     icon: "📖", status: "学习中", statusClass: "is-active", desc: "2 项学习内容", materialId: "mat-hd", homeworkId: "hw-exam"
   });
 });
@@ -103,7 +103,7 @@ test("study detail flattens Chapter and Unit leaves when a curriculum has fewer 
 
   page.loadDetail();
   await flushPromises();
-  assert.deepEqual(page.data.catalogLessons.map((item) => item.displayName), ["第一单元 · 第一章", "第二单元"]);
+  assert.deepEqual(page.data.catalogLessons.map((item) => item.displayName), ["1.1 · 第一单元 · 第一章", "2 · 第二单元"]);
   assert.deepEqual(page.data.catalogLessons.map((item) => item.id), ["chapter-1", "unit-2"]);
 });
 

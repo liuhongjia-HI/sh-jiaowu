@@ -2981,21 +2981,10 @@ button.schedule-block:hover {
   min-width: 0;
 }
 
-.curriculum-chapter-card > .curriculum-node-main {
-  grid-template-columns: 28px 64px max-content max-content 76px minmax(180px, 1fr) max-content 44px;
-}
 
 .curriculum-node-type,
 .curriculum-node-count,
 .curriculum-node-actions {
-  white-space: nowrap;
-}
-
-.curriculum-level-badge,
-.curriculum-lessons-label {
-  color: #16866f;
-  font-size: 12px;
-  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -3020,12 +3009,6 @@ button.schedule-block:hover {
   border-left: 2px solid #d5ebe5;
 }
 
-.curriculum-lessons-label {
-  margin-bottom: 2px;
-  color: #64748b;
-  font-weight: 500;
-}
-
 .curriculum-lesson-row {
   grid-template-columns: 64px 76px minmax(180px, 1fr) 44px;
 }
@@ -3035,9 +3018,6 @@ button.schedule-block:hover {
     grid-template-columns: 28px 58px 68px minmax(120px, 1fr) 44px;
   }
 
-  .curriculum-chapter-card > .curriculum-node-main {
-    grid-template-columns: 28px 58px max-content max-content 68px minmax(120px, 1fr) 44px;
-  }
 
   .curriculum-node-count {
     display: none;

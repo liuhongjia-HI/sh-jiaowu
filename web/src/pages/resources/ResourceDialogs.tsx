@@ -500,7 +500,6 @@ export function CourseDialog({
             {!collapsedUnits.has(unit.id) && curriculumChildren('chapter', unit.id).map((chapter) => <div key={chapter.id} data-testid="curriculum-chapter" className="curriculum-chapter-card">
               <div className="curriculum-node-main">
                 <Button type="text" size="small" htmlType="button" aria-label={`${collapsedChapters.has(chapter.id) ? '展开' : '收起'} Chapter`} onClick={() => setCollapsedChapters((current) => { const next = new Set(current); next.has(chapter.id) ? next.delete(chapter.id) : next.add(chapter.id); return next; })}>{collapsedChapters.has(chapter.id) ? '▸' : '▾'}</Button>
-                <span className="curriculum-level-badge">Unit 下级</span>
                 <Typography.Text strong className="curriculum-node-type">Chapter</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Chapter序号" value={chapter.sortOrder} onChange={(value) => updateCurriculumSortOrder(chapter.id, value || 1)} />
                 <Input aria-label={`Chapter名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder={`Chapter 名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(chapter.id) && !chapter.name.trim() ? 'error' : undefined} />
@@ -513,7 +512,7 @@ export function CourseDialog({
                 <Button size="small" htmlType="button" onClick={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)}>生成</Button>
                 <Button type="link" size="small" htmlType="button" icon={<PlusOutlined />} onClick={() => addCurriculumNode('lesson', chapter.id)}>新增 Lesson</Button>
               </div>
-              {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons"><div className="curriculum-lessons-label">Chapter 下的 Lesson</div>{curriculumChildren('lesson', chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
+              {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumChildren('lesson', chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Lesson序号" value={lesson.sortOrder} onChange={(value) => updateCurriculumSortOrder(lesson.id, value || 1)} />
                 <Input aria-label="Lesson名称（叶子必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（叶子必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
