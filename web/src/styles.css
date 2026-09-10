@@ -2982,7 +2982,7 @@ button.schedule-block:hover {
 }
 
 .curriculum-chapter-card > .curriculum-node-main {
-  grid-template-columns: 28px 64px max-content 76px minmax(180px, 1fr) max-content 44px;
+  grid-template-columns: 28px 64px max-content max-content 76px minmax(180px, 1fr) max-content 44px;
 }
 
 .curriculum-node-type,
@@ -3036,7 +3036,7 @@ button.schedule-block:hover {
   }
 
   .curriculum-chapter-card > .curriculum-node-main {
-    grid-template-columns: 28px 58px max-content 68px minmax(120px, 1fr) 44px;
+    grid-template-columns: 28px 58px max-content max-content 68px minmax(120px, 1fr) 44px;
   }
 
   .curriculum-node-count {
