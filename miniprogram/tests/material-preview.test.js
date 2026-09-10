@@ -12,7 +12,17 @@ test("material preview keeps only the preview card as the full-courseware entry"
   assert.match(template, /class="button challenge-button" bindtap="goAnswer"/);
 });
 
-test("material preview shows five fixed tags and filters content within the current lesson", async () => {
+test("material preview uses English action labels and hides study-count caption", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.wxml"), "utf8");
+
+  assert.doesNotMatch(template, /人学过|进度已保存|开始练习|收藏讲义|class="preview-caption"/);
+  assert.doesNotMatch(template, />下载打印</);
+  assert.match(template, />Next<\/button>/);
+  assert.match(template, />Print<\/button>/);
+  assert.match(template, /favorited \? 'Favorited ✓' : 'Favorite ♡'/);
+});
+
+test("material preview defaults to All, uses English tags, and filters content within the current lesson", async () => {
   const navigatedUrls = [];
   const requestImpl = (path) => {
     if (path === "/student/materials/mat-hd") return Promise.resolve({ id: "mat-hd", title: "课程讲义", courseId: "course-1", lessonId: "lesson-1", tagCode: "HD", curriculum: { lesson: "Themes and Elements" } });
@@ -36,7 +46,18 @@ test("material preview shows five fixed tags and filters content within the curr
   await flushPromises();
   await flushPromises();
 
-  assert.deepEqual(page.data.tags.map((item) => [item.code, item.count]), [["HD", 2], ["Blank", 1], ["HW", 1], ["Exam", 0], ["Special", 0]]);
+  assert.equal(page.data.activeTag, "ALL");
+  assert.equal(page.data.activeTagLabel, "All");
+  assert.equal(page.data.contentTagLabel, "Notes");
+  assert.deepEqual(page.data.tags.map((item) => [item.code, item.shortLabel, item.count]), [
+    ["ALL", "All", 2],
+    ["HD", "Notes", 1],
+    ["Blank", "Blank", 0],
+    ["HW", "Homework", 1],
+    ["Exam", "Exam", 0],
+    ["Special", "Special", 0]
+  ]);
+  assert.deepEqual(page.data.tagItems.map((item) => item.id), ["mat-hd", "homework-1"]);
   page.selectTag({ currentTarget: { dataset: { code: "HW" } } });
   assert.equal(page.data.contentMode, "list");
   assert.equal(page.data.tagItems[0].id, "homework-1");
@@ -47,8 +68,8 @@ test("material preview shows five fixed tags and filters content within the curr
   assert.deepEqual(navigatedUrls, ["/pages/answer/index?id=homework-1"]);
 
   page.selectTag({ currentTarget: { dataset: { code: "Blank" } } });
-  assert.equal(page.data.contentMode, "list");
-  assert.equal(page.data.tagItems.length, 1);
+  assert.equal(page.data.contentMode, "empty");
+  assert.equal(page.data.tagItems.length, 0);
 });
 
 test("homework-only lesson can enter the tagged content page without a material id", async () => {
@@ -64,10 +85,46 @@ test("homework-only lesson can enter the tagged content page without a material 
   page.onLoad({ courseId: "course-1", lessonId: "lesson-1" });
   await flushPromises();
 
-  assert.equal(page.data.activeTag, "Exam");
+  assert.equal(page.data.activeTag, "ALL");
   assert.equal(page.data.contentMode, "homework");
   assert.equal(page.data.activeHomework.id, "homework-1");
+  assert.equal(page.data.contentTagLabel, "Exam");
   assert.equal(page.data.lessonTitle, "课节一");
+});
+
+test("material preview shows lesson name instead of file-code title", async () => {
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/materials/mat-hd") {
+      return Promise.resolve({
+        id: "mat-hd",
+        title: "HD_G5S1Q1_1.1.2 Themes and Elements",
+        courseId: "course-1",
+        lessonId: "lesson-1",
+        tagCode: "HD",
+        curriculum: { lesson: "Themes and Elements" }
+      });
+    }
+    if (path === "/student/materials/mat-hd/preview/pages") return Promise.resolve({ imageMode: false, pageCount: 0 });
+    if (path === "/student/favorites") return Promise.resolve([]);
+    if (path === "/student/study/course-1") {
+      return Promise.resolve({
+        course: { curriculum: [{ id: "lesson-1", type: "lesson", name: "Themes and Elements" }] },
+        materials: [{ id: "mat-hd", title: "HD_G5S1Q1_1.1.2 Themes and Elements", lessonId: "lesson-1", courseId: "course-1", tagCode: "HD" }],
+        homework: []
+      });
+    }
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock());
+
+  page.onLoad({ id: "mat-hd", courseId: "course-1", lessonId: "lesson-1" });
+  await flushPromises();
+  await flushPromises();
+
+  assert.equal(page.data.displayTitle, "Themes and Elements");
+  assert.equal(page.data.materialCode, "HD_G5S1Q1_1.1.2");
+  assert.equal(page.data.activeTag, "ALL");
+  assert.equal(page.data.activeTagLabel, "All");
+  assert.equal(page.data.contentTagLabel, "Notes");
 });
 
 function loadMaterialPreviewPage(requestImpl, wxMock) {
@@ -518,7 +575,7 @@ test("small challenge opens the task list when the lesson has no matching task",
 test("download print is a single disabled-capable entry", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.wxml"), "utf8");
   assert.doesNotMatch(template, /打开打印|下载课件|bindtap="downloadMaterial"/);
-  assert.match(template, /disabled="{{!material.downloadUrl \|\| downloading}}".*bindtap="printMaterial">下载打印/);
+  assert.match(template, /disabled="{{!material.downloadUrl \|\| downloading}}".*bindtap="printMaterial">Print/);
 });
 
 test("download print without permission never requests or opens a file", () => {

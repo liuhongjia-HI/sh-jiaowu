@@ -2,103 +2,106 @@
   <view class="global-watermark-layer" aria-hidden="true">
     <view wx:for="{{watermarkTexts}}" wx:key="index" class="global-watermark">{{item}}</view>
   </view>
-  <view class="hero">
-    <view class="eyebrow">资料预览</view>
-    <view class="hero-title">{{pageTitle}}</view>
+
+  <view class="preview-header">
+    <view class="preview-title">{{displayTitle}}</view>
+    <view class="preview-meta-line">
+      <text class="preview-kicker">{{contentTagLabel || activeTagLabel}}</text>
+      <text wx:if="{{contentMode === 'material' && materialCode}}" class="preview-code">{{materialCode}}</text>
+    </view>
   </view>
-  <scroll-view class="lesson-tag-filter" scroll-x="true" enable-flex="true">
+
+  <scroll-view class="lesson-tag-filter" scroll-x="true" enable-flex="true" show-scrollbar="{{false}}">
     <view class="lesson-tag-filter-inner">
-      <view wx:for="{{tags}}" wx:key="code" class="lesson-tag {{activeTag === item.code ? 'is-active' : ''}}" data-code="{{item.code}}" bindtap="selectTag">
-        <view class="lesson-tag-code">{{item.code}}</view>
-        <view class="lesson-tag-name">{{item.label}}{{item.count ? ' ' + item.count : ''}}</view>
+      <view wx:for="{{tags}}" wx:key="code" class="lesson-tag {{activeTag === item.code ? 'is-active' : ''}} {{item.count ? '' : 'is-empty'}}" data-code="{{item.code}}" bindtap="selectTag">
+        <text class="lesson-tag-label">{{item.shortLabel}}</text>
+        <text wx:if="{{item.count}}" class="lesson-tag-count">{{item.count}}</text>
       </view>
     </view>
   </scroll-view>
-  <scroll-view wx:if="{{tagItems.length > 1}}" class="tag-item-filter" scroll-x="true" enable-flex="true">
+
+  <scroll-view wx:if="{{contentMode === 'material' && tagItems.length > 1}}" class="tag-item-filter" scroll-x="true" enable-flex="true" show-scrollbar="{{false}}">
     <view class="tag-item-filter-inner">
-      <view wx:for="{{tagItems}}" wx:key="id" class="tag-item {{(item.contentType === 'material' && material.id === item.id) || (item.contentType === 'homework' && activeHomework.id === item.id) ? 'is-active' : ''}}" data-id="{{item.id}}" bindtap="selectTagItem">{{item.title}}</view>
+      <view wx:for="{{tagItems}}" wx:key="id" class="tag-item {{(item.contentType === 'material' && material.id === item.id) || (item.contentType === 'homework' && activeHomework.id === item.id) ? 'is-active' : ''}}" data-id="{{item.id}}" bindtap="selectTagItem">{{item.displayName || item.title}}</view>
     </view>
   </scroll-view>
+
   <view class="section">
-    <view class="card">
     <block wx:if="{{contentMode === 'material'}}">
-    <view class="row preview-meta">
-      <view class="sub">学习进度已自动保存</view>
-      <view class="sub">已添加专属水印</view>
-    </view>
-
-    <view wx:if="{{recordingWarning}}" class="recording-warning">
-      <view class="recording-guard-icon">⚠️</view>
-      <view>
-        <view class="recording-guard-text">检测到系统录屏</view>
-        <view class="recording-guard-sub">资料已添加专属水印，请停止录屏。</view>
+      <view wx:if="{{recordingWarning}}" class="recording-warning">
+        <view class="recording-guard-icon">⚠️</view>
+        <view>
+          <view class="recording-guard-text">检测到系统录屏</view>
+          <view class="recording-guard-sub">资料已添加专属水印，请停止录屏。</view>
+        </view>
       </view>
-    </view>
 
-    <view wx:if="{{previewMode === 'image'}}" class="material-preview-card" hover-class="material-preview-card-active" bindtap="openSecurePreview">
-      <view wx:if="{{pagesLoading || !previewImagePath}}" class="preview-loading">正在加载课件预览…</view>
-      <image wx:else class="preview-cover" src="{{previewImagePath}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
-      <view wx:if="{{previewImagePath}}" class="preview-page-count">共 {{pageCount}} 页</view>
-    </view>
+      <view wx:if="{{previewMode === 'image'}}" class="paper" hover-class="paper-active" bindtap="openSecurePreview">
+        <view wx:if="{{pagesLoading || !previewImagePath}}" class="preview-loading">正在加载课件预览…</view>
+        <image wx:else class="preview-cover" src="{{previewImagePath}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
+        <view wx:if="{{previewImagePath}}" class="paper-foot">共 {{pageCount}} 页 · 点击查看完整课件</view>
+      </view>
 
-    <view wx:elif="{{previewMode === 'pdf'}}" class="material-preview-card preview-fallback" hover-class="material-preview-card-active" bindtap="openSecurePreview">
-      <view class="preview-file-icon">📄</view>
-      <view class="preview-fallback-title">{{paperTitle}}</view>
-      <view class="preview-fallback-message">{{previewMessage}}</view>
-    </view>
+      <view wx:elif="{{previewMode === 'pdf'}}" class="paper paper-fallback" hover-class="paper-active" bindtap="openSecurePreview">
+        <view class="preview-file-icon">📄</view>
+        <view class="preview-fallback-title">{{displayTitle}}</view>
+        <view class="preview-fallback-message">{{previewMessage}}</view>
+      </view>
 
-    <view wx:elif="{{previewMode === 'unknown' || previewMode === 'processing'}}" class="preview-unavailable preview-processing">
-      <view class="preview-unavailable-icon">⏳</view>
+      <view wx:elif="{{previewMode === 'unknown' || previewMode === 'processing'}}" class="paper paper-status">
+        <view class="preview-unavailable-icon">⏳</view>
         <view class="preview-unavailable-title">{{previewMode === 'processing' ? '预览生成中' : '加载预览中'}}</view>
-      <view wx:if="{{previewMessage}}" class="preview-unavailable-message">{{previewMessage}}</view>
-    </view>
-
-    <view wx:elif="{{previewMode === 'cover-error'}}" class="preview-unavailable">
-      <view class="preview-unavailable-icon">🖼️</view>
-      <view class="preview-unavailable-title">缩略图加载失败</view>
-      <view class="preview-unavailable-message">{{previewMessage}}</view>
-      <button class="button light preview-retry" bindtap="retryPreview">重新加载</button>
-    </view>
-
-    <view wx:elif="{{previewMode === 'unavailable'}}" class="preview-unavailable">
-      <view class="preview-unavailable-icon">📄</view>
-      <view class="preview-unavailable-title">课件暂时无法打开</view>
-      <view class="preview-unavailable-message">{{previewMessage}}</view>
-      <button class="button light preview-retry" bindtap="retryPreview">重新检查</button>
-    </view>
-
-    <view class="badges">
-      <view class="badge">{{readText}}</view>
-      <view class="badge">距离小徽章还差一步</view>
-    </view>
-    <view class="button-row">
-      <button class="button light" bindtap="toggleFavorite">{{favorited ? '已收藏 ✓' : '收藏讲义 ♡'}}</button>
-      <view class="download-print-wrap">
-        <button class="button light download-print" disabled="{{!material.downloadUrl || downloading}}" loading="{{downloading}}" bindtap="printMaterial">下载打印</button>
-        <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">暂未开通下载打印权限</view>
+        <view wx:if="{{previewMessage}}" class="preview-unavailable-message">{{previewMessage}}</view>
       </view>
-      <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
-    </view>
+
+      <view wx:elif="{{previewMode === 'cover-error'}}" class="paper paper-status">
+        <view class="preview-unavailable-icon">🖼️</view>
+        <view class="preview-unavailable-title">缩略图加载失败</view>
+        <view class="preview-unavailable-message">{{previewMessage}}</view>
+        <button class="button light preview-retry" bindtap="retryPreview">重新加载</button>
+      </view>
+
+      <view wx:elif="{{previewMode === 'unavailable'}}" class="paper paper-status">
+        <view class="preview-unavailable-icon">📄</view>
+        <view class="preview-unavailable-title">课件暂时无法打开</view>
+        <view class="preview-unavailable-message">{{previewMessage}}</view>
+        <button class="button light preview-retry" bindtap="retryPreview">重新检查</button>
+      </view>
+
+      <view class="preview-actions">
+        <button class="button challenge-button" bindtap="goAnswer">Next</button>
+        <view class="button-row">
+          <button class="button light" bindtap="toggleFavorite">{{favorited ? 'Favorited ✓' : 'Favorite ♡'}}</button>
+          <view class="download-print-wrap">
+            <button class="button light download-print" disabled="{{!material.downloadUrl || downloading}}" loading="{{downloading}}" bindtap="printMaterial">Print</button>
+            <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">暂未开通下载打印权限</view>
+          </view>
+        </view>
+      </view>
     </block>
-    <view wx:elif="{{contentMode === 'homework'}}" class="lesson-content-state">
-      <view class="lesson-content-icon">✍️</view>
-      <view class="lesson-content-title">{{activeHomework.title}}</view>
-      <view class="lesson-content-desc">{{activeHomework.questionNum || 0}} 道题，完成后可查看结果</view>
-      <button class="button challenge-button" bindtap="goAnswer">开始练习</button>
+
+    <view wx:elif="{{contentMode === 'homework'}}" class="homework-card">
+      <view class="homework-kicker">{{contentTagLabel || activeTagLabel}}</view>
+      <view class="homework-title">{{activeHomework.title}}</view>
+      <view class="homework-desc">{{activeHomework.questionNum || 0}} 道题，完成后可查看结果</view>
+      <button class="button challenge-button" bindtap="goAnswer">Next</button>
     </view>
+
     <view wx:elif="{{contentMode === 'list'}}" class="tag-content-list">
-      <view class="tag-content-list-title">{{activeTagLabel}}（{{tagItems.length}}）</view>
+      <view class="tag-content-list-title">{{activeTagLabel}} · {{tagItems.length}} 份</view>
       <view wx:for="{{tagItems}}" wx:key="id" class="tag-content-list-item" data-id="{{item.id}}" bindtap="selectTagItem">
         <view class="tag-content-list-icon">{{item.contentType === 'homework' ? '✍️' : '📄'}}</view>
-        <view class="tag-content-list-main"><view class="tag-content-list-name">{{item.title}}</view><view class="tag-content-list-desc">{{item.contentType === 'homework' ? (item.questionNum || 0) + ' 道题' : '课程资料'}}</view></view>
+        <view class="tag-content-list-main">
+          <view class="tag-content-list-name">{{item.displayName || item.title}}</view>
+          <view class="tag-content-list-desc">{{item.contentType === 'homework' ? (item.questionNum || 0) + ' 道题' : '课程资料'}}</view>
+        </view>
         <view class="tag-content-list-arrow">›</view>
       </view>
     </view>
-    <view wx:else class="lesson-content-state">
-      <view class="lesson-content-icon">📭</view>
-      <view class="lesson-content-title">这个标签下暂时没有内容</view>
-      <view class="lesson-content-desc">老师发布后会显示在这里</view>
-    </view>
+
+    <view wx:else class="empty-card">
+      <view class="title">{{activeTagLabel}}还没有内容</view>
+      <view class="sub">老师发布后会显示在这里</view>
     </view>
   </view>
 </view>

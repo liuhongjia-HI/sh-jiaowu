@@ -2,11 +2,12 @@ const { request } = require("../../utils/request");
 const { activateContentSecurity } = require("../../utils/content-security");
 
 const TAG_DEFINITIONS = [
-  { code: "HD", label: "课程讲义" },
-  { code: "Blank", label: "空白练习" },
-  { code: "HW", label: "课后作业" },
-  { code: "Exam", label: "测试卷" },
-  { code: "Special", label: "专题资料" }
+  { code: "ALL", label: "All", shortLabel: "All" },
+  { code: "HD", label: "Notes", shortLabel: "Notes" },
+  { code: "Blank", label: "Blank", shortLabel: "Blank" },
+  { code: "HW", label: "Homework", shortLabel: "Homework" },
+  { code: "Exam", label: "Exam", shortLabel: "Exam" },
+  { code: "Special", label: "Special", shortLabel: "Special" }
 ];
 
 Page({
@@ -15,13 +16,15 @@ Page({
     activeHomework: {},
     contentMode: "material",
     tags: TAG_DEFINITIONS.map((item) => ({ ...item, count: 0 })),
-    activeTag: "HD",
-    activeTagLabel: "课程讲义",
+    activeTag: "ALL",
+    activeTagLabel: "All",
+    contentTagLabel: "Notes",
     tagItems: [],
     lessonTitle: "",
     pageTitle: "资料预览",
+    displayTitle: "资料预览",
+    materialCode: "",
     paperTitle: "",
-    readText: "",
     securityNotice: "仅供本人学习，请勿分享、截图或录屏。",
     watermarkText: "水印加载中",
     watermarkTexts: ["水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中"],
@@ -44,11 +47,11 @@ Page({
     this.pageLoadToken = 0;
     this.previewRetryCount = 0;
     if (!id && (!this.courseId || !this.lessonId)) {
-      this.setData({ pageTitle: "课节信息缺失", contentMode: "empty" });
+      this.setData({ pageTitle: "课节信息缺失", displayTitle: "课节信息缺失", contentMode: "empty" });
       return;
     }
     if (!id) {
-      this.setData({ pageTitle: "课节内容", contentMode: "empty" });
+      this.setData({ pageTitle: "课节内容", displayTitle: "课节内容", contentMode: "empty" });
       this.loadLessonContents();
       return;
     }
@@ -70,14 +73,16 @@ Page({
     request(`/student/materials/${id}`).then((material) => {
       this.courseId = this.courseId || material.courseId || "";
       this.lessonId = this.lessonId || material.lessonId || "";
-      const lessonTitle = (material.curriculum && material.curriculum.lesson) || material.title;
+      const lessonTitle = (material.curriculum && material.curriculum.lesson) || this.data.lessonTitle || material.title;
+      const header = buildDisplayHeader(material, lessonTitle);
       this.setData({
         material,
-        pageTitle: material.title,
-        paperTitle: lessonTitle,
-        lessonTitle,
-        activeTag: normalizeTagCode(material.tagCode) || this.data.activeTag,
-        readText: `${material.viewCount || 0} 人学过`,
+        pageTitle: header.displayTitle,
+        displayTitle: header.displayTitle,
+        materialCode: header.materialCode,
+        paperTitle: header.displayTitle,
+        lessonTitle: header.displayTitle,
+        contentTagLabel: tagLabel(normalizeTagCode(material.tagCode) || "HD"),
         watermarkText: material.watermarkText || "水印加载中",
         watermarkTexts: buildWatermarks(material.watermarkText || "水印加载中"),
         securityNotice: material.securityNotice || "仅供本人学习，请勿分享、截图或录屏。"
@@ -87,6 +92,7 @@ Page({
     }).catch(() => {
       this.setData({
         pageTitle: "资料加载失败",
+        displayTitle: "资料加载失败",
         securityNotice: "资料加载失败，请重新进入。",
         previewMode: "unavailable",
         previewMessage: "资料加载失败，请重新进入"
@@ -108,39 +114,44 @@ Page({
     request(`/student/study/${this.courseId}`).then((detail) => {
       const courseMaterials = detail.materials || [];
       const courseHomework = detail.homework || [];
-      // 标签筛选面向当前课程的全部内容；课节只用于从课程详情进入时保留上下文。
+      // 从课程目录进入时，只展示当前课节的讲义和练习，避免串到其他章节。
       const contents = [
-        ...courseMaterials.map((item) => ({ ...item, contentType: "material", tagCode: normalizeTagCode(item.tagCode) || "HD" })),
-        ...courseHomework.map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "HW" }))
-      ];
+        ...courseMaterials.map((item) => ({ ...item, contentType: "material", tagCode: normalizeTagCode(item.tagCode) || "HD", displayName: prettyContentTitle(item.title) })),
+        ...courseHomework.map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "HW", displayName: prettyContentTitle(item.title) }))
+      ].filter((item) => item.lessonId === this.lessonId);
       const lesson = ((detail.course && detail.course.curriculum) || []).find((node) => node.id === this.lessonId);
       this.lessonContents = contents;
-      const tags = TAG_DEFINITIONS.map((tag) => ({ ...tag, count: contents.filter((item) => item.tagCode === tag.code).length }));
-      const currentTag = normalizeTagCode(this.data.activeTag);
-      const activeTag = tags.some((tag) => tag.code === currentTag && tag.count > 0)
-        ? currentTag
-        : ((tags.find((tag) => tag.count > 0) || TAG_DEFINITIONS[0]).code);
-      this.setData({ tags, activeTag, lessonTitle: (lesson && lesson.name) || this.data.lessonTitle });
-      this.showTagContents(activeTag, true);
+      const tags = TAG_DEFINITIONS.map((tag) => ({ ...tag, count: countForTag(contents, tag) }));
+      const resolvedLessonTitle = prettyContentTitle((lesson && lesson.name) || this.data.lessonTitle);
+      this.setData({
+        tags,
+        activeTag: "ALL",
+        activeTagLabel: "All",
+        lessonTitle: resolvedLessonTitle || this.data.lessonTitle,
+        displayTitle: resolvedLessonTitle || this.data.displayTitle,
+        pageTitle: resolvedLessonTitle || this.data.pageTitle
+      });
+      this.showTagContents("ALL", true);
     }).catch(() => {});
   },
   selectTag(event) {
-    this.showTagContents(event.currentTarget.dataset.code || "HD", false, true);
+    this.showTagContents(event.currentTarget.dataset.code || "ALL", false, true);
   },
   selectTagItem(event) {
     const item = (this.lessonContents || []).find((content) => content.id === event.currentTarget.dataset.id);
     if (item) this.showContent(item);
   },
   showTagContents(code, preserveCurrent, listOnly) {
-    const items = (this.lessonContents || []).filter((item) => item.tagCode === code);
-      this.setData({ activeTag: code, activeTagLabel: (TAG_DEFINITIONS.find((tag) => tag.code === code) || {}).label || code, tagItems: items });
+    const tagCode = normalizeFilterTag(code);
+    const items = itemsForTag(this.lessonContents || [], tagCode);
+    this.setData({ activeTag: tagCode, activeTagLabel: tagLabel(tagCode), tagItems: items });
     if (!items.length) {
       this.pageLoadToken += 1;
       if (this.stopContentSecurity) {
         this.stopContentSecurity();
         this.stopContentSecurity = null;
       }
-      this.setData({ contentMode: "empty", pageTitle: this.data.lessonTitle || "课节内容", activeHomework: {} });
+      this.setData({ contentMode: "empty", activeHomework: {}, materialCode: "" });
       return;
     }
     if (listOnly) {
@@ -149,7 +160,7 @@ Page({
         this.stopContentSecurity();
         this.stopContentSecurity = null;
       }
-      this.setData({ contentMode: "list", activeHomework: {}, pageTitle: `${TAG_DEFINITIONS.find((tag) => tag.code === code)?.label || code}资料` });
+      this.setData({ contentMode: "list", activeHomework: {}, materialCode: "" });
       return;
     }
     const current = preserveCurrent && items.find((item) => item.contentType === "material" && item.id === this.materialId);
@@ -159,7 +170,7 @@ Page({
     if (item.contentType === "homework") {
       this.pageLoadToken += 1;
       this.resetContentSecurity(item.id, "homework");
-      this.setData({ contentMode: "homework", activeHomework: item, pageTitle: item.title });
+      this.setData({ contentMode: "homework", activeHomework: item, materialCode: "", contentTagLabel: tagLabel(item.tagCode || "HW") });
       return;
     }
     if (item.id === this.materialId && this.data.contentMode === "material") return;
@@ -168,7 +179,7 @@ Page({
   onShareAppMessage() {
     const contextQuery = this.courseId && this.lessonId ? `&courseId=${encodeURIComponent(this.courseId)}&lessonId=${encodeURIComponent(this.lessonId)}` : "";
     return {
-      title: this.data.pageTitle && this.data.pageTitle !== "资料预览" ? `Starline 课节：${this.data.pageTitle}` : "Starline 课节内容",
+      title: this.data.displayTitle && this.data.displayTitle !== "资料预览" ? `Starline 课节：${this.data.displayTitle}` : "Starline 课节内容",
       path: this.materialId
         ? `/pages/material-preview/index?id=${encodeURIComponent(this.materialId)}${contextQuery}`
         : (this.courseId && this.lessonId ? `/pages/material-preview/index?courseId=${encodeURIComponent(this.courseId)}&lessonId=${encodeURIComponent(this.lessonId)}` : "/pages/study/index")
@@ -460,4 +471,44 @@ function normalizeTagCode(code) {
   if (value.toUpperCase() === "HD") return "HD";
   if (value.toUpperCase() === "HW") return "HW";
   return "";
+}
+
+function normalizeFilterTag(code) {
+  if (String(code || "").toUpperCase() === "ALL") return "ALL";
+  return normalizeTagCode(code) || "ALL";
+}
+
+function tagLabel(code) {
+  return (TAG_DEFINITIONS.find((tag) => tag.code === code) || {}).label || code;
+}
+
+function itemsForTag(contents, code) {
+  if (code === "ALL") return (contents || []).slice();
+  return (contents || []).filter((item) => item.tagCode === code);
+}
+
+function countForTag(contents, tag) {
+  if (tag.code === "ALL") return (contents || []).length;
+  return (contents || []).filter((item) => item.tagCode === tag.code).length;
+}
+
+function splitMaterialTitle(title) {
+  const raw = String(title || "").trim();
+  const matched = raw.match(/^((?:HD|HW|Blank|Exam|Special)[_-][A-Za-z0-9._-]+)\s+(.+)$/i);
+  if (matched) return { code: matched[1], name: matched[2] };
+  return { code: "", name: raw };
+}
+
+function prettyContentTitle(title) {
+  const split = splitMaterialTitle(title);
+  return split.name || String(title || "").trim();
+}
+
+function buildDisplayHeader(material, lessonTitle) {
+  const split = splitMaterialTitle(material && material.title);
+  const lesson = prettyContentTitle(lessonTitle);
+  return {
+    displayTitle: lesson || split.name || "课节内容",
+    materialCode: split.code
+  };
 }
