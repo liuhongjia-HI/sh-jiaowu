@@ -488,7 +488,7 @@ export function CourseDialog({
               <Button type="text" size="small" htmlType="button" aria-label={`${collapsedUnits.has(unit.id) ? '展开' : '收起'} Unit`} onClick={() => setCollapsedUnits((current) => { const next = new Set(current); next.has(unit.id) ? next.delete(unit.id) : next.add(unit.id); return next; })}>{collapsedUnits.has(unit.id) ? '▸' : '▾'}</Button>
               <Typography.Text strong className="curriculum-node-type">Unit</Typography.Text>
               <InputNumber min={1} max={200} aria-label="Unit序号" value={unit.sortOrder} onChange={(value) => updateCurriculumSortOrder(unit.id, value || 1)} />
-              <Input aria-label={`Unit名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder={`Unit 名称${curriculumNodeIsLeaf(unit.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(unit.id) && !unit.name.trim() ? 'error' : undefined} />
+              <Input aria-label={`Unit名称${curriculumNodeIsLeaf(unit.id) ? '（必填）' : '（选填）'}`} value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder={`Unit 名称${curriculumNodeIsLeaf(unit.id) ? '（必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(unit.id) && !unit.name.trim() ? 'error' : undefined} />
               <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('chapter', unit.id).length} 个 Chapter</Typography.Text>
               <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
             </div>
@@ -503,7 +503,7 @@ export function CourseDialog({
                 <Button type="text" size="small" htmlType="button" aria-label={`${collapsedChapters.has(chapter.id) ? '展开' : '收起'} Chapter`} onClick={() => setCollapsedChapters((current) => { const next = new Set(current); next.has(chapter.id) ? next.delete(chapter.id) : next.add(chapter.id); return next; })}>{collapsedChapters.has(chapter.id) ? '▸' : '▾'}</Button>
                 <Typography.Text strong className="curriculum-node-type">Chapter</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Chapter序号" value={chapter.sortOrder} onChange={(value) => updateCurriculumSortOrder(chapter.id, value || 1)} />
-                <Input aria-label={`Chapter名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder={`Chapter 名称${curriculumNodeIsLeaf(chapter.id) ? '（叶子必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(chapter.id) && !chapter.name.trim() ? 'error' : undefined} />
+                <Input aria-label={`Chapter名称${curriculumNodeIsLeaf(chapter.id) ? '（必填）' : '（选填）'}`} value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder={`Chapter 名称${curriculumNodeIsLeaf(chapter.id) ? '（必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(chapter.id) && !chapter.name.trim() ? 'error' : undefined} />
                 <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('lesson', chapter.id).length} 个 Lesson</Typography.Text>
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
               </div>
@@ -516,7 +516,7 @@ export function CourseDialog({
               {!collapsedChapters.has(chapter.id) && <div className="curriculum-lessons">{curriculumChildren('lesson', chapter.id).map((lesson) => <div key={lesson.id} className="curriculum-lesson-row" data-testid="curriculum-lesson">
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Lesson序号" value={lesson.sortOrder} onChange={(value) => updateCurriculumSortOrder(lesson.id, value || 1)} />
-                <Input aria-label="Lesson名称（叶子必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（叶子必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
+                <Input aria-label="Lesson名称（必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
                 <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
               </div>)}</div>}
             </div>)}
