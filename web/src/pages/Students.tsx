@@ -34,7 +34,7 @@ import type { KeyboardEvent } from 'react';
 import { deleteData, getData, postData, postForm, putData } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
-import { gradeOptions as curriculumGradeOptions, subjectOptions } from '../utils/curriculum';
+import { gradeOptions as curriculumGradeOptions, subjectLabel, subjectOptions } from '../utils/curriculum';
 import type {
   CurrentUser,
   DirectGrantReplaceRequest,
@@ -138,7 +138,7 @@ function TutoringTeacherNames({ assignments }: { assignments?: TutoringAssignmen
         <Space direction="vertical" size={4}>
           {assignments.map((item) => (
             <Typography.Text key={`${item.teacherId}-${item.subjectName}-${item.levelCode}-${item.role}`} style={{ color: '#fff' }}>
-              {item.teacherName} · {item.role === 'primary' ? '主辅导' : '协作'} · {item.subjectName} {item.levelCode}级 · {item.startsAt} 起
+              {item.teacherName} · {item.role === 'primary' ? '主辅导' : '协作'} · {subjectLabel(item.subjectName)} {item.levelCode}级 · {item.startsAt} 起
             </Typography.Text>
           ))}
         </Space>
@@ -861,7 +861,7 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
           pagination={false}
           columns={[
             { title: '日期', dataIndex: 'examDate', width: 110 },
-            { title: '学科', dataIndex: 'subject', width: 80 },
+            { title: '学科', dataIndex: 'subject', width: 80, render: (value: string) => subjectLabel(value) },
             { title: '类型', dataIndex: 'examType', width: 90, render: (value) => value || '阶段测评' },
             { title: '考试/测评', dataIndex: 'examName' },
             { title: '分数', width: 100, render: (_, record) => `${record.score}/${record.fullScore}` },
@@ -1045,10 +1045,10 @@ function TutoringAssignmentPanel({
         <Typography.Text type="secondary">{writable ? '主辅导老师决定学生归属、默认排课范围和新产生的批改任务；协作老师仅用于辅助记录。' : '只有有效辅导关系内的学生才会出现在我的工作范围。'}</Typography.Text>
         {writable && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>分配老师</Button>}
       </div>
-      {rows.length === 0 ? <Empty description={writable ? '还没有辅导老师，分配后才能进入老师的工作范围。' : '暂未找到有效辅导关系。'} /> : <CardList rows={rows} rowKey={(item) => item.id} emptyText="还没有辅导关系" renderCard={(item) => <InfoCard title={`${item.subjectName} · ${item.levelCode} · ${item.teacherName}`} subtitle={`${item.startsAt} 起${item.endsAt ? `，${item.endsAt} 结束` : ''}`} status={<Tag color={item.status === 'active' ? 'green' : 'default'}>{item.status === 'active' ? (item.role === 'primary' ? '主辅导老师' : '协作老师') : '已结束'}</Tag>} fields={[{ label: '分配人', value: item.assignedBy || '-' }, { label: '结束原因', value: item.endedReason || '-' }]} actions={writable && item.status === 'active' ? <Space size={4}><Button size="small" onClick={() => openAction({ kind: 'transfer', assignment: item })}>转交</Button><Button size="small" danger onClick={() => openAction({ kind: 'end', assignment: item })}>结束</Button></Space> : undefined} />} />}
+      {rows.length === 0 ? <Empty description={writable ? '还没有辅导老师，分配后才能进入老师的工作范围。' : '暂未找到有效辅导关系。'} /> : <CardList rows={rows} rowKey={(item) => item.id} emptyText="还没有辅导关系" renderCard={(item) => <InfoCard title={`${subjectLabel(item.subjectName)} · ${item.levelCode} · ${item.teacherName}`} subtitle={`${item.startsAt} 起${item.endsAt ? `，${item.endsAt} 结束` : ''}`} status={<Tag color={item.status === 'active' ? 'green' : 'default'}>{item.status === 'active' ? (item.role === 'primary' ? '主辅导老师' : '协作老师') : '已结束'}</Tag>} fields={[{ label: '分配人', value: item.assignedBy || '-' }, { label: '结束原因', value: item.endedReason || '-' }]} actions={writable && item.status === 'active' ? <Space size={4}><Button size="small" onClick={() => openAction({ kind: 'transfer', assignment: item })}>转交</Button><Button size="small" danger onClick={() => openAction({ kind: 'end', assignment: item })}>结束</Button></Space> : undefined} />} />}
       <FormDrawer title="分配辅导老师" open={createOpen} onCancel={() => setCreateOpen(false)} onSubmit={() => createForm.submit()} submitting={create.isPending} submitText="确认分配">
         <Form form={createForm} layout="vertical" onFinish={(values) => create.mutate(values)}>
-          <Form.Item name="subjectId" label="辅导学科" rules={[{ required: true, message: '请选择学科' }]}><Select placeholder="先选择学科" options={selectableSubjects.map((subject) => ({ value: subject.id, label: subject.name }))} onChange={() => createForm.setFieldsValue({ levelCode: undefined as unknown as string, teacherId: undefined as unknown as string })} /></Form.Item>
+          <Form.Item name="subjectId" label="辅导学科" rules={[{ required: true, message: '请选择学科' }]}><Select placeholder="先选择学科" options={selectableSubjects.map((subject) => ({ value: subject.id, label: subjectLabel(subject.name) }))} onChange={() => createForm.setFieldsValue({ levelCode: undefined as unknown as string, teacherId: undefined as unknown as string })} /></Form.Item>
           <Form.Item name="levelCode" label="课程等级" rules={[{ required: true, message: '请选择等级' }]}><Select placeholder="请选择等级" options={levelOptions} onChange={() => createForm.setFieldsValue({ teacherId: undefined as unknown as string })} /></Form.Item>
           <Form.Item name="teacherId" label="辅导老师" rules={[{ required: true, message: '请选择老师' }]}><Select placeholder="只显示覆盖该年级、学科和等级的老师" options={selectableTeachers.map((teacher) => ({ value: teacher.id, label: teacher.name }))} /></Form.Item>
           <Form.Item name="role" label="辅导角色" rules={[{ required: true }]}><Select options={[{ value: 'primary', label: '主辅导老师' }, { value: 'assistant', label: '协作老师' }]} /></Form.Item>
@@ -1354,7 +1354,7 @@ function DirectGrantPanel({
                   type={selectedSubject === subject ? 'primary' : 'default'}
                   onClick={() => setSelectedSubject(subject)}
                 >
-                  {subject}（{count}）
+                  {subjectLabel(subject)}（{count}）
                 </Button>
               ))}
               <Button size="small" type={selectedOnly ? 'primary' : 'default'} onClick={() => setSelectedOnly((value) => !value)}>

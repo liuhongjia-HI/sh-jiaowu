@@ -185,3 +185,31 @@ test("内容准备中的课程即使存在课程编号也不可进入", async ()
 
   assert.equal(page.data.visibleCourses[0].canOpen, false);
 });
+
+test("已开通课程套用年级目录的学生端展示名称，避免露出内部课程编码", async () => {
+  const page = loadStudyPage((path) => {
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.resolve({
+      student: { id: "stu-001", grade: "五年级", openedPackages: ["五年级地理"] },
+      courses: [
+        { id: "course-geo", name: "G5S1Q1 Geo S", subject: "地理", grade: "五年级", materialNum: 9 }
+      ],
+      subjects: [
+        { id: "g5-geography", displayName: "Geography", subject: "地理", grade: "五年级", accessState: "full", canOpen: true, entryCourseId: "course-geo" },
+        { id: "g5-science", displayName: "Science", subject: "科学", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-sci" },
+        { id: "g5-english", displayName: "English", subject: "英文", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-eng" }
+      ],
+      materials: []
+    });
+  });
+
+  page.loadStudy();
+  await flushPromises();
+
+  assert.deepEqual(page.data.visibleCourses.map((item) => [item.displayName || item.name, item.subject, item.isOpened]), [
+    ["Geography", "地理", true],
+    ["Science", "科学", false],
+    ["English", "英文", false]
+  ]);
+  assert.equal(page.data.visibleCourses[0].name, "G5S1Q1 Geo S");
+});

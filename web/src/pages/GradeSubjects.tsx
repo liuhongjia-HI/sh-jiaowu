@@ -6,7 +6,7 @@ import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton } from '../components/ListViews';
 import { getData, postForm, putData, resolveAssetUrl } from '../services/http';
 import type { GradeSubjectCatalogUpdateRequest, GradeSubjectMetadata, SubjectMetadata } from '../types/starline';
-import { gradeOptions } from '../utils/curriculum';
+import { gradeOptions, subjectLabel } from '../utils/curriculum';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const GRADE_GROUPS = [
@@ -62,13 +62,13 @@ export default function GradeSubjects() {
 
   if (items.isLoading || subjects.isLoading) return <Skeleton active />;
   if (items.error || subjects.error) return <Card>年级课程目录加载失败，请刷新后重试。</Card>;
-  const subjectOptions = (subjects.data ?? []).filter((item) => item.status === '启用').map((item) => ({ value: item.name, label: item.name }));
+  const subjectOptions = (subjects.data ?? []).filter((item) => item.status === '启用').map((item) => ({ value: item.name, label: subjectLabel(item.name) }));
   return <div className="page-stack grade-catalog-page">
     {selectedGrade ? <GradeDetail grade={selectedGrade} summary={summaries[selectedGrade]} rows={selectedRows} onBack={() => setSelectedGrade(null)} onChangeGrade={setSelectedGrade} onCreate={openCreate} onEdit={openEdit} /> : <GradeOverview summaries={summaries} onSelect={setSelectedGrade} />}
     <FormDrawer title={creating ? `新增${selectedGrade}学科` : editing ? `编辑${editing.grade}${editing.displayName}` : '编辑课程目录'} open={Boolean(editing)} onCancel={() => { setEditing(null); setCreating(false); }} onSubmit={() => form.submit()} submitting={save.isPending || upload.isPending}>
       <Form form={form} layout="vertical" onFinish={(values) => editing && save.mutate({ ...editing, ...values, grade: selectedGrade || editing.grade, gradeCode: gradeCode(selectedGrade || editing.grade) })}>
-        <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]}><Select disabled={!creating} options={subjectOptions} placeholder="选择学科" /></Form.Item>
-        <Form.Item name="displayName" label="学生端展示名称" rules={[{ required: true, message: '请输入课程名称' }]}><Input placeholder="例如：数学" /></Form.Item>
+        <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]}><Select disabled={!creating} options={subjectOptions} placeholder="选择学科" onChange={(value) => { if (creating || !form.getFieldValue('displayName')) form.setFieldValue('displayName', subjectLabel(value)); }} /></Form.Item>
+        <Form.Item name="displayName" label="学生端展示名称" rules={[{ required: true, message: '请输入课程名称' }]}><Input placeholder="例如：Mathematics" /></Form.Item>
         <Form.Item label="课程图片" extra="建议使用横向图片，JPG 或 PNG，5MB 以内。"><Upload accept=".jpg,.jpeg,.png" showUploadList={false} beforeUpload={(file) => { if (file.size > MAX_IMAGE_SIZE) { message.error('图片不能超过 5MB'); return Upload.LIST_IGNORE; } upload.mutate(file); return false; }}><Button icon={<UploadOutlined />} loading={upload.isPending}>上传图片</Button></Upload><Form.Item name="imageUrl" noStyle><Input type="hidden" /></Form.Item></Form.Item>
         <Form.Item noStyle shouldUpdate>{() => form.getFieldValue('imageUrl') ? <Image width={180} height={100} style={{ objectFit: 'cover', borderRadius: 8, marginBottom: 16 }} src={resolveAssetUrl(form.getFieldValue('imageUrl'))} /> : null}</Form.Item>
         <Form.Item name="summary" label="课程简介"><Input.TextArea rows={2} placeholder="例如：建立扎实的数学思维与解题能力" /></Form.Item>

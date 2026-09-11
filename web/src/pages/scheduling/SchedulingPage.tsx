@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
-import { gradeOptions, subjectOptions } from '../../utils/curriculum';
+import { gradeOptions, subjectLabel, subjectOptions } from '../../utils/curriculum';
 import type { AvailabilitySlot, Course, CurrentUser, ScheduleClass, Student, Teacher } from '../../types/starline';
 import {
   addDays,
@@ -296,7 +296,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     return [...teacherOptions, ...studentOptions];
   }, [teachers.data, students.data, user]);
 
-  const courseOptions = (courses.data ?? []).map((item) => ({ label: `${item.name} · ${item.grade}/${item.subject}`, value: item.id }));
+  const courseOptions = (courses.data ?? []).map((item) => ({ label: `${item.name} · ${item.grade}/${subjectLabel(item.subject)}`, value: item.id }));
   const teacherOptions = (teachers.data ?? []).map((item) => ({ label: teacherOptionLabel(item), value: item.id }));
   const studentOptions = (students.data ?? []).map((item) => ({ label: studentOptionLabel(item), value: item.id }));
   const campusOptions = uniqueScheduleCampuses(classes.data ?? []).map((value) => ({ label: value, value }));

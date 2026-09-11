@@ -69,7 +69,7 @@
         <view class="course-title">{{item.displayName || item.name}}</view>
         <view class="course-status {{item.isLocked ? 'course-status-locked' : 'course-status-new'}}">{{item.accessLabel || (item.isNew ? '新开通' : item.status)}}</view>
       </view>
-      <view class="course-meta">{{item.grade || "学习内容"}} · {{item.subject || "综合学习"}}</view>
+      <view class="course-meta">{{item.grade || "学习内容"}} · {{item.displaySubject || item.subject || "综合学习"}}</view>
       <view wx:if="{{item.newCourseText}}" class="course-new-time">{{item.newCourseText}}</view>
       <view class="course-code">{{item.materialNum || 0}} materials · {{item.homeworkNum || 0}} exercises</view>
       <view wx:if="{{!item.isLocked}}" class="course-progress-row">

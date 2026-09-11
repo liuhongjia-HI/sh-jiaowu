@@ -502,6 +502,12 @@ func (s *MemoryStore) UpdateSubjectMetadata(operator, id string, req learning.Su
 	return s.updateSubjectMetadataUnlocked(operator, id, req)
 }
 
+func (s *MemoryStore) DeleteSubjectMetadata(operator, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deleteSubjectMetadataUnlocked(operator, id)
+}
+
 func (s *MemoryStore) GradeSubjects() []learning.GradeSubjectMetadata {
 	s.mu.Lock()
 	defer s.mu.Unlock()

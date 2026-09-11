@@ -24,7 +24,7 @@ func defaultGradeSubjectCatalog() []learning.GradeSubjectMetadata {
 				GradeCode:   "G" + itoa(gradeIndex+1),
 				Grade:       grade,
 				Subject:     subject,
-				DisplayName: subject,
+				DisplayName: subjectEnglishName(subject),
 				SortOrder:   subjectCatalogSort(subject),
 				Status:      "启用",
 			})
@@ -57,9 +57,7 @@ func (s *MemoryStore) gradeSubjectCatalogUnlocked() []learning.GradeSubjectMetad
 		if strings.TrimSpace(item.ID) == "" || strings.TrimSpace(item.Grade) == "" || strings.TrimSpace(item.Subject) == "" {
 			continue
 		}
-		if item.DisplayName == "" {
-			item.DisplayName = item.Subject
-		}
+		item.DisplayName = localizedSubjectDisplayName(item.Subject, item.DisplayName)
 		if item.GradeCode == "" {
 			item.GradeCode = gradeCode(item.Grade)
 		}
@@ -118,9 +116,7 @@ func (s *MemoryStore) updateGradeSubjectsUnlocked(operator string, req learning.
 			return nil, errors.New("同一年级不能重复配置同一学科")
 		}
 		seen[key] = true
-		if item.DisplayName == "" {
-			item.DisplayName = item.Subject
-		}
+		item.DisplayName = localizedSubjectDisplayName(item.Subject, item.DisplayName)
 		item.GradeCode = gradeCode(item.Grade)
 		items = append(items, item)
 	}

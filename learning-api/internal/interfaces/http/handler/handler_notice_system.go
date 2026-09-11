@@ -85,6 +85,16 @@ func (h *LearningHandler) UpdateSubjectMetadata(c *gin.Context) {
 	OK(c, subject)
 }
 
+func (h *LearningHandler) DeleteSubjectMetadata(c *gin.Context) {
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	id := c.Param("id")
+	if err := h.service.DeleteSubjectMetadata(operator.(string), id); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"id": id})
+}
+
 func (h *LearningHandler) GradeSubjects(c *gin.Context) { OK(c, h.service.GradeSubjects()) }
 
 func (h *LearningHandler) UpdateGradeSubjects(c *gin.Context) {

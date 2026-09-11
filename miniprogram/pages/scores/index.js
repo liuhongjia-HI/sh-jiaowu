@@ -1,4 +1,5 @@
 const { request } = require("../../utils/request");
+const { subjectLabel } = require("../../utils/subject");
 
 Page({
   data: {
@@ -59,6 +60,7 @@ function normalizeExamScores(scores) {
       : "暂无对比";
     return {
       ...summary,
+      displayName: subjectLabel(summary.subject),
       latest,
       first,
       trend,
@@ -75,7 +77,7 @@ function latestSummary(examScores, practiceRecords) {
   if (examScores.length > 0) {
     const latest = examScores[0].latest || {};
     return {
-      title: `${examScores[0].subject || "考试"} ${examScores[0].latestScoreText}`,
+      title: `${examScores[0].displayName || examScores[0].subject || "考试"} ${examScores[0].latestScoreText}`,
       subtitle: examScores[0].description || latest.examName || "最近一次考试成绩"
     };
   }

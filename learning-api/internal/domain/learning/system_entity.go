@@ -7,6 +7,7 @@ type SettingUpdateRequest struct {
 
 // SubjectMetadata 是可复用的学科展示元数据。学科名称本身已被课程、学习空间等
 // 业务数据引用，因此这里仅允许维护显示属性，不允许在系统设置中改名。
+// Deletable 是只读计算字段：内置学科和仍被业务数据引用的学科不能删除。
 type SubjectMetadata struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
@@ -14,6 +15,7 @@ type SubjectMetadata struct {
 	Color      string `json:"color"`
 	SortOrder  int    `json:"sortOrder"`
 	Status     string `json:"status"`
+	Deletable  bool   `json:"deletable,omitempty"`
 }
 
 type SubjectMetadataUpdateRequest struct {

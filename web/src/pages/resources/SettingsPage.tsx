@@ -6,6 +6,7 @@ import { getData, putData } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton } from '../../components/ListViews';
 import type { SettingUpdateRequest, SubjectMetadata, SubjectMetadataUpdateRequest } from '../../types/starline';
+import { subjectLabel } from '../../utils/curriculum';
 
 const CALENDAR_KEY = 'academicCalendar';
 const FALL_LABEL = 'S1 第一学期';
@@ -318,7 +319,7 @@ function SubjectMetadataCard() {
           pagination={false}
           dataSource={subjects.data ?? []}
           columns={[
-            { title: '学科', dataIndex: 'name' },
+            { title: '学科', dataIndex: 'name', render: (value: string) => subjectLabel(value) },
             { title: '简称', dataIndex: 'shortLabel' },
             { title: '显示颜色', dataIndex: 'color', render: (color: string) => <Space size={8}><span aria-label={`颜色 ${color}`} style={{ width: 18, height: 18, borderRadius: '50%', background: color, border: '1px solid #d9d9d9', display: 'inline-block' }} /><Typography.Text>{color}</Typography.Text></Space> },
             { title: '排序', dataIndex: 'sortOrder' },
@@ -328,7 +329,7 @@ function SubjectMetadataCard() {
         />
       )}
       <FormDrawer
-        title={editing ? `编辑${editing.name}显示配置` : '编辑学科显示配置'}
+        title={editing ? `编辑${subjectLabel(editing.name)}显示配置` : '编辑学科显示配置'}
         open={Boolean(editing)}
         onCancel={() => setEditing(null)}
         onSubmit={() => form.submit()}

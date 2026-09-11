@@ -150,6 +150,7 @@ type SystemRepository interface {
 	UpdateSetting(string, learning.SettingUpdateRequest) (map[string]string, error)
 	Subjects() []learning.SubjectMetadata
 	UpdateSubjectMetadata(string, string, learning.SubjectMetadataUpdateRequest) (learning.SubjectMetadata, error)
+	DeleteSubjectMetadata(string, string) error
 	GradeSubjects() []learning.GradeSubjectMetadata
 	UpdateGradeSubjects(string, learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error)
 }

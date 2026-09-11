@@ -6,6 +6,7 @@ import { getData, postData, putData, resetTeacherPassword } from '../services/ht
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
 import type { LearningSpace, PasswordResetResult, Teacher, TeacherUpsertRequest } from '../types/starline';
+import { subjectLabel } from '../utils/curriculum';
 
 type TeacherFormValues = {
   name: string;
@@ -32,7 +33,7 @@ export default function Teachers() {
   const learningSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const enabledWatch = Form.useWatch('enabled', form);
   const scopeGradeOptions = useMemo(() => Array.from(new Set((learningSpaces.data ?? []).map((item) => item.grade))).map((value) => ({ label: value, value })), [learningSpaces.data]);
-  const scopeSubjectOptions = useMemo(() => Array.from(new Set((learningSpaces.data ?? []).filter((item) => !scopeGrade || item.grade === scopeGrade).map((item) => item.subject))).map((value) => ({ label: value, value })), [learningSpaces.data, scopeGrade]);
+  const scopeSubjectOptions = useMemo(() => Array.from(new Set((learningSpaces.data ?? []).filter((item) => !scopeGrade || item.grade === scopeGrade).map((item) => item.subject))).map((value) => ({ label: subjectLabel(value), value })), [learningSpaces.data, scopeGrade]);
   const learningSpaceOptions = (learningSpaces.data ?? []).filter((item) => (!scopeGrade || item.grade === scopeGrade) && (!scopeSubject || item.subject === scopeSubject)).map((item) => ({
     label: item.name,
     value: item.id

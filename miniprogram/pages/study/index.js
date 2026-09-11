@@ -1,4 +1,5 @@
 const { request } = require("../../utils/request");
+const { subjectEmoji, subjectLabel, subjectsMatchName } = require("../../utils/subject");
 
 Page({
   data: {
@@ -169,6 +170,8 @@ function decorateCourses(courses, favorites) {
       cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : isOpened ? "opened-course" : "",
       newCourseText: isNew && course.availableAt ? `新开通 · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
+      displayName: subjectLabel(course.displayName || course.subject || course.name),
+      displaySubject: subjectLabel(course.subject || course.displayName),
       entryCourseId: course.entryCourseId || course.id,
       accessLabel,
       isPreview,
@@ -185,18 +188,29 @@ function decorateCourses(courses, favorites) {
 // 接口会同时返回已开通课程和年级学科目录。已开通课程保留真实进度并置顶，
 // 目录中与其同学科的占位卡片不再重复展示。
 function mergeStudyCourses(subjects, courses, favorites) {
-  const opened = decorateCourses((courses || []).map((course) => ({ ...course, isOpened: true })), favorites);
-  const openedSubjects = new Set(opened.map((course) => String(course.subject || course.displayName || "").trim()).filter(Boolean));
+  const opened = decorateCourses((courses || []).map((course) => ({
+    ...course,
+    isOpened: true,
+    displayName: course.displayName || catalogDisplayName(course, subjects)
+  })), favorites);
+  const openedSubjects = opened.map((course) => String(course.subject || course.displayName || "").trim()).filter(Boolean);
   const catalog = decorateCourses((subjects || []).filter((subject) => {
     const key = String(subject.subject || subject.displayName || "").trim();
-    return !openedSubjects.has(key);
+    return !openedSubjects.some((item) => subjectsMatchName(item, key));
   }), favorites);
   return opened.concat(catalog);
 }
 
-function subjectEmoji(subject, index) {
-  const icons = { 数学: "➗", 英文: "🔤", 语文: "📖", 科学: "🔬", 地理: "🌍", 物理: "⚙️", 化学: "🧪" };
-  return icons[subject] || (index % 2 === 0 ? "📚" : "✨");
+function catalogDisplayName(course, subjects) {
+  const subject = String(course.subject || "").trim();
+  if (!subject) return "";
+  const grade = String(course.grade || "").trim();
+  const matched = (subjects || []).find((item) => {
+    if (String(item.subject || "").trim() !== subject) return false;
+    const itemGrade = String(item.grade || "").trim();
+    return !grade || !itemGrade || itemGrade === grade;
+  });
+  return String((matched && matched.displayName) || "").trim();
 }
 
 function courseAvailableAt(course) {

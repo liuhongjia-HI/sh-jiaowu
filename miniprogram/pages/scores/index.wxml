@@ -26,7 +26,7 @@
     <view wx:for="{{examScores}}" wx:key="subject" class="card">
       <view class="row">
         <view>
-          <view class="title small-title">{{item.subject}} · {{item.latestScoreText}} 分</view>
+          <view class="title small-title">{{item.displayName || item.subject}} · {{item.latestScoreText}} 分</view>
           <view class="sub">{{item.examTypeText}} · {{item.latest.examName || "最近测评"}} · {{item.latest.examDate}}</view>
         </view>
         <view class="badge">{{item.trend}}</view>

@@ -87,8 +87,67 @@ export function gradeOptions() {
   return GRADES.map((grade) => ({ label: grade, value: grade }));
 }
 
+const SUBJECT_ENGLISH_NAMES: Record<string, string> = {
+  英文: 'English',
+  英语: 'English',
+  English: 'English',
+  数学: 'Mathematics',
+  Math: 'Mathematics',
+  Mathematics: 'Mathematics',
+  语文: 'Chinese',
+  Chinese: 'Chinese',
+  科学: 'Science',
+  Science: 'Science',
+  综合科学: 'Integrated Science',
+  'Integrated Science': 'Integrated Science',
+  地理: 'Geography',
+  Geography: 'Geography',
+  历史: 'History',
+  History: 'History',
+  物理: 'Physics',
+  Physics: 'Physics',
+  化学: 'Chemistry',
+  Chemistry: 'Chemistry'
+};
+
+const SUBJECT_KEYS: Record<string, string> = {
+  英文: 'english',
+  英语: 'english',
+  English: 'english',
+  数学: 'math',
+  Math: 'math',
+  Mathematics: 'math',
+  语文: 'chinese',
+  Chinese: 'chinese',
+  科学: 'science',
+  Science: 'science',
+  综合科学: 'integrated-science',
+  'Integrated Science': 'integrated-science',
+  地理: 'geography',
+  Geography: 'geography',
+  历史: 'history',
+  History: 'history',
+  物理: 'physics',
+  Physics: 'physics',
+  化学: 'chemistry',
+  Chemistry: 'chemistry'
+};
+
+export function subjectLabel(subject?: string) {
+  const name = (subject || '').trim();
+  return SUBJECT_ENGLISH_NAMES[name] || name;
+}
+
+export function subjectsMatch(left?: string, right?: string) {
+  const first = (left || '').trim();
+  const second = (right || '').trim();
+  if (first === second) return true;
+  if (!first || !second) return false;
+  return (SUBJECT_KEYS[first] || first.toLowerCase()) === (SUBJECT_KEYS[second] || second.toLowerCase());
+}
+
 export function subjectOptions(grade?: string) {
-  return subjectsForGrade(grade).map((subject) => ({ label: subject, value: subject }));
+  return subjectsForGrade(grade).map((subject) => ({ label: subjectLabel(subject), value: subject }));
 }
 
 export function semesterLabel(value?: string) {
@@ -117,7 +176,7 @@ export function semesterOptions(settingValue?: string) {
 }
 
 export function formatLearningSpace(space: { grade: string; subject: string; semester: string; phase: string; level?: string; name?: string }) {
-  return `${space.grade} · ${space.subject} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)} · ${space.level || 'S'}`;
+  return `${space.grade} · ${subjectLabel(space.subject)} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)} · ${space.level || 'S'}`;
 }
 
 // 校历（系统设置 academicCalendar）里的一条学期记录，是学年下拉的唯一权威来源——

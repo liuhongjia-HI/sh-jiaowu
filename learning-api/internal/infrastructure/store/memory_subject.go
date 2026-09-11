@@ -19,6 +19,9 @@ func (s *MemoryStore) subjectsUnlocked() []learning.SubjectMetadata {
 		}
 		return out[i].Name < out[j].Name
 	})
+	for index := range out {
+		out[index].Deletable = s.subjectDeleteBlockReason(out[index]) == ""
+	}
 	return out
 }
 
@@ -57,7 +60,105 @@ func (s *MemoryStore) updateSubjectMetadataUnlocked(operator, id string, req lea
 		s.subjects[index].SortOrder = req.SortOrder
 		s.subjects[index].Status = req.Status
 		s.prependLogDetail(operator, "修改学科显示配置", before.Name, auditChangeDetail(before, s.subjects[index]))
-		return s.subjects[index], nil
+		updated := s.subjects[index]
+		updated.Deletable = s.subjectDeleteBlockReason(updated) == ""
+		return updated, nil
 	}
 	return learning.SubjectMetadata{}, errors.New("学科不存在")
+}
+
+func (s *MemoryStore) deleteSubjectMetadataUnlocked(operator, id string) error {
+	if s.db != nil {
+		return persistentMutationError(s, func(work *MemoryStore) error {
+			return work.deleteSubjectMetadataUnlocked(operator, id)
+		})
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("学科不存在")
+	}
+	for index, item := range s.subjects {
+		if item.ID != id {
+			continue
+		}
+		if reason := s.subjectDeleteBlockReason(item); reason != "" {
+			return errors.New(reason)
+		}
+		s.subjects = append(s.subjects[:index], s.subjects[index+1:]...)
+		s.prependLogDetail(operator, "删除学科显示配置", item.Name, "")
+		return nil
+	}
+	return errors.New("学科不存在")
+}
+
+func isDefaultSubjectID(id string) bool {
+	for _, item := range defaultSubjectMetadata() {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *MemoryStore) subjectDeleteBlockReason(item learning.SubjectMetadata) string {
+	if isDefaultSubjectID(item.ID) {
+		return "系统内置学科不能删除。如不再开设，请改为停用"
+	}
+	if reason := s.subjectUsageReason(item.Name); reason != "" {
+		return reason
+	}
+	return ""
+}
+
+func (s *MemoryStore) subjectUsageReason(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	for _, space := range s.learningSpaces {
+		if subjectsMatch(space.Subject, name) {
+			return "仍有学习空间使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, course := range s.courses {
+		if subjectsMatch(course.Subject, name) {
+			return "仍有课程使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, pkg := range s.packages {
+		if subjectsMatch(pkg.Subject, name) {
+			return "仍有课程方案使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, material := range s.materials {
+		if subjectsMatch(material.Subject, name) {
+			return "仍有课程讲义使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, homework := range s.homework {
+		if subjectsMatch(homework.Subject, name) {
+			return "仍有课后练习使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, question := range s.questionBank {
+		if subjectsMatch(question.Subject, name) {
+			return "仍有题库题目使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, assignment := range s.tutoringAssignments {
+		if subjectsMatch(assignment.SubjectID, name) || subjectsMatch(assignment.SubjectName, name) {
+			return "仍有辅导关系使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, score := range s.scoreRecords {
+		if subjectsMatch(score.Subject, name) {
+			return "仍有成绩记录使用该学科，不能删除。如不再开设，请改为停用"
+		}
+	}
+	for _, catalog := range s.gradeSubjectCatalogUnlocked() {
+		if subjectsMatch(catalog.Subject, name) {
+			return "年级课程目录仍在使用该学科，不能删除。请先从目录中移除"
+		}
+	}
+	return ""
 }

@@ -601,54 +601,97 @@ func twoDigit(value int) string {
 }
 
 func subjectSlug(subject string) string {
-	switch subject {
-	case "语文":
+	switch strings.TrimSpace(subject) {
+	case "语文", "Chinese":
 		return "chinese"
-	case "数学":
+	case "数学", "Mathematics", "Math":
 		return "math"
-	case "英文", "英语":
+	case "英文", "英语", "English":
 		return "english"
-	case "综合科学":
+	case "综合科学", "Integrated Science":
 		return "integrated-science"
-	case "科学":
+	case "科学", "Science":
 		return "science"
-	case "物理":
+	case "物理", "Physics":
 		return "physics"
-	case "化学":
+	case "化学", "Chemistry":
 		return "chemistry"
-	case "地理":
+	case "地理", "Geography":
 		return "geography"
-	case "历史":
+	case "历史", "History":
 		return "history"
-	case "政治":
+	case "政治", "Politics":
 		return "politics"
-	case "生物":
+	case "生物", "Biology":
 		return "biology"
 	default:
-		return strings.ToLower(subject)
+		return strings.ToLower(strings.TrimSpace(subject))
 	}
 }
 
-// subjectsMatch 保持旧数据中的“英语”和新课程字典中的“英文”兼容。
-// 两者共享 english slug，历史套餐、课程和教师范围不应因字典名称调整而失效。
+// subjectEnglishName 是学生端和管理端统一使用的英文科目名。
+// 内部课程、学习空间仍保存中文学科名，展示时再翻译，避免历史数据失配。
+func subjectEnglishName(subject string) string {
+	switch strings.TrimSpace(subject) {
+	case "英文", "英语", "English":
+		return "English"
+	case "数学", "Math", "Mathematics":
+		return "Mathematics"
+	case "语文", "Chinese":
+		return "Chinese"
+	case "科学", "Science":
+		return "Science"
+	case "综合科学", "Integrated Science":
+		return "Integrated Science"
+	case "地理", "Geography":
+		return "Geography"
+	case "历史", "History":
+		return "History"
+	case "物理", "Physics":
+		return "Physics"
+	case "化学", "Chemistry":
+		return "Chemistry"
+	default:
+		return strings.TrimSpace(subject)
+	}
+}
+
+func localizedSubjectDisplayName(subject, displayName string) string {
+	name := strings.TrimSpace(displayName)
+	if name == "" || subjectsMatch(name, subject) {
+		return subjectEnglishName(subject)
+	}
+	return name
+}
+
+// subjectsMatch 把中文名、英文名和历史别名视为同一门学科。
+// 英文/英语、History/历史这类新旧数据都应对上同一门课。
 func subjectsMatch(left, right string) bool {
 	left = strings.TrimSpace(left)
 	right = strings.TrimSpace(right)
 	if left == right {
 		return true
 	}
-	return (left == "英文" && right == "英语") || (left == "英语" && right == "英文")
+	if left == "" || right == "" {
+		return false
+	}
+	return subjectSlug(left) == subjectSlug(right)
 }
 
 func subjectTextContains(value, subject string) bool {
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		return false
+	}
 	if strings.Contains(value, subject) {
 		return true
 	}
-	if subject == "英文" {
-		return strings.Contains(value, "英语")
+	english := subjectEnglishName(subject)
+	if english != "" && english != subject && strings.Contains(value, english) {
+		return true
 	}
-	if subject == "英语" {
-		return strings.Contains(value, "英文")
+	if subjectsMatch(subject, "英文") {
+		return strings.Contains(value, "英语") || strings.Contains(value, "英文") || strings.Contains(value, "English")
 	}
 	return false
 }

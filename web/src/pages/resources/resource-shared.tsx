@@ -7,7 +7,7 @@ import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
 import { subjectAccent } from '../../utils/subject-colors';
-import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
+import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, phaseLabel, semesterLabel, semesterOptions, subjectLabel, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
 export type ResourceKind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -105,7 +105,7 @@ export function titleFor(row: Record<string, unknown>) {
 
 export function subtitleFor(kind: Kind, row: Record<string, unknown>) {
   if (kind === 'settings') return '系统设置';
-  const parts = [row.grade, row.subject, row.course, row.ownerTeacherName, row.target].filter(Boolean);
+  const parts = [row.grade, row.subject ? subjectLabel(String(row.subject)) : '', row.course, row.ownerTeacherName, row.target].filter(Boolean);
   return parts.map(String).join(' · ') || undefined;
 }
 
@@ -161,6 +161,7 @@ export function displayValue(value: unknown) {
 export function displayFieldValue(key: string, value: unknown) {
   if (key === 'semester') return semesterLabel(String(value || '')) || '-';
   if (key === 'phase' || key === 'phaseScope') return phaseLabel(String(value || '')) || displayValue(value);
+  if (key === 'subject' || key === 'subjectName') return subjectLabel(String(value || '')) || '-';
   return displayValue(value);
 }
 
@@ -194,7 +195,7 @@ export function questionSelectLabel(question: QuestionBankItem) {
   const stem = richTextPlainText(question.stem);
   const title = questionTitle(question);
   const stemSuffix = stem && stem !== title ? ` · ${stem}` : '';
-  return `${question.grade} ${semesterLabel(question.semester)} ${question.subject} · ${questionTypeLabel(question.type)} · ${title}${stemSuffix}`;
+  return `${question.grade} ${semesterLabel(question.semester)} ${subjectLabel(question.subject)} · ${questionTypeLabel(question.type)} · ${title}${stemSuffix}`;
 }
 
 export function normalizeQuestionForm(values: QuestionFormValues): QuestionBankUpsertRequest {

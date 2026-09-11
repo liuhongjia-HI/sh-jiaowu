@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { getData, postData } from '../services/http';
 import type { GrantCreateRequest, GrantPreview, Student, StudyPackage } from '../types/starline';
+import { subjectLabel } from '../utils/curriculum';
 
 type GrantFormValues = {
   studentId: string;
@@ -155,7 +156,7 @@ function InputDate(props: { disabled?: boolean; min?: string; value?: string; on
 }
 
 function packageOptionLabel(item: StudyPackage) {
-  return [item.name, item.subject, item.semester, item.packageType].filter(Boolean).join(' · ');
+  return [item.name, subjectLabel(item.subject), item.semester, item.packageType].filter(Boolean).join(' · ');
 }
 
 function PreviewTags({ title, values, color }: { title: string; values: string[]; color: string }) {

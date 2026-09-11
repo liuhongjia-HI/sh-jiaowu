@@ -263,14 +263,14 @@ func (s *MemoryStore) subjectShortLabel(subject string) string {
 		return ""
 	}
 	for _, entry := range s.subjects {
-		if entry.Name == subject && entry.Status == "启用" {
+		if subjectsMatch(entry.Name, subject) && entry.Status == "启用" {
 			if label := strings.TrimSpace(entry.ShortLabel); label != "" {
 				return label
 			}
-			return subject
+			return subjectEnglishName(entry.Name)
 		}
 	}
-	return subject
+	return subjectEnglishName(subject)
 }
 
 // scheduleClassName 按客户的命名约定拼课次标题：教师 年级 科目 学生。

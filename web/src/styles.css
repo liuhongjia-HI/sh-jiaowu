@@ -484,6 +484,28 @@ body {
   min-width: 0;
 }
 
+.package-filter-bar,
+.course-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.package-filter-bar {
+  margin-bottom: 16px;
+}
+
+.course-filter-bar {
+  width: 100%;
+}
+
+.package-filter-bar .ant-select,
+.course-filter-bar .ant-select {
+  flex: 1;
+  min-width: 140px;
+}
+
 .view-toggle {
   padding: 3px;
   border: 1px solid #dfe7ee;

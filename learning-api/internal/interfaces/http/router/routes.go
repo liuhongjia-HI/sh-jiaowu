@@ -162,6 +162,7 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g.GET("/system/readiness", h.SystemReadiness)
 	g.PUT("/settings", h.UpdateSetting)
 	g.PUT("/subjects/:id", h.UpdateSubjectMetadata)
+	g.DELETE("/subjects/:id", h.DeleteSubjectMetadata)
 	g.PUT("/grade-subjects", h.UpdateGradeSubjects)
 	g.POST("/grade-subjects/upload", h.UploadGradeSubjectImage)
 }

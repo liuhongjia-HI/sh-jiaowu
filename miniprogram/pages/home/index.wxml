@@ -156,9 +156,9 @@
           <view class="content-main">
             <view class="content-top">
               <view class="content-type">{{item.recommendationReason}}</view>
-              <view class="content-tag">{{item.subject}}</view>
+              <view class="content-tag">{{item.displayName || item.subject}}</view>
             </view>
-            <view class="content-title">{{item.subject}}</view>
+            <view class="content-title">{{item.displayName || item.subject}}</view>
             <view class="content-meta">{{item.grade}} · {{item.courseCount}} 门课程 · {{item.materialCount}} 份讲义</view>
             <view class="content-meta">{{item.questionCount}} 道习题 · {{item.homeworkCount}} 份练习</view>
             <view class="recommendation-summary">教学老师：{{item.teacherName || "暂未配置"}}</view>

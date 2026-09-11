@@ -1,4 +1,5 @@
 const { request } = require("../../utils/request");
+const { subjectLabel, subjectsMatchName } = require("../../utils/subject");
 
 const ONBOARDING_SEEN_KEY = "starline_onboarding_seen";
 
@@ -267,7 +268,7 @@ Page({
       if (!keyword) {
         return true;
       }
-      return [item.subject, item.grade, item.teacherName, item.teacherIntro]
+      return [item.subject, item.displayName, item.grade, item.teacherName, item.teacherIntro]
         .join(" ")
         .toLowerCase()
         .includes(keyword);
@@ -282,6 +283,7 @@ Page({
         this.setData({
           recommendations: (Array.isArray(recommendations) ? recommendations : []).map((item) => ({
             ...item,
+            displayName: subjectLabel(item.subject),
             contentSampleText: (item.contentSamples || []).join("、")
           })),
           recommendationsLoading: false
@@ -600,11 +602,6 @@ function uniqueSubjectCount(values) {
   return subjects.length;
 }
 
-function subjectsMatchName(left, right) {
-  if (left === right) return true;
-  return (left === "英文" && right === "英语") || (left === "英语" && right === "英文");
-}
-
 function normalizeHomeCourses(home, continueCourse) {
   const courses = Array.isArray(home.courses) ? home.courses : [];
   if (courses.length > 0) {
@@ -642,7 +639,7 @@ function buildCourseSlides(courses, pendingTask) {
 
 function formatCourseMeta(course = {}) {
   const chapterCount = Number(course.chapterCount) || countChapters(course.curriculum) || Number(course.lessonCount) || 0;
-  return [course.grade, course.subject, `${chapterCount} 个章节`].filter(Boolean).join(" · ");
+  return [course.grade, subjectLabel(course.subject), `${chapterCount} 个章节`].filter(Boolean).join(" · ");
 }
 
 function countChapters(curriculum) {

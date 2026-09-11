@@ -1,3 +1,4 @@
+import { subjectsMatch } from './curriculum';
 // 学科颜色的唯一来源。
 //
 // 在这之前排课页和资源页各写了一份调色板，同一门课在两处是不同颜色。
@@ -47,9 +48,7 @@ function findEntry(subject: string) {
   const normalized = (subject || '').trim();
   const direct = activeColors.find((item) => item.subject === normalized);
   if (direct) return direct;
-  // 「英语」和「英文」在历史数据里都出现过，按同一门处理。
-  if (normalized === '英语') return activeColors.find((item) => item.subject === '英文');
-  return undefined;
+  return activeColors.find((item) => subjectsMatch(item.subject, normalized));
 }
 
 // 未配置的学科（比如运营新加了一门还没配色）按名称散列到一组中性色，

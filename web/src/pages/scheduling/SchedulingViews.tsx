@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
-import { GRADES, gradeOptions, subjectOptions } from '../../utils/curriculum';
+import { GRADES, gradeOptions, subjectLabel, subjectOptions } from '../../utils/curriculum';
 import type { AvailabilitySlot, Course, CurrentUser, ScheduleClass, Student, Teacher } from '../../types/starline';
 import {
   addDays,
@@ -1171,7 +1171,7 @@ export function tagList(values: string[], color: string) {
 
 export function courseSubjectGradeText(course: Course | undefined, fallbackName: string) {
   if (!course) return fallbackName;
-  return [course.subject, course.grade].filter(Boolean).join(' · ') || course.name || fallbackName;
+  return [subjectLabel(course.subject), course.grade].filter(Boolean).join(' · ') || course.name || fallbackName;
 }
 
 export function teacherOptionLabel(teacher: Teacher) {
@@ -1726,7 +1726,7 @@ export function uniqueScheduleSubjects(classes: ScheduleClass[], courseById: Cou
     '学生可上课'
   ].map((value) => value || '其他');
   return Array.from(new Set(values)).sort((left, right) => {
-    const priority = ['Eng', '英文', '英语', 'Math', '数学', 'Geo/His', 'Sci', '科学', '综合科学', 'CHN', '语文'];
+    const priority = ['Eng', 'English', '英文', '英语', 'Math', 'Mathematics', '数学', 'Geo/His', 'Geography', 'History', 'Sci', 'Science', '科学', '综合科学', 'CHN', 'Chinese', '语文'];
     const leftIndex = priority.findIndex((item) => left.includes(item));
     const rightIndex = priority.findIndex((item) => right.includes(item));
     if (leftIndex !== -1 || rightIndex !== -1) return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);

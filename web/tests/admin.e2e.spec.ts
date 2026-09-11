@@ -156,6 +156,61 @@ test('新增课程按目录层级引导添加内容', async ({ page }) => {
   await expect(chapter.getByTestId('curriculum-lesson')).toHaveCount(1);
 });
 
+test('课程内容可按年级和学科快捷筛选', async ({ page }) => {
+  await login(page, '13800000001');
+  await page.route('**/api/courses', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          { id: 'course-g4-math', name: 'G4S1Q1 Math', subject: '数学', grade: '四年级', learningSpaceId: 'space-g4-math', lessonCount: 1, curriculum: [], materialNum: 0, homeworkNum: 0, status: '启用' },
+          { id: 'course-g5-geo', name: 'G5S1Q1 Geo', subject: '地理', grade: '五年级', learningSpaceId: 'space-g5-geo', lessonCount: 2, curriculum: [], materialNum: 0, homeworkNum: 0, status: '启用' }
+        ]
+      })
+    });
+  });
+  await page.route('**/api/learning-spaces', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          { id: 'space-g4-math', academicYear: '2026.2027学年', grade: '四年级', subject: '数学', semester: 'S1', phase: 'Q1', level: 'S', name: '四年级数学', status: '启用' },
+          { id: 'space-g5-geo', academicYear: '2026.2027学年', grade: '五年级', subject: '地理', semester: 'S1', phase: 'Q1', level: 'S', name: '五年级地理', status: '启用' }
+        ]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/content', '课程内容');
+  await expect(page.getByText('G4S1Q1 Math')).toBeVisible();
+  await expect(page.getByText('G5S1Q1 Geo')).toBeVisible();
+
+  await page.getByLabel('年级').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('四年级', { exact: true }).click();
+  await expect(page.getByText('G4S1Q1 Math')).toBeVisible();
+  await expect(page.getByText('G5S1Q1 Geo')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '重置' }).click();
+  await expect(page.getByText('G5S1Q1 Geo')).toBeVisible();
+
+  await page.getByLabel('学科').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('Geography', { exact: true }).click();
+  await expect(page.getByText('G5S1Q1 Geo')).toBeVisible();
+  await expect(page.getByText('G4S1Q1 Math')).toHaveCount(0);
+});
+
 test('课程方案可在二次确认后删除', async ({ page }) => {
   await login(page, '13800000001');
   let exists = true;
@@ -179,6 +234,50 @@ test('课程方案可在二次确认后删除', async ({ page }) => {
   await page.locator('button.ant-btn-primary.ant-btn-dangerous').click();
   await expect(row).toHaveCount(0);
   await expect(page.getByText('课程方案已删除。')).toBeVisible();
+});
+
+test('课程方案可按年级、科目和等级筛选', async ({ page }) => {
+  await login(page, '13800000001');
+  await page.route('**/api/packages', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          { id: 'pkg-g6-math-h', name: 'G6 Math H', academicYear: '2026.2027学年', grade: '六年级', semester: 'S1', subject: '数学', level: 'H', phaseScope: '全学期', packageType: '题', summary: '', learningSpaceIds: [], contentTypeCodes: [], status: '启用', openStudentNum: 0 },
+          { id: 'pkg-g6-eng-s', name: 'G6 Eng S', academicYear: '2026.2027学年', grade: '六年级', semester: 'S1', subject: '英文', level: 'S', phaseScope: '全学期', packageType: '题', summary: '', learningSpaceIds: [], contentTypeCodes: [], status: '启用', openStudentNum: 0 },
+          { id: 'pkg-g5-math-s', name: 'G5 Math S', academicYear: '2026.2027学年', grade: '五年级', semester: 'S1', subject: '数学', level: 'S', phaseScope: '全学期', packageType: '题', summary: '', learningSpaceIds: [], contentTypeCodes: [], status: '启用', openStudentNum: 0 }
+        ]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/packages', '课程方案');
+  await expect(page.getByRole('link', { name: 'G6 Math H' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'G6 Eng S' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'G5 Math S' })).toBeVisible();
+
+  await page.getByRole('combobox', { name: '年级' }).click();
+  await page.getByRole('option', { name: '六年级' }).click();
+  await expect(page.getByRole('link', { name: 'G5 Math S' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'G6 Math H' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'G6 Eng S' })).toBeVisible();
+
+  await page.getByRole('combobox', { name: '科目' }).click();
+  await page.getByRole('option', { name: '数学' }).click();
+  await expect(page.getByRole('link', { name: 'G6 Eng S' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'G6 Math H' })).toBeVisible();
+
+  await page.getByRole('combobox', { name: '等级' }).click();
+  await page.getByRole('option', { name: 'H', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'G6 Math H' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'G6 Eng S' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'G5 Math S' })).toHaveCount(0);
 });
 
 test('学年校历只维护学期起止和期中日期', async ({ page }) => {
