@@ -1,5 +1,14 @@
 const { request } = require("../../utils/request");
 
+const STATUS_LABELS = {
+  "学习中": "Learning",
+  "已完成": "Completed",
+  "待挑战": "Ready",
+  "未开通": "Locked",
+  "未解锁": "Locked",
+  "暂无内容": "No content"
+};
+
 Page({
   data: {
     course: {},
@@ -8,8 +17,8 @@ Page({
     stations: [],
     catalogLessons: [],
     lessonCount: 0,
-    materialCountText: "0 份资料",
-    homeworkText: "可得徽章"
+    materialCountText: "0 materials",
+    homeworkText: "Earn badges"
   },
   onLoad(options) {
     this.courseId = options.id || "";
@@ -20,7 +29,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: this.data.course.name || "Starline 课程详情",
+      title: this.data.course.name || "Starline course details",
       path: this.courseId ? `/pages/study-detail/index?id=${encodeURIComponent(this.courseId)}` : "/pages/study/index"
     };
   },
@@ -48,8 +57,8 @@ Page({
         stations,
         catalogLessons: catalog,
         lessonCount: catalog.length,
-        materialCountText: `${materials.length} 份资料`,
-        homeworkText: homework.length ? `${homework.length} 个挑战` : "可得徽章"
+        materialCountText: `${materials.length} materials`,
+        homeworkText: homework.length ? `${homework.length} exercises` : "Earn badges"
       });
     });
   },
@@ -112,8 +121,9 @@ function buildCatalog(nodes, stations, materials, homework) {
       ...lesson,
       icon: status === '未开通' ? '🔒' : (status === '暂无内容' ? '·' : '📖'),
       status,
+      statusLabel: STATUS_LABELS[status] || status,
       statusClass: status === '已完成' ? 'is-done' : (status === '学习中' ? 'is-active' : 'is-locked'),
-      desc: count ? `${count} 项学习内容` : (status === '未开通' ? '开通后可查看讲义和练习' : '老师尚未发布内容'),
+      desc: count ? `${count} learning item${count === 1 ? '' : 's'}` : (status === '未开通' ? 'Unlock to view materials and exercises' : "Teacher hasn't published content yet"),
       materialId: (lessonMaterials[0] && lessonMaterials[0].id) || (active && active.materialId) || '',
       homeworkId: (lessonHomework[0] && lessonHomework[0].id) || (active && active.homeworkId) || ''
     };

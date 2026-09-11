@@ -21,20 +21,20 @@
   </scroll-view>
 
   <view class="section">
-    <view wx:if="{{(contentMode === 'material' || contentMode === 'homework') && tagItems.length}}" class="back-to-list" bindtap="backToList">‹ 返回列表</view>
+    <view wx:if="{{(contentMode === 'material' || contentMode === 'homework') && tagItems.length}}" class="back-to-list" bindtap="backToList">‹ Back</view>
     <block wx:if="{{contentMode === 'material'}}">
       <view wx:if="{{recordingWarning}}" class="recording-warning">
         <view class="recording-guard-icon">⚠️</view>
         <view>
-          <view class="recording-guard-text">检测到系统录屏</view>
-          <view class="recording-guard-sub">资料已添加专属水印，请停止录屏。</view>
+          <view class="recording-guard-text">Screen recording detected</view>
+          <view class="recording-guard-sub">This material is watermarked. Please stop recording.</view>
         </view>
       </view>
 
       <view wx:if="{{previewMode === 'image'}}" class="paper" hover-class="paper-active" bindtap="openSecurePreview">
-        <view wx:if="{{pagesLoading || !previewImagePath}}" class="preview-loading">正在加载课件预览…</view>
+        <view wx:if="{{pagesLoading || !previewImagePath}}" class="preview-loading">Loading preview…</view>
         <image wx:else class="preview-cover" src="{{previewImagePath}}" mode="widthFix" show-menu-by-longpress="{{false}}"></image>
-        <view wx:if="{{previewImagePath}}" class="paper-foot">共 {{pageCount}} 页 · 点击查看完整课件</view>
+        <view wx:if="{{previewImagePath}}" class="paper-foot">{{pageCount}} pages · Tap to open</view>
       </view>
 
       <view wx:elif="{{previewMode === 'pdf'}}" class="paper paper-fallback" hover-class="paper-active" bindtap="openSecurePreview">
@@ -45,22 +45,22 @@
 
       <view wx:elif="{{previewMode === 'unknown' || previewMode === 'processing'}}" class="paper paper-status">
         <view class="preview-unavailable-icon">⏳</view>
-        <view class="preview-unavailable-title">{{previewMode === 'processing' ? '预览生成中' : '加载预览中'}}</view>
+        <view class="preview-unavailable-title">{{previewMode === 'processing' ? 'Generating preview' : 'Loading preview'}}</view>
         <view wx:if="{{previewMessage}}" class="preview-unavailable-message">{{previewMessage}}</view>
       </view>
 
       <view wx:elif="{{previewMode === 'cover-error'}}" class="paper paper-status">
         <view class="preview-unavailable-icon">🖼️</view>
-        <view class="preview-unavailable-title">缩略图加载失败</view>
+        <view class="preview-unavailable-title">Thumbnail failed to load</view>
         <view class="preview-unavailable-message">{{previewMessage}}</view>
-        <button class="button light preview-retry" bindtap="retryPreview">重新加载</button>
+        <button class="button light preview-retry" bindtap="retryPreview">Reload</button>
       </view>
 
       <view wx:elif="{{previewMode === 'unavailable'}}" class="paper paper-status">
         <view class="preview-unavailable-icon">📄</view>
-        <view class="preview-unavailable-title">课件暂时无法打开</view>
+        <view class="preview-unavailable-title">Unable to open</view>
         <view class="preview-unavailable-message">{{previewMessage}}</view>
-        <button class="button light preview-retry" bindtap="retryPreview">重新检查</button>
+        <button class="button light preview-retry" bindtap="retryPreview">Check again</button>
       </view>
 
       <view class="preview-actions">
@@ -69,7 +69,7 @@
           <button class="button light" bindtap="toggleFavorite">{{favorited ? 'Favorited ✓' : 'Favorite ♡'}}</button>
           <view class="download-print-wrap">
             <button class="button light download-print" disabled="{{!material.downloadUrl || downloading}}" loading="{{downloading}}" bindtap="printMaterial">Print</button>
-            <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">暂未开通下载打印权限</view>
+            <view wx:if="{{!material.downloadUrl}}" class="download-permission-hint">Print is not enabled</view>
           </view>
         </view>
       </view>
@@ -78,17 +78,17 @@
     <view wx:elif="{{contentMode === 'homework'}}" class="homework-card">
       <view class="homework-kicker">{{contentTagLabel || activeTagLabel}}</view>
       <view class="homework-title">{{activeHomework.title}}</view>
-      <view class="homework-desc">{{activeHomework.questionNum || 0}} 道题，完成后可查看结果</view>
+      <view class="homework-desc">{{homeworkDesc}}</view>
       <button class="button challenge-button" bindtap="goAnswer">Next</button>
     </view>
 
     <view wx:elif="{{contentMode === 'list'}}" class="tag-content-list">
-      <view class="tag-content-list-title">{{activeTagLabel}} · {{tagItems.length}} 份</view>
+      <view class="tag-content-list-title">{{activeTagLabel}} · {{tagItemCountText}}</view>
       <view wx:for="{{tagItems}}" wx:key="id" class="tag-content-list-item" data-id="{{item.id}}" bindtap="selectTagItem">
         <view class="tag-content-list-icon">{{item.contentType === 'homework' ? '✍️' : '📄'}}</view>
         <view class="tag-content-list-main">
           <view class="tag-content-list-name">{{item.displayName || item.title}}</view>
-          <view class="tag-content-list-desc">{{item.contentType === 'homework' ? (item.questionNum || 0) + ' 道题' : '课程资料'}}</view>
+          <view class="tag-content-list-desc">{{item.listDesc}}</view>
         </view>
         <view wx:if="{{item.tagCode}}" class="tag-content-list-tag">{{item.tagCode}}</view>
         <view class="tag-content-list-arrow">›</view>
@@ -96,8 +96,8 @@
     </view>
 
     <view wx:else class="empty-card">
-      <view class="title">{{activeTagLabel}}还没有内容</view>
-      <view class="sub">老师发布后会显示在这里</view>
+      <view class="title">{{activeTagLabel}} has no content yet</view>
+      <view class="sub">It will appear here after the teacher publishes it</view>
     </view>
   </view>
 </view>

@@ -67,9 +67,9 @@
     <view class="course-content">
       <view class="course-title-row">
         <view class="course-title">{{item.displayName || item.name}}</view>
-        <view class="course-status {{item.isLocked ? 'course-status-locked' : 'course-status-new'}}">{{item.accessLabel || (item.isNew ? '新开通' : item.status)}}</view>
+        <view wx:if="{{item.accessLabel}}" class="course-status {{item.isLocked ? 'course-status-locked' : 'course-status-new'}}">{{item.accessLabel}}</view>
       </view>
-      <view class="course-meta">{{item.grade || "学习内容"}} · {{item.displaySubject || item.subject || "综合学习"}}</view>
+      <view class="course-meta">{{item.displayMeta}}</view>
       <view wx:if="{{item.newCourseText}}" class="course-new-time">{{item.newCourseText}}</view>
       <view class="course-code">{{item.materialNum || 0}} materials · {{item.homeworkNum || 0}} exercises</view>
       <view wx:if="{{!item.isLocked}}" class="course-progress-row">
@@ -78,7 +78,7 @@
       </view>
       <view wx:if="{{!item.isLocked}}" class="course-progress"><view class="course-progress-bar" style="width: {{item.progress}}%;"></view></view>
       <view wx:if="{{item.canOpen}}" class="course-action">{{item.isPreview ? 'Try' : 'Start'}} <text class="course-action-arrow">›</text></view>
-      <view wx:else class="course-action course-action-disabled">{{item.accessLabel || '内容准备中'}}</view>
+      <view wx:else class="course-action course-action-disabled">{{item.accessLabel || 'Preparing'}}</view>
     </view>
   </view>
 </template>

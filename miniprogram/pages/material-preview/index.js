@@ -11,6 +11,9 @@ const TAG_DEFINITIONS = [
   { code: "Special", label: "Special", shortLabel: "Special" }
 ];
 
+const DEFAULT_PAGE_TITLE = "Preview";
+const DEFAULT_LESSON_TITLE = "Lesson";
+
 Page({
   data: {
     material: {},
@@ -21,14 +24,16 @@ Page({
     activeTagLabel: "All",
     contentTagLabel: "HD",
     tagItems: [],
+    tagItemCountText: "0 items",
+    homeworkDesc: "",
     lessonTitle: "",
-    pageTitle: "资料预览",
-    displayTitle: "资料预览",
+    pageTitle: DEFAULT_PAGE_TITLE,
+    displayTitle: DEFAULT_PAGE_TITLE,
     materialCode: "",
     paperTitle: "",
-    securityNotice: "仅供本人学习，请勿分享、截图或录屏。",
-    watermarkText: "水印加载中",
-    watermarkTexts: ["水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中"],
+    securityNotice: "For personal study only. Do not share, screenshot, or record.",
+    watermarkText: "Loading watermark",
+    watermarkTexts: ["Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark"],
     favorited: false,
     favoriteId: "",
     // previewMode: unknown 加载中 / processing 生成中 / image 首图预览 / pdf 无缩略图降级 / cover-error 首图失败 / unavailable 不可用
@@ -50,11 +55,11 @@ Page({
     this.previewRetryCount = 0;
     this.listFirst = !!(this.courseId && this.lessonId);
     if (!id && !this.listFirst) {
-      this.setData({ pageTitle: "课节信息缺失", displayTitle: "课节信息缺失", contentMode: "empty" });
+      this.setData({ pageTitle: "Lesson not found", displayTitle: "Lesson not found", contentMode: "empty" });
       return;
     }
     if (this.listFirst) {
-      this.setData({ pageTitle: "课节内容", displayTitle: "课节内容", contentMode: "list" });
+      this.setData({ pageTitle: DEFAULT_LESSON_TITLE, displayTitle: DEFAULT_LESSON_TITLE, contentMode: "list" });
       this.loadLessonContents();
       return;
     }
@@ -86,19 +91,19 @@ Page({
         paperTitle: header.displayTitle,
         lessonTitle: header.displayTitle,
         contentTagLabel: tagLabel(normalizeTagCode(material.tagCode) || "HD"),
-        watermarkText: material.watermarkText || "水印加载中",
-        watermarkTexts: buildWatermarks(material.watermarkText || "水印加载中"),
-        securityNotice: material.securityNotice || "仅供本人学习，请勿分享、截图或录屏。"
+        watermarkText: material.watermarkText || "Loading watermark",
+        watermarkTexts: buildWatermarks(material.watermarkText || "Loading watermark"),
+        securityNotice: material.securityNotice || "For personal study only. Do not share, screenshot, or record."
       });
       this.loadPagedPreview(id);
       if (loadLessonContents) this.loadLessonContents();
     }).catch(() => {
       this.setData({
-        pageTitle: "资料加载失败",
-        displayTitle: "资料加载失败",
-        securityNotice: "资料加载失败，请重新进入。",
+        pageTitle: "Failed to load",
+        displayTitle: "Failed to load",
+        securityNotice: "Failed to load. Please try again.",
         previewMode: "unavailable",
-        previewMessage: "资料加载失败，请重新进入"
+        previewMessage: "Failed to load. Please try again."
       });
     });
     this.refreshFavorite(id);
@@ -150,7 +155,12 @@ Page({
   showTagContents(code, preserveCurrent, listOnly) {
     const tagCode = normalizeFilterTag(code);
     const items = itemsForTag(this.lessonContents || [], tagCode);
-    this.setData({ activeTag: tagCode, activeTagLabel: tagLabel(tagCode), tagItems: items });
+    this.setData({
+      activeTag: tagCode,
+      activeTagLabel: tagLabel(tagCode),
+      tagItems: items.map(decorateContentItem),
+      tagItemCountText: formatItemCount(items.length)
+    });
     if (!items.length) {
       this.pageLoadToken += 1;
       if (this.stopContentSecurity) {
@@ -176,7 +186,13 @@ Page({
     if (item.contentType === "homework") {
       this.pageLoadToken += 1;
       this.resetContentSecurity(item.id, "homework");
-      this.setData({ contentMode: "homework", activeHomework: item, materialCode: "", contentTagLabel: tagLabel(item.tagCode || "Exam") });
+      this.setData({
+        contentMode: "homework",
+        activeHomework: item,
+        homeworkDesc: homeworkResultText(item.questionNum),
+        materialCode: "",
+        contentTagLabel: tagLabel(item.tagCode || "Exam")
+      });
       return;
     }
     if (item.id === this.materialId && this.data.contentMode === "material") return;
@@ -185,7 +201,7 @@ Page({
   onShareAppMessage() {
     const contextQuery = this.courseId && this.lessonId ? `&courseId=${encodeURIComponent(this.courseId)}&lessonId=${encodeURIComponent(this.lessonId)}` : "";
     return {
-      title: this.data.displayTitle && this.data.displayTitle !== "资料预览" ? `Starline 课节：${this.data.displayTitle}` : "Starline 课节内容",
+      title: isDefaultPreviewTitle(this.data.displayTitle) ? "Starline Lesson" : `Starline Lesson: ${this.data.displayTitle}`,
       path: this.materialId
         ? `/pages/material-preview/index?id=${encodeURIComponent(this.materialId)}${contextQuery}`
         : (this.courseId && this.lessonId ? `/pages/material-preview/index?courseId=${encodeURIComponent(this.courseId)}&lessonId=${encodeURIComponent(this.lessonId)}` : "/pages/study/index")
@@ -206,14 +222,14 @@ Page({
     if (this.data.downloading) return;
     const downloadUrl = this.data.material && this.data.material.downloadUrl;
     if (!downloadUrl) {
-      wx.showToast({ title: "暂未开通下载打印权限", icon: "none" });
+      wx.showToast({ title: "Print is not enabled", icon: "none" });
       return;
     }
     this.setData({ downloading: true });
-    wx.showLoading({ title: "正在下载课件" });
+    wx.showLoading({ title: "Downloading" });
     return downloadWithAuth(stripApiPrefix(downloadUrl))
       .then((tempFilePath) => openDocument(tempFilePath))
-      .catch((error) => showFileError("课件无法打开", error))
+      .catch((error) => showFileError("Unable to open", error))
       .finally(() => {
         this.setData({ downloading: false });
         wx.hideLoading();
@@ -227,7 +243,7 @@ Page({
       if (previewStatus === "processing") {
         this.setData({
           previewMode: "processing",
-          previewMessage: info.message || "课件正在生成，请稍后再试",
+          previewMessage: info.message || "Generating. Please try again later.",
           pagesLoading: false
         });
         this.schedulePreviewRetry(id);
@@ -236,7 +252,7 @@ Page({
       if (previewStatus === "failed" || previewStatus === "unavailable") {
         this.setData({
           previewMode: "unavailable",
-          previewMessage: info.message || "课件暂时无法打开",
+          previewMessage: info.message || "Unable to open",
           pagesLoading: false
         });
         return;
@@ -244,7 +260,7 @@ Page({
       if (!info || !info.imageMode || !info.pageCount) {
         this.setData({
           previewMode: "pdf",
-          previewMessage: (info && info.message) || "暂未生成缩略图，点击打开完整课件",
+          previewMessage: (info && info.message) || "Thumbnail not ready. Tap to open the full file.",
           pageCount: (info && info.pageCount) || 0,
           pagesLoading: false
         });
@@ -260,7 +276,7 @@ Page({
       });
       this.loadPreviewCover(id, token);
     }).catch((error) => {
-      const message = error.message || "课件暂时无法打开";
+      const message = error.message || "Unable to open";
       this.setData({ previewMode: "unavailable", previewMessage: message, pagesLoading: false });
       if (message.includes("正在生成") && this.previewRetryCount < 3) {
         this.schedulePreviewRetry(id);
@@ -296,7 +312,7 @@ Page({
         if (token !== this.pageLoadToken) return;
         this.setData({
           previewMode: "cover-error",
-          previewMessage: error.message || "课件缩略图加载失败",
+          previewMessage: error.message || "Thumbnail failed to load",
           pagesLoading: false
         });
       });
@@ -316,7 +332,7 @@ Page({
     if (this.data.favorited && this.data.favoriteId) {
       request(`/student/favorites/${this.data.favoriteId}`, { method: "DELETE" })
         .then(() => {
-          wx.showToast({ title: "已取消收藏", icon: "none" });
+          wx.showToast({ title: "Removed from favorites", icon: "none" });
           this.setData({ favorited: false, favoriteId: "" });
         })
         .catch(() => {});
@@ -327,7 +343,7 @@ Page({
       data: { targetType: "material", targetId: this.materialId }
     })
       .then((favorite) => {
-        wx.showToast({ title: "已收藏", icon: "success" });
+        wx.showToast({ title: "Favorited", icon: "success" });
         this.setData({ favorited: true, favoriteId: favorite.id });
       })
       .catch(() => {});
@@ -352,10 +368,10 @@ Page({
         wx.navigateTo({ url: `/pages/answer/index?id=${selected.id}` });
         return;
       }
-      wx.showToast({ title: "本课节暂无练习", icon: "none" });
+      wx.showToast({ title: "No exercise for this lesson", icon: "none" });
       wx.navigateTo({ url: "/pages/tasks/index" });
     }).catch(() => {
-      wx.showToast({ title: "练习加载失败，请稍后重试", icon: "none" });
+      wx.showToast({ title: "Failed to load exercise", icon: "none" });
       wx.navigateTo({ url: "/pages/tasks/index" });
     });
   },
@@ -363,15 +379,15 @@ Page({
     if (this.data.openingPreview) return;
     const previewUrl = this.data.material.previewUrl;
     if (!previewUrl) {
-      wx.showToast({ title: "完整课件还在准备，请稍后再试", icon: "none" });
+      wx.showToast({ title: "The full file is still being prepared", icon: "none" });
       return;
     }
     this.setData({ openingPreview: true });
-    wx.showLoading({ title: "正在打开课件" });
+    wx.showLoading({ title: "Opening" });
     downloadWithAuth(stripApiPrefix(previewUrl))
       .then((tempFilePath) => openDocument(tempFilePath, Boolean(this.data.material.downloadUrl)))
       .catch((error) => {
-        showFileError("课件无法打开", error);
+        showFileError("Unable to open", error);
       })
       .finally(() => {
         this.setData({ openingPreview: false });
@@ -394,13 +410,13 @@ function downloadWithAuth(path) {
       },
       success(res) {
         if (res.statusCode !== 200) {
-          readDownloadErrorMessage(res).then((message) => reject(new Error(message || `课件请求失败（${res.statusCode}）`)));
+          readDownloadErrorMessage(res).then((message) => reject(new Error(message || `Request failed (${res.statusCode})`)));
           return;
         }
         resolve(res.tempFilePath);
       },
       fail(err) {
-        reject(new Error((err && err.errMsg) || "网络下载失败"));
+        reject(new Error((err && err.errMsg) || "Download failed"));
       }
     });
   });
@@ -431,9 +447,9 @@ function readDownloadErrorMessage(response) {
 }
 
 function showFileError(title, error) {
-  const content = (error && error.message) || "请稍后重试";
+  const content = (error && error.message) || "Please try again";
   if (wx.showModal) {
-    wx.showModal({ title, content, showCancel: false, confirmText: "知道了" });
+    wx.showModal({ title, content, showCancel: false, confirmText: "OK" });
     return;
   }
   wx.showToast({ title: content, icon: "none" });
@@ -449,7 +465,7 @@ function openDocument(filePath, showMenu = true) {
       showMenu,
       success: resolve,
       fail(error) {
-        reject(new Error((error && error.errMsg) || "资料打开失败，请稍后再试"));
+        reject(new Error((error && error.errMsg) || "Unable to open. Please try again"));
       }
     });
   });
@@ -463,6 +479,34 @@ function openDocument(filePath, showMenu = true) {
 // 小程序这边此前一直没处理，是一个独立的既有 bug。
 function stripApiPrefix(path) {
   return String(path || "").replace(/^\/api/, "");
+}
+
+function formatCount(count, singular, plural) {
+  const n = Number(count) || 0;
+  return n === 1 ? `1 ${singular}` : `${n} ${plural}`;
+}
+
+function formatItemCount(count) {
+  return formatCount(count, "item", "items");
+}
+
+function formatQuestionCount(count) {
+  return formatCount(count, "question", "questions");
+}
+
+function homeworkResultText(count) {
+  return `${formatQuestionCount(count)}. Results available after you finish.`;
+}
+
+function decorateContentItem(item) {
+  return {
+    ...item,
+    listDesc: item.contentType === "homework" ? formatQuestionCount(item.questionNum) : "Course material"
+  };
+}
+
+function isDefaultPreviewTitle(title) {
+  return !title || title === DEFAULT_PAGE_TITLE || title === DEFAULT_LESSON_TITLE;
 }
 
 function buildWatermarks(text) {
@@ -515,7 +559,7 @@ function buildDisplayHeader(material, lessonTitle) {
   const split = splitMaterialTitle(material && material.title);
   const lesson = prettyContentTitle(lessonTitle);
   return {
-    displayTitle: lesson || split.name || "课节内容",
+    displayTitle: lesson || split.name || DEFAULT_LESSON_TITLE,
     materialCode: split.code
   };
 }

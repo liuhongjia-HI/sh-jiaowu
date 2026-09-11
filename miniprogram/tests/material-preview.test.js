@@ -17,12 +17,18 @@ test("material preview keeps only the preview card as the full-courseware entry"
 
 test("material preview uses English action labels and hides study-count caption", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.wxml"), "utf8");
+  const pageConfig = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.json"), "utf8");
 
   assert.doesNotMatch(template, /人学过|进度已保存|开始练习|收藏讲义|class="preview-caption"/);
   assert.doesNotMatch(template, />下载打印</);
+  assert.doesNotMatch(template, /资料预览|课程资料|道题|返回列表/);
+  assert.doesNotMatch(template, /[\u4e00-\u9fff]/);
+  assert.match(pageConfig, /"navigationBarTitleText": "Preview"/);
   assert.match(template, /wx:if="{{showNextButton}}"[\s\S]*?>Next<\/button>/);
   assert.match(template, />Print<\/button>/);
   assert.match(template, /favorited \? 'Favorited ✓' : 'Favorite ♡'/);
+  assert.match(template, /activeTagLabel}} · {{tagItemCountText}}/);
+  assert.match(template, /item.listDesc/);
 });
 
 test("material preview hides the Next action until it is re-enabled", () => {
@@ -124,6 +130,13 @@ test("lesson entry shows the content list before opening a material", async () =
     ["hw-1", "HW", "What is Science"],
     ["hw-2", "HW", "HW_1.1"]
   ]);
+  assert.equal(page.data.tagItemCountText, "4 items");
+  assert.deepEqual(page.data.tagItems.map((item) => item.listDesc), [
+    "Course material",
+    "Course material",
+    "6 questions",
+    "4 questions"
+  ]);
   assert.equal(requested.includes("/student/materials/mat-hd"), false);
 
   page.selectTagItem({ currentTarget: { dataset: { id: "mat-hd" } } });
@@ -160,6 +173,27 @@ test("homework-only lesson can enter the tagged content page without a material 
   assert.equal(page.data.contentMode, "homework");
   assert.equal(page.data.activeHomework.id, "homework-1");
   assert.equal(page.data.contentTagLabel, "Exam");
+  assert.equal(page.data.homeworkDesc, "5 questions. Results available after you finish.");
+  assert.equal(page.data.tagItems[0].listDesc, "5 questions");
+});
+
+test("material preview uses singular English count labels", async () => {
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/study/course-1") return Promise.resolve({
+      course: { curriculum: [{ id: "lesson-1", type: "lesson", name: "1" }] },
+      materials: [],
+      homework: [{ id: "hw-1", title: "HW 1.1.1", lessonId: "lesson-1", tagCode: "HW", questionNum: 1 }]
+    });
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock());
+
+  page.onLoad({ courseId: "course-1", lessonId: "lesson-1" });
+  await flushPromises();
+
+  assert.equal(page.data.tagItemCountText, "1 item");
+  assert.equal(page.data.tagItems[0].listDesc, "1 question");
+  page.selectTagItem({ currentTarget: { dataset: { id: "hw-1" } } });
+  assert.equal(page.data.homeworkDesc, "1 question. Results available after you finish.");
 });
 
 test("material preview shows lesson name instead of file-code title", async () => {
@@ -494,7 +528,7 @@ test("material detail failure leaves the loading state with an actionable messag
   await flushPromises();
 
   assert.equal(page.data.previewMode, "unavailable");
-  assert.equal(page.data.previewMessage, "资料加载失败，请重新进入");
+  assert.equal(page.data.previewMessage, "Failed to load. Please try again.");
 });
 
 test("openSecurePreview shows the backend reason when a historical preview file is missing", async () => {
@@ -531,7 +565,7 @@ test("openSecurePreview shows the backend reason when a historical preview file 
   await flushPromises();
   await flushPromises();
 
-  assert.equal(modal.title, "课件无法打开");
+  assert.equal(modal.title, "Unable to open");
   assert.equal(modal.content, "历史课件文件不可用，请联系老师重新上传");
 });
 
@@ -624,7 +658,7 @@ test("small challenge does not use a task that is missing the material's lesson"
   await flushPromises();
 
   assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
-  assert.deepEqual(toastTitles, ["本课节暂无练习"]);
+  assert.deepEqual(toastTitles, ["No exercise for this lesson"]);
 });
 
 test("small challenge opens the task list when the lesson has no matching task", async () => {
@@ -645,7 +679,7 @@ test("small challenge opens the task list when the lesson has no matching task",
   await flushPromises();
 
   assert.deepEqual(navigatedUrls, ["/pages/tasks/index"]);
-  assert.deepEqual(toastTitles, ["本课节暂无练习"]);
+  assert.deepEqual(toastTitles, ["No exercise for this lesson"]);
 });
 
 test("download print is a single disabled-capable entry", () => {

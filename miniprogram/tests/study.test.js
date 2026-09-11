@@ -48,9 +48,10 @@ test("课程卡片整体可点击，学习入口只负责展示状态", () => {
   assert.match(template, /wx:if="{{item\.canOpen}}" class="course-card-hit-area" bindtap="goDetail" data-id="{{item\.entryCourseId}}"/);
   assert.match(template, /wx:else class="course-card-hit-area">\s*<template is="course-card"/);
   assert.match(template, /wx:if="{{item\.canOpen}}" class="course-action">/);
-  assert.match(template, /wx:else class="course-action course-action-disabled">{{item\.accessLabel \|\| '内容准备中'}}<\/view>/);
+  assert.match(template, /wx:else class="course-action course-action-disabled">{{item\.accessLabel \|\| 'Preparing'}}<\/view>/);
   assert.match(template, /item\.isPreview \? 'Try' : 'Start'/);
-  assert.doesNotMatch(template, /体验第一节/);
+  assert.match(template, /item\.displayMeta/);
+  assert.doesNotMatch(template, /体验第一节|学习内容|综合学习|首节可体验|暂未开通|内容准备中|新开通/);
 });
 
 test("内容准备中的课程分支不绑定课程点击事件", () => {
@@ -141,7 +142,10 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
   await flushPromises();
   assert.equal(page.data.visibleCourses.length, 2);
   assert.equal(page.data.visibleCourses[0].displayName, "Geography");
-  assert.equal(page.data.visibleCourses[0].accessLabel, "首节可体验");
+  assert.equal(page.data.visibleCourses[0].accessLabel, "Preview");
+  assert.equal(page.data.visibleCourses[0].displayMeta, "Grade 5");
+  assert.equal(page.data.visibleCourses[1].accessLabel, "Unavailable");
+  assert.equal(page.data.visibleCourses[1].displayMeta, "Grade 5");
   page.goDetail({ currentTarget: { dataset: { id: "", canOpen: false } } });
   assert.equal(toasts[0].title, "Unlock to access all content");
   page.goDetail({ currentTarget: { dataset: { id: "course-g05-geography-s1-q1", canOpen: true } } });
@@ -212,4 +216,30 @@ test("已开通课程套用年级目录的学生端展示名称，避免露出�
     ["English", "英文", false]
   ]);
   assert.equal(page.data.visibleCourses[0].name, "G5S1Q1 Geo S");
+  assert.deepEqual(page.data.visibleCourses.map((item) => item.displayMeta), ["Grade 5", "Grade 5", "Grade 5"]);
+  assert.equal(page.data.visibleCourses[1].accessLabel, "Preview");
+});
+
+test("course cards show English labels and do not repeat the subject in meta", async () => {
+  const page = loadStudyPage((path) => {
+    if (path === "/student/favorites") return Promise.resolve([]);
+    return Promise.resolve({
+      student: { id: "stu-001", grade: "五年级", openedPackages: [] },
+      subjects: [
+        { id: "g5-english", displayName: "English", subject: "英文", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-eng", materialNum: 2 },
+        { id: "g5-math", displayName: "Mathematics", subject: "数学", grade: "五年级", accessState: "locked", accessLabel: "暂未开通", canOpen: false }
+      ],
+      courses: [], materials: []
+    });
+  });
+
+  page.loadStudy();
+  await flushPromises();
+
+  assert.equal(page.data.visibleCourses[0].displayName, "English");
+  assert.equal(page.data.visibleCourses[0].displayMeta, "Grade 5");
+  assert.equal(page.data.visibleCourses[0].accessLabel, "Preview");
+  assert.equal(page.data.visibleCourses[1].displayName, "Mathematics");
+  assert.equal(page.data.visibleCourses[1].displayMeta, "Grade 5");
+  assert.equal(page.data.visibleCourses[1].accessLabel, "Unavailable");
 });

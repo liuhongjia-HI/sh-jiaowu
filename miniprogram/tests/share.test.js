@@ -83,7 +83,7 @@ test("study detail flattens all Lesson leaves in curriculum order", async () => 
   assert.deepEqual(page.data.catalogLessons[0], {
     id: "lesson-1", parentId: "chapter-1", type: "lesson", name: "第一节", sortOrder: 1,
     displayName: "1.1.1 · Chapter 1 · 第一节",
-    icon: "📖", status: "学习中", statusClass: "is-active", desc: "2 项学习内容", materialId: "mat-hd", homeworkId: "hw-exam"
+    icon: "📖", status: "学习中", statusLabel: "Learning", statusClass: "is-active", desc: "2 learning items", materialId: "mat-hd", homeworkId: "hw-exam"
   });
 });
 
@@ -120,12 +120,27 @@ test("study detail renders one flat leaf list without Unit or Chapter groups", (
 test("study detail header omits teacher, progress, and start-learning CTA", () => {
   const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
 
-  assert.match(wxml, /正在学习/);
+  assert.match(wxml, /In Progress/);
   assert.match(wxml, /detail-title/);
   assert.doesNotMatch(wxml, /老师：/);
   assert.doesNotMatch(wxml, /已学/);
   assert.doesNotMatch(wxml, /开始学习/);
   assert.doesNotMatch(wxml, /detail-meta|detail-progress/);
+});
+
+test("study detail page copy is English", () => {
+  const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
+  const json = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.json"), "utf8");
+
+  assert.match(json, /Course Details/);
+  assert.match(wxml, /Course Details/);
+  assert.match(wxml, /In Progress/);
+  assert.match(wxml, /Course outline/);
+  assert.match(wxml, /Class Feedback/);
+  assert.match(wxml, /Write feedback/);
+  assert.match(wxml, /Have insights or questions\? Share your feedback/);
+  assert.match(wxml, /lesson\.statusLabel/);
+  assert.doesNotMatch(wxml, /课程详情|正在学习|课程目录|课堂反馈|写反馈|有收获或疑问|老师尚未发布|暂无内容|学习中/);
 });
 
 test("study detail renders every lecture returned by the API", async () => {

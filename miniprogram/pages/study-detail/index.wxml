@@ -1,20 +1,20 @@
 <view class="detail-page">
   <view class="detail-topbar">
     <view class="detail-back" bindtap="goBack">‹</view>
-    <view class="detail-topbar-title">{{course.name || "课程详情"}}</view>
+    <view class="detail-topbar-title">{{course.name || "Course Details"}}</view>
     <button class="detail-share" open-type="share" plain="true">↗</button>
   </view>
 
   <view class="detail-summary">
     <view class="detail-summary-copy">
-      <view class="detail-status"><text>●</text> 正在学习</view>
-      <view class="detail-title">{{course.name || "学习课程"}}</view>
+      <view class="detail-status"><text>●</text> In Progress</view>
+      <view class="detail-title">{{course.name || "Course"}}</view>
     </view>
     <view class="detail-book-art">📖</view>
   </view>
 
   <view class="detail-section-head">
-    <view class="detail-section-title">课程目录 <text>· {{lessonCount}} 节</text></view>
+    <view class="detail-section-title">Course outline <text>· {{lessonCount}} lessons</text></view>
   </view>
   <view class="lesson-list catalog-list">
     <view wx:for="{{catalogLessons}}" wx:for-item="lesson" wx:key="id" class="lesson-row {{lesson.statusClass}}" data-status="{{lesson.status}}" data-lesson-id="{{lesson.id}}" data-material-id="{{lesson.materialId}}" data-homework-id="{{lesson.homeworkId}}" bindtap="tapLesson">
@@ -24,16 +24,16 @@
         <view class="lesson-title">{{lesson.displayName || lesson.name}}</view>
         <view class="lesson-desc">{{lesson.desc}}</view>
       </view>
-      <view class="lesson-status">{{lesson.status}}</view>
+      <view class="lesson-status">{{lesson.statusLabel}}</view>
     </view>
   </view>
-  <view wx:if="{{!catalogLessons.length}}" class="detail-empty-line">老师配置课程目录后会显示在这里</view>
+  <view wx:if="{{!catalogLessons.length}}" class="detail-empty-line">The outline will appear here once the teacher sets it up</view>
 
   <view class="detail-feedback">
     <view class="detail-section-head">
-      <view class="detail-section-title">课堂反馈</view>
-      <view class="detail-section-link">写反馈 ›</view>
+      <view class="detail-section-title">Class Feedback</view>
+      <view class="detail-section-link">Write feedback ›</view>
     </view>
-    <view class="detail-feedback-copy">有收获或疑问？欢迎反馈</view>
+    <view class="detail-feedback-copy">Have insights or questions? Share your feedback</view>
   </view>
 </view>
