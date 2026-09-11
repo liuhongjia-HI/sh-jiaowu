@@ -25,6 +25,15 @@ func gradeIndexOf(grade string) int {
 	return -1
 }
 
+// gradeEnglishName 是学生端展示用的年级文案。内部存储与匹配仍用中文年级。
+func gradeEnglishName(grade string) string {
+	grade = strings.TrimSpace(grade)
+	if index := gradeIndexOf(grade); index >= 0 {
+		return "Grade " + strconv.Itoa(index+1)
+	}
+	return grade
+}
+
 // academicYearStart 取学年字符串的起始年份，例如 "2025.2026学年" 返回 2025。
 func academicYearStart(academicYear string) (int, bool) {
 	trimmed := strings.TrimSpace(academicYear)

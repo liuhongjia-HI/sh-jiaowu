@@ -138,24 +138,38 @@ func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.S
 		if meta.Grade != grade || meta.Status != "启用" {
 			continue
 		}
-		card := learning.StudentSubjectCard{GradeSubjectMetadata: meta, AccessState: "locked", AccessLabel: "暂未开通"}
+		card := learning.StudentSubjectCard{GradeSubjectMetadata: meta, AccessState: "locked", AccessLabel: "Unavailable"}
 		courseIDs := s.courseIDsForGradeSubject(meta.Grade, meta.Subject)
 		fullMaterials, fullHomework := s.subjectContentCounts(student.ID, courseIDs)
 		if s.hasActiveSubjectLearningAccess(student.ID, meta.Grade, meta.Subject) {
-			card.AccessState, card.AccessLabel, card.CanOpen = "full", "可学习", true
+			card.AccessState, card.AccessLabel, card.CanOpen = "full", "Ready", true
 			card.MaterialNum, card.HomeworkNum = fullMaterials, fullHomework
 			card.EntryCourseID = s.firstAccessibleCourseID(student.ID, meta.Grade, meta.Subject)
 		} else if previewCourse, ok := s.previewCourseForGradeSubject(student.ID, meta); ok {
-			card.AccessState, card.AccessLabel, card.CanOpen = "preview", "首节可体验", true
+			card.AccessState, card.AccessLabel, card.CanOpen = "preview", "Preview", true
 			card.PreviewCourseID = previewCourse.ID
 			card.EntryCourseID = previewCourse.ID
 			card.MaterialNum, card.HomeworkNum = s.previewContentCounts(previewCourse)
 		} else if len(courseIDs) == 0 {
-			card.AccessState, card.AccessLabel = "pending", "内容准备中"
+			card.AccessState, card.AccessLabel = "pending", "Preparing"
 		}
+		card.Grade = gradeEnglishName(meta.Grade)
 		cards = append(cards, card)
 	}
 	return cards
+}
+
+func (s *MemoryStore) catalogDisplayNameForCourse(course learning.Course) string {
+	for _, item := range s.gradeSubjectCatalogUnlocked() {
+		if !subjectsMatch(item.Subject, course.Subject) {
+			continue
+		}
+		if item.Grade != "" && course.Grade != "" && item.Grade != course.Grade {
+			continue
+		}
+		return localizedSubjectDisplayName(item.Subject, item.DisplayName)
+	}
+	return subjectEnglishName(course.Subject)
 }
 
 func (s *MemoryStore) firstAccessibleCourseID(studentID, grade, subject string) string {

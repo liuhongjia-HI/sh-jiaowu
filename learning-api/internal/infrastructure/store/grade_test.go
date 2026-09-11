@@ -79,3 +79,18 @@ func TestApplyDerivedGradeBackfillsLegacyStudentWithoutBaseline(t *testing.T) {
 		t.Fatalf("回填后次年应升为四年级，实际 %q", student.Grade)
 	}
 }
+
+func TestGradeEnglishNameUsesOrdinalLabels(t *testing.T) {
+	cases := map[string]string{
+		"一年级":   "Grade 1",
+		"五年级":   "Grade 5",
+		"十二年级": "Grade 12",
+		"Grade 5": "Grade 5",
+		"":        "",
+	}
+	for input, want := range cases {
+		if got := gradeEnglishName(input); got != want {
+			t.Fatalf("gradeEnglishName(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

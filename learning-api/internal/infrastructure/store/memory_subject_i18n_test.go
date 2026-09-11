@@ -78,3 +78,55 @@ func TestSubjectShortLabelMatchesEnglishAliases(t *testing.T) {
 		t.Fatalf("Mathematics should map to Math, got %q", got)
 	}
 }
+
+func TestStudentStudyReturnsEnglishCardCopy(t *testing.T) {
+	store := NewMemoryStore()
+	student, err := store.PrincipalByUserID("user-student-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	study, err := store.StudentStudy(student)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(study.Subjects) == 0 {
+		t.Fatal("expected subject catalog")
+	}
+	for _, card := range study.Subjects {
+		if card.Grade != "Grade 5" {
+			t.Fatalf("subject grade = %q, want Grade 5", card.Grade)
+		}
+		if card.DisplayName != subjectEnglishName(card.Subject) {
+			t.Fatalf("displayName = %q, want English name for %q", card.DisplayName, card.Subject)
+		}
+		switch card.AccessState {
+		case "preview":
+			if card.AccessLabel != "Preview" {
+				t.Fatalf("preview label = %q", card.AccessLabel)
+			}
+		case "locked":
+			if card.AccessLabel != "Unavailable" {
+				t.Fatalf("locked label = %q", card.AccessLabel)
+			}
+		case "full":
+			if card.AccessLabel != "Ready" {
+				t.Fatalf("full label = %q", card.AccessLabel)
+			}
+		case "pending":
+			if card.AccessLabel != "Preparing" {
+				t.Fatalf("pending label = %q", card.AccessLabel)
+			}
+		}
+	}
+	if len(study.Courses) == 0 {
+		t.Fatal("expected opened courses")
+	}
+	for _, course := range study.Courses {
+		if course.Grade != "Grade 5" {
+			t.Fatalf("course grade = %q, want Grade 5", course.Grade)
+		}
+		if course.DisplayName == "" || course.DisplayName == course.Name {
+			t.Fatalf("course displayName should use catalog English name, got %q / %q", course.DisplayName, course.Name)
+		}
+	}
+}

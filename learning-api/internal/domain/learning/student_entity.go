@@ -226,6 +226,7 @@ type StudentBatchDeleteRequest struct {
 
 type StudentCourseCard struct {
 	Course
+	DisplayName    string `json:"displayName,omitempty"`
 	Progress       int    `json:"progress"`
 	OpenedAt       string `json:"openedAt,omitempty"`
 	AvailableAt    string `json:"availableAt,omitempty"`

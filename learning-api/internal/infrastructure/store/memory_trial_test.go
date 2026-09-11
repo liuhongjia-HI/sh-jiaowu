@@ -112,11 +112,11 @@ func TestStudentStudyListsConfiguredGradeSubjectsAndMarksPreview(t *testing.T) {
 			science = item
 		}
 	}
-	if english.ID == "" || english.AccessState != "preview" || english.AccessLabel != "首节可体验" || !english.CanOpen {
+	if english.ID == "" || english.AccessState != "preview" || english.AccessLabel != "Preview" || !english.CanOpen {
 		t.Fatalf("english preview card = %#v", english)
 	}
 	for _, card := range []learning.StudentSubjectCard{geography, science} {
-		if card.ID == "" || card.AccessState != "preview" || card.AccessLabel != "首节可体验" || !card.CanOpen || card.MaterialNum == 0 {
+		if card.ID == "" || card.AccessState != "preview" || card.AccessLabel != "Preview" || !card.CanOpen || card.MaterialNum == 0 {
 			t.Fatalf("subject with first-chapter handout must be previewable: %#v", card)
 		}
 	}
