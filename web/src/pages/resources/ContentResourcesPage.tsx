@@ -6,6 +6,7 @@ import { deleteData, getData, http, postData, postForm, putData } from '../../se
 import { ActionButton } from '../../components/ListViews';
 import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog, homeworkTagOptions, materialTagOptions } from './ResourceDialogs';
 import { canUpload } from './resource-shared';
+import { formatResourceCurriculumLabel } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, QuestionBankItem, StudyPackage } from '../../types/starline';
 import type { UploadFile } from 'antd';
 
@@ -324,7 +325,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         columns={[
           ...(canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: Material | Homework) => <button type="button" className="material-sort-handle" title="拖动调整同一课程内顺序" draggable onDragStart={(event) => { kind === 'materials' ? setDraggingMaterialId((row as Material).id) : setDraggingHomeworkId((row as Homework).id); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button> }] : []),
           { title: '标题', dataIndex: 'title' },
-		  { title: '目录', render: (_: unknown, row: Material | Homework) => { const path = row.curriculum; const parts = path ? [path.unit, path.chapter, path.lesson].filter((item) => item && item.trim()) : []; return parts.length ? parts.join(' · ') : '—'; } },
+		  { title: '目录', render: (_: unknown, row: Material | Homework) => formatResourceCurriculumLabel(row, (courses.data ?? []).find((course) => course.id === row.courseId)) },
 		  ...(kind === 'materials' ? [{ title: '学科', dataIndex: 'subject' }, { title: '上传人', dataIndex: 'ownerTeacherName' }, { title: '上传时间', dataIndex: 'createdAt' }] : [{ title: '类型', render: (_: unknown, row: Material | Homework) => (row as Homework).assessmentType === 'mock_exam' ? '模拟考试' : '常规练习' }, { title: '截止时间', render: (_: unknown, row: Material | Homework) => (row as Homework).deadlineAt ? new Date((row as Homework).deadlineAt as string).toLocaleString() : '不设截止' }]),
           { title: '课程', dataIndex: 'course' },
           { title: '状态', render: (_: unknown, row: Material | Homework) => { const status = kind === 'materials' ? ((row as Material).previewStatus || (row as Material).publishStatus) : row.status; return <div><div>{status}</div>{row.previewError && <Typography.Text type={status === '转换失败' ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>{row.previewError}</Typography.Text>}</div>; } },

@@ -7,7 +7,7 @@ import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
-import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, formatLearningSpace, levelOptions, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
+import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, formatLearningSpace, levelOptions, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -1262,14 +1262,7 @@ export function ContentEditDialog({
 }
 
 function LessonSelect({ course }: { course?: Course }) {
-	const nodes = course?.curriculum ?? [];
-	const byID = new Map(nodes.map((node) => [node.id, node]));
-	const options = nodes.filter((node) => node.type === 'lesson' || (node.type === 'chapter' && !nodes.some((child) => child.parentId === node.id))).map((lesson) => {
-		if (lesson.type === 'chapter') return { value: lesson.id, label: `${byID.get(lesson.parentId || '')?.name || 'Unit'} · ${lesson.name}` };
-		const chapter = byID.get(lesson.parentId || '');
-		const unit = chapter ? byID.get(chapter.parentId || '') : undefined;
-		return { value: lesson.id, label: `${unit?.name || 'Unit'} · ${chapter?.name || 'Chapter'} · ${lesson.name}` };
-	});
+	const options = curriculumLessonOptions(course?.curriculum);
 	return <Form.Item name="lessonId" label="课节" rules={[{ required: true, message: '请选择课节' }]} extra={options.length ? undefined : <>请先在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 维护 Unit、Chapter 和 Lesson。</>}>
 		<Select placeholder="选择 Unit · Chapter · Lesson" options={options} notFoundContent="该课程尚未维护完整目录" />
 	</Form.Item>;

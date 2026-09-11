@@ -694,3 +694,45 @@ func TestTextSubmissionRoutesReviewToCurrentPrimaryTutor(t *testing.T) {
 		t.Fatalf("new reviewer must see exactly the assigned work, got %#v", got)
 	}
 }
+
+func TestCurriculumPathIncludesUnitAndChapterNumbersWhenNamesAreBlank(t *testing.T) {
+	course := learning.Course{
+		Curriculum: []learning.CurriculumNode{
+			{ID: "unit-9", Type: learning.CurriculumUnit, Name: "Unit", SortOrder: 9},
+			{ID: "chapter-1", ParentID: "unit-9", Type: learning.CurriculumChapter, Name: "", SortOrder: 1},
+			{ID: "lesson-1", ParentID: "chapter-1", Type: learning.CurriculumLesson, Name: "Europe-Physical Geography", SortOrder: 1},
+		},
+	}
+	path, err := curriculumPathForLesson(course, "lesson-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path.Unit != "Unit 9" || path.Chapter != "Chapter 1" || path.Lesson != "Europe-Physical Geography" {
+		t.Fatalf("curriculum path = %#v", path)
+	}
+}
+
+func TestMaterialsListHydratesCurriculumPathFromCourse(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatal(err)
+	}
+	course := store.courses[0]
+	store.courses[0].Curriculum = []learning.CurriculumNode{
+		{ID: "unit-9", Type: learning.CurriculumUnit, Name: "", SortOrder: 9},
+		{ID: "chapter-1", ParentID: "unit-9", Type: learning.CurriculumChapter, Name: "Chapter", SortOrder: 1},
+		{ID: "lesson-geo", ParentID: "chapter-1", Type: learning.CurriculumLesson, Name: "Europe-Physical Geography", SortOrder: 1},
+	}
+	store.materials = append(store.materials, learning.Material{
+		ID: "material-geo-path", Title: "HW_9.1.1 Europe-Physical Geography", CourseID: course.ID, Course: course.Name,
+		LearningSpaceID: course.LearningSpaceID, LessonID: "lesson-geo", Status: learning.StatusEnabled,
+	})
+	rows := store.Materials(admin, learning.MaterialQuery{Keyword: "Europe-Physical Geography"})
+	if len(rows) != 1 {
+		t.Fatalf("expected hydrated material, got %#v", rows)
+	}
+	if rows[0].Curriculum.Unit != "Unit 9" || rows[0].Curriculum.Chapter != "Chapter 1" || rows[0].Curriculum.Lesson != "Europe-Physical Geography" {
+		t.Fatalf("hydrated curriculum = %#v", rows[0].Curriculum)
+	}
+}

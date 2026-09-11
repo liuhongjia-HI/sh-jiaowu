@@ -883,8 +883,8 @@ func curriculumPathForLesson(course learning.Course, lessonID string) (learning.
 	}
 	path := []string{}
 	for current := lesson; ; {
-		if current.Name != "" {
-			path = append([]string{current.Name}, path...)
+		if label := curriculumNodePathLabel(current); label != "" {
+			path = append([]string{label}, path...)
 		}
 		if current.ParentID == "" {
 			break
@@ -910,6 +910,48 @@ func curriculumPathForLesson(course learning.Course, lessonID string) (learning.
 		result.Lesson = path[len(path)-1]
 	}
 	return result, nil
+}
+
+func curriculumNodePathLabel(node learning.CurriculumNode) string {
+	name := strings.TrimSpace(node.Name)
+	order := node.SortOrder
+	if order < 1 {
+		order = 1
+	}
+	typeLabel := "Lesson"
+	switch node.Type {
+	case learning.CurriculumUnit:
+		typeLabel = "Unit"
+	case learning.CurriculumChapter:
+		typeLabel = "Chapter"
+	}
+	if node.Type == learning.CurriculumLesson {
+		if name != "" {
+			return name
+		}
+		return fmt.Sprintf("%s %d", typeLabel, order)
+	}
+	if name == "" || strings.EqualFold(name, typeLabel) {
+		return fmt.Sprintf("%s %d", typeLabel, order)
+	}
+	return name
+}
+
+func (s *MemoryStore) liveCurriculumPath(courseID, lessonID string, current learning.CurriculumPath) learning.CurriculumPath {
+	if strings.TrimSpace(lessonID) == "" {
+		return current
+	}
+	for _, course := range s.courses {
+		if course.ID != courseID {
+			continue
+		}
+		path, err := curriculumPathForLesson(course, lessonID)
+		if err != nil {
+			return current
+		}
+		return path
+	}
+	return current
 }
 
 func curriculumLeaf(nodes []learning.CurriculumNode, id string) bool {
@@ -1688,6 +1730,7 @@ func (s *MemoryStore) learningSpaceName(id string) string {
 func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Material {
 	material.Type = "课程讲义"
 	material.TagCode = contentTagCodeOrInferred(material.TagCode, material.Title, material.FileName)
+	material.Curriculum = s.liveCurriculumPath(material.CourseID, material.LessonID, material.Curriculum)
 	if space, ok := s.findLearningSpace(material.LearningSpaceID); ok {
 		material.Grade = space.Grade
 		material.Semester = space.Semester

@@ -1,3 +1,5 @@
+import type { Course, CurriculumNode, CurriculumPath } from '../types/starline';
+
 // 年级与学科的开设关系，与后端保持一致。综合科学和历史仅兼容旧数据，
 // 不再出现在新建课程与学习空间的选项中。
 // 规则对应 learning-api/internal/infrastructure/store/memory.go 的 subjectAppliesToGrade。
@@ -136,4 +138,78 @@ export function academicYearsFromCalendar(raw?: string): string[] {
   }
   const years = Array.from(new Set(terms.map((term) => term.academicYear).filter(Boolean)));
   return years.sort((a, b) => b.localeCompare(a));
+}
+
+const CURRICULUM_TYPE_LABELS: Record<CurriculumNode['type'], string> = {
+  unit: 'Unit',
+  chapter: 'Chapter',
+  lesson: 'Lesson'
+};
+
+export function curriculumNodeOrder(node?: Pick<CurriculumNode, 'sortOrder'> | null) {
+  const order = Number(node?.sortOrder);
+  return Number.isFinite(order) && order >= 1 ? Math.floor(order) : 1;
+}
+
+// Unit / Chapter 名称经常留空或只填类型名，下拉和目录需要把序号带上才能区分课节。
+export function formatCurriculumNodeLabel(
+  node: Pick<CurriculumNode, 'type' | 'name' | 'sortOrder'> | undefined,
+  fallbackType: CurriculumNode['type']
+) {
+  const typeLabel = CURRICULUM_TYPE_LABELS[node?.type || fallbackType];
+  const numbered = `${typeLabel} ${curriculumNodeOrder(node)}`;
+  const name = (node?.name || '').trim();
+  if (!name || name.toLowerCase() === typeLabel.toLowerCase()) return numbered;
+  const numberedPrefix = new RegExp(`^${typeLabel}\\s*${curriculumNodeOrder(node)}\\b`, 'i');
+  if (numberedPrefix.test(name)) return name;
+  return `${numbered} · ${name}`;
+}
+
+export function formatCurriculumLessonLabel(nodes: CurriculumNode[] | undefined, lessonId?: string) {
+  if (!nodes?.length || !lessonId) return '';
+  const byID = new Map(nodes.map((node) => [node.id, node]));
+  const leaf = byID.get(lessonId);
+  if (!leaf) return '';
+  const ancestors: CurriculumNode[] = [];
+  for (let current = byID.get(leaf.parentId || ''); current; current = byID.get(current.parentId || '')) {
+    ancestors.unshift(current);
+  }
+  const parts = ancestors.map((node) => formatCurriculumNodeLabel(node, node.type));
+  const leafName = (leaf.name || '').trim();
+  parts.push(leaf.type === 'lesson' ? (leafName || formatCurriculumNodeLabel(leaf, 'lesson')) : formatCurriculumNodeLabel(leaf, leaf.type));
+  return parts.filter(Boolean).join(' · ');
+}
+
+export function curriculumLessonOptions(nodes: CurriculumNode[] | undefined) {
+  const list = nodes ?? [];
+  const byID = new Map(list.map((node) => [node.id, node]));
+  const leaves = list.filter((node) => node.type === 'lesson' || (node.type === 'chapter' && !list.some((child) => child.parentId === node.id)));
+  const sortKey = (node: CurriculumNode) => {
+    const orders = [curriculumNodeOrder(node)];
+    for (let current = byID.get(node.parentId || ''); current; current = byID.get(current.parentId || '')) {
+      orders.unshift(curriculumNodeOrder(current));
+    }
+    while (orders.length < 3) orders.unshift(0);
+    return orders;
+  };
+  return [...leaves]
+    .sort((left, right) => {
+      const a = sortKey(left);
+      const b = sortKey(right);
+      for (let index = 0; index < a.length; index += 1) {
+        if (a[index] !== b[index]) return a[index] - b[index];
+      }
+      return left.id.localeCompare(right.id);
+    })
+    .map((lesson) => ({ value: lesson.id, label: formatCurriculumLessonLabel(list, lesson.id) || lesson.name }));
+}
+
+export function formatResourceCurriculumLabel(
+  row: { lessonId?: string; curriculum?: CurriculumPath },
+  course?: Pick<Course, 'curriculum'>
+) {
+  const fromCourse = formatCurriculumLessonLabel(course?.curriculum, row.lessonId);
+  if (fromCourse) return fromCourse;
+  const parts = row.curriculum ? [row.curriculum.unit, row.curriculum.chapter, row.curriculum.lesson].filter((item) => item && item.trim()) : [];
+  return parts.length ? parts.join(' · ') : '—';
 }

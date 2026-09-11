@@ -128,6 +128,7 @@ func (s *MemoryStore) homeworkForCourses(courses []string) []learning.Homework {
 		if homeworkVisible(item.Status) && containsString(courses, item.Course) {
 			item = cloneHomework(item)
 			item.TagCode = contentTagCodeOrInferred(item.TagCode, item.Title, item.FileName)
+			item.Curriculum = s.liveCurriculumPath(item.CourseID, item.LessonID, item.Curriculum)
 			out = append(out, item)
 		}
 	}
