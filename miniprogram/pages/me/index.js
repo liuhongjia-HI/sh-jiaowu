@@ -1,4 +1,5 @@
 const { request } = require("../../utils/request");
+const { subjectLabel } = require("../../utils/subject");
 const { showPhoneAuthFailed, isCancel } = require("../../utils/phone-auth");
 
 Page({
@@ -541,7 +542,7 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
       tone: "active",
       label: "继续学习",
       title: continueCourse.name || "继续上次学习",
-      desc: [continueCourse.grade, continueCourse.subject, progress > 0 ? `已学 ${progress}%` : ""].filter(Boolean).join(" · ") || "从上次进度继续学习。",
+      desc: [continueCourse.grade, subjectLabel(continueCourse.subject), progress > 0 ? `已学 ${progress}%` : ""].filter(Boolean).join(" · ") || "从上次进度继续学习。",
       buttonText: "继续学习"
     };
   }

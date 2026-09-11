@@ -450,6 +450,7 @@ export type SubjectMetadata = {
   color: string;
   sortOrder: number;
   status: '启用' | '停用';
+  deletable?: boolean;
 };
 
 export type SubjectMetadataUpdateRequest = Pick<SubjectMetadata, 'shortLabel' | 'color' | 'sortOrder' | 'status'>;

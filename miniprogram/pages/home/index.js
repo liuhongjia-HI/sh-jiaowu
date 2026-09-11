@@ -675,7 +675,7 @@ function buildFallbackTodos({ pendingHomework, continueCourse }) {
     id: `todo-study-${continueCourse.id}`,
     type: "schedule",
     title: "继续学习",
-    summary: [continueCourse.name, continueCourse.grade, continueCourse.subject].filter(Boolean).join(" · "),
+    summary: [continueCourse.name, continueCourse.grade, subjectLabel(continueCourse.subject)].filter(Boolean).join(" · "),
     actionText: "继续学习",
     path: `/pages/study-detail/index?id=${continueCourse.id}`,
     priority: 60,

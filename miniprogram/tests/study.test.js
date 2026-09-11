@@ -140,7 +140,7 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
   page.loadStudy();
   await flushPromises();
   assert.equal(page.data.visibleCourses.length, 2);
-  assert.equal(page.data.visibleCourses[0].displayName, "地理");
+  assert.equal(page.data.visibleCourses[0].displayName, "Geography");
   assert.equal(page.data.visibleCourses[0].accessLabel, "首节可体验");
   page.goDetail({ currentTarget: { dataset: { id: "", canOpen: false } } });
   assert.equal(toasts[0].title, "Unlock to access all content");

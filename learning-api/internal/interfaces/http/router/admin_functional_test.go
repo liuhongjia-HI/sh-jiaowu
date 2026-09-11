@@ -325,6 +325,28 @@ func TestCampusAdminManagesSubjectMetadataThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodPut, "/api/subjects/english", token, learning.SubjectMetadataUpdateRequest{
 		ShortLabel: "EN", Color: "blue", SortOrder: 12, Status: "启用",
 	}, http.StatusBadRequest, nil)
+
+	denied := app.doJSON(t, http.MethodDelete, "/api/subjects/english", token, nil, http.StatusBadRequest, nil)
+	if denied.Message != "系统内置学科不能删除。如不再开设，请改为停用" {
+		t.Fatalf("unexpected delete rejection: %#v", denied)
+	}
+	teacherToken := app.loginAdmin(t, "13800000004")
+	app.doJSON(t, http.MethodDelete, "/api/subjects/english", teacherToken, nil, http.StatusForbidden, nil)
+
+	app.store.AppendSubjectMetadata(learning.SubjectMetadata{
+		ID: "politics", Name: "政治", ShortLabel: "Pol", Color: "#888888", SortOrder: 0, Status: "启用",
+	})
+	var deleted map[string]string
+	app.doJSON(t, http.MethodDelete, "/api/subjects/politics", token, nil, http.StatusOK, &deleted)
+	if deleted["id"] != "politics" {
+		t.Fatalf("expected deleted subject id, got %#v", deleted)
+	}
+	app.doJSON(t, http.MethodGet, "/api/subjects", token, nil, http.StatusOK, &subjects)
+	for _, item := range subjects {
+		if item.ID == "politics" {
+			t.Fatalf("deleted leftover subject should not remain: %#v", item)
+		}
+	}
 }
 
 func doMultipart(t *testing.T, app *testApp, method, path, token string, fields map[string]string, fileField string, fileName string, fileBody []byte, wantStatus int, out any) apiResponse {

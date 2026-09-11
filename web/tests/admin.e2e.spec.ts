@@ -35,7 +35,7 @@ async function createQuestion(page: Page, title: string, typeText: string, stem:
 
   await ensureCompactOption(page, dialog, 0, '五年级');
   await ensureCompactOption(page, dialog, 1, 'S1');
-  await ensureCompactOption(page, dialog, 2, '英文');
+  await ensureCompactOption(page, dialog, 2, 'English');
   await dialog.getByLabel('题目名称').fill(title);
   await selectOption(page, dialog, '题型', typeText);
   await dialog.getByPlaceholder('请输入学生看到的题目内容，可添加重点、列表或图片 URL。').fill(stem);
@@ -194,18 +194,23 @@ test('课程内容可按年级和学科快捷筛选', async ({ page }) => {
   });
 
   await expectPageHeading(page, '/content', '课程内容');
+  const filters = page.locator('.course-filter-bar');
+  await expect(filters.getByRole('combobox', { name: '年级' })).toBeVisible();
+  await expect(filters.getByRole('combobox', { name: '学科' })).toBeVisible();
+  await expect(filters.getByRole('combobox', { name: '学期阶段' })).toBeVisible();
+  await expect(filters.getByRole('combobox', { name: '状态' })).toBeVisible();
   await expect(page.getByText('G4S1Q1 Math')).toBeVisible();
   await expect(page.getByText('G5S1Q1 Geo')).toBeVisible();
 
-  await page.getByLabel('年级').click();
+  await filters.getByRole('combobox', { name: '年级' }).click();
   await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('四年级', { exact: true }).click();
   await expect(page.getByText('G4S1Q1 Math')).toBeVisible();
   await expect(page.getByText('G5S1Q1 Geo')).toHaveCount(0);
 
-  await page.getByRole('button', { name: '重置' }).click();
+  await filters.getByRole('button', { name: '重置' }).click();
   await expect(page.getByText('G5S1Q1 Geo')).toBeVisible();
 
-  await page.getByLabel('学科').click();
+  await filters.getByRole('combobox', { name: '学科' }).click();
   await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('Geography', { exact: true }).click();
   await expect(page.getByText('G5S1Q1 Geo')).toBeVisible();
   await expect(page.getByText('G4S1Q1 Math')).toHaveCount(0);
@@ -423,7 +428,7 @@ test('学生列表直接展示辅导老师并在悬停时显示匹配详情', as
   await expect(page.locator('.student-table thead')).toContainText('辅导老师');
   const teacherTag = page.locator('.student-table tbody tr', { hasText: '已分配老师学生' }).getByText('英语老师', { exact: true });
   await teacherTag.hover();
-  await expect(page.getByText('英语老师 · 主辅导 · 英文 S级 · 2026-08-30 起')).toBeVisible();
+  await expect(page.getByText('英语老师 · 主辅导 · English S级 · 2026-08-30 起')).toBeVisible();
 });
 
 test('新增教师时可按年级和学科筛选负责学习空间', async ({ page }) => {
@@ -437,7 +442,7 @@ test('新增教师时可按年级和学科筛选负责学习空间', async ({ pa
   await filter.locator('.ant-select-selector').first().click();
   await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('五年级', { exact: true }).last().click();
   await filter.locator('.ant-select-selector').nth(1).click();
-  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('英文', { exact: true }).last().click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('English', { exact: true }).last().click();
 
   const scope = drawer.locator('.ant-form-item').filter({ hasText: '负责学习空间' }).last();
   await scope.locator('.ant-select-selector').click();
@@ -704,7 +709,7 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   const subjectFilter = drawer.getByRole('group', { name: '科目筛选' });
   await expect(subjectFilter).toBeVisible();
   await expect(subjectFilter.getByRole('button', { name: /全部（\d+）/ })).toBeVisible();
-  const englishFilter = subjectFilter.getByRole('button', { name: /英文（\d+）/ });
+  const englishFilter = subjectFilter.getByRole('button', { name: /English（\d+）/ });
   await expect(englishFilter).toBeVisible();
 
   await englishFilter.click();

@@ -117,7 +117,7 @@ Page({
     const keyword = this.data.keyword.trim().toLowerCase();
     const activeFilter = this.data.activeFilter;
     const visibleCourses = this.data.courses.filter((course) => {
-      const matchKeyword = !keyword || [course.name, course.displayName, course.subject, course.grade].join(" ").toLowerCase().includes(keyword);
+      const matchKeyword = !keyword || [course.name, course.displayName, course.displaySubject, course.subject, course.grade].join(" ").toLowerCase().includes(keyword);
       const completed = isCompletedCourse(course);
       const matchFilter = activeFilter === "all"
         || (activeFilter === "learning" && !completed)
@@ -206,7 +206,7 @@ function catalogDisplayName(course, subjects) {
   if (!subject) return "";
   const grade = String(course.grade || "").trim();
   const matched = (subjects || []).find((item) => {
-    if (String(item.subject || "").trim() !== subject) return false;
+    if (!subjectsMatchName(item.subject, subject)) return false;
     const itemGrade = String(item.grade || "").trim();
     return !grade || !itemGrade || itemGrade === grade;
   });

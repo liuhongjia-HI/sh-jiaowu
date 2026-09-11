@@ -2,7 +2,7 @@ import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Selec
 import { CalendarOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getData, putData } from '../../services/http';
+import { deleteData, getData, putData } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton } from '../../components/ListViews';
 import type { SettingUpdateRequest, SubjectMetadata, SubjectMetadataUpdateRequest } from '../../types/starline';
@@ -302,6 +302,17 @@ function SubjectMetadataCard() {
     },
     onError: (error: Error) => message.error(error.message || '保存学科显示配置失败，请检查输入。')
   });
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteData(`/subjects/${id}`),
+    onSuccess: () => {
+      message.success('学科已删除。');
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['subjects-for-schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['grade-subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+    onError: (error: Error) => message.error(error.message || '删除学科失败，请稍后重试。')
+  });
 
   function openEdit(subject: SubjectMetadata) {
     setEditing(subject);
@@ -311,7 +322,7 @@ function SubjectMetadataCard() {
   return (
     <Card title="学科显示配置" extra={<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => subjects.refetch()} />}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        学科名称由课程和学习空间使用，此处只维护课表等页面的简称、颜色、排序和启用状态。
+        学科名称由课程和学习空间使用。此处维护课表等页面的简称、颜色、排序和启用状态；没有业务引用的残留学科可以删除，内置学科只能停用。
       </Typography.Paragraph>
       {subjects.isLoading ? <Skeleton active /> : subjects.error ? <Alert type="error" message="学科配置加载失败，请稍后重试。" /> : (
         <Table
@@ -324,7 +335,16 @@ function SubjectMetadataCard() {
             { title: '显示颜色', dataIndex: 'color', render: (color: string) => <Space size={8}><span aria-label={`颜色 ${color}`} style={{ width: 18, height: 18, borderRadius: '50%', background: color, border: '1px solid #d9d9d9', display: 'inline-block' }} /><Typography.Text>{color}</Typography.Text></Space> },
             { title: '排序', dataIndex: 'sortOrder' },
             { title: '状态', dataIndex: 'status', render: (status: SubjectMetadata['status']) => <Tag color={status === '启用' ? 'green' : 'default'}>{status}</Tag> },
-            { title: '操作', render: (_: unknown, row: SubjectMetadata) => <ActionButton tooltip="编辑显示配置" icon={<EditOutlined />} onClick={() => openEdit(row)} /> }
+            { title: '操作', width: 108, render: (_: unknown, row: SubjectMetadata) => (
+              <Space size={4}>
+                <ActionButton tooltip="编辑显示配置" icon={<EditOutlined />} onClick={() => openEdit(row)} />
+                {row.deletable ? (
+                  <Popconfirm title={`确定删除「${subjectLabel(row.name)}」？`} description="删除后不可恢复。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: remove.isPending }} onConfirm={() => remove.mutate(row.id)}>
+                    <ActionButton danger tooltip="删除学科" icon={<DeleteOutlined />} />
+                  </Popconfirm>
+                ) : null}
+              </Space>
+            ) }
           ]}
         />
       )}

@@ -67,6 +67,13 @@ func (s *MemoryStore) updateSubjectMetadataUnlocked(operator, id string, req lea
 	return learning.SubjectMetadata{}, errors.New("学科不存在")
 }
 
+// AppendSubjectMetadata 仅用于测试注入残留学科，正式环境没有创建学科接口。
+func (s *MemoryStore) AppendSubjectMetadata(item learning.SubjectMetadata) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.subjects = append(s.subjects, item)
+}
+
 func (s *MemoryStore) deleteSubjectMetadataUnlocked(operator, id string) error {
 	if s.db != nil {
 		return persistentMutationError(s, func(work *MemoryStore) error {
