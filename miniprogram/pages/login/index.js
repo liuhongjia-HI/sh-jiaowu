@@ -19,7 +19,6 @@ function rememberedStudentID() {
 
 Page({
   data: {
-    statusBarHeight: 0,
     binding: false,
     gradeOptions: ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级"],
     gradeIndex: -1,
@@ -30,7 +29,6 @@ Page({
     }
   },
   onLoad(options = {}) {
-    this.setStatusBarHeight();
     const grade = String(options.grade || "").trim();
     const gradeIndex = this.data.gradeOptions.indexOf(grade);
     if (gradeIndex >= 0) {
@@ -41,23 +39,15 @@ Page({
   onUnload() {
     completeLoginRedirect();
     wx.removeStorageSync(LOGIN_RETURN_KEY);
+    if (wx.setStorageSync) {
+      wx.setStorageSync("starline_onboarding_seen", "1");
+    }
   },
   onShareAppMessage() {
     return {
       title: "加入 Starline 学习",
       path: "/pages/home/index"
     };
-  },
-  setStatusBarHeight() {
-    try {
-      const info = wx.getWindowInfo ? wx.getWindowInfo() : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : null);
-      const statusBarHeight = info && Number(info.statusBarHeight);
-      if (statusBarHeight > 0) {
-        this.setData({ statusBarHeight });
-      }
-    } catch (error) {
-      // 部分旧版基础库没有窗口信息 API，保留 0 让顶部栏按默认高度渲染。
-    }
   },
   onInput(event) {
     const field = event.currentTarget.dataset.field;
@@ -186,6 +176,9 @@ Page({
   leaveLogin() {
     completeLoginRedirect();
     wx.removeStorageSync(LOGIN_RETURN_KEY);
+    if (wx.setStorageSync) {
+      wx.setStorageSync("starline_onboarding_seen", "1");
+    }
     wx.switchTab({
       url: "/pages/home/index",
       fail: () => {

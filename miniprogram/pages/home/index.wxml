@@ -22,6 +22,13 @@
     </view>
   </view>
   <view wx:else>
+    <view class="section" wx:if="{{visitorMode}}">
+      <view class="empty-card home-empty">
+        <view class="title">添加学生后查看专属内容</view>
+        <view class="sub">也可以先浏览公开内容，稍后再绑定手机号。</view>
+        <button class="button" bindtap="goAddStudent">添加学生</button>
+      </view>
+    </view>
     <view class="section" wx:if="{{promoBanners.length > 0}}">
       <swiper class="promo-banner-swiper" indicator-dots="{{promoBanners.length > 1}}" indicator-color="rgba(255,255,255,.45)" indicator-active-color="#fff" autoplay circular interval="4500">
         <swiper-item wx:for="{{promoBanners}}" wx:key="id">

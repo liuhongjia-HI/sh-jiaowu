@@ -184,3 +184,14 @@
 .benefit-title { color: #2a3035; font-size: 27rpx; font-weight: 850; }
 .benefit-summary { margin-top: 5rpx; color: #879099; font-size: 22rpx; }
 .help-copy { margin-top: 28rpx; color: #939aa1; font-size: 22rpx; text-align: center; }
+
+.skip-button {
+  height: 62rpx;
+  margin-top: 8rpx;
+  background: transparent;
+  color: #939aa1;
+  font-size: 24rpx;
+  font-weight: 650;
+  line-height: 62rpx;
+}
+.skip-button::after { border: 0; }

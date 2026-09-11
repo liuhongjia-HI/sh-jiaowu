@@ -125,12 +125,13 @@ test("login page sends the device's remembered student when silently restoring",
   ]);
 });
 
-test("login page owns its back affordance so return works even without a page stack", () => {
+test("login page keeps native navigation and an explicit return-home action", () => {
   const config = JSON.parse(fs.readFileSync(path.join(__dirname, "../pages/login/index.json"), "utf8"));
   const template = fs.readFileSync(path.join(__dirname, "../pages/login/index.wxml"), "utf8");
 
-  assert.equal(config.navigationStyle, "custom");
-  assert.match(template, /class="login-nav-back"[^>]*bindtap="leaveLogin"/);
+  assert.notEqual(config.navigationStyle, "custom");
+  assert.match(template, /bindtap="leaveLogin"/);
+  assert.match(template, /返回首页/);
 });
 
 test("login page returns to the protected material that triggered binding", async () => {
@@ -301,6 +302,9 @@ test("login page falls back to relaunching home when switchTab fails", () => {
     removeStorageSync(key) {
       calls.push(["removeStorageSync", key]);
     },
+    setStorageSync(key, value) {
+      calls.push(["setStorageSync", key, value]);
+    },
     switchTab(args) {
       calls.push(["switchTab", args.url]);
       args.fail();
@@ -314,6 +318,7 @@ test("login page falls back to relaunching home when switchTab fails", () => {
 
   assert.deepEqual(calls, [
     ["removeStorageSync", "starline_after_login"],
+    ["setStorageSync", "starline_onboarding_seen", "1"],
     ["switchTab", "/pages/home/index"],
     ["reLaunch", "/pages/home/index"]
   ]);
@@ -324,12 +329,18 @@ test("leaving login page clears a stale protected-page destination", () => {
   const page = loadLoginPage(() => Promise.resolve({ token: "unused" }), {
     removeStorageSync(key) {
       calls.push(["removeStorageSync", key]);
+    },
+    setStorageSync(key, value) {
+      calls.push(["setStorageSync", key, value]);
     }
   });
 
   page.onUnload();
 
-  assert.deepEqual(calls, [["removeStorageSync", "starline_after_login"]]);
+  assert.deepEqual(calls, [
+    ["removeStorageSync", "starline_after_login"],
+    ["setStorageSync", "starline_onboarding_seen", "1"]
+  ]);
 });
 
 test("login page uses selected grade option when binding phone", async () => {

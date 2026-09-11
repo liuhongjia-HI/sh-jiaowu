@@ -54,3 +54,26 @@ test("parent onboarding keeps direct binding as a separate simple entry", () => 
   page.goBindStudent();
   assert.equal(calls[0].url, "/pages/login/index?mode=bind");
 });
+
+test("parent onboarding lets visitors skip binding and return home", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/parent-onboarding/index.wxml"), "utf8");
+  assert.match(template, /bindtap="skipForNow"/);
+  assert.match(template, /暂不添加，先去看看/);
+
+  const calls = [];
+  const storage = {};
+  const page = loadPage({
+    setStorageSync(key, value) {
+      storage[key] = value;
+    },
+    switchTab(args) {
+      calls.push(["switchTab", args.url]);
+    },
+    reLaunch(args) {
+      calls.push(["reLaunch", args.url]);
+    }
+  });
+  page.skipForNow();
+  assert.equal(storage.starline_onboarding_seen, "1");
+  assert.deepEqual(calls, [["switchTab", "/pages/home/index"]]);
+});

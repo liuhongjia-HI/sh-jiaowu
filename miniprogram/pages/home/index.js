@@ -1,5 +1,7 @@
 const { request } = require("../../utils/request");
 
+const ONBOARDING_SEEN_KEY = "starline_onboarding_seen";
+
 Page({
   data: {
     loading: true,
@@ -49,7 +51,6 @@ Page({
     this.refreshGreeting();
     if (!hasStudentToken()) {
       this.showVisitorHome();
-      this.redirectToParentOnboarding();
       this.loadPromoBanners();
       return;
     }
@@ -67,7 +68,9 @@ Page({
     this.homeHidden = false;
     this.refreshGreeting();
     if (!hasStudentToken()) {
-      this.showVisitorHome();
+      if (!this.data.visitorMode) {
+        this.showVisitorHome();
+      }
       this.redirectToParentOnboarding();
       return;
     }
@@ -100,8 +103,7 @@ Page({
     this.setData({
       loading: false,
       error: "",
-      // 未登录用户也直接进入首页内容流，不再展示额外的欢迎卡片。
-      // 保留访客态标记，登录后 onShow 可据此刷新真实学习数据。
+      // 未登录用户停在访客首页，保留添加学生入口，登录后 onShow 再刷新学习数据。
       visitorMode: true,
       home: {},
       hasContent: false,
@@ -122,12 +124,17 @@ Page({
     });
   },
   redirectToParentOnboarding() {
-    if (this.data.onboardingRedirected) return;
-    // 未完成绑定时清掉学生首页，避免家长返回后再次落到不适用的学生视角。
-    const navigate = typeof wx.reLaunch === "function" ? wx.reLaunch : wx.navigateTo;
-    if (typeof navigate !== "function") return;
+    if (this.data.onboardingRedirected || hasSeenParentOnboarding()) {
+      return;
+    }
+    if (typeof wx.navigateTo !== "function") {
+      return;
+    }
+    // 只引导一次，且必须保留首页栈。审核员点击左上角首页/返回后要能停在访客首页，
+    // 不能再用 reLaunch 把页面栈清掉后循环拉回登录引导。
+    markParentOnboardingSeen();
     this.setData({ onboardingRedirected: true });
-    navigate({ url: "/pages/parent-onboarding/index" });
+    wx.navigateTo({ url: "/pages/parent-onboarding/index" });
   },
   refreshGreeting(now = new Date()) {
     this.setData({ greeting: greetingForHour(now.getHours()) });
@@ -420,6 +427,9 @@ Page({
   goLogin() {
     wx.navigateTo({ url: "/pages/login/index" });
   },
+  goAddStudent() {
+    wx.navigateTo({ url: "/pages/parent-onboarding/index" });
+  },
   goOpen() {
     if (!this.data.home) {
       this.goLogin();
@@ -519,6 +529,16 @@ Page({
 
 function hasStudentToken() {
   return Boolean(wx.getStorageSync && wx.getStorageSync("starline_token"));
+}
+
+function hasSeenParentOnboarding() {
+  return Boolean(wx.getStorageSync && wx.getStorageSync(ONBOARDING_SEEN_KEY));
+}
+
+function markParentOnboardingSeen() {
+  if (wx.setStorageSync) {
+    wx.setStorageSync(ONBOARDING_SEEN_KEY, "1");
+  }
 }
 
 function greetingForHour(hour) {

@@ -147,20 +147,56 @@ test("home page opens directly for a visitor and still loads promo banners", asy
 
 test("home page routes an unauthenticated visitor to parent onboarding once", () => {
   const navigations = [];
+  const storage = {};
   const page = loadHomePage(() => Promise.resolve({}), {
-    getStorageSync() {
-      return "";
+    getStorageSync(key) {
+      return storage[key] || "";
+    },
+    setStorageSync(key, value) {
+      storage[key] = value;
+    },
+    navigateTo(args) {
+      navigations.push(["navigateTo", args.url]);
     },
     reLaunch(args) {
-      navigations.push(args.url);
+      navigations.push(["reLaunch", args.url]);
     }
   });
 
   page.onLoad();
   page.onShow();
 
-  assert.deepEqual(navigations, ["/pages/parent-onboarding/index"]);
+  assert.deepEqual(navigations, [["navigateTo", "/pages/parent-onboarding/index"]]);
   assert.equal(page.data.onboardingRedirected, true);
+  assert.equal(storage.starline_onboarding_seen, "1");
+});
+
+test("home page does not bounce a returning visitor back into onboarding", () => {
+  const navigations = [];
+  const page = loadHomePage(() => Promise.resolve({}), {
+    getStorageSync(key) {
+      return key === "starline_onboarding_seen" ? "1" : "";
+    },
+    navigateTo(args) {
+      navigations.push(["navigateTo", args.url]);
+    },
+    reLaunch(args) {
+      navigations.push(["reLaunch", args.url]);
+    }
+  });
+
+  page.onLoad();
+  page.onShow();
+
+  assert.deepEqual(navigations, []);
+  assert.equal(page.data.visitorMode, true);
+  assert.equal(page.data.onboardingRedirected, false);
+});
+
+test("visitor home keeps an add-student path without forcing login", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/home/index.wxml"), "utf8");
+  assert.match(template, /wx:if="\{\{visitorMode\}\}"/);
+  assert.match(template, /bindtap="goAddStudent"/);
 });
 
 test("home page does not route an authenticated student to parent onboarding", () => {

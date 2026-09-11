@@ -27,6 +27,7 @@
     <view class="card-subtitle">填写孩子信息，完成手机号绑定后即可查看专属内容</view>
     <button class="primary-button" bindtap="goAddStudent">添加学生</button>
     <button class="secondary-button" bindtap="goBindStudent">已有学生信息，直接绑定</button>
+    <button class="skip-button" bindtap="skipForNow">暂不添加，先去看看</button>
   </view>
 
   <view class="help-copy">需要帮助？联系老师或教务</view>
