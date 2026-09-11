@@ -1111,7 +1111,7 @@ export function UploadDialog({
         {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="标题以 Exam_、Special_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={homeworkTagOptions} />
         </Form.Item>}
-        {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
+        {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
           <>
             <LessonSelect course={selectedCourse} />
             <Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item>
