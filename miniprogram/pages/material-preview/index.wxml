@@ -64,7 +64,7 @@
       </view>
 
       <view class="preview-actions">
-        <button class="button challenge-button" bindtap="goAnswer">Next</button>
+        <button wx:if="{{showNextButton}}" class="button challenge-button" bindtap="goAnswer">Next</button>
         <view class="button-row">
           <button class="button light" bindtap="toggleFavorite">{{favorited ? 'Favorited ✓' : 'Favorite ♡'}}</button>
           <view class="download-print-wrap">

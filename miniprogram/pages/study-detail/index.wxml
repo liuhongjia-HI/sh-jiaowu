@@ -9,9 +9,6 @@
     <view class="detail-summary-copy">
       <view class="detail-status"><text>●</text> 正在学习</view>
       <view class="detail-title">{{course.name || "学习课程"}}</view>
-      <view wx:if="{{teacherText || course.duration}}" class="detail-meta">{{teacherText ? '老师：' + teacherText : ''}}{{teacherText && course.duration ? ' ｜ ' : ''}}{{course.duration ? '时长：' + course.duration : ''}}</view>
-      <view class="detail-progress-row"><text>已学 {{progress}}%</text><text>{{progress >= 100 ? "已完成" : (progress > 0 ? "继续学习" : "开始学习")}}</text></view>
-      <view class="detail-progress"><view class="detail-progress-bar" style="width: {{progress}}%;"></view></view>
     </view>
     <view class="detail-book-art">📖</view>
   </view>

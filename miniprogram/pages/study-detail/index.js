@@ -8,15 +8,12 @@ Page({
     stations: [],
     catalogLessons: [],
     lessonCount: 0,
-    progress: 0,
-    teacherText: "",
     materialCountText: "0 份资料",
     homeworkText: "可得徽章"
   },
   onLoad(options) {
     this.courseId = options.id || "";
     if (!this.courseId) {
-      this.setData({ teacherText: "课程信息缺失" });
       return;
     }
     this.loadDetail();
@@ -51,11 +48,6 @@ Page({
         stations,
         catalogLessons: catalog,
         lessonCount: catalog.length,
-        progress: data.progress || 0,
-        teacherText:
-          (materials[0] && materials[0].ownerTeacherName) ||
-          (homework[0] && homework[0].ownerTeacherName) ||
-          `${course.subject || ""}老师`,
         materialCountText: `${materials.length} 份资料`,
         homeworkText: homework.length ? `${homework.length} 个挑战` : "可得徽章"
       });

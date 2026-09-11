@@ -10,7 +10,7 @@ test("material preview keeps only the preview card as the full-courseware entry"
   assert.doesNotMatch(template, /class="preview-action"/);
   assert.doesNotMatch(template, /class="watermark-layer"/);
   assert.doesNotMatch(template, /tag-item-filter/);
-  assert.match(template, /class="button challenge-button" bindtap="goAnswer"/);
+  assert.match(template, /wx:if="{{showNextButton}}".*class="button challenge-button" bindtap="goAnswer"/);
   assert.match(template, /bindtap="backToList"/);
   assert.match(template, /contentMode === 'list'/);
 });
@@ -20,9 +20,16 @@ test("material preview uses English action labels and hides study-count caption"
 
   assert.doesNotMatch(template, /人学过|进度已保存|开始练习|收藏讲义|class="preview-caption"/);
   assert.doesNotMatch(template, />下载打印</);
-  assert.match(template, />Next<\/button>/);
+  assert.match(template, /wx:if="{{showNextButton}}"[\s\S]*?>Next<\/button>/);
   assert.match(template, />Print<\/button>/);
   assert.match(template, /favorited \? 'Favorited ✓' : 'Favorite ♡'/);
+});
+
+test("material preview hides the Next action until it is re-enabled", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.wxml"), "utf8");
+  const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock());
+  assert.equal(page.data.showNextButton, false);
+  assert.match(template, /preview-actions[\s\S]*wx:if="{{showNextButton}}"[\s\S]*bindtap="goAnswer">Next/);
 });
 
 test("material preview defaults to All, uses English tags, and filters content within the current lesson", async () => {

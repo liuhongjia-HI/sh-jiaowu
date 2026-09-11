@@ -39,7 +39,8 @@ Page({
     previewMessage: "",
     openingPreview: false,
     downloading: false,
-    recordingWarning: false
+    recordingWarning: false,
+    showNextButton: false
   },
   onLoad(options) {
     const id = options.id || "";

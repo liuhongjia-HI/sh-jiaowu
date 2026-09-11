@@ -117,6 +117,17 @@ test("study detail renders one flat leaf list without Unit or Chapter groups", (
   assert.doesNotMatch(wxml, /wx:for="\{\{materials\}\}"/);
 });
 
+test("study detail header omits teacher, progress, and start-learning CTA", () => {
+  const wxml = fs.readFileSync(path.join(__dirname, "../pages/study-detail/index.wxml"), "utf8");
+
+  assert.match(wxml, /正在学习/);
+  assert.match(wxml, /detail-title/);
+  assert.doesNotMatch(wxml, /老师：/);
+  assert.doesNotMatch(wxml, /已学/);
+  assert.doesNotMatch(wxml, /开始学习/);
+  assert.doesNotMatch(wxml, /detail-meta|detail-progress/);
+});
+
 test("study detail renders every lecture returned by the API", async () => {
   const materials = [
     { id: "mat-1", title: "第一份讲义" },
