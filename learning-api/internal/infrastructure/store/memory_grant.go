@@ -176,11 +176,12 @@ func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.Di
 		if err != nil {
 			return learning.DirectGrantResult{}, err
 		}
+		selectionStartsAt, selectionEndsAt := s.withDirectGrantPeriodDefaults(req.StartsAt, req.EndsAt)
 		preview, err := s.createGrantForPackageUnlocked(operator, learning.GrantCreateRequest{
 			StudentID: student.ID,
 			PackageID: packageID,
-			StartsAt:  req.StartsAt,
-			EndsAt:    req.EndsAt,
+			StartsAt:  selectionStartsAt,
+			EndsAt:    selectionEndsAt,
 		}, "开通学习内容", "调整学习内容有效期")
 		if err != nil {
 			return learning.DirectGrantResult{}, err
@@ -240,7 +241,7 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 	startsAt, endsAt := "", ""
 	var err error
 	if len(selections) > 0 && periodChanged {
-		startsAt, endsAt, err = s.normalizeGrantPeriod(req.StartsAt, req.EndsAt)
+		startsAt, endsAt, err = s.normalizeGrantPeriod(s.withDirectGrantPeriodDefaults(req.StartsAt, req.EndsAt))
 		if err != nil {
 			return learning.DirectGrantResult{}, err
 		}
@@ -284,7 +285,7 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 			if existing, ok := s.directGrantPeriod(student.ID, packageID); ok {
 				selectionStartsAt, selectionEndsAt = existing.StartsAt, grantEndsAt(existing)
 			} else {
-				selectionStartsAt, selectionEndsAt = s.defaultGrantPeriod()
+				selectionStartsAt, selectionEndsAt = s.defaultDirectGrantPeriod()
 			}
 		}
 		preview, err := s.replaceDirectGrantForPackage(operator, student, packageID, selectionStartsAt, selectionEndsAt)
@@ -473,6 +474,38 @@ func (s *MemoryStore) defaultGrantPeriod() (string, string) {
 	// 校历没配、配错，或本学年结束日已经过去（管理端忘了更新校历）时的兜底，
 	// 避免新开通的套餐一上来就是过期的。
 	return today, now.AddDate(1, 0, 0).Format("2006-01-02")
+}
+
+// defaultDirectGrantPeriod 返回学生课程开通页的默认生效时间。
+// 课程开通按学期内容授权：开通日已在学期内就从当天生效；到期日取当前学期校历节点，
+// 默认到期中，今天已经过了期中则改用期末。今天没落进任何学期时，退回套餐那套
+// 学年/一年兜底，不阻塞开通。
+func (s *MemoryStore) defaultDirectGrantPeriod() (string, string) {
+	today := time.Now().Format("2006-01-02")
+	if term, ok := s.findCalendarTermForDate(today); ok && today <= term.EndDate {
+		return today, calendarTermDeadline(term, today)
+	}
+	return s.defaultGrantPeriod()
+}
+
+func calendarTermDeadline(term academicCalendarTerm, today string) string {
+	end := strings.TrimSpace(term.EndDate)
+	midterm := strings.TrimSpace(term.MidtermDate)
+	if _, err := time.Parse("2006-01-02", midterm); err == nil && today <= midterm {
+		return midterm
+	}
+	return end
+}
+
+func (s *MemoryStore) withDirectGrantPeriodDefaults(startsAt, endsAt string) (string, string) {
+	defaultStartsAt, defaultEndsAt := s.defaultDirectGrantPeriod()
+	if strings.TrimSpace(startsAt) == "" {
+		startsAt = defaultStartsAt
+	}
+	if strings.TrimSpace(endsAt) == "" {
+		endsAt = defaultEndsAt
+	}
+	return startsAt, endsAt
 }
 
 // academicCalendarRange 汇总当前学年在校历里配置的全部学期，

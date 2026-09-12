@@ -86,7 +86,7 @@ function uploadFileTitle(file: UploadFile) {
   return String(file.name || '文件');
 }
 
-import { RichTextInput, courseSelectOptions, optionFromValues, questionAnswerOptions, questionTitle, questionTypeLabel, questionsForCourse, settingLabel, statusTag, uniqueValues } from './resource-shared';
+import { RichTextInput, courseSelectOptions, optionFromValues, questionAnswerOptions, questionTitle, questionTypeLabel, questionsForCourse, settingLabel, statusTag, suggestMaterialTagCode, uniqueValues } from './resource-shared';
 
 function QuestionCheckboxGroup({
   value = [],
@@ -1192,6 +1192,27 @@ function CourseScopeSelect({
   );
 }
 
+
+function lessonUploadPlan(files: UploadFile[], existing: Material[], formTag?: string) {
+  const occupied = new Set(existing.map((item) => item.tagCode).filter(Boolean));
+  const seenInBatch = new Set<string>();
+  return files.map((file) => {
+    const fileName = uploadFileTitle(file);
+    const tagCode = String(formTag || '').trim() || suggestMaterialTagCode(fileName);
+    if (!tagCode) return { fileName, tagCode: '', action: 'add' as const };
+    const action = seenInBatch.has(tagCode) ? 'batch-replace' as const : occupied.has(tagCode) ? 'replace' as const : 'add' as const;
+    seenInBatch.add(tagCode);
+    return { fileName, tagCode, action };
+  });
+}
+
+function uploadPlanActionText(item: { tagCode: string; action: 'add' | 'replace' | 'batch-replace' }) {
+  const slot = item.tagCode || '未识别标签';
+  if (item.action === 'replace') return `${slot} 将替换现有文件`;
+  if (item.action === 'batch-replace') return `${slot} 将替换本次上传中的上一份`;
+  return item.tagCode ? `${slot} 将新增` : '未识别标签，将作为补充资料新增';
+}
+
 export function UploadDialog({
   kind,
   open,
@@ -1199,6 +1220,7 @@ export function UploadDialog({
   courses,
   questions,
   learningSpaces,
+  materials,
   onManageCurriculum,
   onCancel,
   onSubmit
@@ -1209,17 +1231,25 @@ export function UploadDialog({
   courses: Course[];
   questions: QuestionBankItem[];
   learningSpaces: LearningSpace[];
+  materials?: Material[];
   onManageCurriculum?: (course: Course) => void;
   onCancel: () => void;
   onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
 }) {
   const [form] = Form.useForm();
   const courseId = Form.useWatch('courseId', form);
+  const lessonId = Form.useWatch('lessonId', form);
+  const fileList = Form.useWatch('fileList', form) as UploadFile[] | undefined;
+  const formTagCode = Form.useWatch('tagCode', form);
   const selectedCourse = courses.find((course) => course.id === courseId);
   const availableQuestions = questionsForCourse(selectedCourse, questions, learningSpaces);
+  const lessonLabel = curriculumLessonOptions(selectedCourse?.curriculum).find((item) => item.value === lessonId)?.label || '';
+  const lessonMaterials = (materials ?? []).filter((item) => item.courseId === courseId && item.lessonId === lessonId);
+  const existingTags = uniqueValues(lessonMaterials.map((item) => item.tagCode || ''));
+  const plan = lessonUploadPlan(fileList ?? [], lessonMaterials, formTagCode);
   return (
     <FormDrawer
-      title={kind === 'materials' ? '上传课程讲义' : '新建课后练习'}
+      title={kind === 'materials' ? '给课节上传资料' : '新建课后练习'}
       open={open}
       onCancel={onCancel}
       onSubmit={() => form.submit()}
@@ -1228,9 +1258,11 @@ export function UploadDialog({
       width={kind === 'homework' ? 'min(720px, 100vw)' : undefined}
     >
       <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
-        <Form.Item name="title" label={kind === 'materials' ? '资料标题' : '练习标题'} rules={kind === 'homework' ? [{ required: true, message: '请输入标题' }] : []}>
-          <Input placeholder={kind === 'materials' ? '单文件可填写；批量上传默认使用文件名' : '例如：五年级英语 S1 Q1 阅读练习'} />
-        </Form.Item>
+        {kind === 'homework' && (
+          <Form.Item name="title" label="练习标题" rules={[{ required: true, message: '请输入标题' }]}>
+            <Input placeholder="例如：五年级英语 S1 Q1 阅读练习" />
+          </Form.Item>
+        )}
         <CourseScopeSelect
           form={form}
           courses={courses}
@@ -1247,7 +1279,7 @@ export function UploadDialog({
         {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="标题以 Exam_、Special_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={homeworkTagOptions} />
         </Form.Item>}
-        {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
+        {kind === 'materials' ? <LessonSelect course={selectedCourse} /> : (
           <>
             <LessonSelect course={selectedCourse} />
             <Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item>
@@ -1294,9 +1326,33 @@ export function UploadDialog({
                 <Button icon={<UploadOutlined />}>选择文件</Button>
               </Upload>
             </Form.Item>
-            <Typography.Text type="secondary">支持 PDF、PPT、Word，上传后自动生成 PDF 预览，暂不支持在线编辑；单个文件不超过 50MB。</Typography.Text>
-            <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、TK_ 开头时会自动识别；也可手动选择。">
-              <Select allowClear placeholder="未识别时请补充标签" options={materialTagOptions} />
+            <Typography.Text type="secondary">支持 PDF、PPT、Word，一次可上传该课的 HD / Blank / HW / TK；同一标签再传会替换，不新增重复。单个文件不超过 50MB。</Typography.Text>
+            {lessonId ? (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginTop: 12, marginBottom: 12 }}
+                message={lessonLabel ? `本课：${lessonLabel}` : '已选择课节'}
+                description={(
+                  <div>
+                    <div>{existingTags.length ? `当前已有 ${existingTags.join('、')}` : '当前还没有 HD / Blank / HW / TK'}</div>
+                    {plan.length ? (
+                      <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                        {plan.map((item) => (
+                          <li key={`${item.tagCode}-${item.fileName}`}>{item.fileName} · {uploadPlanActionText(item)}</li>
+                        ))}
+                      </ul>
+                    ) : <div>选择文件后，会按文件名识别标签并预览新增或替换。</div>}
+                  </div>
+                )}
+              />
+            ) : null}
+            <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、TK_ 开头时会自动识别。只有文件名无法识别时才需要手动选择；手动选择会应用到本次全部文件。">
+              <Select allowClear placeholder="通常留空，由文件名自动识别" options={materialTagOptions} />
+            </Form.Item>
+            <Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item>
+            <Form.Item name="title" label="资料标题" extra="默认使用课节名称，一般不用填。">
+              <Input placeholder="默认使用课节名称" />
             </Form.Item>
           </>
         )}

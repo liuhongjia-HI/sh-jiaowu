@@ -152,6 +152,31 @@ test("lesson entry shows the content list before opening a material", async () =
   assert.equal(page.data.contentTagLabel, "All");
 });
 
+test("lesson list strips HD/Blank/HW filename wrappers including starred topic names", async () => {
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/study/course-1") return Promise.resolve({
+      course: { curriculum: [{ id: "lesson-1", type: "lesson", name: "Introducing Early Humans and the Agricultural Revolution" }] },
+      materials: [
+        { id: "mat-hd", title: "HD_2026-2027_G6S1Q1_His_S&S+*Topic 1 Lesson 01* Introducing Early Humans and the Agricultural Revolution", lessonId: "lesson-1", courseId: "course-1", tagCode: "HD" },
+        { id: "mat-blank", title: "Blank_2026-2027_G6S1Q1_His_S&S+*Topic 1 Lesson 01* Introducing Early Humans and the Agricultural Revolution", lessonId: "lesson-1", courseId: "course-1", tagCode: "Blank" },
+        { id: "mat-hw", title: "HW_G6S1Q1_His_S&S+_T01_L01_Introducing Early Humans and the Agricultural Revolution", lessonId: "lesson-1", courseId: "course-1", tagCode: "HW" }
+      ],
+      homework: []
+    });
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock());
+
+  page.onLoad({ courseId: "course-1", lessonId: "lesson-1" });
+  await flushPromises();
+
+  assert.equal(page.data.displayTitle, "Introducing Early Humans and the Agricultural Revolution");
+  assert.deepEqual(page.data.tagItems.map((item) => [item.tagCode, item.displayName]), [
+    ["HD", "Introducing Early Humans and the Agricultural Revolution"],
+    ["Blank", "Introducing Early Humans and the Agricultural Revolution"],
+    ["HW", "Introducing Early Humans and the Agricultural Revolution"]
+  ]);
+});
+
 test("homework-only lesson can enter the tagged content page without a material id", async () => {
   const page = loadMaterialPreviewPage((path) => {
     if (path === "/student/study/course-1") return Promise.resolve({

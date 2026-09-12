@@ -178,8 +178,8 @@ type DirectGrantReplaceRequest struct {
 }
 
 // DirectGrantPeriodDefault is the editable default shown before a student is
-// directly granted learning content. The server owns the calendar calculation
-// so management screens and saved grants cannot diverge around school terms.
+// directly granted learning content. The server picks the current semester's
+// midterm, or the final date after midterm has passed.
 type DirectGrantPeriodDefault struct {
 	StartsAt string `json:"startsAt"`
 	EndsAt   string `json:"endsAt"`

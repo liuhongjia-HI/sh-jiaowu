@@ -407,6 +407,17 @@ export function uniqueValues(values: string[]) {
   return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
 }
 
+export function suggestMaterialTagCode(fileName: string) {
+  const normalized = String(fileName || '').toLowerCase();
+  if (normalized.startsWith('hd_')) return 'HD';
+  if (normalized.startsWith('blank_')) return 'Blank';
+  if (normalized.startsWith('hw_')) return 'HW';
+  if (normalized.startsWith('tk_')) return 'TK';
+  if (normalized.startsWith('exam_')) return 'Exam';
+  if (normalized.startsWith('special_')) return 'Special';
+  return '';
+}
+
 export function optionFromValues(values: string[]) {
   return values.map((value) => ({ label: value, value }));
 }

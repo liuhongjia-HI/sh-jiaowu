@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,93 @@ func TestGrantDefaultsFollowCurrentAcademicCalendar(t *testing.T) {
 	start, end := store.defaultGrantPeriod()
 	if start != time.Now().Format("2006-01-02") || end != endDate {
 		t.Fatalf("expected current calendar period, got %s - %s", start, end)
+	}
+}
+
+func TestDirectGrantPeriodDefaultUsesMidtermBeforeItPasses(t *testing.T) {
+	store := NewMemoryStore()
+	today := time.Now()
+	s1Start := today.AddDate(0, 0, -10).Format("2006-01-02")
+	s1Midterm := today.AddDate(0, 0, 5).Format("2006-01-02")
+	s1End := today.AddDate(0, 1, 0).Format("2006-01-02")
+	s2End := today.AddDate(0, 6, 0).Format("2006-01-02")
+	calendar, err := json.Marshal([]academicCalendarTerm{
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: s1Start, MidtermDate: s1Midterm, EndDate: s1End},
+		{AcademicYear: "2026.2027学年", Semester: "S2 第二学期", StartDate: today.AddDate(0, 2, 0).Format("2006-01-02"), EndDate: s2End},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode calendar terms: %v", err)
+	}
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(calendar)}); err != nil {
+		t.Fatalf("expected calendar update: %v", err)
+	}
+
+	got := store.DirectGrantPeriodDefault()
+	wantStart := today.Format("2006-01-02")
+	if got.StartsAt != wantStart || got.EndsAt != s1Midterm {
+		t.Fatalf("expected current semester midterm %s - %s, got %s - %s", wantStart, s1Midterm, got.StartsAt, got.EndsAt)
+	}
+
+	packageStart, packageEnd := store.defaultGrantPeriod()
+	if packageStart != wantStart || packageEnd != s2End {
+		t.Fatalf("expected package grants to keep academic-year end %s - %s, got %s - %s", wantStart, s2End, packageStart, packageEnd)
+	}
+}
+
+func TestDirectGrantPeriodDefaultUsesSemesterEndAfterMidterm(t *testing.T) {
+	store := NewMemoryStore()
+	today := time.Now()
+	s1Start := today.AddDate(0, 0, -20).Format("2006-01-02")
+	s1Midterm := today.AddDate(0, 0, -1).Format("2006-01-02")
+	s1End := today.AddDate(0, 1, 0).Format("2006-01-02")
+	calendar, err := json.Marshal([]academicCalendarTerm{
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: s1Start, MidtermDate: s1Midterm, EndDate: s1End},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode calendar terms: %v", err)
+	}
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(calendar)}); err != nil {
+		t.Fatalf("expected calendar update: %v", err)
+	}
+
+	got := store.DirectGrantPeriodDefault()
+	wantStart := today.Format("2006-01-02")
+	if got.StartsAt != wantStart || got.EndsAt != s1End {
+		t.Fatalf("expected current semester end after midterm %s - %s, got %s - %s", wantStart, s1End, got.StartsAt, got.EndsAt)
+	}
+}
+
+func TestDirectGrantUsesCurrentSemesterNodeWhenPeriodOmitted(t *testing.T) {
+	store := NewMemoryStore()
+	today := time.Now()
+	s1Start := today.AddDate(0, 0, -10).Format("2006-01-02")
+	s1Midterm := today.AddDate(0, 0, 5).Format("2006-01-02")
+	s1End := today.AddDate(0, 1, 0).Format("2006-01-02")
+	calendar, err := json.Marshal([]academicCalendarTerm{
+		{AcademicYear: "2026.2027学年", Semester: "S1 第一学期", StartDate: s1Start, MidtermDate: s1Midterm, EndDate: s1End},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode calendar terms: %v", err)
+	}
+	if _, err := store.UpdateSetting("校区管理员", learning.SettingUpdateRequest{Key: "academicCalendar", Value: string(calendar)}); err != nil {
+		t.Fatalf("expected calendar update: %v", err)
+	}
+
+	spaceID := "space-g05-math-s1-q1"
+	if _, err := store.CreateDirectGrant("运营教务", learning.DirectGrantCreateRequest{
+		StudentID:        "stu-001",
+		LearningSpaceIDs: []string{spaceID},
+		ContentTypeCodes: []string{"course"},
+	}); err != nil {
+		t.Fatalf("expected direct grant without explicit period: %v", err)
+	}
+	grant, ok := store.directGrantPeriod("stu-001", directGrantPackageID("stu-001", spaceID))
+	if !ok {
+		t.Fatal("expected saved direct grant")
+	}
+	wantStart := today.Format("2006-01-02")
+	if !strings.HasPrefix(grant.StartsAt, wantStart) || !strings.HasPrefix(grant.EndsAt, s1Midterm) {
+		t.Fatalf("expected saved grant to use current semester midterm %s - %s, got %s - %s", wantStart, s1Midterm, grant.StartsAt, grant.EndsAt)
 	}
 }
 

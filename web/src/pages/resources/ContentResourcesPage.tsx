@@ -1,11 +1,11 @@
-import { Alert, Button, Card, Form, Input, Popconfirm, Select, Skeleton, Space, Table, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Popconfirm, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, HolderOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, http, postData, postForm, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog, homeworkTagOptions, materialTagOptions } from './ResourceDialogs';
-import { canUpload } from './resource-shared';
+import { canUpload, suggestMaterialTagCode } from './resource-shared';
 import { formatResourceCurriculumLabel, prepareCurriculumForSave, subjectLabel } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, QuestionBankItem, StudyPackage } from '../../types/starline';
 import type { UploadFile } from 'antd';
@@ -18,15 +18,75 @@ function materialTitleFromFile(fileName: string) {
   return fileName.replace(/\.[^.]+$/, '').trim() || fileName;
 }
 
-function suggestTagCode(fileName: string) {
-  const normalized = fileName.toLowerCase();
-  if (normalized.startsWith('hd_')) return 'HD';
-  if (normalized.startsWith('blank_')) return 'Blank';
-  if (normalized.startsWith('hw_')) return 'HW';
-  if (normalized.startsWith('tk_')) return 'TK';
-  if (normalized.startsWith('exam_')) return 'Exam';
-  if (normalized.startsWith('special_')) return 'Special';
-  return '';
+const MATERIAL_TAG_ORDER = ['HD', 'Blank', 'HW', 'TK'];
+
+type MaterialPackRow = {
+  key: string;
+  courseId: string;
+  course: string;
+  lessonId: string;
+  lessonLabel: string;
+  subject?: string;
+  ownerTeacherName?: string;
+  createdAt?: string;
+  materials: Material[];
+};
+
+function materialTagRank(tag?: string) {
+  const index = MATERIAL_TAG_ORDER.indexOf(tag || '');
+  return index < 0 ? MATERIAL_TAG_ORDER.length : index;
+}
+
+function packKey(item: Pick<Material, 'id' | 'courseId' | 'lessonId'>) {
+  return item.lessonId ? `${item.courseId || ''}::${item.lessonId}` : item.id;
+}
+
+function groupMaterialsByLesson(rows: Material[], courses: Course[]): MaterialPackRow[] {
+  const packs = new Map<string, MaterialPackRow>();
+  const order: string[] = [];
+  for (const item of rows) {
+    const key = packKey(item);
+    const existing = packs.get(key);
+    if (existing) {
+      existing.materials.push(item);
+      if (item.createdAt && (!existing.createdAt || item.createdAt > existing.createdAt)) existing.createdAt = item.createdAt;
+      continue;
+    }
+    order.push(key);
+    packs.set(key, {
+      key,
+      courseId: item.courseId || '',
+      course: item.course,
+      lessonId: item.lessonId || '',
+      lessonLabel: formatResourceCurriculumLabel(item, courses.find((course) => course.id === item.courseId)),
+      subject: item.subject,
+      ownerTeacherName: item.ownerTeacherName,
+      createdAt: item.createdAt,
+      materials: [item]
+    });
+  }
+  return order.map((key) => {
+    const pack = packs.get(key)!;
+    pack.materials.sort((left, right) => materialTagRank(left.tagCode) - materialTagRank(right.tagCode) || (left.sortOrder || 0) - (right.sortOrder || 0));
+    return pack;
+  });
+}
+
+function movePack(courseMaterials: Material[], sourceKey: string, targetKey: string) {
+  if (sourceKey === targetKey) return courseMaterials;
+  const sourceItems = courseMaterials.filter((item) => packKey(item) === sourceKey);
+  if (sourceItems.length === 0) return courseMaterials;
+  const without = courseMaterials.filter((item) => packKey(item) !== sourceKey);
+  const targetIndex = without.findIndex((item) => packKey(item) === targetKey);
+  if (targetIndex < 0) return courseMaterials;
+  without.splice(targetIndex, 0, ...sourceItems);
+  return without;
+}
+
+function packPreviewStatus(materials: Material[]) {
+  if (materials.some((item) => item.previewStatus === '转换失败')) return '转换失败';
+  if (materials.some((item) => item.previewStatus === '待转换' || item.previewStatus === '转换中')) return '待转换';
+  return materials.find((item) => item.previewStatus)?.previewStatus || materials[0]?.publishStatus || '';
 }
 
 function deadlineAtValue(value?: string) {
@@ -65,6 +125,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const [uploadedFrom, setUploadedFrom] = useState('');
   const [uploadedTo, setUploadedTo] = useState('');
   const [draggingMaterialId, setDraggingMaterialId] = useState('');
+  const [draggingPackKey, setDraggingPackKey] = useState('');
   const [draggingHomeworkId, setDraggingHomeworkId] = useState('');
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const materialParams = Object.fromEntries(Object.entries({ keyword, subject, tagCode, uploaderId, uploadedFrom, uploadedTo }).filter(([, value]) => Boolean(value))) as Record<string, string>;
@@ -89,25 +150,41 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
 	  if (kind === 'homework') return postData<Homework>('/homework', { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId || '', lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: '启用', questionIds: values.questionIds ?? [], allowDownload: Boolean(values.allowDownload) });
       const files = (values.fileList ?? []).map((item) => item.originFileObj).filter(Boolean) as File[];
       if (files.length === 0) throw new Error('请选择文件');
+      const lessonLabel = formatResourceCurriculumLabel({ lessonId: values.lessonId }, course);
+      const existingTags = new Set((resources.data ?? []).filter((item): item is Material => !('assessmentType' in item) && item.courseId === course.id && item.lessonId === values.lessonId && Boolean(item.tagCode)).map((item) => item.tagCode as string));
       const uploaded: Material[] = [];
+      let added = 0;
+      let replaced = 0;
+      const seenTags = new Set<string>();
       for (const file of files) {
+        const tagCode = values.tagCode || suggestMaterialTagCode(file.name);
         const data = new FormData();
-        data.append('title', files.length === 1 && values.title?.trim() ? values.title.trim() : materialTitleFromFile(file.name));
+        data.append('title', values.title?.trim() || lessonLabel || materialTitleFromFile(file.name));
         data.append('courseId', course.id);
         data.append('learningSpaceId', course.learningSpaceId || '');
 		data.append('lessonId', values.lessonId);
-        data.append('tagCode', values.tagCode || suggestTagCode(file.name));
+        data.append('tagCode', tagCode);
 		data.append('allowDownload', values.allowDownload ? 'true' : 'false');
         data.append('file', file);
         uploaded.push(await postForm<Material>('/materials', data));
+        if (tagCode && (existingTags.has(tagCode) || seenTags.has(tagCode))) replaced += 1;
+        else added += 1;
+        if (tagCode) seenTags.add(tagCode);
       }
-      return uploaded;
+      return { uploaded, added, replaced };
     },
     onSuccess: (result) => {
-      const uploadCount = Array.isArray(result) ? result.length : 0;
-      message.success(kind === 'materials' ? `已上传 ${uploadCount || 1} 份课程讲义。` : '课后练习已发布。');
+      if (kind === 'materials' && result && typeof result === 'object' && 'added' in result) {
+        const parts = [];
+        if (result.added) parts.push(`新增 ${result.added} 个`);
+        if (result.replaced) parts.push(`替换 ${result.replaced} 个`);
+        message.success(parts.length ? `本课资料已更新：${parts.join('，')}。` : '本课资料已更新。');
+      } else {
+        message.success('课后练习已发布。');
+      }
       setOpen(false);
       client.invalidateQueries({ queryKey: [kind] });
+      if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials', 'all-for-reorder'] });
     },
     onError: (error: Error) => message.error(error.message || '保存失败，请稍后重试。')
   });
@@ -243,9 +320,35 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       ? `正在查看“${selectedPackage.name}”套餐包含的全部课程讲义。`
       : packageId && !packages.isLoading
         ? '未找到对应套餐，请返回查看全部课程讲义。'
-        : '维护课程讲义、图片和课件。';
+        : '按课节维护 HD / Blank / HW / TK，一次上传一套资料。';
   const loading = resources.isLoading || courses.isLoading || (Boolean(packageId) && packages.isLoading);
   const loadError = resources.error || courses.error || (Boolean(packageId) && packages.error);
+
+  const materialPacks = kind === 'materials' ? groupMaterialsByLesson(tableRows as Material[], courses.data ?? []) : [];
+  const selectedPacks = materialPacks.filter((pack) => selectedRowKeys.includes(pack.key));
+  const selectedDeleteIds = kind === 'materials' ? selectedPacks.flatMap((pack) => pack.materials.map((item) => item.id)) : selectedRowKeys.map(String);
+
+  const handlePackDrop = (target: MaterialPackRow) => {
+    if (!allMaterials.data) {
+      setDraggingPackKey('');
+      message.info('资料正在加载，请稍后再试。');
+      return;
+    }
+    const sourceKey = draggingPackKey;
+    setDraggingPackKey('');
+    if (!sourceKey || sourceKey === target.key) return;
+    const sourceItems = (allMaterials.data ?? []).filter((item) => packKey(item) === sourceKey);
+    const targetItems = (allMaterials.data ?? []).filter((item) => packKey(item) === target.key);
+    if (!sourceItems.length || !targetItems.length) return;
+    if (sourceItems[0].courseId !== target.courseId) {
+      message.warning('讲义只能在同一课程内调整顺序。');
+      return;
+    }
+    const courseMaterials = (allMaterials.data ?? []).filter((item) => item.courseId === target.courseId);
+    const reordered = movePack(courseMaterials, sourceKey, target.key);
+    if (reordered === courseMaterials) return;
+    reorderMaterials.mutate({ courseId: target.courseId || '', materialIds: reordered.map((item) => item.id) });
+  };
 
   const handleMaterialDrop = (target: Material) => {
     if (!allMaterials.data) {
@@ -303,11 +406,59 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       </div>
       {canManage && <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => setOpen(true)}>{kind === 'materials' ? '上传讲义' : '新建课后练习'}</Button>}
     </div>
-    {kind === 'materials' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索讲义标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear placeholder="学科" value={subject} onChange={setSubject} options={subjectOptions} style={{ width: 130 }} /><Select allowClear showSearch placeholder="上传人" value={uploaderId} onChange={setUploaderId} options={uploaderOptions} style={{ width: 150 }} /><Input type="date" value={uploadedFrom} onChange={(event) => setUploadedFrom(event.target.value)} /><Input type="date" value={uploadedTo} onChange={(event) => setUploadedTo(event.target.value)} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setSubject(undefined); setTagCode(undefined); setUploaderId(undefined); setUploadedFrom(''); setUploadedTo(''); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
+    {kind === 'materials' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索课节或文件名" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear placeholder="学科" value={subject} onChange={setSubject} options={subjectOptions} style={{ width: 130 }} /><Select allowClear showSearch placeholder="上传人" value={uploaderId} onChange={setUploaderId} options={uploaderOptions} style={{ width: 150 }} /><Input type="date" value={uploadedFrom} onChange={(event) => setUploadedFrom(event.target.value)} /><Input type="date" value={uploadedTo} onChange={(event) => setUploadedTo(event.target.value)} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setSubject(undefined); setTagCode(undefined); setUploaderId(undefined); setUploadedFrom(''); setUploadedTo(''); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
     {kind === 'homework' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
-    {canManage && selectedRowKeys.length > 0 && <div style={{ marginBottom: 12 }}><Popconfirm title={`确定删除选中的 ${selectedRowKeys.length} 项内容吗？`} description="删除后学生将无法再查看这些内容。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: removeSelected.isPending }} onConfirm={() => removeSelected.mutate(selectedRowKeys.map(String))}><Button danger icon={<DeleteOutlined />}>批量删除（{selectedRowKeys.length}）</Button></Popconfirm></div>}
+    {canManage && selectedDeleteIds.length > 0 && <div style={{ marginBottom: 12 }}><Popconfirm title={`确定删除选中的 ${selectedDeleteIds.length} 项内容吗？`} description="删除后学生将无法再查看这些内容。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: removeSelected.isPending }} onConfirm={() => removeSelected.mutate(selectedDeleteIds)}><Button danger icon={<DeleteOutlined />}>批量删除（{selectedDeleteIds.length}）</Button></Popconfirm></div>}
     {!canManage && <Alert type="info" showIcon message="当前账号没有上传权限，请联系管理员开通。" />}
-    {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">拖动左侧图标即可调整同一课程内的讲义顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
+    {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">同一课节的 HD / Blank / HW 显示为一套；拖动可调整课节顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
+      {kind === 'materials' ? (
+        <Table<MaterialPackRow>
+          rowKey="key"
+          rowSelection={canManage ? { selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) } : undefined}
+          dataSource={materialPacks}
+          pagination={{ pageSize: 10 }}
+          onRow={(row) => {
+            if (!canManage) return {};
+            return {
+              onDragOver: (event) => event.preventDefault(),
+              onDrop: (event) => { event.preventDefault(); handlePackDrop(row); },
+              onDragEnd: () => setDraggingPackKey('')
+            };
+          }}
+          columns={[
+            ...(canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: MaterialPackRow) => <button type="button" className="material-sort-handle" title="拖动调整同一课程内课节顺序" draggable onDragStart={(event) => { setDraggingPackKey(row.key); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button> }] : []),
+            { title: '课节', render: (_: unknown, row: MaterialPackRow) => <div><strong>{row.lessonLabel}</strong><div className="lesson-pack-versions">{row.materials.map((item) => <Tag key={item.id}>{item.tagCode || '未标签'}</Tag>)}</div></div> },
+            { title: '课程', dataIndex: 'course' },
+            { title: '学科', dataIndex: 'subject', render: (value: string) => subjectLabel(value) },
+            { title: '上传人', dataIndex: 'ownerTeacherName' },
+            { title: '最近上传', dataIndex: 'createdAt' },
+            { title: '状态', render: (_: unknown, row: MaterialPackRow) => packPreviewStatus(row.materials) },
+            { title: '操作', render: (_: unknown, row: MaterialPackRow) => (
+              <div className="lesson-pack-actions">
+                {row.materials.map((item) => {
+                  const deleteAction = canManage ? <Popconfirm
+                    title={`确定删除“${item.tagCode || item.title}”吗？`}
+                    description="删除后，学生将无法再查看这份资料。"
+                    okText="删除"
+                    okButtonProps={{ danger: true, loading: removeContent.isPending }}
+                    cancelText="取消"
+                    onConfirm={() => removeContent.mutate(item.id)}
+                  ><ActionButton tooltip={`删除${item.tagCode || '资料'}`} danger icon={<DeleteOutlined />} /></Popconfirm> : null;
+                  return (
+                    <Space key={item.id} size={4} wrap>
+                      <Tag>{item.tagCode || '未标签'}</Tag>
+                      <ActionButton tooltip={`预览${item.tagCode || ''}`} icon={<EyeOutlined />} disabled={item.previewStatus !== '可预览'} onClick={() => openFile(item.previewUrl, false, item.fileName)} />
+                      {canManage && <ActionButton tooltip={`编辑${item.tagCode || ''}`} icon={<EditOutlined />} onClick={() => openEdit(item)} />}
+                      {deleteAction}
+                      <ActionButton tooltip={`下载${item.tagCode || ''}`} icon={<DownloadOutlined />} onClick={() => openFile(item.downloadUrl, true, item.fileName)} />
+                    </Space>
+                  );
+                })}
+              </div>
+            ) }
+          ]}
+        />
+      ) : (
       <Table<Material | Homework>
         rowKey="id"
         rowSelection={canManage ? { selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) } : undefined}
@@ -315,38 +466,37 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         pagination={{ pageSize: 10 }}
         onRow={(row) => {
           if (!canManage) return {};
-          const target = row as Material;
           return {
             onDragOver: (event) => event.preventDefault(),
-            onDrop: (event) => { event.preventDefault(); kind === 'materials' ? handleMaterialDrop(target) : handleHomeworkDrop(row as Homework); },
+            onDrop: (event) => { event.preventDefault(); handleHomeworkDrop(row as Homework); },
             onDragEnd: () => { setDraggingMaterialId(''); setDraggingHomeworkId(''); }
           };
         }}
         columns={[
-          ...(canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: Material | Homework) => <button type="button" className="material-sort-handle" title="拖动调整同一课程内顺序" draggable onDragStart={(event) => { kind === 'materials' ? setDraggingMaterialId((row as Material).id) : setDraggingHomeworkId((row as Homework).id); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button> }] : []),
+          ...(canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: Material | Homework) => <button type="button" className="material-sort-handle" title="拖动调整同一课程内顺序" draggable onDragStart={(event) => { setDraggingHomeworkId((row as Homework).id); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button> }] : []),
           { title: '标题', dataIndex: 'title' },
 		  { title: '目录', render: (_: unknown, row: Material | Homework) => formatResourceCurriculumLabel(row, (courses.data ?? []).find((course) => course.id === row.courseId)) },
-		  ...(kind === 'materials' ? [{ title: '学科', dataIndex: 'subject', render: (value: string) => subjectLabel(value) }, { title: '上传人', dataIndex: 'ownerTeacherName' }, { title: '上传时间', dataIndex: 'createdAt' }] : [{ title: '类型', render: (_: unknown, row: Material | Homework) => (row as Homework).assessmentType === 'mock_exam' ? '模拟考试' : '常规练习' }, { title: '截止时间', render: (_: unknown, row: Material | Homework) => (row as Homework).deadlineAt ? new Date((row as Homework).deadlineAt as string).toLocaleString() : '不设截止' }]),
+		  { title: '类型', render: (_: unknown, row: Material | Homework) => (row as Homework).assessmentType === 'mock_exam' ? '模拟考试' : '常规练习' },
+          { title: '截止时间', render: (_: unknown, row: Material | Homework) => (row as Homework).deadlineAt ? new Date((row as Homework).deadlineAt as string).toLocaleString() : '不设截止' },
           { title: '课程', dataIndex: 'course' },
-          { title: '状态', render: (_: unknown, row: Material | Homework) => { const status = kind === 'materials' ? ((row as Material).previewStatus || (row as Material).publishStatus) : row.status; return <div><div>{status}</div>{row.previewError && <Typography.Text type={status === '转换失败' ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>{row.previewError}</Typography.Text>}</div>; } },
+          { title: '状态', render: (_: unknown, row: Material | Homework) => { const status = row.status; return <div><div>{status}</div>{row.previewError && <Typography.Text type={status === '转换失败' ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>{row.previewError}</Typography.Text>}</div>; } },
           { title: '操作', render: (_: unknown, row: Material | Homework) => {
             const deleteAction = canManage ? <Popconfirm
               title={`确定删除“${row.title}”吗？`}
-              description={kind === 'materials' ? '删除后，学生将无法再查看这份讲义。' : '删除后，学生将无法再查看这份练习；已有学生提交记录的练习不能删除，请改为停用。'}
+              description="删除后，学生将无法再查看这份练习；已有学生提交记录的练习不能删除，请改为停用。"
               okText="删除"
               okButtonProps={{ danger: true, loading: removeContent.isPending }}
               cancelText="取消"
               onConfirm={() => removeContent.mutate(row.id)}
             ><ActionButton tooltip="删除" danger icon={<DeleteOutlined />} /></Popconfirm> : null;
-            return kind === 'materials'
-              ? <Space><ActionButton tooltip="预览" icon={<EyeOutlined />} disabled={(row as Material).previewStatus !== '可预览'} onClick={() => openFile((row as Material).previewUrl, false, (row as Material).fileName)} />{canManage && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(row)} />}{deleteAction}<ActionButton tooltip="下载" icon={<DownloadOutlined />} onClick={() => openFile((row as Material).downloadUrl, true, (row as Material).fileName)} /></Space>
-              : <Space><ActionButton tooltip="查看提交详情" icon={<EyeOutlined />} onClick={() => setSubmissionHomework(row as Homework)} />{canManage && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(row)} />}{deleteAction}</Space>;
+            return <Space><ActionButton tooltip="查看提交详情" icon={<EyeOutlined />} onClick={() => setSubmissionHomework(row as Homework)} />{canManage && <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(row)} />}{deleteAction}</Space>;
           } }
         ]}
       />
+      )}
     </Card>}
     <HomeworkSubmissionDialog homework={submissionHomework} summary={submissionSummary.data} loading={submissionSummary.isLoading} error={Boolean(submissionSummary.error)} onCancel={() => setSubmissionHomework(null)} />
-    <UploadDialog kind={kind} open={open} loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => setOpen(false)} onSubmit={(values) => create.mutate(values)} />
+    <UploadDialog kind={kind} open={open} loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} materials={(kind === 'materials' ? (resources.data ?? []) : []) as Material[]} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => setOpen(false)} onSubmit={(values) => create.mutate(values)} />
     <ContentEditDialog kind={kind} form={contentForm} item={editing} loading={save.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setEditing(null)} onSubmit={(values) => save.mutate(values)} />
     <CourseDialog form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
   </div>;

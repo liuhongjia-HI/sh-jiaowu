@@ -551,8 +551,20 @@ function splitMaterialTitle(title) {
 }
 
 function prettyContentTitle(title) {
-  const split = splitMaterialTitle(title);
-  return split.name || String(title || "").trim();
+  const raw = String(title || "").trim();
+  const tagged = raw.match(/^(?:HD|HW|TK|Blank|Exam|Special)[_-](.+)$/i);
+  if (!tagged) {
+    const split = splitMaterialTitle(raw);
+    return split.name || raw;
+  }
+  const rest = tagged[1].trim();
+  const starred = rest.match(/\*([^*]+)\*\s*(.*)$/);
+  if (starred) return (starred[2].trim() || starred[1].trim() || rest);
+  const numbered = rest.match(/T\d+_L\d+_(.+)$/i);
+  if (numbered) return numbered[1].trim();
+  const spaced = rest.match(/^[A-Za-z0-9._-]+\s+(.+)$/);
+  if (spaced) return spaced[1].trim();
+  return raw;
 }
 
 function buildDisplayHeader(material, lessonTitle) {

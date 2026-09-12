@@ -404,6 +404,9 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	if asset.ID != "" {
 		s.enqueuePreviewJobUnlocked(asset.ID)
 	}
+	if slot := s.materialSlotIndex(course.ID, req.LessonID, tagCode); slot >= 0 {
+		return s.replaceMaterialAt(operator, principal, slot, req, course, curriculum, tagCode, asset)
+	}
 	item := learning.Material{
 		ID:               "material-" + time.Now().Format("20060102150405.000000000"),
 		Title:            req.Title,
@@ -432,6 +435,49 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	s.materials = append([]learning.Material{item}, s.materials...)
 	s.prependLog(operator, "上传学习资料", item.Title)
 	return s.decorateMaterial(item), nil
+}
+
+func (s *MemoryStore) materialSlotIndex(courseID, lessonID, tagCode string) int {
+	if courseID == "" || lessonID == "" || tagCode == "" {
+		return -1
+	}
+	found := -1
+	for index, item := range s.materials {
+		if item.CourseID != courseID || item.LessonID != lessonID || item.TagCode != tagCode {
+			continue
+		}
+		if found < 0 || item.SortOrder < s.materials[found].SortOrder || (item.SortOrder == s.materials[found].SortOrder && item.CreatedAt < s.materials[found].CreatedAt) {
+			found = index
+		}
+	}
+	return found
+}
+
+func (s *MemoryStore) replaceMaterialAt(operator string, principal learning.Principal, index int, req learning.MaterialUploadRequest, course learning.Course, curriculum learning.CurriculumPath, tagCode string, asset learning.FileAsset) (learning.Material, error) {
+	before := s.materials[index]
+	item := &s.materials[index]
+	item.Title = req.Title
+	item.CourseID = course.ID
+	item.Course = course.Name
+	item.LearningSpaceID = course.LearningSpaceID
+	item.LessonID = req.LessonID
+	item.Curriculum = curriculum
+	item.TagCode = tagCode
+	item.AllowDownload = req.AllowDownload
+	item.OwnerTeacherID = principal.UserID
+	item.OwnerTeacherName = principal.Name
+	item.PublishStatus = "已发布"
+	item.Status = learning.StatusEnabled
+	item.FileID = asset.ID
+	item.FileName = asset.FileName
+	item.FileSize = asset.FileSize
+	item.FileType = asset.FileType
+	item.PreviewStatus = asset.PreviewStatus
+	item.PreviewError = ""
+	item.PreviewURL = "/api/files/" + asset.ID + "/preview"
+	item.DownloadURL = "/api/files/" + asset.ID + "/download"
+	s.prependLogDetail(operator, "替换课节资料", item.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(*item)))
+	return s.decorateMaterial(*item), nil
 }
 
 func (s *MemoryStore) reorderMaterialsUnlocked(operator string, principal learning.Principal, req learning.MaterialReorderRequest) error {
@@ -578,6 +624,9 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 		}
 		if !canSeeCourse(principal, learning.Course{ID: s.materials[index].CourseID, LearningSpaceID: s.materials[index].LearningSpaceID}) {
 			return learning.Material{}, errors.New("不能维护未负责的学习资料")
+		}
+		if slot := s.materialSlotIndex(course.ID, req.LessonID, tagCode); slot >= 0 && slot != index {
+			return learning.Material{}, errors.New("该课节已有 " + tagCode + " 资料，请直接上传替换，或先删除现有文件")
 		}
 		before := s.materials[index]
 		s.materials[index].Title = req.Title

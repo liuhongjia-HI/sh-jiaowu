@@ -23,6 +23,20 @@ body {
   cursor: grabbing;
 }
 
+.lesson-pack-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.lesson-pack-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+
 .app-shell {
   min-height: 100vh;
   background:

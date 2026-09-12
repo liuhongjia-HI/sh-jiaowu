@@ -891,9 +891,10 @@ test('上传课程讲义和课后练习可以用年级学科筛选课程范围',
 
   await expectPageHeading(page, '/materials', '课程讲义');
   await page.getByRole('button', { name: '上传讲义' }).click();
-  const dialog = page.getByRole('dialog', { name: '上传课程讲义' });
+  const dialog = page.getByRole('dialog', { name: '给课节上传资料' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('快捷筛选')).toBeVisible();
+  await expect(dialog.getByText('一次可上传该课的 HD / Blank / HW / TK', { exact: false })).toBeVisible();
 
   await dialog.getByRole('combobox', { name: '年级' }).click();
   await page.getByRole('option', { name: '五年级', exact: true }).click();

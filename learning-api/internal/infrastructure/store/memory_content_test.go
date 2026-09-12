@@ -348,6 +348,112 @@ func TestMaterialAcceptsHandoutTagsIncludingHWAndTK(t *testing.T) {
 	}
 }
 
+func TestCreateMaterialReplacesSameLessonAndTag(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lessonID := "course-g05-english-s1-q1-lesson-1"
+	first, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "第一课", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD",
+		File: learning.FileAsset{ID: "file-hd-old", FileName: "old-hd.pdf", FileSize: 12, FileType: "PDF"},
+	})
+	if err != nil {
+		t.Fatalf("create first HD: %v", err)
+	}
+	blank, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "第一课", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "Blank",
+		File: learning.FileAsset{ID: "file-blank", FileName: "blank.pdf", FileSize: 10, FileType: "PDF"},
+	})
+	if err != nil {
+		t.Fatalf("create Blank: %v", err)
+	}
+	replaced, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "第一课", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD",
+		AllowDownload: true,
+		File:          learning.FileAsset{ID: "file-hd-new", FileName: "new-hd.pdf", FileSize: 34, FileType: "PDF", PreviewStatus: "待转换"},
+	})
+	if err != nil {
+		t.Fatalf("replace HD: %v", err)
+	}
+	if replaced.ID != first.ID {
+		t.Fatalf("same lesson HD should keep id %q, got %q", first.ID, replaced.ID)
+	}
+	if replaced.FileID != "file-hd-new" || replaced.FileName != "new-hd.pdf" || replaced.FileSize != 34 || !replaced.AllowDownload {
+		t.Fatalf("replaced HD file not updated: %#v", replaced)
+	}
+	if replaced.SortOrder != first.SortOrder {
+		t.Fatalf("replaced HD should keep sort order %d, got %d", first.SortOrder, replaced.SortOrder)
+	}
+	hdCount, blankCount := 0, 0
+	for _, item := range store.materials {
+		if item.CourseID != "course-g05-english-s1-q1" || item.LessonID != lessonID {
+			continue
+		}
+		if item.TagCode == "HD" {
+			hdCount++
+		}
+		if item.TagCode == "Blank" {
+			blankCount++
+		}
+	}
+	if hdCount != 1 || blankCount != 1 || blank.ID == first.ID {
+		t.Fatalf("expected one HD and one Blank, hd=%d blank=%d", hdCount, blankCount)
+	}
+
+	untagged, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "补充讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID,
+		File: learning.FileAsset{ID: "file-untagged-1", FileName: "extra.pdf"},
+	})
+	if err != nil {
+		t.Fatalf("create untagged: %v", err)
+	}
+	another, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "另一份补充讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID,
+		File: learning.FileAsset{ID: "file-untagged-2", FileName: "extra-2.pdf"},
+	})
+	if err != nil {
+		t.Fatalf("create second untagged: %v", err)
+	}
+	if untagged.ID == another.ID {
+		t.Fatalf("untagged materials should not replace each other")
+	}
+}
+
+func TestUpdateMaterialRejectsDuplicateLessonTag(t *testing.T) {
+	store := NewMemoryStore()
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lessonID := "course-g05-english-s1-q1-lesson-1"
+	hd, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "HD", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD",
+	})
+	if err != nil {
+		t.Fatalf("create HD: %v", err)
+	}
+	blank, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "Blank", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "Blank",
+	})
+	if err != nil {
+		t.Fatalf("create Blank: %v", err)
+	}
+	_, err = store.UpdateMaterial("英语老师", teacher, blank.ID, learning.MaterialUpdateRequest{
+		Title: "Blank", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD", Status: "已发布",
+	})
+	if err == nil || !strings.Contains(err.Error(), "已有 HD") {
+		t.Fatalf("expected duplicate tag rejection, got %v", err)
+	}
+	_, err = store.UpdateMaterial("英语老师", teacher, hd.ID, learning.MaterialUpdateRequest{
+		Title: "HD 更新", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD", Status: "已发布",
+	})
+	if err != nil {
+		t.Fatalf("updating the existing HD slot should succeed: %v", err)
+	}
+}
+
 func stationHasTag(stations []learning.Station, id, tag string) bool {
 	for _, station := range stations {
 		if (station.MaterialID == id || station.HomeworkID == id) && station.TagCode == tag {

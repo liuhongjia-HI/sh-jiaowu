@@ -1390,7 +1390,7 @@ function DirectGrantPanel({
       <section className="student-opening-period">
         <Typography.Text strong>生效时间</Typography.Text>
         <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px' }}>
-          已带入当前校历的时间范围；如本次开通有特殊安排，可在保存前调整。
+          已按当前学期校历节点带入：未过期中取期中，过了期中取期末；如本次开通有特殊安排，可在保存前调整。
         </Typography.Paragraph>
         {periodLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : (
           <>
@@ -1418,8 +1418,8 @@ function DirectGrantPanel({
             <Alert
               type={periodError ? 'warning' : 'success'}
               showIcon
-              message={periodError ? '暂未读取到校历时间，已使用默认日期' : '日期已按当前校历带入'}
-              description={periodError ? '请确认校历配置后再保存，系统也会在服务端按校历重新校验。' : '未手动调整时，保存将继续使用服务端按校历计算的时间。'}
+              message={periodError ? '暂未读取到当前学期校历节点，已使用默认日期' : '日期已按当前学期期中/期末节点带入'}
+              description={periodError ? '请确认校历配置后再保存，系统也会在服务端按当前学期期中/期末节点重新校验。' : '未手动调整时，保存将继续使用服务端按当前学期期中/期末节点计算的时间。'}
             />
           </>
         )}
