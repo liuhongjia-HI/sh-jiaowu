@@ -78,6 +78,10 @@ func (s *Service) UpdateStudentProfile(operator string, principal learning.Princ
 	return s.student.UpdateStudentProfile(operator, principal, req)
 }
 
+func (s *Service) UpdateGuardianProfile(operator string, principal learning.Principal, req learning.GuardianProfileUpdateRequest) (learning.Guardian, error) {
+	return s.student.UpdateGuardianProfile(operator, principal, req)
+}
+
 func (s *Service) StudentCourseDetail(principal learning.Principal, courseID string) (learning.StudentCourseDetail, error) {
 	return s.student.StudentCourseDetail(principal, courseID)
 }

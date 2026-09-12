@@ -14,7 +14,7 @@
 
     <view class="profile-card">
       <button class="profile-avatar" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" disabled="{{savingProfile}}" aria-label="选择微信头像">
-        <image wx:if="{{studentProfile.avatarUrl}}" class="profile-avatar-image" src="{{studentProfile.avatarUrl}}" mode="aspectFill"></image>
+        <image wx:if="{{guardianProfile.avatarUrl}}" class="profile-avatar-image" src="{{guardianProfile.avatarUrl}}" mode="aspectFill"></image>
         <view wx:else class="profile-avatar-fallback" aria-hidden="true">
           <view class="avatar-illustration-body"></view>
           <view class="avatar-illustration-hair"></view>
@@ -25,7 +25,7 @@
       </button>
       <view class="profile-copy">
         <view class="profile-greeting">下午好，</view>
-        <input class="profile-nickname" type="nickname" value="{{profileForm.nickname}}" placeholder="微信用户" bindinput="onNicknameInput" bindblur="commitNickname" confirm-type="done" aria-label="微信昵称" />
+        <input class="profile-nickname" type="nickname" value="{{guardianProfile.nickname}}" placeholder="点击输入微信昵称" bindinput="onNicknameInput" bindblur="commitNickname" confirm-type="done" aria-label="微信昵称" />
         <button class="profile-phone-action {{studentProfile.phoneAuthorized ? 'authorized' : 'pending'}}" open-type="getPhoneNumber" bindgetphonenumber="authorizePhone" loading="{{savingProfile}}" disabled="{{savingProfile}}" aria-label="授权手机号">
           <text>{{studentProfile.phoneHint}}</text>
         </button>

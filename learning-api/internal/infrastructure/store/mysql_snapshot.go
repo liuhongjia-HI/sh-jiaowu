@@ -78,8 +78,8 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, guardian := range s.guardians {
 		if _, err := tx.Exec(
-			`INSERT INTO guardians (id, phone, open_id, union_id, name, nickname, last_student_id, account_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			guardian.ID, guardian.Phone, guardian.OpenID, guardian.UnionID, guardian.Name, guardian.Nickname, guardian.LastStudentID, guardian.AccountStatus,
+			`INSERT INTO guardians (id, phone, open_id, union_id, name, nickname, avatar_url, last_student_id, account_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			guardian.ID, guardian.Phone, guardian.OpenID, guardian.UnionID, guardian.Name, guardian.Nickname, guardian.AvatarURL, guardian.LastStudentID, guardian.AccountStatus,
 		); err != nil {
 			return err
 		}

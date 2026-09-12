@@ -775,6 +775,43 @@ func (s *MemoryStore) UpdateStudentProfile(operator string, principal learning.P
 	return result1, err
 }
 
+func (s *MemoryStore) UpdateGuardianProfile(operator string, principal learning.Principal, req learning.GuardianProfileUpdateRequest) (learning.Guardian, error) {
+	if principal.GuardianID == "" {
+		return learning.Guardian{}, errors.New("guardian account is not bound")
+	}
+	req.Nickname = strings.TrimSpace(req.Nickname)
+	req.AvatarURL = strings.TrimSpace(req.AvatarURL)
+	if len([]rune(req.Nickname)) > 32 {
+		return learning.Guardian{}, errors.New("昵称最多 32 个字")
+	}
+	if len(req.AvatarURL) > 1000 {
+		return learning.Guardian{}, errors.New("头像地址过长")
+	}
+	if req.Nickname == "" && req.AvatarURL == "" {
+		return learning.Guardian{}, errors.New("请提供昵称或头像")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return persistentMutation(s, func(work *MemoryStore) (learning.Guardian, error) {
+		for index := range work.guardians {
+			if work.guardians[index].ID != principal.GuardianID {
+				continue
+			}
+			if work.guardians[index].AccountStatus != "正常" {
+				return learning.Guardian{}, errors.New("账号已停用，请联系老师或管理员")
+			}
+			if req.Nickname != "" {
+				work.guardians[index].Nickname = req.Nickname
+			}
+			if req.AvatarURL != "" {
+				work.guardians[index].AvatarURL = req.AvatarURL
+			}
+			return work.guardians[index], nil
+		}
+		return learning.Guardian{}, errors.New("guardian not found")
+	})
+}
+
 func (s *MemoryStore) RemindStudent(operator string, principal learning.Principal, id string) (learning.StudentRemindResult, error) {
 	return noticeMutation(s, func(work *MemoryStore) (learning.StudentRemindResult, error) {
 		return work.remindStudentUnlocked(operator, principal, id)

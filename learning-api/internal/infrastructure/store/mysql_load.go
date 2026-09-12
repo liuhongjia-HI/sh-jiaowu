@@ -175,7 +175,7 @@ func (s *MemoryStore) loadStudentsFromDB() error {
 }
 
 func (s *MemoryStore) loadGuardiansFromDB() error {
-	rows, err := s.db.Query(`SELECT id, phone, open_id, union_id, name, nickname, last_student_id, account_status FROM guardians ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, phone, open_id, union_id, name, nickname, avatar_url, last_student_id, account_status FROM guardians ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (s *MemoryStore) loadGuardiansFromDB() error {
 	out := []learning.Guardian{}
 	for rows.Next() {
 		var item learning.Guardian
-		if err := rows.Scan(&item.ID, &item.Phone, &item.OpenID, &item.UnionID, &item.Name, &item.Nickname, &item.LastStudentID, &item.AccountStatus); err != nil {
+		if err := rows.Scan(&item.ID, &item.Phone, &item.OpenID, &item.UnionID, &item.Name, &item.Nickname, &item.AvatarURL, &item.LastStudentID, &item.AccountStatus); err != nil {
 			return err
 		}
 		out = append(out, item)

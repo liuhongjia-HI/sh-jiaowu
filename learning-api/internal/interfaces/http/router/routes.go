@@ -203,6 +203,8 @@ func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, t
 	g.POST("/accounts/:id/switch", h.SwitchStudentAccount)
 	g.PUT("/profile", h.UpdateStudentProfile)
 	g.POST("/profile/avatar", h.UploadStudentAvatar)
+	g.PUT("/guardian-profile", h.UpdateGuardianProfile)
+	g.POST("/guardian-profile/avatar", h.UploadGuardianAvatar)
 	g.GET("/availability", h.StudentAvailability)
 	g.PUT("/availability", h.SaveStudentAvailability)
 	g.GET("/schedule", h.StudentSchedule)

@@ -107,10 +107,19 @@ func (s *MemoryStore) ensureGuardianLink(phone, openID, studentID string) string
 		}
 	}
 	if idx == -1 {
+		// 头像和昵称早期曾暂存在学生档案；第一次为旧会话建立家长身份时带过去，
+		// 避免升级后已有资料突然显示为空。后续只由家长资料接口维护。
+		legacyNickname, legacyAvatarURL := "", ""
+		if student, ok := s.findStudent(studentID); ok {
+			legacyNickname = student.Nickname
+			legacyAvatarURL = student.AvatarURL
+		}
 		s.guardians = append(s.guardians, learning.Guardian{
 			ID:            "guardian-" + time.Now().Format("20060102150405.000000000"),
 			Phone:         phone,
 			OpenID:        openID,
+			Nickname:      legacyNickname,
+			AvatarURL:     legacyAvatarURL,
 			AccountStatus: "正常",
 		})
 		idx = len(s.guardians) - 1

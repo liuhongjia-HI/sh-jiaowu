@@ -200,6 +200,36 @@ func TestStudentAvatarUsesConfiguredPersistentStorageRoot(t *testing.T) {
 	}
 }
 
+func TestGuardianAvatarUploadAndProfileUpdateThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	defer os.RemoveAll(filepath.Join("uploads"))
+
+	guardianToken := app.login(t, "/api/auth/wechat-login", map[string]string{
+		"code": "guardian-avatar-openid", "phone": "13900008888", "studentName": "小星", "schoolName": "星线小学", "grade": "五年级",
+	})
+	var guardian learning.Guardian
+	app.doJSON(t, http.MethodPut, "/api/student/guardian-profile", guardianToken, learning.GuardianProfileUpdateRequest{Nickname: "小星妈妈"}, http.StatusOK, &guardian)
+	if guardian.Nickname != "小星妈妈" {
+		t.Fatalf("unexpected guardian nickname: %#v", guardian)
+	}
+
+	pngData, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatalf("decode png fixture: %v", err)
+	}
+	doMultipart(t, app, http.MethodPost, "/api/student/guardian-profile/avatar", guardianToken, nil, "file", "avatar.png", pngData, http.StatusOK, &guardian)
+	if guardian.Nickname != "小星妈妈" || !strings.HasPrefix(guardian.AvatarURL, "/api/student/avatars/avatar-") {
+		t.Fatalf("unexpected guardian avatar: %#v", guardian)
+	}
+
+	var home learning.StudentHome
+	app.doJSON(t, http.MethodGet, "/api/student/home", guardianToken, nil, http.StatusOK, &home)
+	if home.Guardian.Nickname != "小星妈妈" || home.Guardian.AvatarURL != guardian.AvatarURL {
+		t.Fatalf("home did not expose guardian profile: %#v", home.Guardian)
+	}
+}
+
 func (a *testApp) login(t *testing.T, path string, body any) string {
 	t.Helper()
 	var auth authResponse

@@ -30,6 +30,7 @@ type StudentRepository interface {
 	UpdateClassReservation(string, learning.Principal, string, learning.ClassReservationUpdateRequest) (learning.ClassReservationIntent, error)
 	ConfirmStudentSubscription(string, learning.Principal, learning.StudentSubscriptionRequest) (learning.SubscriptionReminder, error)
 	UpdateStudentProfile(string, learning.Principal, learning.StudentProfileUpdateRequest) (learning.Student, error)
+	UpdateGuardianProfile(string, learning.Principal, learning.GuardianProfileUpdateRequest) (learning.Guardian, error)
 	StudentCourseDetail(learning.Principal, string) (learning.StudentCourseDetail, error)
 	StudentMaterial(learning.Principal, string) (learning.Material, error)
 	StudentMaterialPreviewFile(learning.Principal, string) (learning.FileAsset, error)

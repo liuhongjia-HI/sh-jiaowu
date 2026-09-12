@@ -32,10 +32,9 @@ Page({
     overviewMetrics: buildOverviewMetrics({}),
     quickActions: buildQuickActions({}, []),
     profileCompleteness: buildProfileCompleteness({}),
+    guardianProfile: buildGuardianProfile({}),
     supportNotice: buildSupportNotice([], []),
     profileForm: {
-      nickname: "",
-      avatarUrl: "",
       studentName: "",
       grade: "",
       schoolName: "",
@@ -218,8 +217,7 @@ Page({
       return;
     }
     this.setData({
-      "profileForm.avatarUrl": avatarUrl,
-      "studentProfile.avatarUrl": avatarUrl
+      "guardianProfile.avatarUrl": avatarUrl
     });
     this.uploadAvatar(avatarUrl);
   },
@@ -232,7 +230,7 @@ Page({
     }
     this.setData({ savingProfile: true });
     wx.uploadFile({
-      url: `${baseUrl}/student/profile/avatar`,
+      url: `${baseUrl}/student/guardian-profile/avatar`,
       filePath,
       name: "file",
       header: {
@@ -250,7 +248,7 @@ Page({
           wx.showToast({ title: body.message || "头像保存失败，请重试", icon: "none" });
           return;
         }
-        this.applyUpdatedStudent(body.data, "头像已更新");
+        this.applyUpdatedGuardian(body.data, "头像已更新");
       },
       fail: () => {
         this.restoreProfileAvatar();
@@ -261,31 +259,52 @@ Page({
   },
   restoreProfileAvatar() {
     if (!this.data.me) {
-      this.setData({ "studentProfile.avatarUrl": "" });
+      this.setData({ "guardianProfile.avatarUrl": "" });
       return;
     }
     this.setData({
-      studentProfile: buildStudentProfile(this.data.me),
-      "profileForm.avatarUrl": this.data.me.avatarUrl || ""
+      guardianProfile: buildGuardianProfile((this.data.home && this.data.home.guardian) || {})
     });
   },
   onNicknameInput(event) {
     const nickname = event.detail && event.detail.value ? event.detail.value : "";
     this.setData({
-      "profileForm.nickname": nickname,
-      "studentProfile.displayName": nickname || "微信用户"
+      "guardianProfile.nickname": nickname
     });
   },
   commitNickname() {
-    const nickname = (this.data.profileForm.nickname || "").trim();
+    const nickname = (this.data.guardianProfile.nickname || "").trim();
     if (!nickname) {
       wx.showToast({ title: "昵称不能为空", icon: "none" });
       return;
     }
-    if (nickname === ((this.data.me && this.data.me.nickname) || "")) {
+    if (nickname === (((this.data.home && this.data.home.guardian) || {}).nickname || "")) {
       return;
     }
-    this.saveProfileChanges({ nickname }, "昵称已更新");
+    this.saveGuardianProfile({ nickname }, "昵称已更新");
+  },
+  saveGuardianProfile(changes = {}, toastTitle = "资料已更新") {
+    if (this.data.savingProfile) {
+      return;
+    }
+    const data = {};
+    if (Object.prototype.hasOwnProperty.call(changes, "nickname")) {
+      data.nickname = (changes.nickname || "").trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(changes, "avatarUrl")) {
+      data.avatarUrl = changes.avatarUrl || "";
+    }
+    if (Object.keys(data).length === 0) {
+      return;
+    }
+    this.setData({ savingProfile: true });
+    request("/student/guardian-profile", { method: "PUT", data })
+      .then((guardian) => this.applyUpdatedGuardian(guardian, toastTitle))
+      .catch((error) => {
+        this.restoreProfileAvatar();
+        wx.showToast({ title: error.message || "保存失败", icon: "none" });
+      })
+      .then(() => this.setData({ savingProfile: false }));
   },
   authorizePhone(event) {
     if (this.data.savingProfile) {
@@ -356,8 +375,6 @@ Page({
     request("/student/profile", {
       method: "PUT",
       data: {
-        nickname: form.nickname || "",
-        avatarUrl: form.avatarUrl || "",
         studentName,
         schoolName,
         guardianName: (form.guardianName || "").trim()
@@ -371,6 +388,12 @@ Page({
     const home = this.data.home ? { ...this.data.home, student } : { student };
     const state = buildPageState(home);
     this.setData({ ...state, profileEditing: false, profileEditText: "编辑" });
+    wx.showToast({ title: toastTitle, icon: "success" });
+  },
+  applyUpdatedGuardian(guardian, toastTitle) {
+    const home = { ...(this.data.home || {}), guardian };
+    const state = buildPageState(home);
+    this.setData({ ...state });
     wx.showToast({ title: toastTitle, icon: "success" });
   },
   goStudyDetail() {
@@ -434,6 +457,7 @@ function buildPageState(home = {}) {
     pendingTask,
     recentLearning: buildRecentLearning(home, continueCourse),
     studentProfile: buildStudentProfile(student),
+    guardianProfile: buildGuardianProfile(home.guardian || {}),
     primaryTask: buildPrimaryTask(home, pendingTask, continueCourse),
     overviewMetrics: buildOverviewMetrics(student, home, continueCourse, pendingHomework),
     quickActions: buildQuickActions(),
@@ -466,12 +490,18 @@ function formatRecentDate(value) {
 
 function profileFormFromStudent(student) {
   return {
-    nickname: student.nickname || "",
-    avatarUrl: student.avatarUrl || "",
     studentName: student.name || "",
     grade: student.grade || "",
     schoolName: student.schoolName || "",
     guardianName: student.guardianName || ""
+  };
+}
+
+function buildGuardianProfile(guardian = {}) {
+  return {
+    nickname: guardian.nickname || "",
+    avatarUrl: normalizeAvatarUrl(guardian.avatarUrl),
+    displayName: guardian.nickname || "微信用户"
   };
 }
 

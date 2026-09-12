@@ -9,8 +9,8 @@ func identityRows(s *MemoryStore) []persistenceRow {
 	}
 	for _, guardian := range s.guardians {
 		rows = append(rows, simpleRow("guardians", "id", guardian.ID,
-			`INSERT INTO guardians (id, phone, open_id, union_id, name, nickname, last_student_id, account_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE phone=VALUES(phone), open_id=VALUES(open_id), union_id=VALUES(union_id), name=VALUES(name), nickname=VALUES(nickname), last_student_id=VALUES(last_student_id), account_status=VALUES(account_status)`,
-			guardian.ID, guardian.Phone, guardian.OpenID, guardian.UnionID, guardian.Name, guardian.Nickname, guardian.LastStudentID, guardian.AccountStatus))
+			`INSERT INTO guardians (id, phone, open_id, union_id, name, nickname, avatar_url, last_student_id, account_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE phone=VALUES(phone), open_id=VALUES(open_id), union_id=VALUES(union_id), name=VALUES(name), nickname=VALUES(nickname), avatar_url=VALUES(avatar_url), last_student_id=VALUES(last_student_id), account_status=VALUES(account_status)`,
+			guardian.ID, guardian.Phone, guardian.OpenID, guardian.UnionID, guardian.Name, guardian.Nickname, guardian.AvatarURL, guardian.LastStudentID, guardian.AccountStatus))
 	}
 	for _, relation := range s.guardianStudents {
 		rows = append(rows, relationRow("guardian_students", []string{"guardian_id", "student_id"}, []any{relation.GuardianID, relation.StudentID},

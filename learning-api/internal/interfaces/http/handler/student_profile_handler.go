@@ -73,6 +73,34 @@ func (h *LearningHandler) UploadStudentAvatar(c *gin.Context) {
 	OK(c, updated)
 }
 
+// UploadGuardianAvatar stores a chooseAvatar temporary file for the login
+// guardian. It intentionally does not depend on the currently selected child.
+func (h *LearningHandler) UploadGuardianAvatar(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		BadRequest(c, "请选择头像")
+		return
+	}
+	avatar, err := saveStudentAvatar(file, h.fileStorageRoot)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	principal, ok := middleware.CurrentPrincipal(c)
+	if !ok || principal.GuardianID == "" {
+		_ = os.Remove(avatar.Path)
+		Unauthorized(c, "家长登录状态无效，请重新登录")
+		return
+	}
+	updated, err := h.service.UpdateGuardianProfile(principal.Name, principal, learning.GuardianProfileUpdateRequest{AvatarURL: avatar.URL})
+	if err != nil {
+		_ = os.Remove(avatar.Path)
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, updated)
+}
+
 // StudentAvatar 是公开的只读图片地址：微信小程序 image 组件不会为图片请求自动追加 Authorization header。
 func (h *LearningHandler) StudentAvatar(c *gin.Context) {
 	fileName := strings.TrimSpace(c.Param("asset"))

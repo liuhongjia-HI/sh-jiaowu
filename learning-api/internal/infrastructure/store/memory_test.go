@@ -148,6 +148,32 @@ func TestLoginWithWechatCodeBindsStudentByPhone(t *testing.T) {
 	}
 }
 
+func TestGuardianProfileIsSharedAcrossStudentViews(t *testing.T) {
+	store := NewMemoryStore()
+	principal, err := store.LoginWithWechatCode(learning.WechatLoginRequest{
+		Code: "guardian-profile-openid", Phone: "13900009999", StudentName: "小星", SchoolName: "星线小学", Grade: "五年级",
+	})
+	if err != nil {
+		t.Fatalf("login guardian: %v", err)
+	}
+	updated, err := store.UpdateGuardianProfile("小星家长", principal, learning.GuardianProfileUpdateRequest{
+		Nickname: "星妈", AvatarURL: "/api/student/avatars/guardian.png",
+	})
+	if err != nil {
+		t.Fatalf("update guardian profile: %v", err)
+	}
+	if updated.Nickname != "星妈" || updated.AvatarURL != "/api/student/avatars/guardian.png" {
+		t.Fatalf("unexpected guardian profile: %#v", updated)
+	}
+	home, err := store.StudentHome(principal)
+	if err != nil {
+		t.Fatalf("load student home: %v", err)
+	}
+	if home.Guardian.ID != principal.GuardianID || home.Guardian.Nickname != "星妈" || home.Student.Nickname != "" {
+		t.Fatalf("guardian profile must not change the selected student: %#v", home)
+	}
+}
+
 func TestWechatLoginExplainsPendingStudentAccount(t *testing.T) {
 	store := NewMemoryStore()
 	for index := range store.users {

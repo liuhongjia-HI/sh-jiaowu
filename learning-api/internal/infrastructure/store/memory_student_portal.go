@@ -51,8 +51,18 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 	feedback := s.classroomFeedbackForStudent(student.ID)
 	subscriptionReminder := s.subscriptionReminder(student.ID)
 	trial := s.studentTrialUnlocked(student)
+	guardian := learning.Guardian{}
+	if principal.GuardianID != "" {
+		for _, item := range s.guardians {
+			if item.ID == principal.GuardianID {
+				guardian = item
+				break
+			}
+		}
+	}
 	return learning.StudentHome{
 		Student:              student,
+		Guardian:             guardian,
 		Courses:              courseCards,
 		ContinueCourse:       continueCourse,
 		ContinueProgress:     s.courseProgress(student.ID, continueCourse.ID),

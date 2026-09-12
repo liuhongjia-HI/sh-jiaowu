@@ -109,8 +109,6 @@ test("me page submits student profile information from the mini program form", a
   assert.deepEqual(requestCall[2], {
     method: "PUT",
     data: {
-      nickname: "Star",
-      avatarUrl: "https://example.com/avatar.png",
       studentName: "小星",
       schoolName: "星线小学",
       guardianName: "星星家长"
@@ -155,18 +153,14 @@ test("me page blocks profile submission when required fields are missing", () =>
   ]);
 });
 
-test("me page commits nickname independently from basic student profile", async () => {
+test("me page commits nickname to the logged-in guardian", async () => {
   const calls = [];
   const page = loadMePage((url, options = {}) => {
     calls.push(["request", url, options]);
     return Promise.resolve({
-      id: "stu-nickname",
-      name: "小星",
+      id: "guardian-nickname",
       nickname: "星星",
-      avatarUrl: "",
-      phone: "",
-      grade: "五年级",
-      schoolName: "星线小学"
+      avatarUrl: ""
     });
   }, {
     showToast(args) {
@@ -174,8 +168,9 @@ test("me page commits nickname independently from basic student profile", async 
     }
   });
   page.setData({
-    me: { id: "stu-nickname", name: "小星", nickname: "", schoolName: "" },
-    profileForm: { nickname: "", avatarUrl: "", studentName: "小星", schoolName: "", guardianName: "" }
+    me: { id: "stu-nickname", name: "小星", schoolName: "" },
+    home: { student: { id: "stu-nickname", name: "小星" }, guardian: { id: "guardian-nickname", nickname: "", avatarUrl: "" } },
+    guardianProfile: { nickname: "", avatarUrl: "", displayName: "微信用户" }
   });
 
   page.onNicknameInput({ detail: { value: " 星星 " } });
@@ -183,8 +178,9 @@ test("me page commits nickname independently from basic student profile", async 
   await flushPromises();
 
   const requestCall = calls.find((item) => item[0] === "request");
+  assert.equal(requestCall[1], "/student/guardian-profile");
   assert.deepEqual(requestCall[2], { method: "PUT", data: { nickname: "星星" } });
-  assert.equal(page.data.me.nickname, "星星");
+  assert.equal(page.data.home.guardian.nickname, "星星");
   assert.equal(page.data.savingProfile, false);
 });
 
@@ -225,7 +221,7 @@ test("me page submits the WeChat phone authorization code", async () => {
   assert.equal(page.data.studentProfile.phoneHint, "199****0000");
 });
 
-test("me page uploads the temporary chooseAvatar file and applies the persisted URL", () => {
+test("me page uploads the temporary chooseAvatar file to the logged-in guardian", () => {
   const calls = [];
   let uploadOptions;
   const page = loadMePage(() => Promise.reject(new Error("unexpected request")), {
@@ -239,13 +235,9 @@ test("me page uploads the temporary chooseAvatar file and applies the persisted 
         data: JSON.stringify({
           code: 0,
           data: {
-            id: "stu-avatar",
-            name: "小星",
+            id: "guardian-avatar",
             nickname: "星星",
-            avatarUrl: "/api/student/avatars/avatar-test.png",
-            phone: "",
-            grade: "五年级",
-            schoolName: "星线小学"
+            avatarUrl: "/api/student/avatars/avatar-test.png"
           }
         })
       });
@@ -257,15 +249,16 @@ test("me page uploads the temporary chooseAvatar file and applies the persisted 
   });
 
   page.setData({
-    me: { id: "stu-avatar", name: "小星", nickname: "星星", avatarUrl: "", schoolName: "" },
-    profileForm: { nickname: "星星", avatarUrl: "", studentName: "小星", schoolName: "", guardianName: "" }
+    me: { id: "stu-avatar", name: "小星", schoolName: "" },
+    home: { student: { id: "stu-avatar", name: "小星" }, guardian: { id: "guardian-avatar", nickname: "星星", avatarUrl: "" } },
+    guardianProfile: { nickname: "星星", avatarUrl: "", displayName: "星星" }
   });
   page.onChooseAvatar({ detail: { avatarUrl: "wxfile://tmp/avatar.jpg" } });
 
-  assert.equal(uploadOptions.url, "https://api.example.com/api/student/profile/avatar");
+  assert.equal(uploadOptions.url, "https://api.example.com/api/student/guardian-profile/avatar");
   assert.equal(uploadOptions.filePath, "wxfile://tmp/avatar.jpg");
   assert.equal(uploadOptions.name, "file");
   assert.equal(uploadOptions.header.Authorization, "Bearer student-token");
-  assert.equal(page.data.studentProfile.avatarUrl, "https://api.example.com/api/student/avatars/avatar-test.png");
+  assert.equal(page.data.guardianProfile.avatarUrl, "https://api.example.com/api/student/avatars/avatar-test.png");
   assert.equal(page.data.savingProfile, false);
 });

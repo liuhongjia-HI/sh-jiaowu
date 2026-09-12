@@ -363,6 +363,21 @@ func (h *LearningHandler) UpdateStudentProfile(c *gin.Context) {
 	OK(c, updated)
 }
 
+func (h *LearningHandler) UpdateGuardianProfile(c *gin.Context) {
+	var req learning.GuardianProfileUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	updated, err := h.service.UpdateGuardianProfile(principal.Name, principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, updated)
+}
+
 func (h *LearningHandler) StudentSecurityEvent(c *gin.Context) {
 	var req learning.SecurityEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

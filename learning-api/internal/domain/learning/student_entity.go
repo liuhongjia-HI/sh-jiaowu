@@ -77,6 +77,13 @@ type StudentProfileUpdateRequest struct {
 	PhoneCode string `json:"phoneCode,omitempty"`
 }
 
+// GuardianProfileUpdateRequest 只包含登录家长自己的微信展示资料。
+// 家长可切换多个学生，因此头像和昵称不能写入某个学生档案。
+type GuardianProfileUpdateRequest struct {
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatarUrl"`
+}
+
 type StudentQuery struct {
 	Keyword        string
 	Grade          string
@@ -90,12 +97,13 @@ type StudentQuery struct {
 // 学生档案（Student）本身不再假定"一个手机号 = 一个孩子"，谁能看哪个孩子由
 // GuardianStudent 关系表决定，而不是靠 students.phone 撞出来。
 type Guardian struct {
-	ID       string `json:"id"`
-	Phone    string `json:"phone"`
-	OpenID   string `json:"openId,omitempty"`
-	UnionID  string `json:"unionId,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Nickname string `json:"nickname,omitempty"`
+	ID        string `json:"id"`
+	Phone     string `json:"phone"`
+	OpenID    string `json:"openId,omitempty"`
+	UnionID   string `json:"unionId,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Nickname  string `json:"nickname,omitempty"`
+	AvatarURL string `json:"avatarUrl,omitempty"`
 	// LastStudentID 只是新会话默认展示哪个孩子的提示值，不是权威状态——权威值
 	// 是 token 里的 activeStudentID，每次切换只更新这里，从不用来做权限判断。
 	LastStudentID string `json:"lastStudentId,omitempty"`
@@ -355,6 +363,7 @@ type FavoriteRequest struct {
 
 type StudentHome struct {
 	Student              Student              `json:"student"`
+	Guardian             Guardian             `json:"guardian"`
 	Courses              []StudentCourseCard  `json:"courses"`
 	ContinueCourse       Course               `json:"continueCourse"`
 	ContinueProgress     int                  `json:"continueProgress"`
