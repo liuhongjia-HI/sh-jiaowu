@@ -731,6 +731,57 @@ func (s *MemoryStore) packageNameExists(currentID, name string) bool {
 	return false
 }
 
+func (s *MemoryStore) copiedPackageAcademicYear(sourceYear, requestedYear string) string {
+	requestedYear = strings.TrimSpace(requestedYear)
+	if requestedYear != "" {
+		return requestedYear
+	}
+	current := s.configuredAcademicYear()
+	sourceYear = strings.TrimSpace(sourceYear)
+	sourceStart, sourceOK := academicYearStart(sourceYear)
+	currentStart, currentOK := academicYearStart(current)
+	if sourceOK && currentOK && sourceStart > currentStart {
+		return sourceYear
+	}
+	if current != "" {
+		return current
+	}
+	if sourceYear != "" {
+		return sourceYear
+	}
+	return currentAcademicYear()
+}
+
+func (s *MemoryStore) copiedPackageName(sourceName, sourceYear, targetYear string) string {
+	preferred := strings.TrimSpace(sourceName)
+	if targetYear != "" && sourceYear != "" && targetYear != sourceYear {
+		if replaced := strings.ReplaceAll(preferred, sourceYear, targetYear); replaced != preferred {
+			preferred = replaced
+		}
+	}
+	return s.uniquePackageName(preferred)
+}
+
+func (s *MemoryStore) uniquePackageName(preferred string) string {
+	preferred = strings.TrimSpace(preferred)
+	if preferred == "" {
+		preferred = "课程方案"
+	}
+	if !s.packageNameExists("", preferred) {
+		return preferred
+	}
+	for i := 1; i < 1000; i++ {
+		name := preferred + "（副本）"
+		if i > 1 {
+			name = fmt.Sprintf("%s（副本%d）", preferred, i)
+		}
+		if !s.packageNameExists("", name) {
+			return name
+		}
+	}
+	return fmt.Sprintf("%s（副本%s）", preferred, time.Now().Format("150405"))
+}
+
 func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string, req learning.CourseUpsertRequest) (learning.Course, error) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)

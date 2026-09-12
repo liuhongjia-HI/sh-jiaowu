@@ -117,6 +117,7 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.POST("/grants/direct", h.CreateDirectGrant)
 	g.PUT("/grants/direct", h.ReplaceDirectGrant)
 	g.POST("/packages", h.CreatePackage)
+	g.POST("/packages/:id/copy", h.CopyPackage)
 	g.PUT("/packages/:id", h.UpdatePackage)
 	g.DELETE("/packages/:id", h.DeletePackage)
 	g.POST("/students", h.CreateStudent)

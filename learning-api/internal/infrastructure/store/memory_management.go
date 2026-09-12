@@ -118,6 +118,53 @@ func (s *MemoryStore) createPackageUnlocked(operator string, req learning.Packag
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.Package, error) { return work.createPackageUnlocked(operator, req) })
 	}
+	return s.saveNewPackageUnlocked(operator, req, "创建学习套餐", "")
+}
+
+func (s *MemoryStore) copyPackageUnlocked(operator, id string, req learning.PackageCopyRequest) (learning.Package, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.Package, error) {
+			return work.copyPackageUnlocked(operator, id, req)
+		})
+	}
+	id = strings.TrimSpace(id)
+	src, exists := s.findPackage(id)
+	if !exists || isDirectGrantPackage(id) {
+		return learning.Package{}, errors.New("学习套餐不存在")
+	}
+	academicYear := s.copiedPackageAcademicYear(src.AcademicYear, req.AcademicYear)
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = s.copiedPackageName(src.Name, src.AcademicYear, academicYear)
+	} else if s.packageNameExists("", name) {
+		return learning.Package{}, errors.New("学习套餐名称已存在")
+	}
+	status := src.Status
+	if strings.TrimSpace(string(req.Status)) != "" {
+		status = req.Status
+	}
+	created, err := s.saveNewPackageUnlocked(operator, learning.PackageUpsertRequest{
+		Name:             name,
+		AcademicYear:     academicYear,
+		Grade:            src.Grade,
+		Semester:         src.Semester,
+		Subject:          src.Subject,
+		Level:            src.Level,
+		PhaseScope:       src.PhaseScope,
+		PackageType:      src.PackageType,
+		Summary:          src.Summary,
+		LearningSpaceIDs: append([]string(nil), src.LearningSpaceIDs...),
+		ContentTypeCodes: append([]string(nil), src.ContentTypeCodes...),
+		TrialEnabled:     src.TrialEnabled,
+		Status:           status,
+	}, "复制学习套餐", src.Name+" → "+name)
+	if err != nil {
+		return learning.Package{}, err
+	}
+	return created, nil
+}
+
+func (s *MemoryStore) saveNewPackageUnlocked(operator string, req learning.PackageUpsertRequest, action, detail string) (learning.Package, error) {
 	pkg, err := s.packageFromRequest("", req)
 	if err != nil {
 		return learning.Package{}, err
@@ -128,7 +175,11 @@ func (s *MemoryStore) createPackageUnlocked(operator string, req learning.Packag
 	pkg.ID = "pkg-custom-" + time.Now().Format("20060102150405.000000000")
 	s.packages = append([]learning.Package{pkg}, s.packages...)
 	s.replacePackageRelations(pkg.ID, req.LearningSpaceIDs, req.ContentTypeCodes)
-	s.prependLog(operator, "创建学习套餐", pkg.Name)
+	if strings.TrimSpace(detail) != "" {
+		s.prependLogDetail(operator, action, pkg.Name, detail)
+	} else {
+		s.prependLog(operator, action, pkg.Name)
+	}
 	return s.decoratePackage(pkg), nil
 }
 

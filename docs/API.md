@@ -21,6 +21,7 @@
 - `GET /api/system/readiness`
 - `GET /api/packages`
 - `POST /api/packages`
+- `POST /api/packages/{id}/copy`
 - `PUT /api/packages/{id}`
 - `GET /api/learning-spaces`
 - `GET /api/students`
@@ -149,6 +150,8 @@
 - `course`：课程
 - `question`：题
 - `handout`：学习资料
+
+`POST /api/packages/{id}/copy` 一键复制课程方案。不传请求体时，学年自动滚到当前学年（源方案如果已经是未来学年则保持），名称自动去重，学习空间和开放内容原样保留。复制结果是一份独立新方案：不带走学生开通、体验和订单。教师不可调用。
 
 编辑已开通套餐后，系统会同步刷新该套餐对应学生的学习空间访问权限。
 

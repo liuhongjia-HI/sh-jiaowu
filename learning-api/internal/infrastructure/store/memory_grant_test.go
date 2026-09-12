@@ -898,3 +898,89 @@ func TestPackageLevelIsDerivedAndCannotMixLearningSpaceLevels(t *testing.T) {
 		t.Fatalf("expected mixed levels to be rejected, got %v", err)
 	}
 }
+
+func TestCopyPackageCreatesIndependentPlan(t *testing.T) {
+	store := NewMemoryStore()
+	currentYear := store.configuredAcademicYear()
+	source, err := store.CreatePackage("运营教务", learning.PackageUpsertRequest{
+		Name:             "2018.2019学年 五年级 S1 英语 复制源",
+		AcademicYear:     "2018.2019学年",
+		Grade:            "五年级",
+		Semester:         "S1",
+		Subject:          "英语",
+		Level:            "S",
+		PhaseScope:       "Q1",
+		PackageType:      "题+课程讲义",
+		Summary:          "用于复制验收的源方案。",
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+		ContentTypeCodes: []string{"question", "handout"},
+		TrialEnabled:     true,
+		Status:           learning.StatusEnabled,
+	})
+	if err != nil {
+		t.Fatalf("expected source package: %v", err)
+	}
+	if _, err := store.CreateGrant("运营教务", learning.GrantCreateRequest{StudentID: "stu-001", PackageID: source.ID}); err != nil {
+		t.Fatalf("expected source grant: %v", err)
+	}
+
+	copied, err := store.CopyPackage("运营教务", source.ID, learning.PackageCopyRequest{})
+	if err != nil {
+		t.Fatalf("expected copy to succeed: %v", err)
+	}
+	if copied.ID == "" || copied.ID == source.ID {
+		t.Fatalf("copy must get a new id, got %#v", copied)
+	}
+	if copied.AcademicYear != currentYear {
+		t.Fatalf("copy should roll to current academic year %q, got %q", currentYear, copied.AcademicYear)
+	}
+	wantName := currentYear + " 五年级 S1 英语 复制源"
+	if copied.Name != wantName {
+		t.Fatalf("copy should replace the year in the name, got %q want %q", copied.Name, wantName)
+	}
+	if copied.OpenStudentNum != 0 {
+		t.Fatalf("copy must not inherit student openings, got %#v", copied)
+	}
+	if !copied.TrialEnabled || copied.Status != learning.StatusEnabled {
+		t.Fatalf("copy should keep trial flag and status, got %#v", copied)
+	}
+	if !containsString(copied.LearningSpaceIDs, "space-g05-english-s1-q1") || !containsString(copied.ContentTypeCodes, "handout") {
+		t.Fatalf("copy should keep spaces and content types: %#v", copied)
+	}
+
+	sourceAfter, ok := store.findPackage(source.ID)
+	if !ok || sourceAfter.OpenStudentNum == 0 {
+		t.Fatalf("source openings must stay on the original package, got %#v", sourceAfter)
+	}
+	for _, grant := range store.grants {
+		if grant.PackageID == copied.ID {
+			t.Fatalf("copy must not duplicate grants: %#v", grant)
+		}
+	}
+
+	second, err := store.CopyPackage("运营教务", source.ID, learning.PackageCopyRequest{})
+	if err != nil {
+		t.Fatalf("second copy should succeed: %v", err)
+	}
+	if second.Name != wantName+"（副本）" {
+		t.Fatalf("second copy should add a unique suffix, got %q", second.Name)
+	}
+
+	sameYear, err := store.CopyPackage("运营教务", copied.ID, learning.PackageCopyRequest{})
+	if err != nil {
+		t.Fatalf("same-year copy should succeed: %v", err)
+	}
+	if sameYear.AcademicYear != currentYear || sameYear.Name == copied.Name || !strings.Contains(sameYear.Name, "副本") {
+		t.Fatalf("same-year copy should keep year and suffix the name, got %#v", sameYear)
+	}
+}
+
+func TestCopyPackageRejectsMissingAndDirectPackages(t *testing.T) {
+	store := NewMemoryStore()
+	if _, err := store.CopyPackage("运营教务", "pkg-not-found", learning.PackageCopyRequest{}); err == nil || !strings.Contains(err.Error(), "不存在") {
+		t.Fatalf("expected missing package to be rejected, got %v", err)
+	}
+	if _, err := store.CopyPackage("运营教务", "direct-stu-001-space", learning.PackageCopyRequest{}); err == nil || !strings.Contains(err.Error(), "不存在") {
+		t.Fatalf("expected direct grant package copy to be rejected, got %v", err)
+	}
+}

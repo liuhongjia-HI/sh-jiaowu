@@ -129,8 +129,8 @@ test("study page shows the grade subject catalog and blocks unopened subjects", 
     return Promise.resolve({
       student: { id: "stu-001", grade: "五年级", openedPackages: [] },
       subjects: [
-        { id: "g5-geography", displayName: "地理", subject: "地理", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-g05-geography-s1-q1", materialNum: 1 },
-        { id: "g5-chinese", displayName: "语文", subject: "语文", grade: "五年级", accessState: "locked", accessLabel: "暂未开通", canOpen: false }
+        { id: "g5-geography", displayName: "Geography", subject: "地理", grade: "Grade 5", accessState: "preview", accessLabel: "Preview", canOpen: true, entryCourseId: "course-g05-geography-s1-q1", materialNum: 1 },
+        { id: "g5-chinese", displayName: "Chinese", subject: "语文", grade: "Grade 5", accessState: "locked", accessLabel: "Unavailable", canOpen: false }
       ],
       courses: [], materials: []
     });
@@ -158,7 +158,7 @@ test("点击可学习课程卡片时，即使事件未携带权限字段也能�
     if (path === "/student/favorites") return Promise.resolve([]);
     return Promise.resolve({
       subjects: [
-        { id: "g5-math", displayName: "数学", subject: "数学", grade: "五年级", accessState: "full", canOpen: true, entryCourseId: "course-math-first" }
+        { id: "g5-math", displayName: "Mathematics", subject: "数学", grade: "Grade 5", accessState: "full", canOpen: true, entryCourseId: "course-math-first" }
       ],
       courses: [], materials: []
     });
@@ -178,7 +178,7 @@ test("内容准备中的课程即使存在课程编号也不可进入", async ()
     return Promise.resolve({
       student: { id: "stu-001", grade: "五年级", openedPackages: ["五年级语文"] },
       subjects: [
-        { id: "g5-chinese", entryCourseId: "course-chinese", displayName: "语文", subject: "语文", grade: "五年级", accessState: "pending", accessLabel: "内容准备中", canOpen: false }
+        { id: "g5-chinese", entryCourseId: "course-chinese", displayName: "Chinese", subject: "语文", grade: "Grade 5", accessState: "pending", accessLabel: "Preparing", canOpen: false }
       ],
       courses: [], materials: []
     });
@@ -196,12 +196,12 @@ test("已开通课程套用年级目录的学生端展示名称，避免露出�
     return Promise.resolve({
       student: { id: "stu-001", grade: "五年级", openedPackages: ["五年级地理"] },
       courses: [
-        { id: "course-geo", name: "G5S1Q1 Geo S", subject: "地理", grade: "五年级", materialNum: 9 }
+        { id: "course-geo", name: "G5S1Q1 Geo S", subject: "地理", grade: "Grade 5", displayName: "Geography", materialNum: 9 }
       ],
       subjects: [
-        { id: "g5-geography", displayName: "Geography", subject: "地理", grade: "五年级", accessState: "full", canOpen: true, entryCourseId: "course-geo" },
-        { id: "g5-science", displayName: "Science", subject: "科学", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-sci" },
-        { id: "g5-english", displayName: "English", subject: "英文", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-eng" }
+        { id: "g5-geography", displayName: "Geography", subject: "地理", grade: "Grade 5", accessState: "full", canOpen: true, entryCourseId: "course-geo" },
+        { id: "g5-science", displayName: "Science", subject: "科学", grade: "Grade 5", accessState: "preview", accessLabel: "Preview", canOpen: true, entryCourseId: "course-sci" },
+        { id: "g5-english", displayName: "English", subject: "英文", grade: "Grade 5", accessState: "preview", accessLabel: "Preview", canOpen: true, entryCourseId: "course-eng" }
       ],
       materials: []
     });
@@ -220,14 +220,14 @@ test("已开通课程套用年级目录的学生端展示名称，避免露出�
   assert.equal(page.data.visibleCourses[1].accessLabel, "Preview");
 });
 
-test("course cards show English labels and do not repeat the subject in meta", async () => {
+test("course cards render API English copy and do not repeat the subject in meta", async () => {
   const page = loadStudyPage((path) => {
     if (path === "/student/favorites") return Promise.resolve([]);
     return Promise.resolve({
       student: { id: "stu-001", grade: "五年级", openedPackages: [] },
       subjects: [
-        { id: "g5-english", displayName: "English", subject: "英文", grade: "五年级", accessState: "preview", accessLabel: "首节可体验", canOpen: true, entryCourseId: "course-eng", materialNum: 2 },
-        { id: "g5-math", displayName: "Mathematics", subject: "数学", grade: "五年级", accessState: "locked", accessLabel: "暂未开通", canOpen: false }
+        { id: "g5-english", displayName: "English", subject: "英文", grade: "Grade 5", accessState: "preview", accessLabel: "Preview", canOpen: true, entryCourseId: "course-eng", materialNum: 2 },
+        { id: "g5-math", displayName: "Mathematics", subject: "数学", grade: "Grade 5", accessState: "locked", accessLabel: "Unavailable", canOpen: false }
       ],
       courses: [], materials: []
     });

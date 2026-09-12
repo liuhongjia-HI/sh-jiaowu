@@ -207,7 +207,8 @@ func (s *MemoryStore) seedBaseDictionaries() {
 // 每加一个新的“取代关系”就在这补一条。
 var retiredSettingKeys = []string{"grantDefaultStart", "grantDefaultEnd", "academicYearStart", "academicYearEnd", "academicYear", "academicPeriods", "subjectColors", "downloadPolicy"}
 
-// 综合科学和历史仅为旧数据保留展示元数据，不再进入新课程矩阵。
+// 学科元数据是课程方案、年级目录等下拉的来源。综合科学和历史默认停用，
+// 运营在系统设置里启用后必须保持启用，启动时不得再强制改回停用。
 func defaultSubjectMetadata() []learning.SubjectMetadata {
 	return []learning.SubjectMetadata{
 		{ID: "english", Name: "英文", ShortLabel: "Eng", Color: "#1A6FD4", SortOrder: 1, Status: "启用"},
@@ -315,11 +316,18 @@ func (s *MemoryStore) seedBaseLearningSpaces() {
 	// 这个学年只是空间记录上的展示值/初始标签，随便选一个固定值即可，
 	// 不需要跟系统设置里的当前学年保持一致。
 	const academicYear = "2025.2026学年"
+	s.ensureLearningSpaces(academicYear)
+}
+
+func (s *MemoryStore) ensureLearningSpaces(academicYear string) {
 	exists := map[string]bool{}
-	for _, space := range s.learningSpaces {
+	for index, space := range s.learningSpaces {
 		exists[space.ID] = true
+		if space.Status != learning.StatusEnabled && s.optionalSubjectEnabled(space.Subject) {
+			s.learningSpaces[index].Status = learning.StatusEnabled
+		}
 	}
-	for _, space := range baseLearningSpaces(academicYear) {
+	for _, space := range append(baseLearningSpaces(academicYear), extraLearningSpaces(academicYear, s.enabledOptionalSubjects())...) {
 		if exists[space.ID] {
 			continue
 		}
@@ -329,10 +337,23 @@ func (s *MemoryStore) seedBaseLearningSpaces() {
 }
 
 func baseLearningSpaces(academicYear string) []learningSpace {
-	spaces := make([]learningSpace, 0, 668)
+	return learningSpacesForSubjects(academicYear, demoSubjects, levelsForGradeSubject)
+}
+
+func extraLearningSpaces(academicYear string, subjects []string) []learningSpace {
+	return learningSpacesForSubjects(academicYear, subjects, func(gradeIndex int, subject string) []string {
+		if isCoreSubject(subject) {
+			return nil
+		}
+		return extraSubjectLevels(gradeIndex)
+	})
+}
+
+func learningSpacesForSubjects(academicYear string, subjects []string, levelsFor func(int, string) []string) []learningSpace {
+	spaces := make([]learningSpace, 0)
 	for gradeIndex, grade := range demoGrades {
-		for _, subject := range demoSubjects {
-			levels := levelsForGradeSubject(gradeIndex, subject)
+		for _, subject := range subjects {
+			levels := levelsFor(gradeIndex, subject)
 			if len(levels) == 0 {
 				continue
 			}
@@ -350,6 +371,42 @@ func baseLearningSpaces(academicYear string) []learningSpace {
 		}
 	}
 	return spaces
+}
+
+func isCoreSubject(subject string) bool {
+	return containsString(demoSubjects, subject)
+}
+
+func extraSubjectLevels(gradeIndex int) []string {
+	if gradeIndex <= 3 {
+		return []string{"S"}
+	}
+	if gradeIndex <= 5 {
+		return []string{"S", "S+"}
+	}
+	return standardLevels
+}
+
+func (s *MemoryStore) enabledOptionalSubjects() []string {
+	out := make([]string, 0)
+	seen := map[string]bool{}
+	for _, item := range s.subjects {
+		if item.Status != "启用" || isCoreSubject(item.Name) || seen[item.Name] {
+			continue
+		}
+		seen[item.Name] = true
+		out = append(out, item.Name)
+	}
+	return out
+}
+
+func (s *MemoryStore) optionalSubjectEnabled(subject string) bool {
+	for _, item := range s.enabledOptionalSubjects() {
+		if subjectsMatch(item, subject) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {

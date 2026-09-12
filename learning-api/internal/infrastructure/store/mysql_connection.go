@@ -102,7 +102,7 @@ func (s *MemoryStore) reconcileDefaultSettings() error {
 }
 
 // reconcileSubjectMetadata 先补齐默认行，再将旧版 subjectColors JSON 中已配置
-// 的展示值写入对应学科。迁移完成后删除旧设置，后续读写只经过 subjects 表。
+// 的展示值写入对应学科。已有学科的启用状态以数据库为准，避免把人工启用改回停用。
 func (s *MemoryStore) reconcileSubjectMetadata() error {
 	for _, subject := range defaultSubjectMetadata() {
 		if _, err := s.db.Exec(`INSERT INTO subjects (id, name, short_label, color, sort_order, status)
@@ -115,9 +115,6 @@ func (s *MemoryStore) reconcileSubjectMetadata() error {
 			subject.ID, subject.Name, subject.ShortLabel, subject.Color, subject.SortOrder, subject.Status); err != nil {
 			return err
 		}
-	}
-	if _, err := s.db.Exec(`UPDATE subjects SET status = '停用' WHERE id IN ('integrated-science', 'history')`); err != nil {
-		return err
 	}
 	var raw string
 	err := s.db.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = 'subjectColors'`).Scan(&raw)
@@ -160,7 +157,7 @@ func (s *MemoryStore) reconcileBaseLearningSpaces() error {
 	if err != nil {
 		return err
 	}
-	for _, space := range baseLearningSpaces(academicYear) {
+	for _, space := range append(baseLearningSpaces(academicYear), extraLearningSpaces(academicYear, s.enabledOptionalSubjects())...) {
 		if _, err := tx.Exec(
 			`INSERT INTO learning_spaces (id, academic_year, grade, subject, semester, phase, level, name, status)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -171,10 +168,15 @@ func (s *MemoryStore) reconcileBaseLearningSpaces() error {
 			return err
 		}
 	}
-	// 旧课程矩阵中的综合科学、历史和 G4 地理只停用不删除，保住课程、资料、
-	// 套餐及审计引用；新建业务只会看到当前矩阵里的启用空间。
+	for _, subject := range s.enabledOptionalSubjects() {
+		if _, err := tx.Exec(`UPDATE learning_spaces SET status = '启用' WHERE subject = ? OR subject = ?`, subject, subjectEnglishName(subject)); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	// G4 地理不在当前开设矩阵中，旧空间只停用不删除，保住课程、资料和套餐引用。
 	if _, err := tx.Exec(`UPDATE learning_spaces SET status = '停用'
-		WHERE id LIKE 'space-g%' AND (subject IN ('综合科学', '历史') OR (grade = '四年级' AND subject = '地理'))`); err != nil {
+		WHERE id LIKE 'space-g%' AND grade = '四年级' AND subject = '地理'`); err != nil {
 		tx.Rollback()
 		return err
 	}

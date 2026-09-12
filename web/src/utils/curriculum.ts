@@ -1,7 +1,10 @@
-import type { Course, CurriculumNode, CurriculumPath } from '../types/starline';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getData } from '../services/http';
+import type { Course, CurriculumNode, CurriculumPath, SubjectMetadata } from '../types/starline';
 
-// 年级与学科的开设关系，与后端保持一致。综合科学和历史仅兼容旧数据，
-// 不再出现在新建课程与学习空间的选项中。
+// 年级与学科的开设关系，与后端基础矩阵保持一致。
+// 系统设置里的学科元数据才是下拉的权威来源：启用的学科会出现在课程方案、年级目录等选项中。
 // 规则对应 learning-api/internal/infrastructure/store/memory.go 的 subjectAppliesToGrade。
 
 export const GRADES = [
@@ -29,13 +32,13 @@ export const SUBJECTS_BY_GRADE: Record<string, string[]> = {
 
 export const LEARNING_LEVELS = ['S', 'S+', 'H', 'H+'];
 
-export function levelsForGradeSubject(grade?: string, subject?: string): string[] {
+export function levelsForGradeSubject(grade?: string, subject?: string, catalog?: string[]): string[] {
   const index = gradeIndex(grade);
-  if (index < 0 || !subject || !subjectsForGrade(grade).includes(subject)) return [];
+  if (index < 0 || !subject || !subjectsForGrade(grade, catalog).some((item) => subjectsMatch(item, subject))) return [];
   if (index <= 3) return ['S'];
   if (index === 4) {
     if (['数学', '英文', '语文'].includes(subject)) return ['S', 'S+', 'H'];
-    if (subject === '地理') return ['S', 'S+'];
+    if (subject === '地理' || subject === '历史') return ['S', 'S+'];
     return ['S'];
   }
   if (index === 5) return ['数学', '英文', '语文'].includes(subject) ? ['S', 'S+', 'H'] : ['S', 'S+'];
@@ -45,8 +48,8 @@ export function levelsForGradeSubject(grade?: string, subject?: string): string[
   return ['S', 'S+', 'H'];
 }
 
-export function levelOptions(grade?: string, subject?: string) {
-  return levelsForGradeSubject(grade, subject).map((level) => ({ label: level, value: level }));
+export function levelOptions(grade?: string, subject?: string, catalog?: string[]) {
+  return levelsForGradeSubject(grade, subject, catalog).map((level) => ({ label: level, value: level }));
 }
 
 export const DEFAULT_ACADEMIC_YEAR = '2025.2026学年';
@@ -78,9 +81,31 @@ export function gradeIndex(grade?: string): number {
   return GRADES.indexOf(grade);
 }
 
-// 该年级实际开设的学科；年级未知时返回全部业务学科，兼容历史数据和后台自由筛选。
-export function subjectsForGrade(grade?: string): string[] {
-  return SUBJECTS_BY_GRADE[grade || ''] || ALL_SUBJECTS;
+// 该年级实际开设的学科。系统设置启用的学科是下拉权威来源；
+// 未拉到元数据时退回基础矩阵，避免页面空着。
+export function subjectsForGrade(grade?: string, catalog?: string[]): string[] {
+  const matrix = SUBJECTS_BY_GRADE[grade || ''] || ALL_SUBJECTS;
+  if (!catalog) return matrix;
+  const listed = matrix.filter((subject) => catalog.some((item) => subjectsMatch(item, subject)));
+  for (const subject of catalog) {
+    if (ALL_SUBJECTS.some((item) => subjectsMatch(item, subject))) continue;
+    if (listed.some((item) => subjectsMatch(item, subject))) continue;
+    listed.push(subject);
+  }
+  return listed;
+}
+
+export function enabledSubjectNames(subjects?: Array<Pick<SubjectMetadata, 'name' | 'status'>>): string[] | undefined {
+  if (!subjects) return undefined;
+  return subjects.filter((item) => item.status === '启用').map((item) => item.name).filter(Boolean);
+}
+
+export function useSubjectCatalog() {
+  const query = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => getData<SubjectMetadata[]>('/subjects')
+  });
+  return useMemo(() => enabledSubjectNames(query.data), [query.data]);
 }
 
 export function gradeOptions() {
@@ -146,8 +171,8 @@ export function subjectsMatch(left?: string, right?: string) {
   return (SUBJECT_KEYS[first] || first.toLowerCase()) === (SUBJECT_KEYS[second] || second.toLowerCase());
 }
 
-export function subjectOptions(grade?: string) {
-  return subjectsForGrade(grade).map((subject) => ({ label: subjectLabel(subject), value: subject }));
+export function subjectOptions(grade?: string, catalog?: string[]) {
+  return subjectsForGrade(grade, catalog).map((subject) => ({ label: subjectLabel(subject), value: subject }));
 }
 
 export function semesterLabel(value?: string) {

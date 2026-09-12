@@ -1,5 +1,5 @@
 const { request } = require("../../utils/request");
-const { subjectEmoji, subjectLabel, gradeLabel, subjectsMatchName } = require("../../utils/subject");
+const { subjectEmoji, subjectsMatchName } = require("../../utils/subject");
 
 Page({
   data: {
@@ -117,7 +117,7 @@ Page({
     const keyword = this.data.keyword.trim().toLowerCase();
     const activeFilter = this.data.activeFilter;
     const visibleCourses = this.data.courses.filter((course) => {
-      const matchKeyword = !keyword || [course.name, course.displayName, course.displaySubject, course.subject, course.grade, course.displayGrade, course.displayMeta, course.accessLabel].join(" ").toLowerCase().includes(keyword);
+      const matchKeyword = !keyword || [course.name, course.displayName, course.subject, course.grade, course.displayMeta, course.accessLabel].join(" ").toLowerCase().includes(keyword);
       const completed = isCompletedCourse(course);
       const matchFilter = activeFilter === "all"
         || (activeFilter === "learning" && !completed)
@@ -159,25 +159,20 @@ function decorateCourses(courses, favorites) {
     const progress = Number(course.progress) || 0;
     const isNew = Boolean(course.isNew);
     const isOpened = Boolean(course.isOpened);
-    const rawAccessLabel = course.accessLabel || (isOpened ? "已开通" : ((Number(course.materialNum) > 0 || Number(course.homeworkNum) > 0) ? "首节可体验" : ""));
-    const isPreview = course.accessState === "preview" || rawAccessLabel === "首节可体验";
-    const isPreparing = course.accessState === "pending" || rawAccessLabel === "内容准备中";
-    const displayName = subjectLabel(course.displayName || course.subject || course.name);
-    const displaySubject = subjectLabel(course.subject || course.displayName);
-    const displayGrade = gradeLabel(course.grade);
-    const accessLabel = accessLabelText(rawAccessLabel) || (isNew ? "New" : accessLabelText(course.status));
+    const isPreview = course.accessState === "preview";
+    const isPreparing = course.accessState === "pending";
+    const displayName = course.displayName || course.name;
+    const accessLabel = course.accessLabel || (isNew ? "New" : "");
     return {
       ...course,
       progress,
       favorited: favoriteCourseNames.includes(course.name),
-      badgeText: accessLabel || (progress >= 80 ? "Reading star" : progress > 0 ? "Keep going" : "New"),
+      badgeText: accessLabel,
       cardClass: isNew ? "new-course" : progress >= 100 ? "reward" : isOpened ? "opened-course" : "",
       newCourseText: isNew && course.availableAt ? `New · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
       displayName,
-      displaySubject,
-      displayGrade,
-      displayMeta: courseMetaText(displayName, displayGrade, displaySubject),
+      displayMeta: course.grade || "Learning content",
       entryCourseId: course.entryCourseId || course.id,
       accessLabel,
       isPreview,
@@ -228,30 +223,6 @@ function courseAvailableAt(course) {
 function formatCourseTime(value) {
   const text = String(value || "");
   return text.length >= 16 ? text.slice(5, 16).replace(" ", " ") : text;
-}
-
-const ACCESS_LABELS = {
-  首节可体验: "Preview",
-  暂未开通: "Unavailable",
-  内容准备中: "Preparing",
-  已开通: "Unlocked",
-  可学习: "Ready",
-  新开通: "New",
-  已完成: "Completed"
-};
-
-function accessLabelText(label) {
-  const name = String(label || "").trim();
-  return ACCESS_LABELS[name] || name;
-}
-
-function courseMetaText(displayName, displayGrade, displaySubject) {
-  const parts = [];
-  if (displayGrade) parts.push(displayGrade);
-  if (displaySubject && displaySubject !== displayName && !subjectsMatchName(displayName, displaySubject)) {
-    parts.push(displaySubject);
-  }
-  return parts.join(" · ") || "Learning content";
 }
 
 function studyEmptyMessage(hasOpenedPackage) {

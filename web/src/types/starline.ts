@@ -142,6 +142,7 @@ export type StudyPackage = {
   learningSpaces?: string[];
   contentTypeCodes?: string[];
   contentTypes?: string[];
+  trialEnabled?: boolean;
   openStudentNum: number;
   status: string;
 };
@@ -158,6 +159,7 @@ export type PackageUpsertRequest = {
   summary: string;
   learningSpaceIds: string[];
   contentTypeCodes: string[];
+  trialEnabled?: boolean;
   status: string;
 };
 

@@ -628,6 +628,44 @@ func TestDeletePackageThroughAPI(t *testing.T) {
 	app.doJSON(t, http.MethodDelete, "/api/packages/"+granted.ID, token, nil, http.StatusBadRequest, nil)
 }
 
+func TestCopyPackageThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginAdmin(t, "13800000002")
+	teacherToken := app.loginAdmin(t, "13800000004")
+
+	var created learning.Package
+	app.doJSON(t, http.MethodPost, "/api/packages", token, learning.PackageUpsertRequest{
+		Name:             "2018.2019学年 五年级 S1 英语 接口复制源",
+		AcademicYear:     "2018.2019学年",
+		Grade:            "五年级",
+		Semester:         "S1",
+		Subject:          "英语",
+		PhaseScope:       "Q1",
+		PackageType:      "题",
+		LearningSpaceIDs: []string{"space-g05-english-s1-q1"},
+		ContentTypeCodes: []string{"question"},
+		Status:           learning.StatusEnabled,
+	}, http.StatusOK, &created)
+	app.doJSON(t, http.MethodPost, "/api/grants", token, learning.GrantCreateRequest{StudentID: "stu-001", PackageID: created.ID}, http.StatusOK, nil)
+	app.doJSON(t, http.MethodPost, "/api/packages/"+created.ID+"/copy", teacherToken, map[string]string{}, http.StatusForbidden, nil)
+
+	var copied learning.Package
+	app.doJSON(t, http.MethodPost, "/api/packages/"+created.ID+"/copy", token, map[string]string{}, http.StatusOK, &copied)
+	if copied.ID == "" || copied.ID == created.ID || copied.AcademicYear == "2018.2019学年" || !strings.Contains(copied.Name, copied.AcademicYear) {
+		t.Fatalf("expected copied package to be a new current-year plan, got %#v", copied)
+	}
+	if copied.OpenStudentNum != 0 {
+		t.Fatalf("copied package must not inherit openings, got %#v", copied)
+	}
+
+	var logs []learning.OperationLog
+	app.doJSON(t, http.MethodGet, "/api/logs", token, nil, http.StatusOK, &logs)
+	if len(logs) == 0 || logs[0].Action != "复制学习套餐" || !strings.Contains(logs[0].Detail, created.Name) {
+		t.Fatalf("expected copy audit log, got %#v", logs)
+	}
+}
+
 func TestCreateDirectGrantThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

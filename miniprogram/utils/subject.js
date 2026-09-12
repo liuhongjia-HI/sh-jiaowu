@@ -44,29 +44,9 @@ const SUBJECT_KEYS = {
   Chemistry: "chemistry"
 };
 
-const GRADE_ENGLISH_NAMES = {
-  一年级: "Grade 1",
-  二年级: "Grade 2",
-  三年级: "Grade 3",
-  四年级: "Grade 4",
-  五年级: "Grade 5",
-  六年级: "Grade 6",
-  七年级: "Grade 7",
-  八年级: "Grade 8",
-  九年级: "Grade 9",
-  十年级: "Grade 10",
-  十一年级: "Grade 11",
-  十二年级: "Grade 12"
-};
-
 function subjectLabel(subject) {
   const name = String(subject || "").trim();
   return SUBJECT_ENGLISH_NAMES[name] || name;
-}
-
-function gradeLabel(grade) {
-  const name = String(grade || "").trim();
-  return GRADE_ENGLISH_NAMES[name] || name;
 }
 
 function subjectKey(subject) {
@@ -109,7 +89,6 @@ function subjectEmoji(subject, index) {
 
 module.exports = {
   subjectLabel,
-  gradeLabel,
   subjectsMatchName,
   subjectEmoji
 };

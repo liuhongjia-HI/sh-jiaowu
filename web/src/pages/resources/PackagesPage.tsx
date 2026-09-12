@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Form, Input, Pagination, Popconfirm, Select, Skeleton, Space, Table, Typography, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, postData, putData } from '../../services/http';
@@ -14,6 +14,8 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
   const [form] = Form.useForm<PackageUpsertRequest>();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StudyPackage | null>(null);
+  const [copiedFrom, setCopiedFrom] = useState<string>();
+  const [copiedYearChanged, setCopiedYearChanged] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [gradeFilter, setGradeFilter] = useState<string>();
   const [subjectFilter, setSubjectFilter] = useState<string>();
@@ -26,18 +28,33 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
   const canManage = Boolean(user?.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role)));
   const save = useMutation({
     mutationFn: (values: PackageUpsertRequest) => {
-      const body = { ...values, summary: values.summary || '', phaseScope: values.phaseScope || '全学期', packageType: values.packageType || '', status: values.status || '启用' };
+      const body = { ...values, summary: values.summary || '', phaseScope: values.phaseScope || '全学期', packageType: values.packageType || '', trialEnabled: values.trialEnabled ?? editing?.trialEnabled ?? false, status: values.status || '启用' };
       return editing ? putData<StudyPackage>(`/packages/${editing.id}`, body) : postData<StudyPackage>('/packages', body);
     },
     onSuccess: () => {
       message.success(editing ? '课程方案已保存。' : '课程方案已创建，可在学生管理中直接开通。');
-      setOpen(false);
-      setEditing(null);
-      form.resetFields();
+      closeDialog();
       client.invalidateQueries({ queryKey: ['packages'] });
       client.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error: Error) => message.error(error.message || '保存课程方案失败，请检查学习空间和开放内容。')
+  });
+  const copy = useMutation({
+    mutationFn: (row: StudyPackage) => postData<StudyPackage>(`/packages/${row.id}/copy`, {}),
+    onSuccess: (created, source) => {
+      const yearChanged = created.academicYear !== source.academicYear;
+      message.success(yearChanged
+        ? `已复制到${created.academicYear}，学生开通记录不会带过来。`
+        : `已复制为「${created.name}」，学生开通记录不会带过来。`);
+      client.invalidateQueries({ queryKey: ['packages'] });
+      client.invalidateQueries({ queryKey: ['dashboard'] });
+      setCopiedFrom(source.name);
+      setCopiedYearChanged(yearChanged);
+      setEditing(created);
+      setOpen(true);
+      setPage(1);
+    },
+    onError: (error: Error) => message.error(error.message || '复制课程方案失败，请稍后重试。')
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteData(`/packages/${id}`),
@@ -60,6 +77,13 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
       })
       .sort(comparePackages);
   }, [packages.data, keyword, gradeFilter, subjectFilter, levelFilter]);
+  function closeDialog() {
+    setOpen(false);
+    setEditing(null);
+    setCopiedFrom(undefined);
+    setCopiedYearChanged(false);
+    form.resetFields();
+  }
   if (packages.isLoading || spaces.isLoading || settings.isLoading) return <Skeleton active />;
   if (packages.error || spaces.error || settings.error) return <Alert type="error" message="课程方案加载失败，请稍后重试。" />;
   // 学年选项来自校历（系统设置），不再从学习空间凑——学习空间的 academicYear 是数据库
@@ -69,7 +93,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
   const paged = rows.slice((page - 1) * 10, page * 10);
   const defaults: PackageUpsertRequest = { name: '', academicYear: academicYearForDate(), grade: '' as never, subject: '' as never, semester: semesters[0]?.value || 'S1', level: 'S', phaseScope: '全学期', packageType: '', summary: '', learningSpaceIds: [], contentTypeCodes: ['question', 'handout'], status: '启用' };
   const initialValues: PackageUpsertRequest = editing
-    ? { name: editing.name, academicYear: editing.academicYear, grade: editing.grade, subject: editing.subject, semester: editing.semester, level: editing.level || 'S', phaseScope: editing.phaseScope, packageType: editing.packageType, summary: editing.summary, learningSpaceIds: editing.learningSpaceIds ?? [], contentTypeCodes: editing.contentTypeCodes ?? [], status: editing.status }
+    ? { name: editing.name, academicYear: editing.academicYear, grade: editing.grade, subject: editing.subject, semester: editing.semester, level: editing.level || 'S', phaseScope: editing.phaseScope, packageType: editing.packageType, summary: editing.summary, learningSpaceIds: editing.learningSpaceIds ?? [], contentTypeCodes: editing.contentTypeCodes ?? [], trialEnabled: editing.trialEnabled, status: editing.status }
     : defaults;
   const subjectSelectOptions = subjectOptions(gradeFilter);
   const levelSelectOptions = filterLevelOptions(gradeFilter, subjectFilter);
@@ -79,9 +103,9 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>课程方案</Typography.Title>
-          <Typography.Text type="secondary">预先配置各年级课程包含的课程、讲义和习题；每个年级下各学科的首章节会自动向学生开放。点击方案名称可查看方案内的学习资料。</Typography.Text>
+          <Typography.Text type="secondary">预先配置各年级课程包含的课程、讲义和习题；每个年级下各学科的首章节会自动向学生开放。已有方案可一键复制到当前学年，点击方案名称可查看方案内的学习资料。</Typography.Text>
         </div>
-        {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setOpen(true); }}>新增方案</Button>}
+        {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCopiedFrom(undefined); setCopiedYearChanged(false); setEditing(null); setOpen(true); }}>新增方案</Button>}
       </div>
       <Card>
         <div className="package-filter-bar">
@@ -141,7 +165,8 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
             { title: '状态', dataIndex: 'status' },
             ...(canManage ? [{ title: '操作', render: (_: unknown, row: StudyPackage) => (
               <Space size={4}>
-                <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => { setEditing(row); setOpen(true); }} />
+                <ActionButton tooltip="复制" icon={<CopyOutlined />} loading={copy.isPending && copy.variables?.id === row.id} onClick={() => copy.mutate(row)} />
+                <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => { setCopiedFrom(undefined); setCopiedYearChanged(false); setEditing(row); setOpen(true); }} />
                 <Popconfirm title={`确定删除“${row.name}”吗？`} description="删除后不可恢复；已有学生开通、体验或订单记录的课程方案不能删除，请改为停用。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: remove.isPending }} onConfirm={() => remove.mutate(row.id)}>
                   <ActionButton tooltip="删除" danger icon={<DeleteOutlined />} loading={remove.isPending} />
                 </Popconfirm>
@@ -151,7 +176,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
         />
         {rows.length > 10 && <Pagination current={page} pageSize={10} total={rows.length} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />}
       </Card>
-      <PackageDialog form={form} open={open} editing={Boolean(editing)} loading={save.isPending} learningSpaces={spaces.data ?? []} academicYearOptions={years} semesterOptions={semesters} initialValues={initialValues} onCancel={() => setOpen(false)} onSubmit={(values) => save.mutate(values)} />
+      <PackageDialog form={form} open={open} editing={Boolean(editing)} copiedFrom={copiedFrom} copiedYearChanged={copiedYearChanged} loading={save.isPending} learningSpaces={spaces.data ?? []} academicYearOptions={years} semesterOptions={semesters} initialValues={initialValues} onCancel={closeDialog} onSubmit={(values) => save.mutate(values)} />
     </div>
   );
 }

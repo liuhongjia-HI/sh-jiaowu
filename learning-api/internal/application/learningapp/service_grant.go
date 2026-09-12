@@ -10,6 +10,9 @@ func (s *Service) Packages() []learning.Package              { return s.grant.Pa
 func (s *Service) CreatePackage(o string, r learning.PackageUpsertRequest) (learning.Package, error) {
 	return s.grant.CreatePackage(o, r)
 }
+func (s *Service) CopyPackage(o, id string, r learning.PackageCopyRequest) (learning.Package, error) {
+	return s.grant.CopyPackage(o, id, r)
+}
 func (s *Service) UpdatePackage(o, id string, r learning.PackageUpsertRequest) (learning.Package, error) {
 	return s.grant.UpdatePackage(o, id, r)
 }

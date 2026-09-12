@@ -642,6 +642,12 @@ func (s *MemoryStore) CreatePackage(operator string, req learning.PackageUpsertR
 	return result1, err
 }
 
+func (s *MemoryStore) CopyPackage(operator, id string, req learning.PackageCopyRequest) (learning.Package, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.copyPackageUnlocked(operator, id, req)
+}
+
 func (s *MemoryStore) UpdatePackage(operator string, id string, req learning.PackageUpsertRequest) (learning.Package, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

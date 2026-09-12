@@ -623,6 +623,8 @@ export function PackageDialog({
   form,
   open,
   editing,
+  copiedFrom,
+  copiedYearChanged,
   loading,
   learningSpaces,
   academicYearOptions,
@@ -634,6 +636,8 @@ export function PackageDialog({
   form: ReturnType<typeof Form.useForm<PackageFormValues>>[0];
   open: boolean;
   editing: boolean;
+  copiedFrom?: string;
+  copiedYearChanged?: boolean;
   loading: boolean;
   learningSpaces: LearningSpace[];
   academicYearOptions: Array<{ label: string; value: string }>;
@@ -665,7 +669,7 @@ export function PackageDialog({
 
   return (
     <FormDrawer
-      title={editing ? '编辑课程方案' : '新增课程方案'}
+      title={copiedFrom ? '确认复制的课程方案' : editing ? '编辑课程方案' : '新增课程方案'}
       open={open}
       onCancel={onCancel}
       onSubmit={() => form.submit()}
@@ -680,6 +684,16 @@ export function PackageDialog({
       width="min(720px, 100vw)"
     >
         <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
+        {copiedFrom && (
+          <Alert
+            type="info"
+            showIcon
+            message={copiedYearChanged
+              ? `已从「${copiedFrom}」复制到当前学年。学习空间和开放内容都保留了，学生开通记录不会带过来。确认后保存即可。`
+              : `已从「${copiedFrom}」复制成独立方案。学生开通记录不会带过来，可直接改等级、内容或名称。`}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Form.Item name="name" label="方案名称" rules={[{ required: true, message: '请输入方案名称' }]}>
           <Input
             placeholder="下面选完后自动生成，也可以手动修改"

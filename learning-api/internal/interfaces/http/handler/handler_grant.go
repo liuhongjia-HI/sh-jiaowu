@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"io"
 	"strings"
 
 	"starline/learning-api/internal/domain/learning"
@@ -34,6 +36,20 @@ func (h *LearningHandler) UpdatePackage(c *gin.Context) {
 		return
 	}
 	OK(c, updated)
+}
+
+func (h *LearningHandler) CopyPackage(c *gin.Context) {
+	req, ok := bindPackageCopy(c)
+	if !ok {
+		return
+	}
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	copied, err := h.service.CopyPackage(operator.(string), c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, copied)
 }
 
 func (h *LearningHandler) DeletePackage(c *gin.Context) {
@@ -137,6 +153,18 @@ func (h *LearningHandler) ReplaceDirectGrant(c *gin.Context) {
 		return
 	}
 	OK(c, result)
+}
+
+func bindPackageCopy(c *gin.Context) (learning.PackageCopyRequest, bool) {
+	var req learning.PackageCopyRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		BadRequest(c, "invalid request")
+		return learning.PackageCopyRequest{}, false
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.AcademicYear = strings.TrimSpace(req.AcademicYear)
+	req.Status = learning.Status(strings.TrimSpace(string(req.Status)))
+	return req, true
 }
 
 func bindPackage(c *gin.Context) (learning.PackageUpsertRequest, bool) {

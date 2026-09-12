@@ -241,6 +241,56 @@ test('课程方案可在二次确认后删除', async ({ page }) => {
   await expect(page.getByText('课程方案已删除。')).toBeVisible();
 });
 
+test('课程方案可一键复制并打开新方案编辑', async ({ page }) => {
+  await login(page, '13800000001');
+  const source = {
+    id: 'pkg-copy-src',
+    name: '可复制的课程方案',
+    academicYear: '2025.2026学年',
+    grade: '五年级',
+    semester: 'S1',
+    subject: '英语',
+    level: 'S',
+    phaseScope: 'Q1',
+    packageType: '题',
+    summary: '复制源',
+    learningSpaceIds: ['space-g05-english-s1-q1'],
+    contentTypeCodes: ['question'],
+    status: '启用'
+  };
+  const copied = {
+    ...source,
+    id: 'pkg-copy-dst',
+    name: '2026.2027学年 可复制的课程方案',
+    academicYear: '2026.2027学年',
+    summary: '复制源',
+    openStudentNum: 0
+  };
+  await page.route('**/api/packages/pkg-copy-src/copy', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, message: 'ok', data: copied }) });
+  });
+  await page.route('**/api/packages', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 0, message: 'ok', data: [source] })
+    });
+  });
+
+  await expectPageHeading(page, '/packages', '课程方案');
+  const row = page.locator('.ant-table-tbody tr', { hasText: '可复制的课程方案' });
+  await row.getByRole('button', { name: '复制' }).click();
+  await expect(page.getByText('已复制到2026.2027学年，学生开通记录不会带过来。')).toBeVisible();
+  const drawer = page.getByRole('dialog', { name: '确认复制的课程方案' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText('已从「可复制的课程方案」复制到当前学年')).toBeVisible();
+  await expect(drawer.getByLabel('方案名称')).toHaveValue('2026.2027学年 可复制的课程方案');
+});
+
 test('课程方案可按年级、科目和等级筛选', async ({ page }) => {
   await login(page, '13800000001');
   await page.route('**/api/packages', async (route) => {

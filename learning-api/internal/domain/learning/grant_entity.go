@@ -36,6 +36,14 @@ type PackageUpsertRequest struct {
 	Status           Status   `json:"status"`
 }
 
+// PackageCopyRequest 复制课程方案。空字段由服务端按最省事的规则补齐：
+// 学年默认滚到当前学年（源方案如果已经是未来学年则保持），名称自动去重。
+type PackageCopyRequest struct {
+	Name         string `json:"name"`
+	AcademicYear string `json:"academicYear"`
+	Status       Status `json:"status"`
+}
+
 // StudentTrial 描述学生当前学年的体验资格与使用状态。体验记录负责资格和
 // 转正归因，套餐授权继续负责具体内容的访问控制。
 type StudentTrial struct {
