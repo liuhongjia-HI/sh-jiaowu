@@ -63,3 +63,56 @@ func TestDeleteReferencedCustomSubjectRejected(t *testing.T) {
 		t.Fatalf("expected referenced subject delete to fail, got %v", err)
 	}
 }
+
+func TestEnablingHistorySubjectAddsLearningSpaces(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	before := len(store.learningSpaces)
+	if before != 668 {
+		t.Fatalf("expected 668 core learning spaces before enabling history, got %d", before)
+	}
+
+	updated, err := store.UpdateSubjectMetadata("测试管理员", "history", learning.SubjectMetadataUpdateRequest{
+		ShortLabel: "His",
+		Color:      "#8B5A2B",
+		SortOrder:  7,
+		Status:     "启用",
+	})
+	if err != nil {
+		t.Fatalf("enable history: %v", err)
+	}
+	if updated.Status != "启用" {
+		t.Fatalf("history should stay enabled, got %#v", updated)
+	}
+	if len(store.learningSpaces) <= before {
+		t.Fatal("enabling history should create learning spaces")
+	}
+
+	var spaceID string
+	for _, space := range store.LearningSpaces() {
+		if space.Grade == "六年级" && space.Subject == "历史" && space.Semester == "S1" && space.Level == "S" && space.Status == "启用" {
+			spaceID = space.ID
+			break
+		}
+	}
+	if spaceID == "" {
+		t.Fatal("expected an enabled grade-6 history learning space")
+	}
+
+	pkg, err := store.CreatePackage("测试管理员", learning.PackageUpsertRequest{
+		Name:             "六年级 History 课程方案",
+		AcademicYear:     currentAcademicYear(),
+		Grade:            "六年级",
+		Semester:         "S1",
+		Subject:          "历史",
+		Level:            "S",
+		LearningSpaceIDs: []string{spaceID},
+		ContentTypeCodes: []string{"question"},
+		Status:           learning.StatusEnabled,
+	})
+	if err != nil {
+		t.Fatalf("create history package: %v", err)
+	}
+	if pkg.Subject != "历史" {
+		t.Fatalf("unexpected package subject: %#v", pkg)
+	}
+}

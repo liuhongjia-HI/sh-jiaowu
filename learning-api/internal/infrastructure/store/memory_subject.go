@@ -59,6 +59,9 @@ func (s *MemoryStore) updateSubjectMetadataUnlocked(operator, id string, req lea
 		s.subjects[index].Color = req.Color
 		s.subjects[index].SortOrder = req.SortOrder
 		s.subjects[index].Status = req.Status
+		if req.Status == "启用" {
+			s.ensureLearningSpaces(currentAcademicYear())
+		}
 		s.prependLogDetail(operator, "修改学科显示配置", before.Name, auditChangeDetail(before, s.subjects[index]))
 		updated := s.subjects[index]
 		updated.Deletable = s.subjectDeleteBlockReason(updated) == ""

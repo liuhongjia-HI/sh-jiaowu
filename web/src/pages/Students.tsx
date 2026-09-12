@@ -34,7 +34,7 @@ import type { KeyboardEvent } from 'react';
 import { deleteData, getData, postData, postForm, putData } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
-import { gradeOptions as curriculumGradeOptions, subjectLabel, subjectOptions } from '../utils/curriculum';
+import { gradeOptions as curriculumGradeOptions, subjectLabel, subjectOptions, useSubjectCatalog } from '../utils/curriculum';
 import type {
   CurrentUser,
   DirectGrantReplaceRequest,
@@ -749,6 +749,7 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
   const [editing, setEditing] = useState<StudentScoreRecord | null>(null);
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+  const subjectCatalog = useSubjectCatalog();
   const queryKey = ['students', student.id, 'scores'];
   const scores = useQuery({
     queryKey,
@@ -891,7 +892,7 @@ function ScorePanel({ student, canEdit }: { student: Student; canEdit: boolean }
               <Select options={examTypeOptions} />
             </Form.Item>
             <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]} style={{ width: '33%' }}>
-              <Select placeholder="学科" options={subjectOptions(student.grade)} />
+              <Select placeholder="学科" options={subjectOptions(student.grade, subjectCatalog)} />
             </Form.Item>
             <Form.Item name="examDate" label="考试日期" rules={[{ required: true, message: '请选择考试日期' }]} style={{ width: '33%' }}>
               <Input type="date" />

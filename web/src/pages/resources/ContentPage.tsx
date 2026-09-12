@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, postData, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../../components/ListViews';
 import { CourseDialog, type CourseFormValues } from './ResourceDialogs';
-import { DEFAULT_PHASES, DEFAULT_SEMESTERS, gradeOptions, phaseLabel, semesterLabel, subjectLabel, subjectOptions, subjectsForGrade } from '../../utils/curriculum';
+import { DEFAULT_PHASES, DEFAULT_SEMESTERS, gradeOptions, phaseLabel, semesterLabel, subjectLabel, subjectOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, LearningSpace } from '../../types/starline';
 import { useSearchParams } from 'react-router-dom';
 import MaterialsPage from './MaterialsPage';
@@ -41,6 +41,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
   const client = useQueryClient();
   const courses = useQuery({ queryKey: ['content'], queryFn: () => getData<Course[]>('/courses') });
   const spaces = useQuery({ queryKey: ['learning-spaces-for-content'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
+  const subjectCatalog = useSubjectCatalog();
   const canManage = Boolean(user?.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role)));
   const save = useMutation({
     mutationFn: (values: CourseFormValues) => {
@@ -128,7 +129,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
               options={gradeOptions()}
               onChange={(value) => {
                 setGradeFilter(value);
-                setSubjectFilter((current) => (value && current && !subjectsForGrade(value).includes(current) ? undefined : current));
+                setSubjectFilter((current) => (value && current && !subjectsForGrade(value, subjectCatalog).includes(current) ? undefined : current));
                 setPage(1);
               }}
             />
@@ -137,7 +138,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
               aria-label="学科"
               placeholder="学科"
               value={subjectFilter}
-              options={subjectOptions(gradeFilter)}
+              options={subjectOptions(gradeFilter, subjectCatalog)}
               onChange={(value) => {
                 setSubjectFilter(value);
                 setPage(1);

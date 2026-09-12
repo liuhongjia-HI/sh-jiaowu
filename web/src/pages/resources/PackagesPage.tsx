@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import { PackageDialog } from './ResourceDialogs';
-import { academicYearForDate, academicYearsFromCalendar, ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, gradeIndex, gradeOptions, LEARNING_LEVELS, levelOptions, levelsForGradeSubject, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade } from '../../utils/curriculum';
+import { academicYearForDate, academicYearsFromCalendar, ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, gradeIndex, gradeOptions, LEARNING_LEVELS, levelOptions, levelsForGradeSubject, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
 import type { CurrentUser, LearningSpace, PackageUpsertRequest, StudyPackage } from '../../types/starline';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,6 +25,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
   const packages = useQuery({ queryKey: ['packages'], queryFn: () => getData<StudyPackage[]>('/packages') });
   const spaces = useQuery({ queryKey: ['learning-spaces-for-packages'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const settings = useQuery({ queryKey: ['settings-for-packages'], queryFn: () => getData<Record<string, string>>('/settings') });
+  const subjectCatalog = useSubjectCatalog();
   const canManage = Boolean(user?.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role)));
   const save = useMutation({
     mutationFn: (values: PackageUpsertRequest) => {
@@ -95,8 +96,8 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
   const initialValues: PackageUpsertRequest = editing
     ? { name: editing.name, academicYear: editing.academicYear, grade: editing.grade, subject: editing.subject, semester: editing.semester, level: editing.level || 'S', phaseScope: editing.phaseScope, packageType: editing.packageType, summary: editing.summary, learningSpaceIds: editing.learningSpaceIds ?? [], contentTypeCodes: editing.contentTypeCodes ?? [], trialEnabled: editing.trialEnabled, status: editing.status }
     : defaults;
-  const subjectSelectOptions = subjectOptions(gradeFilter);
-  const levelSelectOptions = filterLevelOptions(gradeFilter, subjectFilter);
+  const subjectSelectOptions = subjectOptions(gradeFilter, subjectCatalog);
+  const levelSelectOptions = filterLevelOptions(gradeFilter, subjectFilter, subjectCatalog);
 
   return (
     <div className="page-stack">
@@ -118,10 +119,10 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
             value={gradeFilter}
             options={gradeOptions()}
             onChange={(value) => {
-              const nextSubject = value && subjectFilter && !subjectsForGrade(value).includes(subjectFilter) ? undefined : subjectFilter;
+              const nextSubject = value && subjectFilter && !subjectsForGrade(value, subjectCatalog).includes(subjectFilter) ? undefined : subjectFilter;
               setGradeFilter(value);
               setSubjectFilter(nextSubject);
-              setLevelFilter((current) => (value && current && !levelAllowed(value, nextSubject, current) ? undefined : current));
+              setLevelFilter((current) => (value && current && !levelAllowed(value, nextSubject, current, subjectCatalog) ? undefined : current));
               setPage(1);
             }}
           />
@@ -133,7 +134,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
             options={subjectSelectOptions}
             onChange={(value) => {
               setSubjectFilter(value);
-              setLevelFilter((current) => (gradeFilter && value && current && !levelsForGradeSubject(gradeFilter, value).includes(current) ? undefined : current));
+              setLevelFilter((current) => (gradeFilter && value && current && !levelsForGradeSubject(gradeFilter, value, subjectCatalog).includes(current) ? undefined : current));
               setPage(1);
             }}
           />
@@ -196,18 +197,18 @@ function sortableIndex(index: number) {
   return index < 0 ? Number.MAX_SAFE_INTEGER : index;
 }
 
-function filterLevelOptions(grade?: string, subject?: string) {
-  if (grade && subject) return levelOptions(grade, subject);
+function filterLevelOptions(grade?: string, subject?: string, catalog?: string[]) {
+  if (grade && subject) return levelOptions(grade, subject, catalog);
   if (grade) {
-    const allowed = new Set(subjectsForGrade(grade).flatMap((item) => levelsForGradeSubject(grade, item)));
+    const allowed = new Set(subjectsForGrade(grade, catalog).flatMap((item) => levelsForGradeSubject(grade, item, catalog)));
     return LEARNING_LEVELS.filter((level) => allowed.has(level)).map((level) => ({ label: level, value: level }));
   }
   return LEARNING_LEVELS.map((level) => ({ label: level, value: level }));
 }
 
-function levelAllowed(grade: string, subject: string | undefined, level: string) {
+function levelAllowed(grade: string, subject: string | undefined, level: string, catalog?: string[]) {
   const allowed = subject
-    ? levelsForGradeSubject(grade, subject)
-    : subjectsForGrade(grade).flatMap((item) => levelsForGradeSubject(grade, item));
+    ? levelsForGradeSubject(grade, subject, catalog)
+    : subjectsForGrade(grade, catalog).flatMap((item) => levelsForGradeSubject(grade, item, catalog));
   return allowed.includes(level);
 }

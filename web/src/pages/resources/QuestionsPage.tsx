@@ -6,7 +6,7 @@ import { getData, postData, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../../components/ListViews';
 import { QuestionDialog } from './ResourceDialogs';
 import { canUpload, hasAdminContentScope, normalizeQuestionForm, optionFromValues, questionTitle, questionTypeLabel, uniqueValues } from './resource-shared';
-import { gradeOptions, semesterOptions, subjectLabel, subjectOptions } from '../../utils/curriculum';
+import { gradeOptions, semesterOptions, subjectLabel, subjectOptions, useSubjectCatalog } from '../../utils/curriculum';
 import type { CurrentUser, LearningSpace, QuestionBankItem, QuestionBankUpsertRequest } from '../../types/starline';
 
 export default function QuestionsPage({ user }: { user?: CurrentUser }) {
@@ -22,6 +22,7 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
   const questions = useQuery({ queryKey: ['questions', gradeFilter, subjectFilter, keyword], queryFn: () => getData<QuestionBankItem[]>('/questions', { grade: gradeFilter || '', subject: subjectFilter || '', keyword }) });
   const learningSpaces = useQuery({ queryKey: ['learning-spaces-for-questions'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const settings = useQuery({ queryKey: ['settings-for-questions'], queryFn: () => getData<Record<string, string>>('/settings') });
+  const subjectCatalog = useSubjectCatalog();
   const currentSemesterOptions = semesterOptions(settings.data?.semesters);
   const questionScope = useMemo(() => {
     const unrestricted = hasAdminContentScope(user);
@@ -68,7 +69,7 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
       const defaultGrade = questionScope.gradeOptions.length === 1 ? questionScope.gradeOptions[0].value : undefined;
       const defaultSemester = questionScope.semesterOptions.length === 1 ? questionScope.semesterOptions[0].value : currentSemesterOptions[0]?.value || 'S1';
       const scopedSubjects = questionScope.unrestricted
-        ? subjectOptions(defaultGrade)
+        ? subjectOptions(defaultGrade, subjectCatalog)
         : optionFromValues(uniqueValues(questionScope.spaces.filter((space) => (!defaultGrade || space.grade === defaultGrade) && (!defaultSemester || space.semester === defaultSemester)).map((space) => space.subject)));
       form.setFieldsValue({ title: '', grade: defaultGrade as string, semester: defaultSemester, subject: (scopedSubjects.length === 1 ? scopedSubjects[0].value : undefined) as string, type: 'single', stem: '', options: [''], answer: '', answers: [], score: 10, status: '启用' });
     }
@@ -87,7 +88,7 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
       <div className="list-toolbar" style={{ marginBottom: 16 }}>
         <Space wrap>
           <Select allowClear placeholder="全部年级" options={gradeOptions()} value={gradeFilter} onChange={(value) => { setGradeFilter(value); setSubjectFilter(undefined); setPage(1); }} style={{ width: 140 }} />
-          <Select allowClear placeholder="全部学科" options={subjectOptions(gradeFilter)} value={subjectFilter} onChange={(value) => { setSubjectFilter(value); setPage(1); }} style={{ width: 140 }} />
+          <Select allowClear placeholder="全部学科" options={subjectOptions(gradeFilter, subjectCatalog)} value={subjectFilter} onChange={(value) => { setSubjectFilter(value); setPage(1); }} style={{ width: 140 }} />
           <Input.Search allowClear placeholder="搜索题目" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} />
           <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => questions.refetch()} />
         </Space>

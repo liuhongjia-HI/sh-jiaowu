@@ -298,6 +298,9 @@ function SubjectMetadataCard() {
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
       queryClient.invalidateQueries({ queryKey: ['subjects-for-schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-packages'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-content'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-questions'] });
       queryClient.invalidateQueries({ queryKey: ['logs'] });
     },
     onError: (error: Error) => message.error(error.message || '保存学科显示配置失败，请检查输入。')
@@ -322,7 +325,7 @@ function SubjectMetadataCard() {
   return (
     <Card title="学科显示配置" extra={<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => subjects.refetch()} />}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        学科名称由课程和学习空间使用。此处维护课表等页面的简称、颜色、排序和启用状态；没有业务引用的残留学科可以删除，内置学科只能停用。
+        学科元数据是课程方案、年级课程目录等页面的下拉来源。启用后会出现在新建选项中，停用后不再出现；简称、颜色和排序仍用于课表展示。没有业务引用的残留学科可以删除，内置学科只能停用。
       </Typography.Paragraph>
       {subjects.isLoading ? <Skeleton active /> : subjects.error ? <Alert type="error" message="学科配置加载失败，请稍后重试。" /> : (
         <Table

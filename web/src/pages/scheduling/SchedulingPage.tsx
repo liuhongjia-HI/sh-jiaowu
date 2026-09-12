@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
-import { gradeOptions, subjectLabel, subjectOptions } from '../../utils/curriculum';
+import { gradeOptions, subjectLabel, subjectOptions, useSubjectCatalog } from '../../utils/curriculum';
 import type { AvailabilitySlot, Course, CurrentUser, ScheduleClass, Student, Teacher } from '../../types/starline';
 import {
   addDays,
@@ -300,7 +300,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const teacherOptions = (teachers.data ?? []).map((item) => ({ label: teacherOptionLabel(item), value: item.id }));
   const studentOptions = (students.data ?? []).map((item) => ({ label: studentOptionLabel(item), value: item.id }));
   const campusOptions = uniqueScheduleCampuses(classes.data ?? []).map((value) => ({ label: value, value }));
-  const classSubjectOptions = subjectOptions(classGradeFilter);
+  const subjectCatalog = useSubjectCatalog();
+  const classSubjectOptions = subjectOptions(classGradeFilter, subjectCatalog);
   const courseById = useMemo(() => Object.fromEntries((courses.data ?? []).map((item) => [item.id, item])), [courses.data]);
   const teacherById = useMemo(() => Object.fromEntries((teachers.data ?? []).map((item) => [item.id, item])), [teachers.data]);
   const studentById = useMemo(() => Object.fromEntries((students.data ?? []).map((item) => [item.id, item])), [students.data]);
@@ -393,10 +394,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   }, [availability.data, availabilityForm]);
 
   useEffect(() => {
-    if (classSubjectFilter && !subjectOptions(classGradeFilter).some((item) => item.value === classSubjectFilter)) {
+    if (classSubjectFilter && !subjectOptions(classGradeFilter, subjectCatalog).some((item) => item.value === classSubjectFilter)) {
       setClassSubjectFilter(undefined);
     }
-  }, [classGradeFilter, classSubjectFilter]);
+  }, [classGradeFilter, classSubjectFilter, subjectCatalog]);
 
   // 打开「维护可上课时间」抽屉，并预选某个师生，便于一键协调缺时间的对象。
   function openAvailabilityFor(ownerType: 'teacher' | 'student', ownerId: string) {
