@@ -438,6 +438,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"notices", "related_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "recipient_student_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "retry_count", "INT NOT NULL DEFAULT 0"},
+		{"notices", "is_read", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"parent_notices", "notice_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"parent_notices", "channel", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"parent_notices", "failure_reason", "TEXT NOT NULL"},

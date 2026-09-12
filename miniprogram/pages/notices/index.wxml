@@ -32,7 +32,7 @@
       <view class="notice-body">
         <view class="notice-title-row">
           <view class="notice-title">{{item.title}}</view>
-          <view class="notice-status">{{item.status}}</view>
+          <view class="notice-status {{item.isRead ? 'notice-status-read' : 'notice-status-unread'}}">{{item.isRead ? '已读' : '未读'}}</view>
         </view>
         <view class="notice-summary">{{item.summary}}</view>
         <view class="notice-target">{{item.studentDisplay || item.scopeText}}</view>

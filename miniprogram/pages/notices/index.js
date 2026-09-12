@@ -68,12 +68,25 @@ Page({
   goNotice(event) {
     const id = event.currentTarget.dataset.id || "";
     const notice = this.data.notices.find((item) => item.id === id);
-    const path = notice && notice.destinationPath;
+    if (!notice) return;
+    const path = notice.destinationPath;
     if (!path) {
+      this.markNoticeRead(notice);
       wx.showToast({ title: "这条通知暂无可查看的详情", icon: "none" });
       return;
     }
-    wx.navigateTo({ url: path });
+    wx.navigateTo({ url: path, success: () => this.markNoticeRead(notice) });
+  },
+  markNoticeRead(notice) {
+    if (notice.isRead) return;
+    return request(`/student/notices/${encodeURIComponent(notice.id)}/read`, { method: "POST", silent: true })
+      .then(() => {
+        this.setData({
+          notices: this.data.notices.map((item) => item.id === notice.id ? { ...item, isRead: true } : item)
+        }, () => this.applyFilters());
+      })
+      // 请求工具已提示错误，保留未读状态，允许下次点击重试。
+      .catch(() => {});
   },
   changeFilter(event) {
     const activeFilter = event.currentTarget.dataset.filter;
@@ -94,6 +107,7 @@ Page({
 function decorateNotices(notices, student) {
   return notices.map((notice) => ({
     ...notice,
+    isRead: notice.isRead === true,
     icon: notice.type || "新",
     iconClass: notice.type === "评" ? "review" : "default",
     category: noticeCategory(notice),

@@ -198,3 +198,70 @@ test("linked student names can wrap without hiding the switch action", () => {
   assert.match(contextMainRules, /min-width:\s*0/);
   assert.match(nameRules, /overflow-wrap:\s*anywhere/);
 });
+
+test("opening a notice saves its read state and retains it after reload", async () => {
+  let isRead = false;
+  let writes = 0;
+  const page = loadNoticesPage((path, options) => {
+    if (path === "/student/accounts") return Promise.resolve([]);
+    if (path === "/student/notices/course-1/read") {
+      assert.equal(options.method, "POST");
+      writes++;
+      isRead = true;
+      return Promise.resolve({ isRead });
+    }
+    return Promise.resolve([
+      { id: "course-1", relatedType: "course", relatedId: "course-001", status: "已发送", isRead },
+      { id: "course-2", relatedType: "course", relatedId: "course-002" }
+    ]);
+  });
+  global.wx.navigateTo = ({ success }) => success();
+  page.onLoad();
+  await flushPromises();
+  assert.equal(page.data.visibleNotices[0].isRead, false);
+  page.changeFilter({ currentTarget: { dataset: { filter: "课程" } } });
+  page.goNotice({ currentTarget: { dataset: { id: "course-1" } } });
+  await flushPromises();
+  assert.deepEqual(page.data.visibleNotices.map((item) => item.isRead), [true, false]);
+  page.goNotice({ currentTarget: { dataset: { id: "course-1" } } });
+  await flushPromises();
+  assert.equal(writes, 1);
+  page.loadNotices();
+  await flushPromises();
+  assert.deepEqual(page.data.visibleNotices.map((item) => item.isRead), [true, false]);
+});
+
+test("failed navigation does not mark a notice read", async () => {
+  let writes = 0;
+  const page = loadNoticesPage((path, options) => {
+    if (options && options.method === "POST") writes++;
+    return Promise.resolve([{ id: "course-1", relatedType: "course", relatedId: "course-001" }]);
+  });
+  global.wx.navigateTo = () => {};
+  page.onLoad();
+  await flushPromises();
+  page.goNotice({ currentTarget: { dataset: { id: "course-1" } } });
+  await flushPromises();
+  assert.equal(writes, 0);
+  assert.equal(page.data.visibleNotices[0].isRead, false);
+});
+
+test("failed read-state save keeps the message unread and allows retry", async () => {
+  let writes = 0;
+  const page = loadNoticesPage((path, options) => {
+    if (options && options.method === "POST") {
+      writes++;
+      return writes === 1 ? Promise.reject(new Error("network error")) : Promise.resolve({ isRead: true });
+    }
+    return Promise.resolve([{ id: "course-1", relatedType: "course", relatedId: "course-001" }]);
+  });
+  global.wx.navigateTo = ({ success }) => success();
+  page.onLoad();
+  await flushPromises();
+  page.goNotice({ currentTarget: { dataset: { id: "course-1" } } });
+  await flushPromises();
+  assert.equal(page.data.visibleNotices[0].isRead, false);
+  page.goNotice({ currentTarget: { dataset: { id: "course-1" } } });
+  await flushPromises();
+  assert.equal(page.data.visibleNotices[0].isRead, true);
+});

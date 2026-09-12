@@ -3,6 +3,9 @@ package learningapp
 import "starline/learning-api/internal/domain/learning"
 
 func (s *Service) Notices(p learning.Principal) []learning.Notice { return s.notice.Notices(p) }
+func (s *Service) MarkStudentNoticeRead(p learning.Principal, id string) (learning.Notice, error) {
+	return s.notice.MarkStudentNoticeRead(p, id)
+}
 func (s *Service) CreateNotice(o string, p learning.Principal, r learning.NoticeCreateRequest) (learning.Notice, error) {
 	return s.notice.CreateNotice(o, p, r)
 }

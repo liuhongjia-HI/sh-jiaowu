@@ -254,8 +254,20 @@
 
 .notice-status {
   flex: none;
-  color: #45bd80;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
   font-size: 19rpx;
+}
+
+.notice-status-unread {
+  background: #fff0e9;
+  color: #ff5a1f;
+  font-weight: 700;
+}
+
+.notice-status-read {
+  background: #f2f3f5;
+  color: #777a83;
 }
 
 .notice-summary {

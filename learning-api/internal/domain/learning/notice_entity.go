@@ -9,6 +9,7 @@ type Notice struct {
 	Channel            string `json:"channel,omitempty"`
 	RecipientOpenID    string `json:"recipientOpenId,omitempty"`
 	Status             string `json:"status"`
+	IsRead             bool   `json:"isRead"`
 	FailureReason      string `json:"failureReason,omitempty"`
 	RelatedType        string `json:"relatedType,omitempty"`
 	RelatedID          string `json:"relatedId,omitempty"`

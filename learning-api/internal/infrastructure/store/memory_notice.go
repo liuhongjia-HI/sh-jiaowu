@@ -22,6 +22,29 @@ func (s *MemoryStore) noticesUnlocked(principal learning.Principal) []learning.N
 	return out
 }
 
+func (s *MemoryStore) MarkStudentNoticeRead(principal learning.Principal, id string) (learning.Notice, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	student, ok := s.findStudent(principal.StudentID)
+	if !ok || student.AccountStatus == "停用" {
+		return learning.Notice{}, errors.New("学生账号不存在或已停用")
+	}
+	for index, notice := range s.notices {
+		// 学生收件箱的通知均绑定唯一学生，阅读状态随该通知持久化。
+		if notice.ID != id || notice.RecipientStudentID != student.ID || !studentNoticeVisible(notice) {
+			continue
+		}
+		if notice.IsRead {
+			return notice, nil
+		}
+		return persistentMutation(s, func(work *MemoryStore) (learning.Notice, error) {
+			work.notices[index].IsRead = true
+			return work.notices[index], nil
+		})
+	}
+	return learning.Notice{}, errors.New("通知不存在或无权查看")
+}
+
 func (s *MemoryStore) createNoticeUnlocked(operator string, principal learning.Principal, req learning.NoticeCreateRequest) (learning.Notice, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.Notice, error) {
