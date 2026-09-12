@@ -124,7 +124,6 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const [uploaderId, setUploaderId] = useState<string>();
   const [uploadedFrom, setUploadedFrom] = useState('');
   const [uploadedTo, setUploadedTo] = useState('');
-  const [draggingMaterialId, setDraggingMaterialId] = useState('');
   const [draggingPackKey, setDraggingPackKey] = useState('');
   const [draggingHomeworkId, setDraggingHomeworkId] = useState('');
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -151,7 +150,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       const files = (values.fileList ?? []).map((item) => item.originFileObj).filter(Boolean) as File[];
       if (files.length === 0) throw new Error('请选择文件');
       const lessonLabel = formatResourceCurriculumLabel({ lessonId: values.lessonId }, course);
-      const existingTags = new Set((resources.data ?? []).filter((item): item is Material => !('assessmentType' in item) && item.courseId === course.id && item.lessonId === values.lessonId && Boolean(item.tagCode)).map((item) => item.tagCode as string));
+      const existingSource = allMaterials.data ?? (resources.data ?? []).filter((item): item is Material => !('assessmentType' in item));
+      const existingTags = new Set(existingSource.filter((item) => item.courseId === course.id && item.lessonId === values.lessonId && Boolean(item.tagCode)).map((item) => item.tagCode as string));
       const uploaded: Material[] = [];
       let added = 0;
       let replaced = 0;
@@ -350,39 +350,6 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     reorderMaterials.mutate({ courseId: target.courseId || '', materialIds: reordered.map((item) => item.id) });
   };
 
-  const handleMaterialDrop = (target: Material) => {
-    if (!allMaterials.data) {
-      setDraggingMaterialId('');
-      message.info('资料正在加载，请稍后再试。');
-      return;
-    }
-    const source = (allMaterials.data ?? []).find((item) => item.id === draggingMaterialId);
-    setDraggingMaterialId('');
-    if (!source || source.id === target.id) return;
-    if (source.courseId !== target.courseId) {
-      message.warning('讲义只能在同一课程内调整顺序。');
-      return;
-    }
-    const courseMaterials = (allMaterials.data ?? []).filter((item) => item.courseId === target.courseId);
-    const reordered = moveMaterial(courseMaterials, source.id, target.id);
-    if (reordered === courseMaterials) return;
-    reorderMaterials.mutate({ courseId: target.courseId || '', materialIds: reordered.map((item) => item.id) });
-  };
-
-  const moveMaterialByOffset = (source: Material, offset: number) => {
-    const courseMaterials = (allMaterials.data ?? []).filter((item) => item.courseId === source.courseId);
-    const sourceIndex = courseMaterials.findIndex((item) => item.id === source.id);
-    const target = courseMaterials[sourceIndex + offset];
-    if (target) handleMaterialDropFromSource(source, target);
-  };
-
-  const handleMaterialDropFromSource = (source: Material, target: Material) => {
-    if (source.courseId !== target.courseId) return;
-    const courseMaterials = (allMaterials.data ?? []).filter((item) => item.courseId === target.courseId);
-    const reordered = moveMaterial(courseMaterials, source.id, target.id);
-    if (reordered === courseMaterials) return;
-    reorderMaterials.mutate({ courseId: target.courseId || '', materialIds: reordered.map((item) => item.id) });
-  };
   const handleHomeworkDrop = (target: Homework) => {
     const source = (resources.data ?? []).find((item) => item.id === draggingHomeworkId) as Homework | undefined;
     setDraggingHomeworkId('');
@@ -469,7 +436,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
           return {
             onDragOver: (event) => event.preventDefault(),
             onDrop: (event) => { event.preventDefault(); handleHomeworkDrop(row as Homework); },
-            onDragEnd: () => { setDraggingMaterialId(''); setDraggingHomeworkId(''); }
+            onDragEnd: () => setDraggingHomeworkId('')
           };
         }}
         columns={[
