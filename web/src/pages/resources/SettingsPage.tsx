@@ -325,7 +325,7 @@ function SubjectMetadataCard() {
   return (
     <Card title="学科显示配置" extra={<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => subjects.refetch()} />}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        学科元数据是课程方案、年级课程目录等页面的下拉来源。启用后会出现在新建选项中，停用后不再出现；简称、颜色和排序仍用于课表展示。没有业务引用的残留学科可以删除，内置学科只能停用。
+        学科元数据是课程方案、年级课程目录等页面的下拉来源。启用后会出现在新建选项中，停用后不再出现。政治、生物等非内置残留学科可以删除；仍被课程或方案使用的不能删。内置学科只能停用。
       </Typography.Paragraph>
       {subjects.isLoading ? <Skeleton active /> : subjects.error ? <Alert type="error" message="学科配置加载失败，请稍后重试。" /> : (
         <Table
@@ -341,11 +341,9 @@ function SubjectMetadataCard() {
             { title: '操作', width: 108, render: (_: unknown, row: SubjectMetadata) => (
               <Space size={4}>
                 <ActionButton tooltip="编辑显示配置" icon={<EditOutlined />} onClick={() => openEdit(row)} />
-                {row.deletable ? (
-                  <Popconfirm title={`确定删除「${subjectLabel(row.name)}」？`} description="删除后不可恢复。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: remove.isPending }} onConfirm={() => remove.mutate(row.id)}>
-                    <ActionButton danger tooltip="删除学科" icon={<DeleteOutlined />} />
-                  </Popconfirm>
-                ) : null}
+                <Popconfirm title={`确定删除「${subjectLabel(row.name)}」？`} description="删除后不可恢复。内置学科或仍被课程、方案使用的学科会删除失败。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: remove.isPending }} onConfirm={() => remove.mutate(row.id)}>
+                  <ActionButton danger tooltip="删除学科" icon={<DeleteOutlined />} />
+                </Popconfirm>
               </Space>
             ) }
           ]}

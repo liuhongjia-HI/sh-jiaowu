@@ -52,6 +52,37 @@ func TestDeleteBuiltInSubjectMetadataRejected(t *testing.T) {
 	}
 }
 
+func TestDeleteLeftoverPoliticsAndBiologyIgnoresLearningSpaces(t *testing.T) {
+	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	store.subjects = append(store.subjects, learning.SubjectMetadata{
+		ID: "politics", Name: "政治", ShortLabel: "Pol", Color: "#888888", Status: "启用",
+	}, learning.SubjectMetadata{
+		ID: "biology", Name: "生物", ShortLabel: "Bio", Color: "#228B22", Status: "启用",
+	})
+	store.learningSpaces = append(store.learningSpaces, learningSpace{
+		ID: "space-g07-politics-s1-q1", Grade: "七年级", Subject: "政治", Semester: "S1", Phase: "Q1", Level: "S", Status: learning.StatusEnabled,
+	}, learningSpace{
+		ID: "space-g08-biology-s1-q1", Grade: "八年级", Subject: "生物", Semester: "S1", Phase: "Q1", Level: "S", Status: learning.StatusEnabled,
+	})
+	store.settings[gradeSubjectCatalogSetting] = `[{"id":"g7-politics","gradeCode":"G7","grade":"七年级","subject":"政治","displayName":"Politics","status":"启用","sortOrder":1}]`
+
+	for _, id := range []string{"politics", "biology"} {
+		if err := store.DeleteSubjectMetadata("测试管理员", id); err != nil {
+			t.Fatalf("delete leftover %s: %v", id, err)
+		}
+	}
+	for _, item := range store.Subjects() {
+		if item.ID == "politics" || item.ID == "biology" {
+			t.Fatalf("leftover subject should be gone: %#v", item)
+		}
+	}
+	for _, item := range store.GradeSubjects() {
+		if item.Subject == "政治" || item.Subject == "生物" {
+			t.Fatalf("grade catalog should drop leftover subject: %#v", item)
+		}
+	}
+}
+
 func TestDeleteReferencedCustomSubjectRejected(t *testing.T) {
 	store := NewMemoryStore()
 	store.subjects = append(store.subjects, learning.SubjectMetadata{

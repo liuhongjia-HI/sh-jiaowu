@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"sort"
@@ -94,6 +95,7 @@ func (s *MemoryStore) deleteSubjectMetadataUnlocked(operator, id string) error {
 		if reason := s.subjectDeleteBlockReason(item); reason != "" {
 			return errors.New(reason)
 		}
+		s.removeLeftoverSubjectFromCatalog(item.Name)
 		s.subjects = append(s.subjects[:index], s.subjects[index+1:]...)
 		s.prependLogDetail(operator, "删除学科显示配置", item.Name, "")
 		return nil
@@ -114,21 +116,13 @@ func (s *MemoryStore) subjectDeleteBlockReason(item learning.SubjectMetadata) st
 	if isDefaultSubjectID(item.ID) {
 		return "系统内置学科不能删除。如不再开设，请改为停用"
 	}
-	if reason := s.subjectUsageReason(item.Name); reason != "" {
-		return reason
-	}
-	return ""
+	return s.leftoverSubjectUsageReason(item.Name)
 }
 
-func (s *MemoryStore) subjectUsageReason(name string) string {
+func (s *MemoryStore) leftoverSubjectUsageReason(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return ""
-	}
-	for _, space := range s.learningSpaces {
-		if subjectsMatch(space.Subject, name) {
-			return "仍有学习空间使用该学科，不能删除。如不再开设，请改为停用"
-		}
 	}
 	for _, course := range s.courses {
 		if subjectsMatch(course.Subject, name) {
@@ -165,10 +159,40 @@ func (s *MemoryStore) subjectUsageReason(name string) string {
 			return "仍有成绩记录使用该学科，不能删除。如不再开设，请改为停用"
 		}
 	}
-	for _, catalog := range s.gradeSubjectCatalogUnlocked() {
-		if subjectsMatch(catalog.Subject, name) {
-			return "年级课程目录仍在使用该学科，不能删除。请先从目录中移除"
-		}
-	}
 	return ""
+}
+
+func (s *MemoryStore) removeLeftoverSubjectFromCatalog(name string) {
+	if s.settings == nil {
+		return
+	}
+	raw := strings.TrimSpace(s.settings[gradeSubjectCatalogSetting])
+	if raw == "" {
+		return
+	}
+	var items []learning.GradeSubjectMetadata
+	if err := json.Unmarshal([]byte(raw), &items); err != nil || len(items) == 0 {
+		return
+	}
+	kept := make([]learning.GradeSubjectMetadata, 0, len(items))
+	removed := false
+	for _, item := range items {
+		if subjectsMatch(item.Subject, name) {
+			removed = true
+			continue
+		}
+		kept = append(kept, item)
+	}
+	if !removed {
+		return
+	}
+	if len(kept) == 0 {
+		delete(s.settings, gradeSubjectCatalogSetting)
+		return
+	}
+	encoded, err := json.Marshal(kept)
+	if err != nil {
+		return
+	}
+	s.settings[gradeSubjectCatalogSetting] = string(encoded)
 }
