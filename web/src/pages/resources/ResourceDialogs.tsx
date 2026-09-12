@@ -1145,7 +1145,7 @@ export function UploadDialog({
         {kind === 'materials' ? <><LessonSelect course={selectedCourse} /><Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item></> : (
           <>
             <LessonSelect course={selectedCourse} />
-            <Form.Item name="allowDownload" valuePropName="checked" initialValue={false}><Checkbox>允许学生下载</Checkbox></Form.Item>
+            <Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item>
             <Alert
               type="info"
               showIcon
