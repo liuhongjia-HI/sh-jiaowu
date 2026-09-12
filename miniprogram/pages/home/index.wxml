@@ -1,10 +1,8 @@
 <view class="home-page">
   <view class="home-top">
-    <view class="home-greeting-row">
-      <view>
-        <view class="home-greeting">{{greeting}}，{{greetingName}} <text class="home-greeting-wave">👋</text></view>
-        <view class="home-greeting-sub">今天也来学一点</view>
-      </view>
+    <view class="home-title-row">
+      <view class="home-page-title">首页</view>
+      <view class="home-center-button" data-action="study" bindtap="handleShortcut">查看学习中心</view>
     </view>
     <view class="search-panel">
       <view class="search-icon">⌕</view>
@@ -48,15 +46,15 @@
       <view class="status-strip">
         <view class="status-item" data-action="tasks" bindtap="handleShortcut">
           <view class="status-value">{{todoItems.length}}</view>
-          <view class="status-label">今日待办</view>
+          <view class="status-label">今日待办</view><view class="english-label">To Do</view>
         </view>
         <view class="status-item" data-action="study" bindtap="handleShortcut">
           <view class="status-value">{{openedSubjectCount}}</view>
-          <view class="status-label">在学课程</view>
+          <view class="status-label">在学课程</view><view class="english-label">Course</view>
         </view>
         <view class="status-item" data-action="notices" bindtap="handleShortcut">
           <view class="status-value">{{noticeCount}}</view>
-          <view class="status-label">通知消息</view>
+          <view class="status-label">通知消息</view><view class="english-label">Message</view>
         </view>
       </view>
     </view>
@@ -64,7 +62,7 @@
     <view class="section">
       <view class="section-head">
         <view>
-          <view class="section-title tight">今日待办</view>
+          <view class="section-title tight">今日待办 <text class="english-inline">To Do</text></view>
           <view class="section-sub">优先完成重要任务</view>
         </view>
       </view>
@@ -91,7 +89,7 @@
       <view class="subscribe-prompt" bindtap="requestLearningSubscribe">
         <view class="subscribe-prompt-icon">醒</view>
         <view class="subscribe-prompt-main">
-          <view class="subscribe-prompt-title">{{subscriptionReminder.title || '学习提醒'}}</view>
+          <view class="subscribe-prompt-title">{{subscriptionReminder.title || '学习提醒'}} <text class="english-inline">Reminder</text></view>
           <view class="subscribe-prompt-summary">{{subscriptionReminder.summary || '接收上课、作业和批改完成提醒。'}}</view>
         </view>
         <view class="subscribe-prompt-action">{{subscriptionReminder.actionText || '开启提醒'}} ›</view>
@@ -101,7 +99,7 @@
     <view class="section">
       <view class="section-head">
         <view>
-          <view class="section-title tight">课堂反馈</view>
+          <view class="section-title tight">课堂反馈 <text class="english-inline">Comment</text></view>
           <view class="section-sub">查看课堂表现和下一步建议</view>
         </view>
       </view>
@@ -129,7 +127,7 @@
     <view class="section">
       <view class="section-head">
         <view>
-          <view class="section-title tight">推荐课程</view>
+          <view class="section-title tight">推荐课程 <text class="english-inline">Recommendation</text></view>
           <view class="section-sub">{{keyword ? "根据搜索结果为你推荐" : "看看本年级还可以学习哪些学科"}}</view>
         </view>
       </view>
