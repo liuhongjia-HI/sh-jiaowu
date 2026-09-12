@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Checkbox, Empty, Form, Input, InputNumber, Modal, Pagination, Radio, Select, Skeleton, Space, Table, Tag, Typography, Upload, message } from 'antd';
-import type { TableColumnsType, UploadFile } from 'antd';
+import type { FormInstance, TableColumnsType, UploadFile } from 'antd';
 import { CheckCircleOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -7,7 +7,7 @@ import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
-import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, curriculumSiblings, formatLearningSpace, levelOptions, nextCurriculumSortOrder, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
+import { ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, curriculumSiblings, formatLearningSpace, gradeIndex, gradeOptions, levelOptions, nextCurriculumSortOrder, phaseLabel, semesterLabel, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade, subjectsMatch, useSubjectCatalog } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -1084,6 +1084,114 @@ export function QuestionDialog({
   );
 }
 
+function courseMatchesScope(course: Course, grade?: string, subject?: string) {
+  if (grade && course.grade !== grade) return false;
+  if (subject && !subjectsMatch(course.subject, subject)) return false;
+  return true;
+}
+
+function sortScopeValues(values: string[], indexOf: (value: string) => number, labelOf = (value: string) => value) {
+  return [...values].sort((left, right) => {
+    const leftIndex = indexOf(left);
+    const rightIndex = indexOf(right);
+    if (leftIndex === rightIndex) return labelOf(left).localeCompare(labelOf(right), 'zh');
+    if (leftIndex < 0) return 1;
+    if (rightIndex < 0) return -1;
+    return leftIndex - rightIndex;
+  });
+}
+
+function CourseScopeSelect({
+  form,
+  courses,
+  initialCourse,
+  onCourseChange
+}: {
+  form: FormInstance;
+  courses: Course[];
+  initialCourse?: Course;
+  onCourseChange?: () => void;
+}) {
+  const [grade, setGrade] = useState(initialCourse?.grade || undefined);
+  const [subject, setSubject] = useState(initialCourse?.subject || undefined);
+  const gradeSelectOptions = useMemo(() => (
+    sortScopeValues(uniqueValues(courses.map((course) => course.grade)), gradeIndex).map((value) => ({ label: value, value }))
+  ), [courses]);
+  const subjectSelectOptions = useMemo(() => (
+    sortScopeValues(
+      uniqueValues(courses.filter((course) => !grade || course.grade === grade).map((course) => course.subject)),
+      (value) => ALL_SUBJECTS.findIndex((item) => subjectsMatch(item, value)),
+      subjectLabel
+    ).map((value) => ({ label: subjectLabel(value), value }))
+  ), [courses, grade]);
+  const filteredCourses = useMemo(
+    () => courses.filter((course) => courseMatchesScope(course, grade, subject)),
+    [courses, grade, subject]
+  );
+
+  const applyScope = (nextGrade?: string, nextSubject?: string) => {
+    const currentId = String(form.getFieldValue('courseId') || '');
+    const current = courses.find((course) => course.id === currentId);
+    if (current && !courseMatchesScope(current, nextGrade, nextSubject)) {
+      form.setFieldValue('courseId', undefined);
+      onCourseChange?.();
+    }
+  };
+
+  return (
+    <>
+      <Form.Item label="快捷筛选">
+        <Space.Compact block>
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            aria-label="年级"
+            placeholder="年级"
+            value={grade}
+            options={gradeSelectOptions}
+            style={{ width: '50%' }}
+            onChange={(value) => {
+              const nextGrade = value || undefined;
+              const nextSubject = nextGrade && subject && !courses.some((course) => course.grade === nextGrade && subjectsMatch(course.subject, subject))
+                ? undefined
+                : subject;
+              setGrade(nextGrade);
+              setSubject(nextSubject);
+              applyScope(nextGrade, nextSubject);
+            }}
+          />
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            aria-label="学科"
+            placeholder="学科"
+            value={subject}
+            options={subjectSelectOptions}
+            style={{ width: '50%' }}
+            onChange={(value) => {
+              const nextSubject = value || undefined;
+              setSubject(nextSubject);
+              applyScope(grade, nextSubject);
+            }}
+          />
+        </Space.Compact>
+      </Form.Item>
+      <Form.Item name="courseId" label="课程范围" rules={[{ required: true, message: '请选择课程范围' }]}>
+        <Select
+          showSearch
+          placeholder="选择学生可学习的课程"
+          optionFilterProp="searchLabel"
+          options={courseSelectOptions(filteredCourses)}
+          notFoundContent={grade || subject ? '当前筛选下暂无课程' : '暂无课程'}
+          onChange={onCourseChange}
+        />
+      </Form.Item>
+    </>
+  );
+}
+
 export function UploadDialog({
   kind,
   open,
@@ -1123,17 +1231,14 @@ export function UploadDialog({
         <Form.Item name="title" label={kind === 'materials' ? '资料标题' : '练习标题'} rules={kind === 'homework' ? [{ required: true, message: '请输入标题' }] : []}>
           <Input placeholder={kind === 'materials' ? '单文件可填写；批量上传默认使用文件名' : '例如：五年级英语 S1 Q1 阅读练习'} />
         </Form.Item>
-        <Form.Item name="courseId" label="课程范围" rules={[{ required: true, message: '请选择课程范围' }]}>
-          <Select
-            showSearch
-            placeholder="选择学生可学习的课程"
-            optionFilterProp="searchLabel"
-            options={courseSelectOptions(courses)}
-            onChange={() => {
-              if (kind === 'homework') form.setFieldValue('questionIds', []);
-            }}
-          />
-        </Form.Item>
+        <CourseScopeSelect
+          form={form}
+          courses={courses}
+          onCourseChange={() => {
+            form.setFieldValue('lessonId', undefined);
+            if (kind === 'homework') form.setFieldValue('questionIds', []);
+          }}
+        />
         {selectedCourse && onManageCurriculum && (
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => onManageCurriculum(selectedCourse)} style={{ marginTop: -16, marginBottom: 12, paddingInline: 0 }}>
             维护本课程的 Unit · Chapter · Lesson
@@ -1237,17 +1342,15 @@ export function ContentEditDialog({
         <Form.Item name="title" label={kind === 'materials' ? '资料标题' : '题目标题'} rules={[{ required: true, message: '请输入标题' }]}>
           <Input placeholder={kind === 'materials' ? '例如：五年级英语 S1 Q1 核心资料' : '例如：五年级英语 S1 Q1 阅读练习题'} />
         </Form.Item>
-        <Form.Item name="courseId" label="课程范围" rules={[{ required: true, message: '请选择课程范围' }]}>
-          <Select
-            showSearch
-            placeholder="选择学生可学习的课程"
-            optionFilterProp="searchLabel"
-            options={courseSelectOptions(courses)}
-            onChange={() => {
-              if (kind === 'homework') form.setFieldValue('questionIds', []);
-            }}
-          />
-        </Form.Item>
+        <CourseScopeSelect
+          form={form}
+          courses={courses}
+          initialCourse={item ? courses.find((course) => course.id === item.courseId) : undefined}
+          onCourseChange={() => {
+            form.setFieldValue('lessonId', undefined);
+            if (kind === 'homework') form.setFieldValue('questionIds', []);
+          }}
+        />
         <Form.Item name="tagCode" label="主标签">
           <Select allowClear placeholder="选择一个主标签" options={kind === 'materials' ? materialTagOptions : homeworkTagOptions} />
         </Form.Item>

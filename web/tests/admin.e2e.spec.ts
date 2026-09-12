@@ -886,6 +886,44 @@ test('教师可以新增题目并发布课后练习', async ({ page }) => {
   await expect(page.getByText(homeworkTitle)).toBeVisible();
 });
 
+test('上传课程讲义和课后练习可以用年级学科筛选课程范围', async ({ page }) => {
+  await login(page, '13800000002');
+
+  await expectPageHeading(page, '/materials', '课程讲义');
+  await page.getByRole('button', { name: '上传讲义' }).click();
+  const dialog = page.getByRole('dialog', { name: '上传课程讲义' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('快捷筛选')).toBeVisible();
+
+  await dialog.getByRole('combobox', { name: '年级' }).click();
+  await page.getByRole('option', { name: '五年级', exact: true }).click();
+  await dialog.getByRole('combobox', { name: '学科' }).click();
+  await page.getByRole('option', { name: 'English', exact: true }).click();
+
+  await selectOption(page, dialog, '课程范围', '五年级英文S1Q1课程');
+  const courseField = dialog.locator('.ant-form-item').filter({ hasText: '课程范围' }).first();
+  await expect(courseField).toContainText('五年级英文S1Q1课程');
+
+  await dialog.getByRole('combobox', { name: '年级' }).click();
+  await page.getByRole('option', { name: '四年级', exact: true }).click();
+  await expect(courseField).not.toContainText('五年级英文S1Q1课程');
+
+  await courseField.locator('.ant-select-selector').click();
+  const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  await expect(dropdown.getByText('四年级英文S1Q1课程', { exact: false })).toBeVisible();
+  await expect(dropdown.getByText('五年级英文S1Q1课程', { exact: false })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await dialog.getByRole('button', { name: '取消' }).click();
+
+  await expectPageHeading(page, '/homework', '课后练习');
+  await page.getByRole('button', { name: '新建课后练习' }).click();
+  const homeworkDialog = page.getByRole('dialog', { name: '新建课后练习' });
+  await expect(homeworkDialog).toBeVisible();
+  await expect(homeworkDialog.getByText('快捷筛选')).toBeVisible();
+  await expect(homeworkDialog.getByRole('combobox', { name: '年级' })).toBeVisible();
+  await expect(homeworkDialog.getByRole('combobox', { name: '学科' })).toBeVisible();
+});
+
 test('校区管理员可以从周历入口新建排课', async ({ page }) => {
   await login(page, '13800000002');
 
