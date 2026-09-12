@@ -279,19 +279,6 @@
   line-height: 1.45;
 }
 
-.english-label {
-  color: #ff4b55;
-  font-size: 22rpx;
-  line-height: 1.25;
-}
-
-.english-inline {
-  color: #ff4b55;
-  font-size: 28rpx;
-  font-weight: 400;
-  margin-left: 12rpx;
-}
-
 .section-head {
   display: flex;
   align-items: flex-end;

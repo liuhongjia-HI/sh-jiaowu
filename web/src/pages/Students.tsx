@@ -61,6 +61,7 @@ import type {
 	TutoringAssignmentCreateRequest,
 	ScheduleClass,
 	LessonFeedback
+	,OperationLog
 } from '../types/starline';
 
 type StudentFormValues = {
@@ -1571,7 +1572,19 @@ function RecordTable({ detail }: { detail: StudentDetail }) {
 }
 
 function LogTable({ detail }: { detail: StudentDetail }) {
-  const logs = [...(detail.logs ?? [])].sort((left, right) => right.time.localeCompare(left.time));
+  // 通知发送也是面向学生的一次操作，和后台审计日志放在同一条时间线上展示。
+  const noticeLogs: OperationLog[] = (detail.notices ?? []).map((notice) => ({
+    id: `notice-${notice.id}`,
+    action: notice.title || '发送通知',
+    target: notice.target || detail.student.name,
+    operator: notice.channel || '系统',
+    time: ''
+  }));
+  const logs = [...(detail.logs ?? []), ...noticeLogs].sort((left, right) => {
+    if (!left.time) return 1;
+    if (!right.time) return -1;
+    return right.time.localeCompare(left.time);
+  });
   if (logs.length === 0) return <Empty description="还没有操作记录。" />;
 
   return (
