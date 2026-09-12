@@ -1547,7 +1547,7 @@ function publicPackageRefs(values?: StudentPackageRef[]) {
 }
 
 function RecordTable({ detail }: { detail: StudentDetail }) {
-  const records = detail.learningRecords ?? [];
+  const records = [...(detail.learningRecords ?? [])].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
   if (records.length === 0) return <Empty description="还没有学习记录。" />;
   return (
     <CardList
@@ -1571,32 +1571,21 @@ function RecordTable({ detail }: { detail: StudentDetail }) {
 }
 
 function LogTable({ detail }: { detail: StudentDetail }) {
-  const logs = detail.logs ?? [];
-  const notices = detail.notices ?? [];
-  if (logs.length === 0 && notices.length === 0) return <Empty description="还没有操作记录。" />;
-  const rows = [
-    ...notices.map((record) => ({ kind: 'notice' as const, record })),
-    ...logs.map((record) => ({ kind: 'log' as const, record }))
-  ];
+  const logs = [...(detail.logs ?? [])].sort((left, right) => right.time.localeCompare(left.time));
+  if (logs.length === 0) return <Empty description="还没有操作记录。" />;
 
   return (
     <CardList
-      rows={rows}
-      rowKey={(item) => `${item.kind}-${item.record.id}`}
+      rows={logs}
+      rowKey={(record) => record.id}
       emptyText="还没有操作记录。"
-      renderCard={(item) => item.kind === 'notice' ? (
+      renderCard={(record) => (
         <InfoCard
-          title={item.record.title}
-          subtitle={item.record.summary}
-          status={<Tag>{item.record.status}</Tag>}
-        />
-      ) : (
-        <InfoCard
-          title={item.record.action}
-          subtitle={item.record.target}
+          title={record.action}
+          subtitle={record.target}
           fields={[
-            { label: '操作人', value: item.record.operator },
-            { label: '时间', value: item.record.time }
+            { label: '操作人', value: record.operator },
+            { label: '时间', value: record.time }
           ]}
         />
       )}
