@@ -639,8 +639,7 @@ ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   short_label = IF(short_label = '', VALUES(short_label), short_label),
   color = IF(color = '', VALUES(color), color),
-  sort_order = IF(sort_order = 0, VALUES(sort_order), sort_order),
-  status = VALUES(status);
+  sort_order = IF(sort_order = 0, VALUES(sort_order), sort_order);
 
 DELETE FROM subjects WHERE id IN ('politics', 'biology');
 

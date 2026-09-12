@@ -96,19 +96,20 @@ type StudentSubjectRecommendation struct {
 type StudentPackageRecommendation = StudentSubjectRecommendation
 
 type StudentGrant struct {
-	StudentID        string   `json:"studentId"`
-	PackageID        string   `json:"packageId"`
-	PackageName      string   `json:"packageName"`
-	StartsAt         string   `json:"startsAt"`
-	EffectiveUntil   string   `json:"effectiveUntil"`
-	PermissionState  string   `json:"permissionState"`
-	IsDirect         bool     `json:"isDirect"`
-	LearningSpaceIDs []string `json:"learningSpaceIds"`
-	LearningSpaces   []string `json:"learningSpaces"`
-	ContentTypes     []string `json:"contentTypes"`
-	OpenCourses      []string `json:"openCourses"`
-	OpenMaterials    []string `json:"openMaterials"`
-	OpenHomework     []string `json:"openHomework"`
+	OpeningBlockedReason string   `json:"openingBlockedReason,omitempty"`
+	StudentID            string   `json:"studentId"`
+	PackageID            string   `json:"packageId"`
+	PackageName          string   `json:"packageName"`
+	StartsAt             string   `json:"startsAt"`
+	EffectiveUntil       string   `json:"effectiveUntil"`
+	PermissionState      string   `json:"permissionState"`
+	IsDirect             bool     `json:"isDirect"`
+	LearningSpaceIDs     []string `json:"learningSpaceIds"`
+	LearningSpaces       []string `json:"learningSpaces"`
+	ContentTypes         []string `json:"contentTypes"`
+	OpenCourses          []string `json:"openCourses"`
+	OpenMaterials        []string `json:"openMaterials"`
+	OpenHomework         []string `json:"openHomework"`
 }
 
 // StudentOpeningItem 是课程开通矩阵中可展开查看的一项具体内容。
@@ -138,10 +139,12 @@ type StudentOpeningCell struct {
 
 // StudentOpeningScope 是学生课程开通页的一行课程范围。
 type StudentOpeningScope struct {
-	LearningSpaceID string               `json:"learningSpaceId"`
-	Name            string               `json:"name"`
-	Subject         string               `json:"subject"`
-	Content         []StudentOpeningCell `json:"content"`
+	SubjectID        string               `json:"subjectId"`
+	SubjectSortOrder int                  `json:"subjectSortOrder"`
+	LearningSpaceID  string               `json:"learningSpaceId"`
+	Name             string               `json:"name"`
+	Subject          string               `json:"subject"`
+	Content          []StudentOpeningCell `json:"content"`
 }
 
 type GrantCreateRequest struct {
@@ -168,13 +171,14 @@ type DirectGrantSelection struct {
 	ContentTypeCodes []string `json:"contentTypeCodes"`
 }
 
-// DirectGrantReplaceRequest replaces one student's complete set of direct grants.
-// An empty selection list intentionally cancels all of that student's direct grants.
+// DirectGrantReplaceRequest replaces currently openable direct grants.
+// Blocked historical grants are preserved unless explicitly revoked.
 type DirectGrantReplaceRequest struct {
-	StudentID  string                 `json:"studentId"`
-	Selections []DirectGrantSelection `json:"selections"`
-	StartsAt   string                 `json:"startsAt"`
-	EndsAt     string                 `json:"endsAt"`
+	RevokeDirectLearningSpaceIDs []string               `json:"revokeDirectLearningSpaceIds,omitempty"`
+	StudentID                    string                 `json:"studentId"`
+	Selections                   []DirectGrantSelection `json:"selections"`
+	StartsAt                     string                 `json:"startsAt"`
+	EndsAt                       string                 `json:"endsAt"`
 }
 
 // DirectGrantPeriodDefault is the editable default shown before a student is

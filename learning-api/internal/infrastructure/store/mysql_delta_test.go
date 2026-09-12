@@ -197,3 +197,31 @@ func TestDeltaRowsRoundTripThroughSameStateShape(t *testing.T) {
 		t.Fatal("cloned restart state changed grant persistence shape")
 	}
 }
+
+func TestOpeningMutationRollbackPreservesHistoricalAndNewGrants(t *testing.T) {
+	s := openingTestStore()
+	id, _ := addOpeningTestLegacy(t, s, true)
+	before := s.cloneForMutation()
+	db, err := sql.Open(mutationTestDriverName, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s.db = db
+	mutationDriverState.reset(true)
+	_, err = s.ReplaceDirectGrant("故障注入", learning.DirectGrantReplaceRequest{
+		StudentID: "opening-student", RevokeDirectLearningSpaceIDs: []string{id},
+		Selections: []learning.DirectGrantSelection{{LearningSpaceID: "space-g04-english-s1-q1", ContentTypeCodes: []string{"course"}}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "injected database write failure") {
+		t.Fatalf("expected persistence failure, got %v", err)
+	}
+	if !reflect.DeepEqual(before.grants, s.grants) || !reflect.DeepEqual(before.packages, s.packages) || !reflect.DeepEqual(before.spaceAccess, s.spaceAccess) || !reflect.DeepEqual(before.logs, s.logs) {
+		t.Fatal("failed transaction published partial changes")
+	}
+	mutationDriverState.mu.Lock()
+	defer mutationDriverState.mu.Unlock()
+	if mutationDriverState.commits != 0 || mutationDriverState.rollbacks != 1 {
+		t.Fatal("expected one rollback and no commit")
+	}
+}

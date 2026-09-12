@@ -210,6 +210,7 @@ export type StudentUpsertRequest = {
 };
 
 export type StudentGrant = {
+  openingBlockedReason?: string;
   studentId: string;
   packageId: string;
   packageName: string;
@@ -246,6 +247,8 @@ export type StudentOpeningCell = {
 };
 
 export type StudentOpeningScope = {
+  subjectId: string;
+  subjectSortOrder: number;
   learningSpaceId: string;
   name: string;
   subject: string;
@@ -306,6 +309,7 @@ export type DirectGrantSelection = {
 };
 
 export type DirectGrantReplaceRequest = {
+  revokeDirectLearningSpaceIds?: string[];
   studentId: string;
   selections: DirectGrantSelection[];
   startsAt?: string;

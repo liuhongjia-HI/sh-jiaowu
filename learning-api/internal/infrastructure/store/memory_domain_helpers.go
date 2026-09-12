@@ -672,6 +672,15 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 	if len(req.LearningSpaceIDs) == 0 {
 		return learning.Package{}, errors.New("请选择套餐开放的学习空间")
 	}
+	oldPackage, existing := s.findPackage(id)
+	oldSpaces := s.learningSpaceIDsForPackage(id)
+	oldTypes := expandedDirectContentTypes(s.contentTypesForPackage(id))
+	expandsAccess := !existing || oldPackage.Grade != req.Grade || !subjectsMatch(oldPackage.Subject, req.Subject) || oldPackage.Semester != req.Semester
+	for _, code := range expandedDirectContentTypes(req.ContentTypeCodes) {
+		if !containsString(oldTypes, code) {
+			expandsAccess = true
+		}
+	}
 	selectedLevel := ""
 	for _, spaceID := range req.LearningSpaceIDs {
 		space, exists := s.findLearningSpace(spaceID)
@@ -680,6 +689,11 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		}
 		if !s.learningSpaceMatches(spaceID, req.Grade, req.Subject, req.Semester) {
 			return learning.Package{}, errors.New("学习空间需与套餐年级、学科和学期一致")
+		}
+		if expandsAccess || !containsString(oldSpaces, spaceID) {
+			if _, reason := s.openingSubject(spaceID, req.Grade); reason != "" {
+				return learning.Package{}, errors.New(reason)
+			}
 		}
 		spaceLevel := strings.TrimSpace(space.Level)
 		if spaceLevel == "" {

@@ -123,13 +123,28 @@ func (s *MemoryStore) StartStudentTrial(principal learning.Principal, packageID 
 func (s *MemoryStore) CreateDirectGrant(operator string, req learning.DirectGrantCreateRequest) (learning.DirectGrantResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result, err := s.createDirectGrantUnlocked(operator, req)
-	return result, err
+	if s.db == nil {
+		work := s.cloneForMutation()
+		result, err := work.createDirectGrantUnlocked(operator, req)
+		if err == nil {
+			s.publishMutation(work)
+		}
+		return result, err
+	}
+	return s.createDirectGrantUnlocked(operator, req)
 }
 
 func (s *MemoryStore) ReplaceDirectGrant(operator string, req learning.DirectGrantReplaceRequest) (learning.DirectGrantResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.db == nil {
+		work := s.cloneForMutation()
+		result, err := work.replaceDirectGrantUnlocked(operator, req)
+		if err == nil {
+			s.publishMutation(work)
+		}
+		return result, err
+	}
 	return s.replaceDirectGrantUnlocked(operator, req)
 }
 

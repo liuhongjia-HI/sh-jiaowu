@@ -2519,6 +2519,7 @@ button.schedule-block:hover {
 }
 
 .student-opening-period {
+  box-sizing: border-box;
   width: 100%;
   margin-top: 4px;
   padding: 14px 16px 16px;

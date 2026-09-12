@@ -828,10 +828,10 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   await expect(drawer.getByText(/当前年级：/)).toBeVisible();
   await expect(drawer.getByLabel('开通日期')).toBeVisible();
   await expect(drawer.getByLabel('结束日期')).toBeVisible();
-  const openedFilter = drawer.getByRole('button', { name: /仅看已开通学科（\d+）/ });
+  const openedFilter = drawer.getByRole('button', { name: /仅看已开通范围（\d+）/ });
   await expect(openedFilter).toBeVisible();
   await openedFilter.click();
-  const openedOnly = drawer.getByRole('button', { name: /仅看已开通学科（\d+）/ });
+  const openedOnly = drawer.getByRole('button', { name: /仅看已开通范围（\d+）/ });
   await expect(openedOnly).toHaveClass(/ant-btn-primary/);
   const subjectFilter = drawer.getByRole('group', { name: '科目筛选' });
   await expect(subjectFilter).toBeVisible();
@@ -844,6 +844,7 @@ test('校区管理员可在课程开通矩阵查看明细并调整内容', async
   const firstEnglishCourse = firstEnglishContent.getByRole('checkbox', { name: '课程学习', exact: true });
   await firstEnglishContent.getByLabel(/课程明细$/).hover();
   await expect(page.getByText('课程明细', { exact: true })).toBeVisible();
+  await firstEnglishContent.getByLabel(/习题明细$/).hover();
   await expect(page.getByRole('button', { name: /撤销套餐“.+”/ }).first()).toBeVisible();
   await expect(firstEnglishContent.getByRole('checkbox', { name: '课程学习', exact: true })).toBeVisible();
   await expect(firstEnglishContent.getByRole('checkbox', { name: '习题练习', exact: true })).toBeVisible();
@@ -1085,3 +1086,55 @@ test('退出登录会清理后台访问态', async ({ page }) => {
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login$/);
 });
+
+for (const revokeLegacy of [false, true]) {
+  test(`课程开通按主数据筛选并${revokeLegacy ? '显式撤销' : '保留'}历史直接权限`, async ({ page }) => {
+    await login(page, '13800000002');
+    let saved: { selections: Array<{ learningSpaceId: string; contentTypeCodes: string[] }>; revokeDirectLearningSpaceIds: string[] } | undefined;
+    await page.route('**/api/students/*', async (route) => {
+      if (route.request().method() !== 'GET' || !/^\/api\/students\/[^/]+$/.test(new URL(route.request().url()).pathname)) { await route.continue(); return; }
+      const response = await route.fetch();
+      const payload = await response.json();
+      const scope = (id: string, subject: string, subjectId: string, sortOrder: number) => ({
+        learningSpaceId: id, name: `四年级${subject}测试范围`, subject, subjectId, subjectSortOrder: sortOrder,
+        content: ['course', 'handout', 'question', 'download'].map((contentTypeCode) => ({ contentTypeCode, opened: false, directOpened: false, packageOpened: false, packageNames: [], packageGrants: [], items: [] }))
+      });
+      payload.data.openingMatrix = [scope('opening-history', '历史', 'history', 7), scope('opening-english', '英文', 'english', 1)];
+      payload.data.grants = saved?.revokeDirectLearningSpaceIds.length ? [] : [{
+        studentId: payload.data.student.id, packageId: 'direct-legacy-politics', packageName: '四年级政治旧权限',
+        startsAt: '2098-09-01', effectiveUntil: '2099-01-01', permissionState: '未开始', isDirect: true,
+        learningSpaceIds: ['legacy-politics'], learningSpaces: ['四年级政治S1Q1S'], contentTypes: ['习题练习'],
+        openCourses: [], openMaterials: [], openHomework: [], openingBlockedReason: '学科不存在：政治'
+      }];
+      await route.fulfill({ response, json: payload });
+    });
+    await page.route('**/api/grants/direct', async (route) => {
+      if (route.request().method() !== 'PUT') { await route.continue(); return; }
+      saved = route.request().postDataJSON();
+      await route.fulfill({ json: { code: 0, message: 'ok', data: { studentName: '测试学生', learningSpaces: [], contentTypes: [], openCourses: [], openMaterials: [], openHomework: [] } } });
+    });
+    await expectPageHeading(page, '/students', '学生管理');
+    await page.getByRole('button', { name: '课程开通', exact: true }).first().click();
+    const drawer = page.locator('.ant-drawer-content').last();
+    const filters = drawer.getByRole('group', { name: '科目筛选' });
+    await expect(filters.getByRole('button')).toHaveText(['全部（2）', 'English（1）', 'History（1）', '仅看已开通范围（0）']);
+    await expect(filters.getByText(/政治|生物|Integrated Science/)).toHaveCount(0);
+    await expect(drawer.getByText('2 门学科 · 2 个课程范围；已选 0 门学科，0 个课程范围')).toBeVisible();
+    await expect(drawer.getByText('学科不存在：政治')).toBeVisible();
+    await expect(drawer.getByText(/2098-09-01 至 2099-01-01 · 未开始/)).toBeVisible();
+    await expect.poll(() => drawer.locator('.ant-drawer-body').evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: test.info().outputPath('opening-preview.png'), animations: 'disabled' });
+    await filters.getByRole('button', { name: 'English（1）', exact: true }).click();
+    await drawer.getByRole('checkbox', { name: '习题练习', exact: true }).check();
+    if (revokeLegacy) {
+      await drawer.getByRole('button', { name: '撤销此项直接权限' }).click();
+      await expect(drawer.getByText('待撤销，保存后生效')).toBeVisible();
+    }
+    await drawer.getByRole('button', { name: '保存变更' }).click();
+    if (revokeLegacy) await page.getByRole('button', { name: '确认取消', exact: true }).click();
+    await expect.poll(() => saved).toBeTruthy();
+    expect(saved?.selections).toEqual([{ learningSpaceId: 'opening-english', contentTypeCodes: ['question'] }]);
+    expect(saved?.revokeDirectLearningSpaceIds).toEqual(revokeLegacy ? ['legacy-politics'] : []);
+    await page.unrouteAll({ behavior: 'wait' });
+  });
+}

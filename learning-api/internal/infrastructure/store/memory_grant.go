@@ -88,7 +88,7 @@ func (s *MemoryStore) createGrantForPackageUnlocked(operator string, req learnin
 		return learning.GrantPreview{}, err
 	}
 	grant := packageGrant{
-		ID:             "grant-" + time.Now().Format("20060102150405"),
+		ID:             grantIDForPackage(req.StudentID, req.PackageID),
 		StudentID:      req.StudentID,
 		PackageID:      req.PackageID,
 		StartsAt:       startsAt,
@@ -155,13 +155,10 @@ func (s *MemoryStore) createDirectGrantUnlocked(operator string, req learning.Di
 
 	spaces := make([]learningSpace, 0, len(spaceIDs))
 	for _, id := range spaceIDs {
-		space, exists := s.findLearningSpace(id)
-		if !exists || space.Status != learning.StatusEnabled {
-			return learning.DirectGrantResult{}, errors.New("课程范围不可用：" + id)
+		if _, reason := s.openingSubject(id, student.Grade); reason != "" {
+			return learning.DirectGrantResult{}, errors.New(reason)
 		}
-		if space.Grade != student.Grade {
-			return learning.DirectGrantResult{}, errors.New("不能给" + student.Grade + "学生开通" + space.Grade + "课程")
-		}
+		space, _ := s.findLearningSpace(id)
 		spaces = append(spaces, space)
 	}
 
@@ -211,18 +208,13 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 	}
 
 	selections := make(map[string][]string, len(req.Selections))
+	submitted := map[string]bool{}
+	revokeIDs := uniqueTrimmed(req.RevokeDirectLearningSpaceIDs)
 	for _, selection := range req.Selections {
 		spaceID := strings.TrimSpace(selection.LearningSpaceID)
 		contentTypes := uniqueTrimmed(selection.ContentTypeCodes)
 		if spaceID == "" || len(contentTypes) == 0 {
 			continue
-		}
-		space, exists := s.findLearningSpace(spaceID)
-		if !exists || space.Status != learning.StatusEnabled {
-			return learning.DirectGrantResult{}, errors.New("课程范围不可用：" + spaceID)
-		}
-		if space.Grade != student.Grade {
-			return learning.DirectGrantResult{}, errors.New("不能给" + student.Grade + "学生开通" + space.Grade + "课程")
 		}
 		for _, code := range contentTypes {
 			if !validContentType(code) {
@@ -234,7 +226,26 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 		}
 		// 课程是最大权限入口，不能被客户端遗漏的子选项削弱。
 		contentTypes = expandedDirectContentTypes(contentTypes)
+		if submitted[spaceID] {
+			return learning.DirectGrantResult{}, errors.New("课程范围重复：" + spaceID)
+		}
+		submitted[spaceID] = true
+		if _, reason := s.openingSubject(spaceID, student.Grade); reason != "" {
+			grant, exists := s.protectedDirectGrant(student.ID, spaceID)
+			if !exists || !sameContentTypes(contentTypes, expandedDirectContentTypes(s.contentTypesForPackage(grant.PackageID))) {
+				return learning.DirectGrantResult{}, errors.New(reason + "，请刷新后重试")
+			}
+			continue
+		}
 		selections[spaceID] = contentTypes
+	}
+
+	for _, id := range revokeIDs {
+		_, reason := s.openingSubject(id, student.Grade)
+		_, exists := s.protectedDirectGrant(student.ID, id)
+		if reason == "" || !exists || submitted[id] {
+			return learning.DirectGrantResult{}, errors.New("历史直接开通不可撤销或与选中项冲突：" + id)
+		}
 	}
 
 	periodChanged := strings.TrimSpace(req.StartsAt) != "" || strings.TrimSpace(req.EndsAt) != ""
@@ -256,8 +267,14 @@ func (s *MemoryStore) replaceDirectGrantUnlocked(operator string, req learning.D
 		if len(spaceIDs) != 1 {
 			continue
 		}
+		if _, reason := s.openingSubject(spaceIDs[0], student.Grade); reason != "" && !containsString(revokeIDs, spaceIDs[0]) {
+			continue
+		}
 		if _, keep := selections[spaceIDs[0]]; keep {
 			continue
+		}
+		if containsString(revokeIDs, spaceIDs[0]) && grant.Status != "revoked" {
+			s.prependLog(operator, "撤销历史直接开通", student.Name+" / "+s.learningSpaceName(spaceIDs[0]))
 		}
 		grant.Status = "revoked"
 		s.grants[index] = grant
@@ -316,7 +333,7 @@ func (s *MemoryStore) replaceDirectGrantForPackage(operator string, student lear
 	if err != nil {
 		return learning.GrantPreview{}, err
 	}
-	grant := packageGrant{ID: "grant-" + time.Now().Format("20060102150405"), StudentID: student.ID, PackageID: packageID, StartsAt: startsAt, EndsAt: endsAt, OpenedAt: time.Now().Format("2006-01-02 15:04:05"), Status: "active", EffectiveUntil: endsAt}
+	grant := packageGrant{ID: grantIDForPackage(student.ID, packageID), StudentID: student.ID, PackageID: packageID, StartsAt: startsAt, EndsAt: endsAt, OpenedAt: time.Now().Format("2006-01-02 15:04:05"), Status: "active", EffectiveUntil: endsAt}
 	for index := range s.grants {
 		if s.grants[index].StudentID != student.ID || s.grants[index].PackageID != packageID {
 			continue
@@ -375,6 +392,13 @@ func (s *MemoryStore) ensureDirectGrantPackage(student learning.Student, space l
 	return pkg.ID, nil
 }
 
+// A student/package pair has one grant row. Second-resolution timestamps collide
+// when a single save opens multiple spaces; keep legacy IDs when updating rows.
+func grantIDForPackage(studentID, packageID string) string {
+	sum := sha256.Sum256([]byte(studentID + "\x00" + packageID))
+	return "grant-" + hex.EncodeToString(sum[:20])
+}
+
 func directGrantPackageID(studentID, learningSpaceID string) string {
 	sum := sha256.Sum256([]byte(studentID + "\x00" + learningSpaceID))
 	return "direct-" + hex.EncodeToString(sum[:20])
@@ -420,6 +444,9 @@ func (s *MemoryStore) validateGrantTarget(studentID, packageID string) (learning
 	}
 	if student.Grade != pkg.Grade {
 		return learning.Student{}, learning.Package{}, errors.New("该套餐适用于" + pkg.Grade + "，不能给" + student.Grade + "学生开通")
+	}
+	if reason := s.packageOpeningBlockedReason(pkg.ID, student.Grade); reason != "" {
+		return learning.Student{}, learning.Package{}, errors.New(reason)
 	}
 	return student, pkg, nil
 }

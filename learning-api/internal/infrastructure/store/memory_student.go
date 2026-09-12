@@ -194,7 +194,8 @@ func (s *MemoryStore) studentDetailUnlocked(principal learning.Principal, id str
 func (s *MemoryStore) openingMatrixForStudent(student learning.Student) []learning.StudentOpeningScope {
 	result := make([]learning.StudentOpeningScope, 0)
 	for _, space := range s.learningSpaces {
-		if space.Status != learning.StatusEnabled || space.Grade != student.Grade {
+		meta, reason := s.openingSubject(space.ID, student.Grade)
+		if reason != "" {
 			continue
 		}
 		content := []learning.StudentOpeningCell{
@@ -236,10 +237,12 @@ func (s *MemoryStore) openingMatrixForStudent(student learning.Student) []learni
 			}
 		}
 		result = append(result, learning.StudentOpeningScope{
-			LearningSpaceID: space.ID,
-			Name:            space.Name,
-			Subject:         space.Subject,
-			Content:         content,
+			LearningSpaceID:  space.ID,
+			Name:             space.Name,
+			Subject:          meta.Name,
+			SubjectID:        meta.ID,
+			SubjectSortOrder: meta.SortOrder,
+			Content:          content,
 		})
 	}
 	sort.SliceStable(result, func(i, j int) bool { return result[i].Name < result[j].Name })
@@ -526,7 +529,8 @@ func (s *MemoryStore) importStudentsUnlocked(operator string, principal learning
 }
 
 func (s *MemoryStore) studentGrantsUnlocked(principal learning.Principal, id string) ([]learning.StudentGrant, error) {
-	if _, err := s.visibleStudent(principal, id); err != nil {
+	student, err := s.visibleStudent(principal, id)
+	if err != nil {
 		return nil, err
 	}
 	grants := make([]learning.StudentGrant, 0)
@@ -540,7 +544,8 @@ func (s *MemoryStore) studentGrantsUnlocked(principal learning.Principal, id str
 		}
 		openCourses, openMaterials, openHomework := s.openContentForPackage(pkg)
 		grants = append(grants, learning.StudentGrant{
-			StudentID: id, PackageID: pkg.ID, PackageName: pkg.Name, StartsAt: grant.StartsAt,
+			OpeningBlockedReason: s.packageOpeningBlockedReason(pkg.ID, student.Grade),
+			StudentID:            id, PackageID: pkg.ID, PackageName: pkg.Name, StartsAt: grant.StartsAt,
 			EffectiveUntil: grantEndsAt(grant), PermissionState: grantPermissionState(grant),
 			IsDirect: isDirectGrantPackage(pkg.ID), LearningSpaceIDs: s.learningSpaceIDsForPackage(pkg.ID), LearningSpaces: s.learningSpaceNamesForPackage(pkg.ID),
 			ContentTypes: s.contentTypeLabelsForPackage(pkg.ID), OpenCourses: openCourses, OpenMaterials: openMaterials, OpenHomework: openHomework,

@@ -297,6 +297,8 @@ function SubjectMetadataCard() {
       setEditing(null);
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces'] });
       queryClient.invalidateQueries({ queryKey: ['subjects-for-schedule'] });
       queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-packages'] });
       queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-content'] });
@@ -310,8 +312,13 @@ function SubjectMetadataCard() {
     onSuccess: () => {
       message.success('学科已删除。');
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces'] });
       queryClient.invalidateQueries({ queryKey: ['subjects-for-schedule'] });
       queryClient.invalidateQueries({ queryKey: ['grade-subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-packages'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-content'] });
+      queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-questions'] });
       queryClient.invalidateQueries({ queryKey: ['logs'] });
     },
     onError: (error: Error) => message.error(error.message || '删除学科失败，请稍后重试。')

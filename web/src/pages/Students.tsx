@@ -161,6 +161,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   const [selected, setSelected] = useState<Student | null>(null);
   const [studentDrawerTab, setStudentDrawerTab] = useState('profile');
   const [directSelections, setDirectSelections] = useState<DirectGrantSelection[]>([]);
+  const [revokeDirectSpaceIds, setRevokeDirectSpaceIds] = useState<string[]>([]);
   const [initialDirectSelections, setInitialDirectSelections] = useState<DirectGrantSelection[]>([]);
   const [directStartsAt, setDirectStartsAt] = useState('');
   const [directEndsAt, setDirectEndsAt] = useState('');
@@ -193,14 +194,16 @@ export default function Students({ user }: { user: CurrentUser }) {
 
   useEffect(() => {
     if (!selected || detail.data?.student.id !== selected.id) return;
+    const openableIds = new Set((detail.data.openingMatrix ?? []).map((scope) => scope.learningSpaceId));
     const selections = (detail.data.grants ?? [])
       .filter((grant) => grant.isDirect && grant.permissionState !== '已到期')
-      .flatMap((grant) => (grant.learningSpaceIds ?? []).map((learningSpaceId) => ({
+      .flatMap((grant) => (grant.learningSpaceIds ?? []).filter((id) => openableIds.has(id)).map((learningSpaceId) => ({
         learningSpaceId,
         contentTypeCodes: (grant.contentTypes ?? []).map(contentTypeCode)
       })));
     setDirectSelections(selections);
     setInitialDirectSelections(selections);
+    setRevokeDirectSpaceIds([]);
   }, [detail.data, selected]);
 
   useEffect(() => {
@@ -284,6 +287,7 @@ export default function Students({ user }: { user: CurrentUser }) {
       if (!selected) throw new Error('请先选择学生');
       const body: DirectGrantReplaceRequest = {
         studentId: selected.id,
+        revokeDirectLearningSpaceIds: revokeDirectSpaceIds,
         selections: directSelections.filter((selection) => selection.contentTypeCodes.length > 0),
         startsAt: directPeriodChanged ? (directStartsAt || undefined) : undefined,
         endsAt: directPeriodChanged ? (directEndsAt || undefined) : undefined
@@ -291,13 +295,16 @@ export default function Students({ user }: { user: CurrentUser }) {
       return putData<DirectGrantResult>('/grants/direct', body);
     },
     onSuccess: (result) => {
-      message.success((result.learningSpaces ?? []).length ? `已保存 ${result.studentName} 的直接开通内容。` : `已取消 ${result.studentName} 的全部直接开通内容。`);
+      message.success(`已保存 ${result.studentName} 的直接开通变更，未撤销的历史权限保持不变。`);
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err: Error) => message.error(err.message || '保存失败，请检查课程范围和学习内容。')
+    onError: (err: Error) => {
+      message.error(err.message || '保存失败，请检查课程范围和学习内容。');
+      queryClient.invalidateQueries({ queryKey: ['students', selected?.id, 'detail'] });
+    }
   });
 
   const revokePackageGrant = useMutation({
@@ -428,6 +435,7 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerTab(tab);
     setDirectSelections([]);
     setInitialDirectSelections([]);
+    setRevokeDirectSpaceIds([]);
     setDirectStartsAt('');
     setDirectEndsAt('');
     setDirectPeriodChanged(false);
@@ -438,6 +446,7 @@ export default function Students({ user }: { user: CurrentUser }) {
     setStudentDrawerTab('courses');
     setDirectSelections([]);
     setInitialDirectSelections([]);
+    setRevokeDirectSpaceIds([]);
     setDirectStartsAt(directGrantPeriod.data?.startsAt || new Date().toISOString().slice(0, 10));
     setDirectEndsAt(directGrantPeriod.data?.endsAt || '');
     setDirectPeriodChanged(false);
@@ -447,13 +456,13 @@ export default function Students({ user }: { user: CurrentUser }) {
     const previous = selectionKeys(initialDirectSelections);
     const next = selectionKeys(directSelections);
     const removed = [...previous].filter((key) => !next.has(key));
-    if (removed.length === 0) {
+    if (removed.length === 0 && revokeDirectSpaceIds.length === 0) {
       createDirectGrant.mutate();
       return;
     }
     Modal.confirm({
-      title: '确认取消学科权限？',
-      content: `将取消 ${new Set(removed.map((key) => key.split(':')[0])).size} 个学科的部分或全部单独开通权限；这不会影响套餐或其他学生。`,
+      title: '确认取消课程范围权限？',
+      content: `将取消 ${new Set(removed.map((key) => key.split(':')[0])).size} 个课程范围的部分或全部单独开通权限，并撤销 ${revokeDirectSpaceIds.length} 个历史范围的直接权限。套餐权限保持不变。`,
       okText: '确认取消',
       okButtonProps: { danger: true },
       cancelText: '暂不取消',
@@ -465,7 +474,7 @@ export default function Students({ user }: { user: CurrentUser }) {
     if (!selected) return;
     Modal.confirm({
       title: '确认撤销套餐开通？',
-      content: `将撤销 ${selected.name} 的“${packageName}”套餐权限。该套餐覆盖的其他课程内容也会一并收回，但不会影响套餐设置或其他学生。`,
+      content: `将撤销 ${selected.name} 的“${packageName}”套餐权限，包含：${detail.data?.grants.find((grant) => grant.packageId === packageId)?.learningSpaces.join("、") || "该套餐覆盖的全部课程范围"}。`,
       okText: '确认撤销',
       okButtonProps: { danger: true },
       cancelText: '暂不撤销',
@@ -705,6 +714,8 @@ export default function Students({ user }: { user: CurrentUser }) {
                 children: selected ? (
                   <CourseOpeningPanel
                     detail={detail.data}
+                    revokeDirectSpaceIds={revokeDirectSpaceIds}
+                    onRevokeDirectSpaceIdsChange={setRevokeDirectSpaceIds}
                     student={selected}
                     writable={writable}
                     loadingLearningSpaces={learningSpaces.isLoading}
@@ -1111,6 +1122,8 @@ function StudentDrawerTitle({ student }: { student: Student }) {
 
 function CourseOpeningPanel({
   detail,
+  revokeDirectSpaceIds,
+  onRevokeDirectSpaceIdsChange,
   student,
   writable,
   loadingLearningSpaces,
@@ -1130,6 +1143,8 @@ function CourseOpeningPanel({
   onRevokePackage
 }: {
   detail: StudentDetail;
+  revokeDirectSpaceIds: string[];
+  onRevokeDirectSpaceIdsChange: (ids: string[]) => void;
   student: Student;
   writable: boolean;
   loadingLearningSpaces: boolean;
@@ -1149,11 +1164,34 @@ function CourseOpeningPanel({
   onRevokePackage: (packageId: string, packageName: string) => void;
 }) {
   const matrix = detail.openingMatrix ?? [];
-  if (!writable) {
-    return <CourseOpeningMatrix matrix={matrix} selections={selections} onSelectionsChange={onSelectionsChange} readOnly />;
-  }
+  const historicalGrants = detail.grants.filter((grant) => grant.openingBlockedReason);
   return (
-    <DirectGrantPanel
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16, width: '100%' }}>
+      {historicalGrants.length > 0 && <Card title="已有开通记录">
+        <Typography.Paragraph type="secondary">以下范围暂不可新增开通。已有权限和有效期保留，可明确撤销。</Typography.Paragraph>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {historicalGrants.map((grant) => {
+            const pending = grant.isDirect && grant.learningSpaceIds.every((id) => revokeDirectSpaceIds.includes(id));
+            return <Card size="small" key={grant.packageId} title={grant.packageName}>
+              <Space direction="vertical">
+                <Typography.Text>{grant.learningSpaces.join('、')}</Typography.Text>
+                <Typography.Text type="secondary">{grant.openingBlockedReason}</Typography.Text>
+                <Typography.Text>{grant.isDirect ? '单独开通' : '套餐开通'} · {grant.contentTypes.join('、')}</Typography.Text>
+                <Typography.Text>{grant.startsAt} 至 {grant.effectiveUntil} · {grant.permissionState}</Typography.Text>
+                {pending && <Tag color="orange">待撤销，保存后生效</Tag>}
+                {writable && grant.permissionState !== '已到期' && <Button size="small" danger disabled={submitting} onClick={() => {
+                  if (!grant.isDirect) { onRevokePackage(grant.packageId, grant.packageName); return; }
+                  onRevokeDirectSpaceIdsChange(pending
+                    ? revokeDirectSpaceIds.filter((id) => !grant.learningSpaceIds.includes(id))
+                    : [...new Set([...revokeDirectSpaceIds, ...grant.learningSpaceIds])]);
+                }}>{grant.isDirect ? (pending ? '保留此项权限' : '撤销此项直接权限') : '撤销整个套餐权限'}</Button>}
+              </Space>
+            </Card>;
+          })}
+        </Space>
+      </Card>}
+      {!writable ? <CourseOpeningMatrix matrix={matrix} selections={selections} onSelectionsChange={onSelectionsChange} readOnly /> : <DirectGrantPanel
+      pendingRevokeCount={revokeDirectSpaceIds.length}
       student={student}
       matrix={matrix}
       loadingLearningSpaces={loadingLearningSpaces}
@@ -1171,7 +1209,8 @@ function CourseOpeningPanel({
       onEndsAtChange={onEndsAtChange}
       onSubmit={onSubmit}
       onRevokePackage={onRevokePackage}
-    />
+    />}
+    </div>
   );
 }
 
@@ -1271,6 +1310,7 @@ function CourseOpeningMatrix({
 
 function DirectGrantPanel({
   student,
+  pendingRevokeCount,
   matrix,
   loadingLearningSpaces,
   learningSpacesError,
@@ -1289,6 +1329,7 @@ function DirectGrantPanel({
   onRevokePackage
 }: {
   student: Student;
+  pendingRevokeCount: number;
   matrix: StudentOpeningScope[];
   loadingLearningSpaces: boolean;
   learningSpacesError: boolean;
@@ -1309,21 +1350,30 @@ function DirectGrantPanel({
   const [selectedSubject, setSelectedSubject] = useState<string>();
   const [selectedOnly, setSelectedOnly] = useState(false);
   const subjectFilters = useMemo(() => {
-    const counts = new Map<string, number>();
-    matrix.forEach((space) => counts.set(space.subject, (counts.get(space.subject) ?? 0) + 1));
-    return Array.from(counts, ([subject, count]) => ({ subject, count }));
+    const counts = new Map<string, { id: string; subject: string; count: number; sortOrder: number }>();
+    matrix.forEach((space) => {
+      const id = space.subjectId;
+      const entry = counts.get(id) ?? { id, subject: space.subject, count: 0, sortOrder: space.subjectSortOrder };
+      entry.count += 1;
+      counts.set(id, entry);
+    });
+    return [...counts.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   }, [matrix]);
   const openedSpaceIds = new Set(matrix.filter((space) => space.content.some((cell) => cell.opened)).map((space) => space.learningSpaceId));
   const selectedSpaceIds = new Set(matrix.filter((space) => space.content.some((cell) =>
     cell.packageOpened ? cell.opened : selections.some((selection) => selection.learningSpaceId === space.learningSpaceId && selection.contentTypeCodes.includes(cell.contentTypeCode))
   )).map((space) => space.learningSpaceId));
-  const visibleMatrix = matrix.filter((space) => (!selectedSubject || space.subject === selectedSubject) && (!selectedOnly || openedSpaceIds.has(space.learningSpaceId)))
+  const visibleMatrix = matrix.filter((space) => (!selectedSubject || space.subjectId === selectedSubject) && (!selectedOnly || openedSpaceIds.has(space.learningSpaceId)))
     .sort((a, b) => Number(openedSpaceIds.has(b.learningSpaceId)) - Number(openedSpaceIds.has(a.learningSpaceId)));
   const previousKeys = selectionKeys(initialSelections);
   const nextKeys = selectionKeys(selections);
   const changedSpaceIds = new Set([...previousKeys, ...nextKeys].filter((key) => previousKeys.has(key) !== nextKeys.has(key)).map((key) => key.split(':')[0]));
   const hasPeriodChange = periodChanged && nextKeys.size > 0;
-  const hasChanges = changedSpaceIds.size > 0 || hasPeriodChange;
+  const hasChanges = changedSpaceIds.size > 0 || hasPeriodChange || pendingRevokeCount > 0;
+  const selectedSubjectCount = new Set(matrix.filter((space) => selectedSpaceIds.has(space.learningSpaceId)).map((space) => space.subjectId)).size;
+  useEffect(() => {
+    if (selectedSubject && !subjectFilters.some((subject) => subject.id === selectedSubject)) setSelectedSubject(undefined);
+  }, [selectedSubject, subjectFilters]);
   return (
     <div className="student-opening-panel">
       <Alert
@@ -1340,7 +1390,7 @@ function DirectGrantPanel({
         <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
           <Space wrap size={[8, 8]}>
             <Tag color="blue">当前年级：{student.grade}</Tag>
-            <Typography.Text strong style={{ color: '#45947d' }}>已选 {selectedSpaceIds.size} 个学科</Typography.Text>
+            <Typography.Text strong style={{ color: '#45947d' }}>{subjectFilters.length} 门学科 · {matrix.length} 个课程范围；已选 {selectedSubjectCount} 门学科，{selectedSpaceIds.size} 个课程范围</Typography.Text>
           </Space>
           <div role="group" aria-label="科目筛选">
             <Space wrap size={[8, 8]}>
@@ -1348,27 +1398,27 @@ function DirectGrantPanel({
               <Button size="small" type={!selectedSubject ? 'primary' : 'default'} onClick={() => setSelectedSubject(undefined)}>
                 全部（{matrix.length}）
               </Button>
-              {subjectFilters.map(({ subject, count }) => (
+              {subjectFilters.map(({ id, subject, count }) => (
                 <Button
-                  key={subject}
+                  key={id}
                   size="small"
-                  type={selectedSubject === subject ? 'primary' : 'default'}
-                  onClick={() => setSelectedSubject(subject)}
+                  type={selectedSubject === id ? 'primary' : 'default'}
+                  onClick={() => setSelectedSubject(id)}
                 >
                   {subjectLabel(subject)}（{count}）
                 </Button>
               ))}
               <Button size="small" type={selectedOnly ? 'primary' : 'default'} onClick={() => setSelectedOnly((value) => !value)}>
-                仅看已开通学科（{openedSpaceIds.size}）
+                仅看已开通范围（{openedSpaceIds.size}）
               </Button>
             </Space>
           </div>
-          <Typography.Text type="secondary">括号内为学科数量</Typography.Text>
+          <Typography.Text type="secondary">括号内为课程范围数量</Typography.Text>
           {selectedSpaceIds.size > 0 && (
-            <Space wrap size={[6, 6]} aria-label="已选学科快捷筛选">
-              <Typography.Text type="secondary">已选学科：</Typography.Text>
+            <Space wrap size={[6, 6]} aria-label="已选课程范围快捷筛选">
+              <Typography.Text type="secondary">已选范围：</Typography.Text>
               {matrix.filter((space) => selectedSpaceIds.has(space.learningSpaceId)).map((space) => (
-                <Button key={space.learningSpaceId} size="small" type={selectedSubject === space.subject && selectedOnly ? 'primary' : 'default'} onClick={() => { setSelectedSubject(space.subject); setSelectedOnly(false); }}>
+                <Button key={space.learningSpaceId} size="small" type={selectedSubject === space.subjectId && selectedOnly ? 'primary' : 'default'} onClick={() => { setSelectedSubject(space.subjectId); setSelectedOnly(false); }}>
                   {space.name}
                 </Button>
               ))}
@@ -1426,7 +1476,7 @@ function DirectGrantPanel({
       </section>
       <div className="student-opening-actions">
         <div className="student-opening-actions-summary">
-          <Typography.Text strong aria-live="polite">{hasChanges ? (changedSpaceIds.size > 0 ? `将修改 ${changedSpaceIds.size} 个学科的权限` : '将更新单独开通权限的生效时间') : '暂无变更'}</Typography.Text>
+          <Typography.Text strong aria-live="polite">{hasChanges ? (pendingRevokeCount > 0 ? `将撤销 ${pendingRevokeCount} 个历史范围的直接权限${changedSpaceIds.size > 0 ? `，并修改 ${changedSpaceIds.size} 个课程范围` : ''}` : changedSpaceIds.size > 0 ? `将修改 ${changedSpaceIds.size} 个课程范围的权限` : '将更新单独开通权限的生效时间') : '暂无变更'}</Typography.Text>
           <Typography.Text type="secondary">{hasPeriodChange ? '本次同时更新单独开通权限的生效时间' : hasChanges ? '保存后生效' : '勾选或取消权限后可保存'}</Typography.Text>
           {changedSpaceIds.size > 0 && <details><summary>查看变更明细</summary>{matrix.filter((scope) => changedSpaceIds.has(scope.learningSpaceId)).map((scope) => {
             const added = scope.content.filter((cell) => !previousKeys.has(`${scope.learningSpaceId}:${cell.contentTypeCode}`) && nextKeys.has(`${scope.learningSpaceId}:${cell.contentTypeCode}`));

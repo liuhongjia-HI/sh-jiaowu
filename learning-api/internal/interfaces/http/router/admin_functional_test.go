@@ -403,3 +403,38 @@ func doMultipart(t *testing.T, app *testApp, method, path, token string, fields 
 	}
 	return envelope
 }
+
+func TestSubjectOpeningAPIProtectsLegacyDirectGrant(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginAdmin(t, "13800000002")
+	var student learning.Student
+	app.doJSON(t, http.MethodPost, "/api/students", token, learning.StudentUpsertRequest{Name: "学科来源测试", Phone: "17901234567", Grade: "四年级"}, http.StatusOK, &student)
+	const space = "space-g04-english-s1-q1"
+	app.doJSON(t, http.MethodPost, "/api/grants/direct", token, learning.DirectGrantCreateRequest{StudentID: student.ID, LearningSpaceIDs: []string{space}, ContentTypeCodes: []string{"question"}}, http.StatusOK, nil)
+	app.doJSON(t, http.MethodPut, "/api/subjects/english", token, learning.SubjectMetadataUpdateRequest{ShortLabel: "Eng", Color: "#1A6FD4", SortOrder: 1, Status: "停用"}, http.StatusOK, nil)
+	var detail learning.StudentDetail
+	app.doJSON(t, http.MethodGet, "/api/students/"+student.ID, token, nil, http.StatusOK, &detail)
+	for _, row := range detail.OpeningMatrix {
+		if row.SubjectID == "english" {
+			t.Fatal("disabled subject remains selectable")
+		}
+	}
+	if len(detail.Grants) != 1 || detail.Grants[0].OpeningBlockedReason == "" {
+		t.Fatal("missing historical grant and reason")
+	}
+	app.doJSON(t, http.MethodPost, "/api/grants/direct", token, learning.DirectGrantCreateRequest{StudentID: student.ID, LearningSpaceIDs: []string{space}, ContentTypeCodes: []string{"course"}}, http.StatusBadRequest, nil)
+	app.doJSON(t, http.MethodPut, "/api/grants/direct", token, learning.DirectGrantReplaceRequest{StudentID: student.ID}, http.StatusOK, nil)
+	app.doJSON(t, http.MethodGet, "/api/students/"+student.ID, token, nil, http.StatusOK, &detail)
+	if len(detail.Grants) != 1 {
+		t.Fatal("empty selections removed protected permission")
+	}
+	teacher := app.loginAdmin(t, "13800000004")
+	revoke := learning.DirectGrantReplaceRequest{StudentID: student.ID, RevokeDirectLearningSpaceIDs: []string{space}}
+	app.doJSON(t, http.MethodPut, "/api/grants/direct", teacher, revoke, http.StatusForbidden, nil)
+	app.doJSON(t, http.MethodPut, "/api/grants/direct", token, revoke, http.StatusOK, nil)
+	app.doJSON(t, http.MethodGet, "/api/students/"+student.ID, token, nil, http.StatusOK, &detail)
+	if len(detail.Grants) != 0 {
+		t.Fatal("explicit revoke not applied")
+	}
+}
