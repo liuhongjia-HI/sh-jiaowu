@@ -7,7 +7,7 @@ import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
-import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, formatLearningSpace, levelOptions, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
+import { DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, curriculumSiblings, formatLearningSpace, levelOptions, nextCurriculumSortOrder, phaseLabel, semesterLabel, semesterOptions, subjectOptions, gradeOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -351,23 +351,24 @@ export function CourseDialog({
   };
   const addCurriculumNode = (type: 'unit' | 'chapter' | 'lesson', parentId?: string) => {
     const id = `node-${Date.now()}-${curriculumNodes.length}`;
-    updateCurriculum([...curriculumNodes, { id, parentId, type, name: '', sortOrder: curriculumNodes.length + 1 }]);
+    updateCurriculum([...curriculumNodes, { id, parentId, type, name: '', sortOrder: nextCurriculumSortOrder(curriculumNodes, type, parentId) }]);
     if (type === 'chapter' && parentId) setCollapsedUnits((current) => new Set([...current].filter((item) => item !== parentId)));
     if (type === 'lesson' && parentId) setCollapsedChapters((current) => new Set([...current].filter((item) => item !== parentId)));
   };
   const generateCurriculumChildren = (type: 'unit' | 'chapter' | 'lesson', count: number, parentId?: string) => {
     const safeCount = Math.max(0, Math.min(200, Math.floor(count || 0)));
-    const existing = curriculumNodes.filter((node) => node.type === type && (type === 'unit' ? !node.parentId : node.parentId === parentId));
+    const existing = curriculumSiblings(curriculumNodes, type, parentId);
     if (safeCount < existing.length) {
       setCurriculumError(`当前已有 ${existing.length} 个 ${type === 'unit' ? 'Unit' : type === 'chapter' ? 'Chapter' : 'Lesson'}，数量不能直接减少，请先删除多余目录。`);
       return;
     }
+    const startOrder = nextCurriculumSortOrder(curriculumNodes, type, parentId);
     const additions = Array.from({ length: safeCount - existing.length }, (_, index) => ({
       id: `node-${Date.now()}-${curriculumNodes.length + index}`,
       parentId: type === 'unit' ? undefined : parentId,
       type,
       name: '',
-      sortOrder: curriculumNodes.length + index + 1
+      sortOrder: startOrder + index
     }));
     if (additions.length) updateCurriculum([...curriculumNodes, ...additions]);
     if (type === 'unit') setUnitCount(safeCount);
@@ -396,8 +397,7 @@ export function CourseDialog({
   const updateCurriculumSortOrder = (nodeId: string, sortOrder: number) => {
     updateCurriculum(curriculumNodes.map((node) => node.id === nodeId ? { ...node, sortOrder: Math.max(1, Math.floor(sortOrder || 1)) } : node));
   };
-  const curriculumChildren = (type: CourseFormValues['curriculum'][number]['type'], parentId?: string) => curriculumNodes
-    .filter((node) => node.type === type && (node.parentId || '') === (parentId || ''))
+  const curriculumChildren = (type: CourseFormValues['curriculum'][number]['type'], parentId?: string) => curriculumSiblings(curriculumNodes, type, parentId)
     .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
   const curriculumNodeIsLeaf = (nodeId: string) => !curriculumNodes.some((node) => node.parentId === nodeId);
   const missingCurriculumTypes = () => ['unit'].filter((type) => !curriculumNodes.some((node) => node.type === type));

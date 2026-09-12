@@ -6,7 +6,7 @@ import { deleteData, getData, http, postData, postForm, putData } from '../../se
 import { ActionButton } from '../../components/ListViews';
 import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog, homeworkTagOptions, materialTagOptions } from './ResourceDialogs';
 import { canUpload } from './resource-shared';
-import { formatResourceCurriculumLabel, subjectLabel } from '../../utils/curriculum';
+import { formatResourceCurriculumLabel, prepareCurriculumForSave, subjectLabel } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, QuestionBankItem, StudyPackage } from '../../types/starline';
 import type { UploadFile } from 'antd';
 
@@ -134,7 +134,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       const { grade: _grade, subject: _subject, curriculum = [], ...courseValues } = values;
       const body: CourseUpsertRequest = {
         ...courseValues,
-        curriculum: curriculum.map((node, index) => ({ ...node, id: node.id || `node-${Date.now()}-${index}`, sortOrder: index + 1 })),
+        curriculum: prepareCurriculumForSave(curriculum),
         status: values.status || '启用'
       };
       return putData<Course>(`/courses/${courseEditor.id}`, body);

@@ -828,7 +828,7 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 	result := make([]learning.CurriculumNode, 0, len(nodes))
 	byID := make(map[string]learning.CurriculumNode, len(nodes))
 	nameByParent := make(map[string]map[string]bool)
-	for index, node := range nodes {
+	for _, node := range nodes {
 		node.ID = strings.TrimSpace(node.ID)
 		node.ParentID = strings.TrimSpace(node.ParentID)
 		node.Name = strings.TrimSpace(node.Name)
@@ -855,11 +855,12 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 		if node.Name != "" {
 			nameByParent[node.ParentID][node.Name] = true
 		}
-		if node.SortOrder <= 0 {
-			node.SortOrder = index + 1
-		}
 		byID[node.ID] = node
 		result = append(result, node)
+	}
+	assignSiblingSortOrders(result)
+	for i := range result {
+		byID[result[i].ID] = result[i]
 	}
 	children := make(map[string]int, len(result))
 	unitCount := 0
@@ -907,6 +908,32 @@ func normalizeCurriculum(nodes []learning.CurriculumNode) ([]learning.Curriculum
 		}
 	}
 	return result, nil
+}
+
+func assignSiblingSortOrders(nodes []learning.CurriculumNode) {
+	type siblingKey struct {
+		parentID string
+		nodeType learning.CurriculumNodeType
+	}
+	maxOrder := map[siblingKey]int{}
+	for _, node := range nodes {
+		key := siblingKey{parentID: node.ParentID, nodeType: node.Type}
+		if node.SortOrder > maxOrder[key] {
+			maxOrder[key] = node.SortOrder
+		}
+	}
+	nextOrder := map[siblingKey]int{}
+	for i := range nodes {
+		if nodes[i].SortOrder > 0 {
+			continue
+		}
+		key := siblingKey{parentID: nodes[i].ParentID, nodeType: nodes[i].Type}
+		if nextOrder[key] == 0 {
+			nextOrder[key] = maxOrder[key] + 1
+		}
+		nodes[i].SortOrder = nextOrder[key]
+		nextOrder[key]++
+	}
 }
 
 func countCurriculumLessons(nodes []learning.CurriculumNode) int {

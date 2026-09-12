@@ -235,6 +235,45 @@ export function curriculumNodeOrder(node?: Pick<CurriculumNode, 'sortOrder'> | n
   return Number.isFinite(order) && order >= 1 ? Math.floor(order) : 1;
 }
 
+function curriculumParentKey(parentId?: string) {
+  return parentId || '';
+}
+
+export function curriculumSiblings<T extends Pick<CurriculumNode, 'type' | 'parentId'>>(
+  nodes: T[],
+  type: CurriculumNode['type'],
+  parentId?: string
+) {
+  const parent = curriculumParentKey(parentId);
+  return nodes.filter((node) => node.type === type && curriculumParentKey(node.parentId) === parent);
+}
+
+// Chapter / Lesson 序号按父节点重置：Unit2 下第一章仍是 Chapter 1，而不是接着 Unit1 往后排。
+export function nextCurriculumSortOrder(
+  nodes: Pick<CurriculumNode, 'type' | 'parentId' | 'sortOrder'>[],
+  type: CurriculumNode['type'],
+  parentId?: string
+) {
+  return curriculumSiblings(nodes, type, parentId).reduce((max, node) => Math.max(max, curriculumNodeOrder(node)), 0) + 1;
+}
+
+export function prepareCurriculumForSave(nodes: CurriculumNode[] | undefined): CurriculumNode[] {
+  const assigned: CurriculumNode[] = [];
+  return (nodes ?? []).map((node, index) => {
+    const explicit = Number(node.sortOrder);
+    const sortOrder = Number.isFinite(explicit) && explicit >= 1
+      ? Math.floor(explicit)
+      : nextCurriculumSortOrder(assigned, node.type, node.parentId);
+    const next = {
+      ...node,
+      id: node.id || `node-${Date.now()}-${index}`,
+      sortOrder
+    };
+    assigned.push(next);
+    return next;
+  });
+}
+
 // Unit / Chapter 名称经常留空或只填类型名，下拉和目录需要把序号带上才能区分课节。
 export function formatCurriculumNodeLabel(
   node: Pick<CurriculumNode, 'type' | 'name' | 'sortOrder'> | undefined,

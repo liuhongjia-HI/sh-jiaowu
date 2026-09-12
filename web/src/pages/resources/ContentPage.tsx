@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, postData, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../../components/ListViews';
 import { CourseDialog, type CourseFormValues } from './ResourceDialogs';
-import { DEFAULT_PHASES, DEFAULT_SEMESTERS, formatLearningSpace, gradeOptions, phaseLabel, semesterLabel, subjectLabel, subjectOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
+import { DEFAULT_PHASES, DEFAULT_SEMESTERS, formatLearningSpace, gradeOptions, phaseLabel, prepareCurriculumForSave, semesterLabel, subjectLabel, subjectOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
 import type { Course, CourseCopyResult, CourseUpsertRequest, CurrentUser, LearningSpace } from '../../types/starline';
 import { useSearchParams } from 'react-router-dom';
 import MaterialsPage from './MaterialsPage';
@@ -55,11 +55,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
       const { grade: _grade, subject: _subject, curriculum = [], ...courseValues } = values;
       const body: CourseUpsertRequest = {
         ...courseValues,
-        curriculum: curriculum.map((node, index) => ({
-          ...node,
-          id: node.id || `node-${Date.now()}-${index}`,
-          sortOrder: Math.max(1, node.sortOrder || index + 1)
-        })),
+        curriculum: prepareCurriculumForSave(curriculum),
         status: values.status || '启用'
       };
       return editing ? putData<Course>(`/courses/${editing.id}`, body) : postData<Course>('/courses', body);

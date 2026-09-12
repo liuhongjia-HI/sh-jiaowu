@@ -13,6 +13,13 @@ async function expectPageHeading(page: Page, path: string, heading: string) {
   await expect(page.getByRole('heading', { name: heading })).toBeVisible();
 }
 
+async function inputValues(locator: Locator) {
+  return locator.evaluateAll((elements) => elements.map((element) => {
+    const input = element instanceof HTMLInputElement ? element : element.querySelector('input');
+    return input ? input.value : '';
+  }));
+}
+
 async function selectOption(page: Page, container: Locator, fieldName: string, optionText: string) {
   const field = container.locator('.ant-form-item').filter({ hasText: fieldName }).first();
   await field.locator('.ant-select-selector').click();
@@ -142,18 +149,29 @@ test('新增课程按目录层级引导添加内容', async ({ page }) => {
   await drawer.getByRole('spinbutton').first().fill('5');
   await drawer.getByRole('button', { name: '生成 Unit' }).click();
   await expect(drawer.getByTestId('curriculum-unit')).toHaveCount(5);
-  expect(await drawer.getByLabel('Unit名称').allInputValues()).toEqual(['1', '2', '3', '4', '5']);
+  expect(await inputValues(drawer.getByLabel('Unit序号'))).toEqual(['1', '2', '3', '4', '5']);
   const unit = drawer.getByTestId('curriculum-unit').first();
   await expect(unit.getByText('0 个 Chapter', { exact: true })).toBeVisible();
   await expect(unit.getByRole('button', { name: '新增 Chapter' })).toBeVisible();
 
   await unit.getByRole('button', { name: '新增 Chapter' }).click();
+  await unit.getByRole('button', { name: '新增 Chapter' }).click();
+  expect(await inputValues(unit.getByLabel('Chapter序号'))).toEqual(['1', '2']);
   const chapter = unit.getByTestId('curriculum-chapter').first();
   await expect(chapter.getByText('0 个 Lesson', { exact: true })).toBeVisible();
   await expect(chapter.getByRole('button', { name: '新增 Lesson' })).toBeVisible();
 
   await chapter.getByRole('button', { name: '新增 Lesson' }).click();
-  await expect(chapter.getByTestId('curriculum-lesson')).toHaveCount(1);
+  await chapter.getByRole('button', { name: '新增 Lesson' }).click();
+  await expect(chapter.getByTestId('curriculum-lesson')).toHaveCount(2);
+  expect(await inputValues(chapter.getByLabel('Lesson序号'))).toEqual(['1', '2']);
+
+  const unit2 = drawer.getByTestId('curriculum-unit').nth(1);
+  await unit2.getByRole('button', { name: '新增 Chapter' }).click();
+  expect(await inputValues(unit2.getByLabel('Chapter序号'))).toEqual(['1']);
+  const unit2Chapter = unit2.getByTestId('curriculum-chapter').first();
+  await unit2Chapter.getByRole('button', { name: '新增 Lesson' }).click();
+  expect(await inputValues(unit2Chapter.getByLabel('Lesson序号'))).toEqual(['1']);
 });
 
 test('课程内容可按年级和学科快捷筛选', async ({ page }) => {

@@ -181,6 +181,55 @@ func TestNormalizeCurriculumRequiresLeafNames(t *testing.T) {
 	}
 }
 
+func TestNormalizeCurriculumNumbersSiblingsPerParent(t *testing.T) {
+	result, err := normalizeCurriculum([]learning.CurriculumNode{
+		{ID: "unit-1", Type: learning.CurriculumUnit, Name: "Unit 1"},
+		{ID: "unit-2", Type: learning.CurriculumUnit, Name: "Unit 2"},
+		{ID: "u1-c1", ParentID: "unit-1", Type: learning.CurriculumChapter, Name: "Chapter A"},
+		{ID: "u1-c2", ParentID: "unit-1", Type: learning.CurriculumChapter, Name: "Chapter B"},
+		{ID: "u2-c1", ParentID: "unit-2", Type: learning.CurriculumChapter, Name: "Chapter A"},
+		{ID: "u1-c1-l1", ParentID: "u1-c1", Type: learning.CurriculumLesson, Name: "Lesson A"},
+		{ID: "u1-c1-l2", ParentID: "u1-c1", Type: learning.CurriculumLesson, Name: "Lesson B"},
+		{ID: "u2-c1-l1", ParentID: "u2-c1", Type: learning.CurriculumLesson, Name: "Lesson A"},
+	})
+	if err != nil {
+		t.Fatalf("normalize curriculum: %v", err)
+	}
+	byID := map[string]learning.CurriculumNode{}
+	for _, node := range result {
+		byID[node.ID] = node
+	}
+	if byID["unit-1"].SortOrder != 1 || byID["unit-2"].SortOrder != 2 {
+		t.Fatalf("units should number 1, 2, got unit1=%d unit2=%d", byID["unit-1"].SortOrder, byID["unit-2"].SortOrder)
+	}
+	if byID["u1-c1"].SortOrder != 1 || byID["u1-c2"].SortOrder != 2 {
+		t.Fatalf("unit1 chapters should number 1, 2, got %#v %#v", byID["u1-c1"], byID["u1-c2"])
+	}
+	if byID["u2-c1"].SortOrder != 1 {
+		t.Fatalf("unit2 first chapter should restart at 1, got %d", byID["u2-c1"].SortOrder)
+	}
+	if byID["u1-c1-l1"].SortOrder != 1 || byID["u1-c1-l2"].SortOrder != 2 {
+		t.Fatalf("unit1 chapter1 lessons should number 1, 2, got %#v %#v", byID["u1-c1-l1"], byID["u1-c1-l2"])
+	}
+	if byID["u2-c1-l1"].SortOrder != 1 {
+		t.Fatalf("unit2 chapter1 first lesson should restart at 1, got %d", byID["u2-c1-l1"].SortOrder)
+	}
+}
+
+func TestNormalizeCurriculumKeepsExplicitSortOrder(t *testing.T) {
+	result, err := normalizeCurriculum([]learning.CurriculumNode{
+		{ID: "unit-9", Type: learning.CurriculumUnit, Name: "Unit", SortOrder: 9},
+		{ID: "chapter-1", ParentID: "unit-9", Type: learning.CurriculumChapter, Name: "", SortOrder: 1},
+		{ID: "lesson-1", ParentID: "chapter-1", Type: learning.CurriculumLesson, Name: "Europe-Physical Geography", SortOrder: 1},
+	})
+	if err != nil {
+		t.Fatalf("normalize curriculum: %v", err)
+	}
+	if result[0].SortOrder != 9 || result[1].SortOrder != 1 || result[2].SortOrder != 1 {
+		t.Fatalf("explicit sort orders should be kept, got %#v", result)
+	}
+}
+
 func TestContentTagIsInferredFromTitleWhenUploadOmitsIt(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")
