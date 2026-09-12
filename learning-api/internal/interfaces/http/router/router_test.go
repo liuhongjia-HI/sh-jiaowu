@@ -666,6 +666,32 @@ func TestCopyPackageThroughAPI(t *testing.T) {
 	}
 }
 
+func TestCopyCourseThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	admin := app.loginAdmin(t, "13800000002")
+	teacher := app.loginAdmin(t, "13800000004")
+	student := app.loginStudent(t)
+	sourceID := "course-g05-english-s1-q1"
+
+	app.doJSON(t, http.MethodPost, "/api/courses/"+sourceID+"/copy", student, map[string]string{}, http.StatusForbidden, nil)
+
+	var copied learning.CourseCopyResult
+	app.doJSON(t, http.MethodPost, "/api/courses/"+sourceID+"/copy", teacher, map[string]string{}, http.StatusOK, &copied)
+	if copied.ID == "" || copied.ID == sourceID || copied.LearningSpaceID != "space-g05-english-s1-q2" {
+		t.Fatalf("teacher copy should create a q2 course, got %#v", copied)
+	}
+	if copied.MaterialCopied == 0 || copied.HomeworkCopied == 0 || copied.Status != learning.StatusDisabled {
+		t.Fatalf("copied course should include content and start disabled, got %#v", copied)
+	}
+
+	var logs []learning.OperationLog
+	app.doJSON(t, http.MethodGet, "/api/logs", admin, nil, http.StatusOK, &logs)
+	if len(logs) == 0 || logs[0].Action != "复制课程" {
+		t.Fatalf("expected course copy audit log, got %#v", logs)
+	}
+}
+
 func TestCreateDirectGrantThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()

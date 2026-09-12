@@ -51,6 +51,7 @@ type StudentRepository interface {
 type ContentRepository interface {
 	Courses(learning.Principal) []learning.Course
 	CreateCourse(string, learning.Principal, learning.CourseUpsertRequest) (learning.Course, error)
+	CopyCourse(string, learning.Principal, string, learning.CourseCopyRequest) (learning.CourseCopyResult, error)
 	UpdateCourse(string, learning.Principal, string, learning.CourseUpsertRequest) (learning.Course, error)
 	DeleteCourse(string, learning.Principal, string) error
 	Questions(learning.Principal, learning.QuestionBankQuery) []learning.QuestionBankItem

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"io"
 	"strings"
 
 	"starline/learning-api/internal/domain/learning"
@@ -41,6 +43,21 @@ func (h *LearningHandler) UpdateCourse(c *gin.Context) {
 	}
 	OK(c, updated)
 }
+func (h *LearningHandler) CopyCourse(c *gin.Context) {
+	req, ok := bindCourseCopy(c)
+	if !ok {
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	copied, err := h.service.CopyCourse(operator.(string), principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, copied)
+}
+
 func (h *LearningHandler) DeleteCourse(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)
@@ -167,6 +184,18 @@ func (h *LearningHandler) StudentMaterialDetail(c *gin.Context) {
 		return
 	}
 	OK(c, material)
+}
+
+func bindCourseCopy(c *gin.Context) (learning.CourseCopyRequest, bool) {
+	var req learning.CourseCopyRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		BadRequest(c, "invalid request")
+		return learning.CourseCopyRequest{}, false
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
+	req.Status = learning.Status(strings.TrimSpace(string(req.Status)))
+	return req, true
 }
 
 func bindCourse(c *gin.Context) (learning.CourseUpsertRequest, bool) {

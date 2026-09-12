@@ -168,6 +168,12 @@ func (s *MemoryStore) CreateCourse(operator string, principal learning.Principal
 	return result1, err
 }
 
+func (s *MemoryStore) CopyCourse(operator string, principal learning.Principal, id string, req learning.CourseCopyRequest) (learning.CourseCopyResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.copyCourseUnlocked(operator, principal, id, req)
+}
+
 func (s *MemoryStore) UpdateCourse(operator string, principal learning.Principal, id string, req learning.CourseUpsertRequest) (learning.Course, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

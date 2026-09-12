@@ -1023,6 +1023,162 @@ func (s *MemoryStore) courseNameExists(currentID, name string) bool {
 	return false
 }
 
+func (s *MemoryStore) findCourse(id string) (learning.Course, bool) {
+	id = strings.TrimSpace(id)
+	for _, course := range s.courses {
+		if course.ID == id {
+			return course, true
+		}
+	}
+	return learning.Course{}, false
+}
+
+func (s *MemoryStore) uniqueCourseName(preferred string) string {
+	preferred = strings.TrimSpace(preferred)
+	if preferred == "" {
+		preferred = "课程"
+	}
+	if !s.courseNameExists("", preferred) {
+		return preferred
+	}
+	for i := 1; i < 1000; i++ {
+		name := preferred + "（副本）"
+		if i > 1 {
+			name = fmt.Sprintf("%s（副本%d）", preferred, i)
+		}
+		if !s.courseNameExists("", name) {
+			return name
+		}
+	}
+	return fmt.Sprintf("%s（副本%s）", preferred, time.Now().Format("150405"))
+}
+
+func (s *MemoryStore) copiedCourseName(sourceName, sourceSpaceID, targetSpaceID string) string {
+	preferred := strings.TrimSpace(sourceName)
+	source, sourceOK := s.findLearningSpace(sourceSpaceID)
+	target, targetOK := s.findLearningSpace(targetSpaceID)
+	if sourceOK && targetOK && source.ID != target.ID {
+		replaced := preferred
+		if source.Phase != "" && target.Phase != "" && source.Phase != target.Phase {
+			replaced = strings.ReplaceAll(replaced, source.Phase, target.Phase)
+		}
+		if source.Semester != "" && target.Semester != "" && source.Semester != target.Semester {
+			replaced = strings.ReplaceAll(replaced, source.Semester, target.Semester)
+		}
+		if source.Level != "" && target.Level != "" && source.Level != target.Level {
+			replaced = strings.ReplaceAll(replaced, source.Level, target.Level)
+		}
+		auto := strings.TrimSpace(target.Grade + target.Subject + " " + target.Semester + " " + target.Phase + " 课程")
+		if replaced != preferred {
+			preferred = replaced
+		} else if auto != "" {
+			preferred = auto
+		}
+	}
+	return s.uniqueCourseName(preferred)
+}
+
+func (s *MemoryStore) suggestedCopyLearningSpaceID(principal learning.Principal, sourceSpaceID string) string {
+	source, ok := s.findLearningSpace(sourceSpaceID)
+	if !ok {
+		return sourceSpaceID
+	}
+	sourceLevel := strings.TrimSpace(source.Level)
+	if sourceLevel == "" {
+		sourceLevel = "S"
+	}
+	candidates := make([]learningSpace, 0)
+	for _, space := range s.learningSpaces {
+		if space.ID == source.ID || space.Status == learning.StatusDisabled {
+			continue
+		}
+		if space.Grade != source.Grade || !subjectsMatch(space.Subject, source.Subject) {
+			continue
+		}
+		level := strings.TrimSpace(space.Level)
+		if level == "" {
+			level = "S"
+		}
+		if level != sourceLevel {
+			continue
+		}
+		if !canSeeCourse(principal, learning.Course{LearningSpaceID: space.ID}) {
+			continue
+		}
+		candidates = append(candidates, space)
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		left, right := learningSpaceSequence(candidates[i]), learningSpaceSequence(candidates[j])
+		if left != right {
+			return left < right
+		}
+		return candidates[i].ID < candidates[j].ID
+	})
+	sourceSeq := learningSpaceSequence(source)
+	for _, space := range candidates {
+		if learningSpaceSequence(space) > sourceSeq {
+			return space.ID
+		}
+	}
+	return source.ID
+}
+
+func learningSpaceSequence(space learningSpace) int {
+	semesterOrder := map[string]int{"S1": 1, "S2": 2, "S3": 3}
+	phaseOrder := map[string]int{"Q1": 1, "期中": 1, "Q2": 2, "期末": 2}
+	semester := semesterOrder[strings.TrimSpace(space.Semester)]
+	if semester == 0 {
+		semester = 9
+	}
+	phase := phaseOrder[strings.TrimSpace(space.Phase)]
+	if phase == 0 {
+		phase = 9
+	}
+	return semester*10 + phase
+}
+
+func remapCurriculum(nodes []learning.CurriculumNode) ([]learning.CurriculumNode, map[string]string, error) {
+	idMap := make(map[string]string, len(nodes))
+	stamp := time.Now().Format("20060102150405.000000000")
+	for index, node := range nodes {
+		nodeID := strings.TrimSpace(node.ID)
+		if nodeID == "" {
+			return nil, nil, errors.New("目录节点 ID 不能为空")
+		}
+		idMap[nodeID] = fmt.Sprintf("node-%s-%d", stamp, index)
+	}
+	out := make([]learning.CurriculumNode, 0, len(nodes))
+	for _, node := range nodes {
+		parentID := strings.TrimSpace(node.ParentID)
+		if parentID != "" {
+			mapped, ok := idMap[parentID]
+			if !ok {
+				return nil, nil, errors.New("目录节点上级不存在")
+			}
+			parentID = mapped
+		}
+		node.ID = idMap[strings.TrimSpace(node.ID)]
+		node.ParentID = parentID
+		out = append(out, node)
+	}
+	return out, idMap, nil
+}
+
+func remapCopiedLessonID(lessonID string, idMap map[string]string) string {
+	lessonID = strings.TrimSpace(lessonID)
+	if lessonID == "" {
+		return ""
+	}
+	return idMap[lessonID]
+}
+
+func optionalBool(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+
 func (s *MemoryStore) decorateCourse(course learning.Course) learning.Course {
 	materialNum := 0
 	for _, material := range s.materials {

@@ -261,6 +261,8 @@ export function CourseDialog({
   form,
   open,
   editing,
+  copiedFrom,
+  copySummary,
   loading,
   learningSpaces,
   allowedLearningSpaceIds,
@@ -271,6 +273,8 @@ export function CourseDialog({
   form: ReturnType<typeof Form.useForm<CourseFormValues>>[0];
   open: boolean;
   editing: boolean;
+  copiedFrom?: string;
+  copySummary?: { materialCopied: number; homeworkCopied: number; spaceChanged: boolean };
   loading: boolean;
   learningSpaces: LearningSpace[];
   allowedLearningSpaceIds: string[];
@@ -400,7 +404,7 @@ export function CourseDialog({
 
   return (
     <FormDrawer
-      title={editing ? '编辑课程' : '新增课程'}
+      title={copiedFrom ? '确认复制的课程' : editing ? '编辑课程' : '新增课程'}
       open={open}
       onCancel={onCancel}
       onSubmit={() => form.submit()}
@@ -413,6 +417,16 @@ export function CourseDialog({
           type="info"
           showIcon
           message="当前账号还没有可维护的课程范围，请联系管理员分配年级和学科。"
+          style={{ marginBottom: 16 }}
+        />
+      )}
+      {copiedFrom && (
+        <Alert
+          type="info"
+          showIcon
+          message={copySummary && copySummary.materialCopied + copySummary.homeworkCopied > 0
+            ? `已从「${copiedFrom}」复制 ${copySummary.materialCopied} 份讲义和 ${copySummary.homeworkCopied} 份练习。学生提交和截止时间不会带过来；确认学习空间后保存即可。`
+            : `已从「${copiedFrom}」复制目录。学生还看不到，确认学习空间后保存即可。`}
           style={{ marginBottom: 16 }}
         />
       )}

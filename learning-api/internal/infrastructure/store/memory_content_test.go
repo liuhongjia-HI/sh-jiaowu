@@ -736,3 +736,142 @@ func TestMaterialsListHydratesCurriculumPathFromCourse(t *testing.T) {
 		t.Fatalf("hydrated curriculum = %#v", rows[0].Curriculum)
 	}
 }
+
+func TestCopyCourseRemapsCurriculumAndContent(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatal(err)
+	}
+	teacher, err := store.PrincipalByUserID("user-teacher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceID := courseID("space-g05-english-s1-q1")
+	source, ok := store.findCourse(sourceID)
+	if !ok {
+		t.Fatal("expected seeded english q1 course")
+	}
+
+	copied, err := store.CopyCourse("英语老师", teacher, sourceID, learning.CourseCopyRequest{})
+	if err != nil {
+		t.Fatalf("teacher copy should succeed: %v", err)
+	}
+	if copied.ID == sourceID || copied.LearningSpaceID != "space-g05-english-s1-q2" {
+		t.Fatalf("teacher copy should land in next sibling space, got %#v", copied)
+	}
+	if copied.Status != learning.StatusDisabled {
+		t.Fatalf("copied course should start disabled, got %q", copied.Status)
+	}
+	if len(copied.Curriculum) != len(source.Curriculum) || copied.Curriculum[0].ID == source.Curriculum[0].ID {
+		t.Fatalf("curriculum should be remapped, source=%#v copy=%#v", source.Curriculum, copied.Curriculum)
+	}
+	if copied.MaterialCopied == 0 || copied.HomeworkCopied == 0 {
+		t.Fatalf("expected materials and homework to copy, got %#v", copied)
+	}
+	if copied.MaterialNum != copied.MaterialCopied || copied.HomeworkNum != copied.HomeworkCopied {
+		t.Fatalf("decorate counts should match copied content: %#v", copied)
+	}
+
+	idSet := map[string]bool{}
+	for _, node := range copied.Curriculum {
+		if idSet[node.ID] {
+			t.Fatalf("copied curriculum id collided: %s", node.ID)
+		}
+		idSet[node.ID] = true
+		for _, srcNode := range source.Curriculum {
+			if srcNode.ID == node.ID {
+				t.Fatalf("copied node reused source id %s", node.ID)
+			}
+		}
+	}
+
+	sourceFiles := map[string]string{}
+	for _, item := range store.materials {
+		if item.CourseID == sourceID {
+			sourceFiles[item.Title] = item.FileID
+		}
+	}
+	foundPublishedMaterial := false
+	copiedMaterials := 0
+	for _, item := range store.materials {
+		if item.CourseID != copied.ID {
+			continue
+		}
+		copiedMaterials++
+		if item.LearningSpaceID != copied.LearningSpaceID {
+			t.Fatalf("copied material stayed in old space: %#v", item)
+		}
+		if item.ViewCount != 0 {
+			t.Fatalf("copied material should reset view count: %#v", item)
+		}
+		if item.FileID != sourceFiles[item.Title] {
+			t.Fatalf("copied material should reuse the source file id, got %#v", item)
+		}
+		if item.Status == learning.StatusEnabled || item.PublishStatus == "已发布" {
+			foundPublishedMaterial = true
+		}
+		if _, ok := idSet[item.LessonID]; item.LessonID != "" && !ok {
+			t.Fatalf("copied material lesson was not remapped: %#v", item)
+		}
+	}
+	if copiedMaterials == 0 {
+		t.Fatal("expected at least one copied material")
+	}
+	if !foundPublishedMaterial {
+		t.Fatal("copying into another space should keep published materials")
+	}
+	for _, item := range store.homework {
+		if item.CourseID != copied.ID {
+			continue
+		}
+		if item.Deadline != "" || item.DeadlineAt != "" || item.SubmittedNum != 0 {
+			t.Fatalf("copied homework should drop deadline and submissions: %#v", item)
+		}
+		if len(item.QuestionIDs) == 0 {
+			t.Fatalf("copied homework should keep question bank references: %#v", item)
+		}
+	}
+
+	sameSpace, err := store.CopyCourse("超级管理员", admin, sourceID, learning.CourseCopyRequest{
+		LearningSpaceID: source.LearningSpaceID,
+	})
+	if err != nil {
+		t.Fatalf("same-space copy should succeed: %v", err)
+	}
+	if sameSpace.LearningSpaceID != source.LearningSpaceID || !strings.Contains(sameSpace.Name, "副本") {
+		t.Fatalf("same-space copy should keep space and unique the name, got %#v", sameSpace)
+	}
+	for _, item := range store.materials {
+		if item.CourseID == sameSpace.ID && (item.Status == learning.StatusEnabled || item.PublishStatus == "已发布") {
+			t.Fatalf("same-space copy must not publish materials: %#v", item)
+		}
+	}
+
+	if _, err := store.CopyCourse("英语老师", teacher, sourceID, learning.CourseCopyRequest{LearningSpaceID: "space-g05-math-s1-q1"}); err == nil {
+		t.Fatal("teacher should not copy into an unassigned space")
+	} else if !strings.Contains(err.Error(), "未负责") && !strings.Contains(err.Error(), "范围") {
+		t.Fatalf("teacher should not copy into an unassigned space, got %v", err)
+	}
+}
+
+func TestCopyCourseCanSkipMaterialsAndHomework(t *testing.T) {
+	store := NewMemoryStore()
+	admin, err := store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatal(err)
+	}
+	falseValue := false
+	sourceID := courseID("space-g05-english-s1-q1")
+	copied, err := store.CopyCourse("超级管理员", admin, sourceID, learning.CourseCopyRequest{
+		LearningSpaceID: "space-g05-english-s1-q1",
+		CopyMaterials:   &falseValue,
+		CopyHomework:    &falseValue,
+	})
+	if err != nil {
+		t.Fatalf("skeleton copy should succeed: %v", err)
+	}
+	if copied.MaterialCopied != 0 || copied.HomeworkCopied != 0 || copied.MaterialNum != 0 || copied.HomeworkNum != 0 {
+		t.Fatalf("skeleton copy should omit content, got %#v", copied)
+	}
+}

@@ -48,6 +48,23 @@ type CourseUpsertRequest struct {
 	Status          Status           `json:"status"`
 }
 
+// CourseCopyRequest 复制课程。空的学习空间由服务端选下一个兄弟空间；
+// 讲义和练习默认一起复制，截止时间和学生提交不会带走。
+type CourseCopyRequest struct {
+	Name            string `json:"name"`
+	LearningSpaceID string `json:"learningSpaceId"`
+	CopyMaterials   *bool  `json:"copyMaterials"`
+	CopyHomework    *bool  `json:"copyHomework"`
+	Status          Status `json:"status"`
+}
+
+type CourseCopyResult struct {
+	Course
+	SourceName     string `json:"sourceName"`
+	MaterialCopied int    `json:"materialCopied"`
+	HomeworkCopied int    `json:"homeworkCopied"`
+}
+
 type Material struct {
 	ID               string         `json:"id"`
 	Title            string         `json:"title"`

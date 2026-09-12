@@ -64,6 +64,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/students/:id/scores", h.StudentScores)
 	g.GET("/courses", h.Courses)
 	g.POST("/courses", h.CreateCourse)
+	g.POST("/courses/:id/copy", h.CopyCourse)
 	g.PUT("/courses/:id", h.UpdateCourse)
 	g.DELETE("/courses/:id", h.DeleteCourse)
 	g.GET("/questions", h.Questions)

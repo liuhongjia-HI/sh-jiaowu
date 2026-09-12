@@ -291,6 +291,65 @@ test('课程方案可一键复制并打开新方案编辑', async ({ page }) => 
   await expect(drawer.getByLabel('方案名称')).toHaveValue('2026.2027学年 可复制的课程方案');
 });
 
+test('课程内容可一键复制到下一阶段并打开确认编辑', async ({ page }) => {
+  await login(page, '13800000001');
+  const source = {
+    id: 'course-copy-src',
+    name: '五年级英语 S1 Q1 课程',
+    subject: '英语',
+    grade: '五年级',
+    learningSpaceId: 'space-g05-english-s1-q1',
+    lessonCount: 1,
+    curriculum: [{ id: 'unit-1', type: 'unit', name: 'Unit 1', sortOrder: 1 }],
+    materialNum: 2,
+    homeworkNum: 1,
+    status: '启用'
+  };
+  const copied = {
+    ...source,
+    id: 'course-copy-dst',
+    name: '五年级英语 S1 Q2 课程',
+    learningSpaceId: 'space-g05-english-s1-q2',
+    status: '停用',
+    sourceName: source.name,
+    materialCopied: 2,
+    homeworkCopied: 1
+  };
+  await page.route('**/api/courses/course-copy-src/copy', async (route) => {
+    expect(route.request().method()).toBe('POST');
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, message: 'ok', data: copied }) });
+  });
+  await page.route('**/api/courses', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, message: 'ok', data: [source] }) });
+  });
+  await page.route('**/api/learning-spaces', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: [
+          { id: 'space-g05-english-s1-q1', academicYear: '2026.2027学年', grade: '五年级', subject: '英语', semester: 'S1', phase: 'Q1', level: 'S', name: '五年级英语S1Q1', status: '启用' },
+          { id: 'space-g05-english-s1-q2', academicYear: '2026.2027学年', grade: '五年级', subject: '英语', semester: 'S1', phase: 'Q2', level: 'S', name: '五年级英语S1Q2', status: '启用' }
+        ]
+      })
+    });
+  });
+
+  await expectPageHeading(page, '/content', '课程内容');
+  const row = page.locator('.ant-table-tbody tr', { hasText: '五年级英语 S1 Q1 课程' });
+  await row.getByRole('button', { name: '复制' }).click();
+  await expect(page.getByText('已复制 1 个课节、2 份讲义、1 份练习。学生还看不到，确认学习空间后可启用。')).toBeVisible();
+  const drawer = page.getByRole('dialog', { name: '确认复制的课程' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText('已从「五年级英语 S1 Q1 课程」复制 2 份讲义和 1 份练习')).toBeVisible();
+  await expect(drawer.getByLabel('课程名称')).toHaveValue('五年级英语 S1 Q2 课程');
+});
+
 test('课程方案可按年级、科目和等级筛选', async ({ page }) => {
   await login(page, '13800000001');
   await page.route('**/api/packages', async (route) => {

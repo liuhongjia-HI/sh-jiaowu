@@ -47,6 +47,7 @@
 - `POST /api/commercial/parent-notices`
 - `GET /api/courses`
 - `POST /api/courses`
+- `POST /api/courses/{id}/copy`
 - `PUT /api/courses/{id}`
 - `GET /api/materials`
 - `POST /api/materials`
@@ -232,6 +233,8 @@
   "status": "启用"
 }
 ```
+
+`POST /api/courses/{id}/copy` 复制课程目录，默认同时复制讲义和练习。不传学习空间时，服务端会选同一个年级、学科、等级下的下一个阶段；没有下一阶段则留在原空间。复制结果是一门独立新课：目录节点换新 ID，讲义复用原文件、练习复用题库，截止时间和学生提交不会带走。原空间复制时讲义/练习会落成草稿，避免学生看到重复内容。教师只能复制到自己负责的学习空间。
 
 编辑课程名称或学习空间后，系统会同步课程下已上传资料和练习的课程名称与学习空间范围。
 

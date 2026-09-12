@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -27,6 +28,69 @@ func (s *MemoryStore) createCourseUnlocked(operator string, principal learning.P
 			return work.createCourseUnlocked(operator, principal, req)
 		})
 	}
+	return s.saveNewCourseUnlocked(operator, principal, req, "创建课程", "")
+}
+
+func (s *MemoryStore) copyCourseUnlocked(operator string, principal learning.Principal, id string, req learning.CourseCopyRequest) (learning.CourseCopyResult, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.CourseCopyResult, error) {
+			return work.copyCourseUnlocked(operator, principal, id, req)
+		})
+	}
+	id = strings.TrimSpace(id)
+	src, exists := s.findCourse(id)
+	if !exists {
+		return learning.CourseCopyResult{}, errors.New("课程不存在")
+	}
+	if !canSeeCourse(principal, src) {
+		return learning.CourseCopyResult{}, errors.New("不能复制未负责的课程")
+	}
+	targetSpaceID := strings.TrimSpace(req.LearningSpaceID)
+	if targetSpaceID == "" {
+		targetSpaceID = s.suggestedCopyLearningSpaceID(principal, src.LearningSpaceID)
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = s.copiedCourseName(src.Name, src.LearningSpaceID, targetSpaceID)
+	} else if s.courseNameExists("", name) {
+		return learning.CourseCopyResult{}, errors.New("课程名称已存在")
+	}
+	status := learning.StatusDisabled
+	if strings.TrimSpace(string(req.Status)) != "" {
+		status = req.Status
+	}
+	curriculum, idMap, err := remapCurriculum(src.Curriculum)
+	if err != nil {
+		return learning.CourseCopyResult{}, err
+	}
+	created, err := s.saveNewCourseUnlocked(operator, principal, learning.CourseUpsertRequest{
+		Name:            name,
+		LearningSpaceID: targetSpaceID,
+		Curriculum:      curriculum,
+		Status:          status,
+	}, "复制课程", src.Name+" → "+name)
+	if err != nil {
+		return learning.CourseCopyResult{}, err
+	}
+	sameSpace := targetSpaceID == src.LearningSpaceID
+	materialCopied := 0
+	if optionalBool(req.CopyMaterials, true) {
+		materialCopied = s.copyCourseMaterials(created, src.ID, idMap, sameSpace)
+	}
+	homeworkCopied := 0
+	if optionalBool(req.CopyHomework, true) {
+		homeworkCopied = s.copyCourseHomework(created, src.ID, idMap, sameSpace)
+	}
+	created = s.decorateCourse(created)
+	return learning.CourseCopyResult{
+		Course:         created,
+		SourceName:     src.Name,
+		MaterialCopied: materialCopied,
+		HomeworkCopied: homeworkCopied,
+	}, nil
+}
+
+func (s *MemoryStore) saveNewCourseUnlocked(operator string, principal learning.Principal, req learning.CourseUpsertRequest, action, detail string) (learning.Course, error) {
 	course, err := s.courseFromRequest(principal, "", req)
 	if err != nil {
 		return learning.Course{}, err
@@ -36,8 +100,87 @@ func (s *MemoryStore) createCourseUnlocked(operator string, principal learning.P
 	}
 	course.ID = "course-custom-" + time.Now().Format("20060102150405.000000000")
 	s.courses = append([]learning.Course{course}, s.courses...)
-	s.prependLog(operator, "创建课程", course.Name)
+	if strings.TrimSpace(detail) != "" {
+		s.prependLogDetail(operator, action, course.Name, detail)
+	} else {
+		s.prependLog(operator, action, course.Name)
+	}
 	return s.decorateCourse(course), nil
+}
+
+func (s *MemoryStore) copyCourseMaterials(course learning.Course, sourceID string, idMap map[string]string, sameSpace bool) int {
+	copied := 0
+	additions := make([]learning.Material, 0)
+	for _, item := range s.materials {
+		if item.CourseID != sourceID {
+			continue
+		}
+		lessonID := remapCopiedLessonID(item.LessonID, idMap)
+		if item.LessonID != "" && lessonID == "" {
+			continue
+		}
+		item.ID = fmt.Sprintf("material-copy-%s-%d", course.ID, copied)
+		item.CourseID = course.ID
+		item.Course = course.Name
+		item.LearningSpaceID = course.LearningSpaceID
+		item.LessonID = lessonID
+		item.ViewCount = 0
+		item.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
+		if path, err := curriculumPathForLesson(course, lessonID); err == nil {
+			item.Curriculum = path
+		}
+		if sameSpace {
+			item.Status = learning.StatusDraft
+			item.PublishStatus = string(learning.StatusDraft)
+		}
+		additions = append(additions, item)
+		copied++
+	}
+	if len(additions) > 0 {
+		s.materials = append(additions, s.materials...)
+	}
+	return copied
+}
+
+func (s *MemoryStore) copyCourseHomework(course learning.Course, sourceID string, idMap map[string]string, sameSpace bool) int {
+	copied := 0
+	additions := make([]learning.Homework, 0)
+	for _, item := range s.homework {
+		if item.CourseID != sourceID {
+			continue
+		}
+		lessonID := remapCopiedLessonID(item.LessonID, idMap)
+		if item.LessonID != "" && lessonID == "" {
+			continue
+		}
+		item = cloneHomework(item)
+		item.ID = fmt.Sprintf("homework-copy-%s-%d", course.ID, copied)
+		item.CourseID = course.ID
+		item.Course = course.Name
+		item.LearningSpaceID = course.LearningSpaceID
+		item.Grade = course.Grade
+		item.Semester = s.semesterForSpace(course.LearningSpaceID)
+		item.Subject = course.Subject
+		item.LessonID = lessonID
+		item.Deadline = ""
+		item.DeadlineAt = ""
+		item.IsOverdue = false
+		item.SubmittedNum = 0
+		item.TotalNum = 0
+		if path, err := curriculumPathForLesson(course, lessonID); err == nil {
+			item.Curriculum = path
+		}
+		if sameSpace {
+			item.Status = string(learning.StatusDraft)
+			item.PublishStatus = string(learning.StatusDraft)
+		}
+		additions = append(additions, item)
+		copied++
+	}
+	if len(additions) > 0 {
+		s.homework = append(additions, s.homework...)
+	}
+	return copied
 }
 
 func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.Principal, id string, req learning.CourseUpsertRequest) (learning.Course, error) {

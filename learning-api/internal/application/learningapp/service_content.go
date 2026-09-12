@@ -6,6 +6,9 @@ func (s *Service) Courses(p learning.Principal) []learning.Course { return s.con
 func (s *Service) CreateCourse(o string, p learning.Principal, r learning.CourseUpsertRequest) (learning.Course, error) {
 	return s.content.CreateCourse(o, p, r)
 }
+func (s *Service) CopyCourse(o string, p learning.Principal, id string, r learning.CourseCopyRequest) (learning.CourseCopyResult, error) {
+	return s.content.CopyCourse(o, p, id, r)
+}
 func (s *Service) UpdateCourse(o string, p learning.Principal, id string, r learning.CourseUpsertRequest) (learning.Course, error) {
 	return s.content.UpdateCourse(o, p, id, r)
 }

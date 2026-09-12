@@ -426,6 +426,20 @@ export type CourseUpsertRequest = {
   status: string;
 };
 
+export type CourseCopyRequest = {
+  name?: string;
+  learningSpaceId?: string;
+  copyMaterials?: boolean;
+  copyHomework?: boolean;
+  status?: string;
+};
+
+export type CourseCopyResult = Course & {
+  sourceName: string;
+  materialCopied: number;
+  homeworkCopied: number;
+};
+
 export type CurriculumNode = {
   id: string;
   parentId?: string;
