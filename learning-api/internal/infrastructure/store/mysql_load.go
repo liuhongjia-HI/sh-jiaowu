@@ -671,7 +671,7 @@ func (s *MemoryStore) loadReviewsFromDB() error {
 }
 
 func (s *MemoryStore) loadNoticesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, retry_count FROM notices ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, recipient_student_id, retry_count FROM notices ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -680,7 +680,7 @@ func (s *MemoryStore) loadNoticesFromDB() error {
 	for rows.Next() {
 		var dbID int
 		var item learning.Notice
-		if err := rows.Scan(&dbID, &item.ID, &item.Type, &item.Title, &item.Target, &item.Summary, &item.Channel, &item.RecipientOpenID, &item.Status, &item.FailureReason, &item.RelatedType, &item.RelatedID, &item.RetryCount); err != nil {
+		if err := rows.Scan(&dbID, &item.ID, &item.Type, &item.Title, &item.Target, &item.Summary, &item.Channel, &item.RecipientOpenID, &item.Status, &item.FailureReason, &item.RelatedType, &item.RelatedID, &item.RecipientStudentID, &item.RetryCount); err != nil {
 			return err
 		}
 		if item.ID == "" {

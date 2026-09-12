@@ -679,6 +679,7 @@ export type Notice = {
   failureReason?: string;
   relatedType?: string;
   relatedId?: string;
+  recipientStudentId?: string;
   retryCount?: number;
 };
 

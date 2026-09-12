@@ -154,19 +154,27 @@ func TestCompletedReviewNoticeLinksToStudentSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatalf("complete review: %v", err)
 	}
+	found := false
+	for _, notice := range store.notices {
+		if notice.RelatedType == "review" {
+			if notice.RelatedID != submission.ID {
+				t.Fatalf("review notice should link to submission %q, got %#v", submission.ID, notice)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected a review notice after completing the review")
+	}
 	home, err := store.StudentHome(student)
 	if err != nil {
 		t.Fatalf("load student home: %v", err)
 	}
 	for _, notice := range home.Notices {
 		if notice.RelatedType == "review" {
-			if notice.RelatedID != submission.ID {
-				t.Fatalf("review notice should link to submission %q, got %#v", submission.ID, notice)
-			}
-			return
+			t.Fatalf("student inbox should not include review notices, got %#v", home.Notices)
 		}
 	}
-	t.Fatal("expected a review notice after completing the review")
 }
 
 // TestUpdateStudentRebasesEnrollmentWhenAdminCorrectsGrade 确认管理端修改年级

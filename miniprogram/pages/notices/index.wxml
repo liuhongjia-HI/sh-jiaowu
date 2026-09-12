@@ -23,7 +23,7 @@
       <view class="notice-empty-star">✦</view>
     </view>
     <view class="notice-empty-title">{{notices.length === 0 ? "暂无新消息" : "这个分类还没有消息"}}</view>
-      <view class="notice-empty-sub">{{notices.length === 0 ? "课程和学习提醒会显示在这里" : "切换到“全部”查看"}}</view>
+      <view class="notice-empty-sub">{{notices.length === 0 ? "课程上传新内容后，会提醒你查看" : "切换到“全部”查看"}}</view>
       <button class="notice-empty-button" bindtap="goStudy">去学习</button>
   </view>
   <view wx:else class="notice-list">

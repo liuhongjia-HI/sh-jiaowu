@@ -34,8 +34,8 @@ func TestCreateNoticeAndStudentNoticeFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected student home: %v", err)
 	}
-	if !noticeListContains(home.Notices, notice.ID) {
-		t.Fatalf("expected English student to see notice, got %#v", home.Notices)
+	if noticeListContains(home.Notices, notice.ID) {
+		t.Fatalf("student inbox should not include admin broadcast notices, got %#v", home.Notices)
 	}
 
 	phoneNotice, err := store.CreateNotice("运营教务", ops, learning.NoticeCreateRequest{
@@ -51,17 +51,17 @@ func TestCreateNoticeAndStudentNoticeFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected student home after phone notice: %v", err)
 	}
-	if !noticeListContains(home.Notices, phoneNotice.ID) {
-		t.Fatalf("expected student to see phone-targeted notice, got %#v", home.Notices)
+	if noticeListContains(home.Notices, phoneNotice.ID) {
+		t.Fatalf("student inbox should not include phone-targeted admin notices, got %#v", home.Notices)
 	}
 }
 
 func TestNoticeWithExplicitStudentRelationDoesNotLeakToAnotherStudent(t *testing.T) {
 	store := NewMemoryStore()
 	notice := learning.Notice{
-		ID: "notice-student-only", Type: "提醒", Title: "小明专属提醒",
-		Target: "五年级", Summary: "请完成今日任务", Status: "已发送",
-		RelatedType: "student", RelatedID: "stu-001",
+		ID: "notice-course-only", Type: "课", Title: "G5英文课已上传新内容，请查看",
+		Target: "五年级", Summary: "请查看", Status: "已发送",
+		RelatedType: "course", RelatedID: "course-g05-english-s1-q1", RecipientStudentID: "stu-001",
 	}
 	student := learning.Student{ID: "stu-001", Name: "小明", Grade: "五年级", AccountStatus: "正常"}
 	other := learning.Student{ID: "stu-002", Name: "小红", Grade: "五年级", AccountStatus: "正常"}
@@ -156,8 +156,8 @@ func TestOfficialAccountNoticeRequiresRecipientAndConfiguration(t *testing.T) {
 	if noticeListContains(home.Notices, withOpenID.ID) || noticeListContains(home.Notices, withoutOpenID.ID) {
 		t.Fatalf("student should not see raw official account notices, got %#v", home.Notices)
 	}
-	if !noticeListContains(home.Notices, stationNoticeID(withOpenID.ID)) || !noticeListContains(home.Notices, stationNoticeID(withoutOpenID.ID)) {
-		t.Fatalf("student should see station history even when official account notice is retryable, got %#v", home.Notices)
+	if noticeListContains(home.Notices, stationNoticeID(withOpenID.ID)) || noticeListContains(home.Notices, stationNoticeID(withoutOpenID.ID)) {
+		t.Fatalf("student inbox should not include official-account station copies, got %#v", home.Notices)
 	}
 
 	store.officialNoticeSender = func(notice learning.Notice) error { return nil }
@@ -172,8 +172,8 @@ func TestOfficialAccountNoticeRequiresRecipientAndConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected student home after retry: %v", err)
 	}
-	if noticeListContains(home.Notices, withOpenID.ID) || !noticeListContains(home.Notices, stationNoticeID(withOpenID.ID)) {
-		t.Fatalf("student should keep seeing station notice after successful retry, got %#v", home.Notices)
+	if noticeListContains(home.Notices, withOpenID.ID) || noticeListContains(home.Notices, stationNoticeID(withOpenID.ID)) {
+		t.Fatalf("student inbox should stay empty of official-account history after retry, got %#v", home.Notices)
 	}
 }
 

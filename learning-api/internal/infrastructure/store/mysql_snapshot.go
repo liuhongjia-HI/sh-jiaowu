@@ -355,8 +355,8 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, notice := range s.notices {
 		if _, err := tx.Exec(
-			`INSERT INTO notices (external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, retry_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			notice.ID, notice.Type, notice.Title, notice.Target, notice.Summary, notice.Channel, notice.RecipientOpenID, notice.Status, notice.FailureReason, notice.RelatedType, notice.RelatedID, notice.RetryCount,
+			`INSERT INTO notices (external_id, notice_type, title, target, content, channel, recipient_open_id, status, failure_reason, related_type, related_id, recipient_student_id, retry_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			notice.ID, notice.Type, notice.Title, notice.Target, notice.Summary, notice.Channel, notice.RecipientOpenID, notice.Status, notice.FailureReason, notice.RelatedType, notice.RelatedID, notice.RecipientStudentID, notice.RetryCount,
 		); err != nil {
 			return err
 		}

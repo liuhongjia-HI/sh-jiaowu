@@ -434,6 +434,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	}
 	s.materials = append([]learning.Material{item}, s.materials...)
 	s.prependLog(operator, "上传学习资料", item.Title)
+	s.notifyCourseContentUploaded(course)
 	return s.decorateMaterial(item), nil
 }
 
@@ -477,6 +478,7 @@ func (s *MemoryStore) replaceMaterialAt(operator string, principal learning.Prin
 	item.PreviewURL = "/api/files/" + asset.ID + "/preview"
 	item.DownloadURL = "/api/files/" + asset.ID + "/download"
 	s.prependLogDetail(operator, "替换课节资料", item.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(*item)))
+	s.notifyCourseContentUploaded(course)
 	return s.decorateMaterial(*item), nil
 }
 
@@ -640,6 +642,9 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 		s.materials[index].Status = req.Status
 		s.materials[index].PublishStatus = publishStatus(req.Status)
 		s.prependLogDetail(operator, "编辑学习资料", req.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(s.materials[index])))
+		if materialVisibleToStudents(s.materials[index]) && !materialVisibleToStudents(before) {
+			s.notifyCourseContentUploaded(course)
+		}
 		return s.decorateMaterial(s.materials[index]), nil
 	}
 	return learning.Material{}, errors.New("学习资料不存在")
@@ -771,6 +776,77 @@ func (s *MemoryStore) expectedStudentsForHomework(homework learning.Homework) []
 		}
 		student, ok := s.findStudent(grant.StudentID)
 		if !ok || seen[student.ID] {
+			continue
+		}
+		seen[student.ID] = true
+		students = append(students, student)
+	}
+	return students
+}
+
+func (s *MemoryStore) notifyCourseContentUploaded(course learning.Course) {
+	if course.Status != learning.StatusEnabled {
+		return
+	}
+	title := s.courseContentNoticeTitle(course)
+	stamp := time.Now().Format("20060102150405.000000000")
+	for _, student := range s.expectedStudentsForCourseHandout(course) {
+		notice := learning.Notice{
+			ID:                 "notice-course-" + course.ID + "-" + student.ID + "-" + stamp,
+			Type:               "课",
+			Title:              title,
+			Target:             student.Name,
+			Summary:            "请查看",
+			Channel:            "站内通知",
+			RecipientStudentID: student.ID,
+			RelatedType:        "course",
+			RelatedID:          course.ID,
+		}
+		notice = s.deliverNotice(notice)
+		s.prependNoticeRecord(notice)
+	}
+}
+
+func (s *MemoryStore) courseContentNoticeTitle(course learning.Course) string {
+	grade := strings.TrimSpace(course.Grade)
+	subject := strings.TrimSpace(course.Subject)
+	if space, ok := s.findLearningSpace(course.LearningSpaceID); ok {
+		if grade == "" {
+			grade = strings.TrimSpace(space.Grade)
+		}
+		if subject == "" {
+			subject = strings.TrimSpace(space.Subject)
+		}
+	}
+	label := strings.TrimSpace(gradeCode(grade) + subject)
+	if label == "" {
+		label = strings.TrimSpace(course.Name)
+	}
+	if label == "" {
+		label = "课程"
+	}
+	if strings.HasSuffix(label, "课") {
+		return label + "已上传新内容，请查看"
+	}
+	return label + "课已上传新内容，请查看"
+}
+
+func (s *MemoryStore) expectedStudentsForCourseHandout(course learning.Course) []learning.Student {
+	students := make([]learning.Student, 0)
+	seen := map[string]bool{}
+	for _, grant := range s.grants {
+		if !grantActive(grant) {
+			continue
+		}
+		pkg, ok := s.findPackage(grant.PackageID)
+		if !ok || !s.packageOpensContent(pkg, course.LearningSpaceID, "handout") {
+			continue
+		}
+		student, ok := s.findStudent(grant.StudentID)
+		if !ok || seen[student.ID] {
+			continue
+		}
+		if student.AccountStatus == "停用" || student.AccountStatus == "待审核" {
 			continue
 		}
 		seen[student.ID] = true

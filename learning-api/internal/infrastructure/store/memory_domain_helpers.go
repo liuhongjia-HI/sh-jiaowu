@@ -509,10 +509,22 @@ func studentNoticeVisible(notice learning.Notice) bool {
 		return false
 	}
 	status := strings.TrimSpace(notice.Status)
-	return status == "已发送" || status == "自动发送"
+	if status != "已发送" && status != "自动发送" {
+		return false
+	}
+	return studentCourseContentNotice(notice)
+}
+
+func studentCourseContentNotice(notice learning.Notice) bool {
+	return strings.EqualFold(strings.TrimSpace(notice.RelatedType), "course") &&
+		strings.TrimSpace(notice.RelatedID) != "" &&
+		strings.TrimSpace(notice.RecipientStudentID) != ""
 }
 
 func noticeMatchesStudent(notice learning.Notice, student learning.Student, subjects []string) bool {
+	if recipientID := strings.TrimSpace(notice.RecipientStudentID); recipientID != "" {
+		return recipientID == student.ID
+	}
 	// 只要通知带有明确的学生关联，就以关联关系为准，不能再回退到
 	// 姓名/年级/课程文本匹配，避免多孩子家庭或同名学生串收通知。
 	if strings.EqualFold(strings.TrimSpace(notice.RelatedType), "student") && strings.TrimSpace(notice.RelatedID) != "" {

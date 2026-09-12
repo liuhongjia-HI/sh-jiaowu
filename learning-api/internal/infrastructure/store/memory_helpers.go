@@ -158,6 +158,14 @@ func materialPublished(status learning.Status) bool {
 	return normalizeMaterialStatus(status) == learning.StatusEnabled || strings.TrimSpace(string(status)) == "可预览"
 }
 
+func materialVisibleToStudents(item learning.Material) bool {
+	if !materialPublished(item.Status) {
+		return false
+	}
+	publish := strings.TrimSpace(item.PublishStatus)
+	return publish == "" || publish == "已发布"
+}
+
 func publishStatus(status learning.Status) string {
 	if status == learning.StatusEnabled {
 		return "已发布"

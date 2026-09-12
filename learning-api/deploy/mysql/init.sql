@@ -457,6 +457,7 @@ CREATE TABLE IF NOT EXISTS notices (
   failure_reason TEXT NOT NULL,
   related_type VARCHAR(32) NOT NULL DEFAULT '',
   related_id VARCHAR(64) NOT NULL DEFAULT '',
+  recipient_student_id VARCHAR(64) NOT NULL DEFAULT '',
   retry_count INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,18 +1,19 @@
 package learning
 
 type Notice struct {
-	ID              string `json:"id"`
-	Type            string `json:"type"`
-	Title           string `json:"title"`
-	Target          string `json:"target"`
-	Summary         string `json:"summary"`
-	Channel         string `json:"channel,omitempty"`
-	RecipientOpenID string `json:"recipientOpenId,omitempty"`
-	Status          string `json:"status"`
-	FailureReason   string `json:"failureReason,omitempty"`
-	RelatedType     string `json:"relatedType,omitempty"`
-	RelatedID       string `json:"relatedId,omitempty"`
-	RetryCount      int    `json:"retryCount,omitempty"`
+	ID                 string `json:"id"`
+	Type               string `json:"type"`
+	Title              string `json:"title"`
+	Target             string `json:"target"`
+	Summary            string `json:"summary"`
+	Channel            string `json:"channel,omitempty"`
+	RecipientOpenID    string `json:"recipientOpenId,omitempty"`
+	Status             string `json:"status"`
+	FailureReason      string `json:"failureReason,omitempty"`
+	RelatedType        string `json:"relatedType,omitempty"`
+	RelatedID          string `json:"relatedId,omitempty"`
+	RecipientStudentID string `json:"recipientStudentId,omitempty"`
+	RetryCount         int    `json:"retryCount,omitempty"`
 }
 
 type NoticeCreateRequest struct {

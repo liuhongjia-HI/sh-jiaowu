@@ -436,6 +436,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"notices", "failure_reason", "TEXT NOT NULL"},
 		{"notices", "related_type", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"notices", "related_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"notices", "recipient_student_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "retry_count", "INT NOT NULL DEFAULT 0"},
 		{"parent_notices", "notice_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"parent_notices", "channel", "VARCHAR(32) NOT NULL DEFAULT ''"},
@@ -545,6 +546,9 @@ SET log_row.external_id = CONCAT('log-db-', log_row.id)`,
 		if err := s.ensureUniqueIndex(index.table, index.name, index.columns); err != nil {
 			return err
 		}
+	}
+	if err := s.purgeLegacyStudentInboxNotices(); err != nil {
+		return err
 	}
 	if err := s.ensureLearningSpaceUniqueIndex(); err != nil {
 		return err
@@ -823,4 +827,35 @@ func (s *MemoryStore) needsDatabaseBootstrap() (bool, error) {
 		return false, err
 	}
 	return count == 0, nil
+}
+
+const studentNoticeInboxResetKey = "studentNoticeInboxReset"
+const studentNoticeInboxResetValue = "course-content-v1"
+
+func (s *MemoryStore) purgeLegacyStudentInboxNotices() error {
+	if _, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS system_settings (
+		setting_key VARCHAR(64) PRIMARY KEY,
+		setting_value TEXT NOT NULL,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`); err != nil {
+		return err
+	}
+	var current string
+	err := s.db.QueryRow(`SELECT setting_value FROM system_settings WHERE setting_key = ?`, studentNoticeInboxResetKey).Scan(&current)
+	if err == nil && current == studentNoticeInboxResetValue {
+		return nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if _, err := s.db.Exec(`DELETE FROM notices
+		WHERE channel <> '公众号模板消息'
+		  AND NOT (related_type = 'course' AND recipient_student_id <> '')`); err != nil {
+		return err
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+		studentNoticeInboxResetKey, studentNoticeInboxResetValue,
+	)
+	return err
 }

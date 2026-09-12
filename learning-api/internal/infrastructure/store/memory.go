@@ -428,10 +428,7 @@ func (s *MemoryStore) seedDemoUsers(adminPasswordHash string) {
 		{ID: "rev-001", StudentID: "stu-001", HomeworkID: "hw-g05-english-s1-q1", StudentName: "小明", PackageName: "英语班", Homework: "阅读挑战", SystemScore: 86, TeacherComment: "阅读理解整体不错，注意把答案依据写完整。", Reward: "阅读小星星", Status: "待批改", ReviewerTeacherID: "user-teacher", ReviewerTeacherName: "英语老师", AssignedAt: "2026-05-22 09:00:00"},
 		{ID: "rev-002", StudentID: "stu-002", HomeworkID: "hw-g05-math-s1-q1", StudentName: "Lucy", PackageName: "数学班", Homework: "图形挑战", SystemScore: 78, TeacherComment: "图形思路基本正确，错题建议再画一遍辅助线。", Reward: "图形探索徽章", Status: "待复核"},
 	}
-	s.notices = []learning.Notice{
-		{ID: "notice-001", Type: "练", Title: "英语阅读挑战已发布", Target: "英语班 86 名学生", Summary: "今天的小挑战别忘啦", Status: "已发送"},
-		{ID: "notice-002", Type: "评", Title: "批改完成提醒", Target: "小明", Summary: "老师反馈已经准备好了", Status: "自动发送"},
-	}
+	s.notices = []learning.Notice{}
 	s.logs = []learning.OperationLog{
 		{ID: "log-001", Operator: "本地开发", Action: "初始化权限演示", Target: "完整学习空间与三种套餐", Time: "2026-05-22 09:30:00"},
 	}
