@@ -290,10 +290,10 @@ func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, qu
 }
 
 var contentTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "TK": true, "Exam": true, "Special": true}
-var materialTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "TK": true}
-var homeworkTagCodes = map[string]bool{"Exam": true, "Special": true}
-var materialHandoutTags = []string{"HD", "Blank", "HW", "TK"}
-var homeworkQuestionTags = []string{"Exam", "Special"}
+var materialTagCodes = map[string]bool{"HD": true, "Blank": true, "HW": true, "Exam": true, "Special": true}
+var homeworkTagCodes = map[string]bool{"TK": true}
+var materialHandoutTags = []string{"HD", "Blank", "HW", "Exam", "Special"}
+var homeworkQuestionTags = []string{"TK"}
 
 var contentTagPrefixes = []struct {
 	prefix string

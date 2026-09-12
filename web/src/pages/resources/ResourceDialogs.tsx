@@ -42,12 +42,12 @@ export const materialTagOptions = [
   { label: 'HD', value: 'HD' },
   { label: 'Blank', value: 'Blank' },
   { label: 'HW', value: 'HW' },
-  { label: 'TK', value: 'TK' }
+  { label: 'Exam', value: 'Exam' },
+  { label: 'Special', value: 'Special' }
 ];
 
 export const homeworkTagOptions = [
-  { label: 'Exam', value: 'Exam' },
-  { label: 'Special', value: 'Special' }
+  { label: 'TK', value: 'TK' }
 ];
 
 function packageContentLabel(codes?: string[]) {
@@ -1276,7 +1276,7 @@ export function UploadDialog({
             维护本课程的 Unit · Chapter · Lesson
           </Button>
         )}
-        {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="标题以 Exam_、Special_ 开头时会自动识别；也可手动选择。">
+        {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="标题以 TK_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={homeworkTagOptions} />
         </Form.Item>}
         {kind === 'materials' ? <LessonSelect course={selectedCourse} /> : (
