@@ -174,12 +174,8 @@ func (s *MemoryStore) reconcileBaseLearningSpaces() error {
 			return err
 		}
 	}
-	// G4 地理不在当前开设矩阵中，旧空间只停用不删除，保住课程、资料和套餐引用。
-	if _, err := tx.Exec(`UPDATE learning_spaces SET status = '停用'
-		WHERE id LIKE 'space-g%' AND grade = '四年级' AND subject = '地理'`); err != nil {
-		tx.Rollback()
-		return err
-	}
+	// 年级学科目录由管理后台元数据驱动。不要在启动时用硬编码矩阵覆盖管理员配置，
+	// 也不要因为目录暂未配置就停用历史课程空间。
 	if err := tx.Commit(); err != nil {
 		return err
 	}
