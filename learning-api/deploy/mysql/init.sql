@@ -736,7 +736,8 @@ INSERT INTO seed_subjects (subject_code, subject_name) VALUES
   ('science', '科学'), ('geography', '地理'), ('physics', '物理'), ('chemistry', '化学');
 
 -- 年级与学科的开设关系按业务课程矩阵显式维护：
--- G1-G4：数学、英文、语文、科学；
+-- G1-G3：数学、英文、语文、科学；
+-- G4：数学、英文、语文、科学、地理；
 -- G5-G7：数学、英文、语文、科学、地理；
 -- G8：数学、英文、语文、科学、地理、物理；
 -- G9-G12：数学、英文、语文、科学、地理、物理、化学。
@@ -750,7 +751,7 @@ INSERT INTO seed_grade_subjects (grade_no, subject_code) VALUES
   (1, 'math'), (1, 'english'), (1, 'chinese'), (1, 'science'),
   (2, 'math'), (2, 'english'), (2, 'chinese'), (2, 'science'),
   (3, 'math'), (3, 'english'), (3, 'chinese'), (3, 'science'),
-  (4, 'math'), (4, 'english'), (4, 'chinese'), (4, 'science'),
+  (4, 'math'), (4, 'english'), (4, 'chinese'), (4, 'science'), (4, 'geography'),
   (5, 'math'), (5, 'english'), (5, 'chinese'), (5, 'science'), (5, 'geography'),
   (6, 'math'), (6, 'english'), (6, 'chinese'), (6, 'science'), (6, 'geography'),
   (7, 'math'), (7, 'english'), (7, 'chinese'), (7, 'science'), (7, 'geography'),

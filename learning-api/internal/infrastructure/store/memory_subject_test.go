@@ -98,8 +98,8 @@ func TestDeleteReferencedCustomSubjectRejected(t *testing.T) {
 func TestEnablingHistorySubjectAddsLearningSpaces(t *testing.T) {
 	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
 	before := len(store.learningSpaces)
-	if before != 668 {
-		t.Fatalf("expected 668 core learning spaces before enabling history, got %d", before)
+	if before != 672 {
+		t.Fatalf("expected 672 core learning spaces before enabling history, got %d", before)
 	}
 
 	updated, err := store.UpdateSubjectMetadata("测试管理员", "history", learning.SubjectMetadataUpdateRequest{

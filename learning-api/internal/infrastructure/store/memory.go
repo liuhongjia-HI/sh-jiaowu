@@ -490,7 +490,7 @@ var demoGradeSubjectLevels = []map[string][]string{
 	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
 	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
 	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
-	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+	{"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}, "地理": {"S"}},
 	{"数学": standardLevels, "英文": standardLevels, "语文": standardLevels, "地理": {"S", "S+"}, "科学": {"S"}},
 	{"数学": standardLevels, "英文": standardLevels, "语文": standardLevels, "地理": {"S", "S+"}, "科学": {"S", "S+"}},
 	{"数学": advancedLevels, "英文": advancedLevels, "语文": standardLevels, "地理": standardLevels, "科学": standardLevels},

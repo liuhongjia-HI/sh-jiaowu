@@ -174,6 +174,18 @@ test('新增课程按目录层级引导添加内容', async ({ page }) => {
   expect(await inputValues(unit2Chapter.getByLabel('Lesson序号'))).toEqual(['1']);
 });
 
+test('四年级课程可选择地理学科', async ({ page }) => {
+  await login(page, '13800000001');
+  await expectPageHeading(page, '/content', '课程内容');
+
+  await page.getByRole('button', { name: '新增课程' }).click();
+  const drawer = page.getByRole('dialog', { name: '新增课程' });
+  await selectOption(page, drawer, '年级', '四年级');
+  const subjectField = drawer.locator('.ant-form-item').filter({ hasText: '科目' }).first();
+  await subjectField.locator('.ant-select-selector').click();
+  await expect(page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('Geography', { exact: true })).toBeVisible();
+});
+
 test('课程内容可按年级和学科快捷筛选', async ({ page }) => {
   await login(page, '13800000001');
   await page.route('**/api/courses', async (route) => {

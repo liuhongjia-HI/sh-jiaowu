@@ -49,7 +49,6 @@ func TestOpeningMatrixUsesSubjectMetadataAndGradeRules(t *testing.T) {
 		{ID: "legacy-politics", Subject: "政治", Grade: "四年级", Level: "S", Status: learning.StatusEnabled},
 		{ID: "legacy-biology", Subject: "生物", Grade: "四年级", Level: "S", Status: learning.StatusEnabled},
 		{ID: "legacy-integrated", Subject: "综合科学", Grade: "四年级", Level: "S", Status: learning.StatusEnabled},
-		{ID: "legacy-geography", Subject: "地理", Grade: "四年级", Level: "S", Status: learning.StatusEnabled},
 		{ID: "legacy-math-h", Subject: "数学", Grade: "四年级", Level: "H", Status: learning.StatusEnabled},
 	} {
 		s.learningSpaces = append(s.learningSpaces, item)
@@ -61,8 +60,8 @@ func TestOpeningMatrixUsesSubjectMetadataAndGradeRules(t *testing.T) {
 		}
 	}
 	rows := s.openingMatrixForStudent(s.students[0])
-	if len(rows) != 20 {
-		t.Fatalf("got %d spaces, want 20", len(rows))
+	if len(rows) != 24 {
+		t.Fatalf("got %d spaces, want 24", len(rows))
 	}
 	counts := map[string]int{}
 	for _, row := range rows {
@@ -74,10 +73,10 @@ func TestOpeningMatrixUsesSubjectMetadataAndGradeRules(t *testing.T) {
 			t.Fatal("sort did not come from metadata")
 		}
 	}
-	if len(counts) != 5 || counts["history"] != 4 {
+	if len(counts) != 6 || counts["geography"] != 4 || counts["history"] != 4 {
 		t.Fatalf("unexpected subjects: %v", counts)
 	}
-	for _, id := range []string{"legacy-politics", "legacy-biology", "legacy-integrated", "legacy-geography", "legacy-math-h"} {
+	for _, id := range []string{"legacy-politics", "legacy-biology", "legacy-integrated", "legacy-math-h"} {
 		if _, err := s.CreateDirectGrant("测试", learning.DirectGrantCreateRequest{StudentID: "opening-student", LearningSpaceIDs: []string{id}, ContentTypeCodes: []string{"question"}}); err == nil {
 			t.Fatalf("POST accepted %s", id)
 		}

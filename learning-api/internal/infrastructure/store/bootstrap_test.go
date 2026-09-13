@@ -41,7 +41,7 @@ func TestBaseLearningSpacesFollowGradeSubjectMatrix(t *testing.T) {
 		"一年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
 		"二年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
 		"三年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
-		"四年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}},
+		"四年级":  {"数学": {"S"}, "英文": {"S"}, "语文": {"S"}, "科学": {"S"}, "地理": {"S"}},
 		"五年级":  {"数学": {"S", "S+", "H"}, "英文": {"S", "S+", "H"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+"}, "科学": {"S"}},
 		"六年级":  {"数学": {"S", "S+", "H"}, "英文": {"S", "S+", "H"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+"}, "科学": {"S", "S+"}},
 		"七年级":  {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}},
@@ -51,8 +51,8 @@ func TestBaseLearningSpacesFollowGradeSubjectMatrix(t *testing.T) {
 		"十一年级": {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}, "物理": {"S", "S+", "H"}, "化学": {"S", "S+", "H"}},
 		"十二年级": {"数学": {"S", "S+", "H", "H+"}, "英文": {"S", "S+", "H", "H+"}, "语文": {"S", "S+", "H"}, "地理": {"S", "S+", "H"}, "科学": {"S", "S+", "H"}, "物理": {"S", "S+", "H"}, "化学": {"S", "S+", "H"}},
 	}
-	if len(store.learningSpaces) != 668 {
-		t.Fatalf("expected 668 learning spaces, got %d", len(store.learningSpaces))
+	if len(store.learningSpaces) != 672 {
+		t.Fatalf("expected 672 learning spaces, got %d", len(store.learningSpaces))
 	}
 
 	counts := map[string]map[string]map[string]int{}
@@ -101,8 +101,8 @@ func TestAcademicYearForDateUsesJulyFirstBoundary(t *testing.T) {
 
 func TestBaseLearningSpacesUsesRequestedAcademicYear(t *testing.T) {
 	spaces := baseLearningSpaces("2026.2027学年")
-	if len(spaces) != 668 {
-		t.Fatalf("expected 668 base learning spaces, got %d", len(spaces))
+	if len(spaces) != 672 {
+		t.Fatalf("expected 672 base learning spaces, got %d", len(spaces))
 	}
 	for _, space := range spaces {
 		if space.AcademicYear != "2026.2027学年" {
