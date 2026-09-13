@@ -176,13 +176,16 @@ Page({
         this.stopContentSecurity();
         this.stopContentSecurity = null;
       }
-      this.setData({ contentMode: "list", activeHomework: {}, materialCode: "", contentTagLabel: tagLabel(tagCode) });
+      this.setData({ contentMode: "list", activeHomework: {}, materialCode: "", contentTagLabel: tagLabel(tagCode), showNextButton: false });
       return;
     }
     const current = preserveCurrent && items.find((item) => item.contentType === "material" && item.id === this.materialId);
     this.showContent(current || items[0]);
   },
   showContent(item) {
+    if (!item) return;
+    this.nextContent = this.findNextContent(item);
+    this.setData({ showNextButton: !!this.nextContent });
     if (item.contentType === "homework") {
       this.pageLoadToken += 1;
       this.resetContentSecurity(item.id, "homework");
@@ -197,6 +200,28 @@ Page({
     }
     if (item.id === this.materialId && this.data.contentMode === "material") return;
     this.loadMaterial(item.id, false);
+  },
+  findNextContent(item) {
+    const contents = this.lessonContents || [];
+    const sameTag = itemsForTag(contents, item.tagCode);
+    const index = sameTag.findIndex((content) => content.id === item.id);
+    if (index >= 0 && sameTag[index + 1]) return sameTag[index + 1];
+    const tagIndex = TAG_DEFINITIONS.findIndex((tag) => tag.code === item.tagCode);
+    for (let i = tagIndex + 1; i < TAG_DEFINITIONS.length; i += 1) {
+      const nextItems = itemsForTag(contents, TAG_DEFINITIONS[i].code);
+      if (nextItems.length) return nextItems[0];
+    }
+    return null;
+  },
+  goNext() {
+    const next = this.nextContent;
+    if (!next) return;
+    const items = itemsForTag(this.lessonContents || [], next.tagCode);
+    if (next.tagCode === "Blank" && items.length > 1) {
+      this.showTagContents("Blank", false, true);
+      return;
+    }
+    this.showContent(next);
   },
   onShareAppMessage() {
     const contextQuery = this.courseId && this.lessonId ? `&courseId=${encodeURIComponent(this.courseId)}&lessonId=${encodeURIComponent(this.lessonId)}` : "";
