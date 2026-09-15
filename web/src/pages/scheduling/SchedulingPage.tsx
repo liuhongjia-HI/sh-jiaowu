@@ -153,7 +153,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   // 默认停在资源泳道日视图：这是排课场景真正读得清的密度，周视图退居总览。
-  const [viewMode, setViewMode] = useState<'day' | 'workweek' | 'week' | 'month' | 'list'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month' | 'list'>('day');
   const [classGradeFilter, setClassGradeFilter] = useState<string>();
   const [classSubjectFilter, setClassSubjectFilter] = useState<string>();
   const [classTeacherFilter, setClassTeacherFilter] = useState<string>();
@@ -349,11 +349,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     () => filteredClasses.filter((item) => !hiddenSubjects.includes(scheduleClassSubject(item, courseById) || '其他')),
     [filteredClasses, hiddenSubjects, courseById]
   );
-  // 工作周只看周一到周五；周视图仍然是完整 7 天——校外教培周末是排课高峰，
-  // 不能把周六日从默认视图里砍掉。
   const selectedWeekDays = useMemo(
-    () => buildWeekDays(selectedWeekStart, viewMode === 'workweek' ? 5 : 7),
-    [selectedWeekStart, viewMode]
+    () => buildWeekDays(selectedWeekStart),
+    [selectedWeekStart]
   );
   const selectedWeekClasses = useMemo(
     () => subjectVisibleClasses.filter((item) => selectedWeekDays.some((day) => scheduleClassOccursOn(item, day.date))),
@@ -376,7 +374,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   );
   const availabilityByDay = useMemo(() => groupScheduleItems(availabilityOverview.data ?? []), [availabilityOverview.data]);
   const availabilitySummary = useMemo(() => availabilityStats(availabilityOverview.data ?? []), [availabilityOverview.data]);
-  const activeClassCount = subjectVisibleClasses.filter((item) => item.status === '已确认').length;
   const totalConfirmedClassCount = (classes.data ?? []).filter((item) => item.status === '已确认').length;
   const activeFilterCount = [classGradeFilter, classSubjectFilter, classTeacherFilter, classStudentFilter, classCampusFilter, classCourseFilter, classTypeFilter]
     .filter(Boolean).length + (statusFilter !== '全部' ? 1 : 0) + (hiddenSubjects.length > 0 ? 1 : 0);
@@ -576,14 +573,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
       <Card
         // 标题跟着视图走：默认已经是日视图，再顶着「周排班」会让人以为切错了。
-        title={viewMode === 'day' ? '排班工作台 · 按老师看一天' : viewMode === 'workweek' ? '排班工作台 · 工作周（周一至周五）' : viewMode === 'week' ? '排班工作台 · 周总览' : '排班工作台'}
+        title={viewMode === 'day' ? '排班工作台 · 按老师看一天' : viewMode === 'week' ? '排班工作台 · 周总览' : '排班工作台'}
         extra={(
           <Segmented
             value={viewMode}
-            onChange={(value) => setViewMode(value as 'day' | 'workweek' | 'week' | 'month' | 'list')}
+            onChange={(value) => setViewMode(value as 'day' | 'week' | 'month' | 'list')}
             options={[
               { label: '日视图', value: 'day', icon: <CalendarOutlined /> },
-              { label: '工作周', value: 'workweek', icon: <CalendarOutlined /> },
               { label: '周视图', value: 'week', icon: <CalendarOutlined /> },
               { label: '月视图', value: 'month', icon: <CalendarOutlined /> },
               { label: '列表视图', value: 'list', icon: <TableOutlined /> }
@@ -592,17 +588,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         )}
       >
         <div className="schedule-workbench">
-          <div className="schedule-summary-grid">
-            <div className="schedule-summary-item">
-              <span>已确认课程</span>
-              <strong>{activeClassCount}</strong>
-            </div>
-            <div className="schedule-summary-item">
-              <span>可上课时间</span>
-              <strong>{availabilitySummary.total}</strong>
-            </div>
-          </div>
-
           <div className={sidebarOpen ? 'schedule-outlook-shell' : 'schedule-outlook-shell is-collapsed'}>
             {!sidebarOpen && (
               <button
@@ -633,7 +618,6 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   selectedWeekStart={selectedWeekStart}
                   selectedDate={selectedDate}
                   highlight={viewMode === 'day' ? 'day' : 'week'}
-                  weekDayCount={selectedWeekDays.length}
                   classCountByDate={classCountByDate}
                   onPickDate={goToDate}
                 />
@@ -750,7 +734,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                   onMoveClass={confirmMoveClass}
                   onCreateClass={openCreateClassForDay}
                 />
-              ) : viewMode === 'week' || viewMode === 'workweek' ? (
+              ) : viewMode === 'week' ? (
                 <ScheduleWeekTimeline
                   loading={classes.isFetching || availabilityOverview.isFetching}
                   weekDays={selectedWeekDays}

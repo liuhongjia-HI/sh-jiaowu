@@ -327,6 +327,33 @@ export function curriculumLessonOptions(nodes: CurriculumNode[] | undefined) {
     .map((lesson) => ({ value: lesson.id, label: formatCurriculumLessonLabel(list, lesson.id) || lesson.name }));
 }
 
+function curriculumNodePath(nodes: CurriculumNode[], leafId: string) {
+  const byID = new Map(nodes.map((node) => [node.id, node]));
+  const leaf = byID.get(leafId);
+  if (!leaf) return [];
+  const path: CurriculumNode[] = [];
+  const seen = new Set<string>();
+  for (let current: CurriculumNode | undefined = leaf; current; current = byID.get(current.parentId || '')) {
+    if (seen.has(current.id)) return [];
+    seen.add(current.id);
+    path.unshift(current);
+  }
+  return path;
+}
+
+// 仅在完整目录路径的节点类型和非空名称唯一一致时推荐，避免同名课节被映射到错误章节。
+export function suggestEquivalentCurriculumLessonId(sourceNodes: CurriculumNode[], sourceLessonId: string, targetNodes: CurriculumNode[]) {
+  const sourcePath = curriculumNodePath(sourceNodes, sourceLessonId);
+  if (!sourcePath.length || sourcePath.some((node) => !node.name.trim())) return undefined;
+  const sourceKey = sourcePath.map((node) => `${node.type}:${node.name.trim()}`).join('/');
+  const targetLeaves = targetNodes.filter((node) => node.type === 'lesson' || (node.type === 'chapter' && !targetNodes.some((child) => child.parentId === node.id)));
+  const matches = targetLeaves.filter((leaf) => {
+    const path = curriculumNodePath(targetNodes, leaf.id);
+    return path.length > 0 && path.every((node) => node.name.trim()) && path.map((node) => `${node.type}:${node.name.trim()}`).join('/') === sourceKey;
+  });
+  return matches.length === 1 ? matches[0].id : undefined;
+}
+
 export function formatResourceCurriculumLabel(
   row: { lessonId?: string; curriculum?: CurriculumPath },
   course?: Pick<Course, 'curriculum'>

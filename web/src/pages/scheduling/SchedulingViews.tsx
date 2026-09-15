@@ -612,15 +612,11 @@ export function ScheduleEmptyTips({ description, compact = false }: { descriptio
 //
 // highlight 区分两种视图：周视图选中的是一整周，日视图选中的是具体某一天。
 // 日视图下仍然高亮整周的话，点 19 号和点 21 号看起来完全一样，等于没有反馈。
-//
-// weekDayCount 让高亮只覆盖实际显示的那几天：工作周视图只有周一到周五，
-// 把周六日也点亮会让人以为那两天在视图里，点进去却什么都没有。
 export function MiniMonthCalendar({
   month,
   selectedWeekStart,
   selectedDate,
   highlight = 'week',
-  weekDayCount = 7,
   classCountByDate,
   onPickDate
 }: {
@@ -628,7 +624,6 @@ export function MiniMonthCalendar({
   selectedWeekStart: Date;
   selectedDate?: Date;
   highlight?: 'week' | 'day';
-  weekDayCount?: number;
   classCountByDate?: Record<string, number>;
   onPickDate: (date: Date) => void;
 }) {
@@ -640,9 +635,7 @@ export function MiniMonthCalendar({
       {['一', '二', '三', '四', '五', '六', '日'].map((item) => <span className="schedule-mini-week" key={item}>{item}</span>)}
       {days.map((day) => {
         const weekSelected = highlight === 'week'
-          && localDateText(startOfWeek(day.date)) === selectedWeekKey
-          // 周一=1…周日=7；工作周下第 6、7 天不在视图里，不该点亮。
-          && (day.date.getDay() === 0 ? 7 : day.date.getDay()) <= weekDayCount;
+          && localDateText(startOfWeek(day.date)) === selectedWeekKey;
         const daySelected = highlight === 'day' && day.key === selectedDayKey;
         const count = classCountByDate?.[day.key] ?? 0;
         const className = [
@@ -1782,11 +1775,8 @@ export function scheduleClassPayload(
   };
 }
 
-// dayCount=5 就是「工作周」（周一至周五）。周视图仍然是 7 天：
-// 校外教培周末恰恰是排课高峰，默认砍掉周六日会把最忙的两天藏起来，
-// 所以工作周是额外一个视图，不是把周视图改窄。
-export function buildWeekDays(weekStart: Date, dayCount = 7): WeekDay[] {
-  return Array.from({ length: dayCount }, (_, index) => {
+export function buildWeekDays(weekStart: Date): WeekDay[] {
+  return Array.from({ length: 7 }, (_, index) => {
     const date = addDays(weekStart, index);
     const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
     return {

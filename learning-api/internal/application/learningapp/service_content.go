@@ -30,6 +30,12 @@ func (s *Service) Materials(p learning.Principal, q learning.MaterialQuery) []le
 func (s *Service) CreateMaterial(o string, p learning.Principal, r learning.MaterialUploadRequest) (learning.Material, error) {
 	return s.content.CreateMaterial(o, p, r)
 }
+func (s *Service) PreviewMaterialSync(p learning.Principal, r learning.MaterialSyncRequest) (learning.MaterialSyncPreview, error) {
+	return s.content.PreviewMaterialSync(p, r)
+}
+func (s *Service) SyncMaterials(o string, p learning.Principal, r learning.MaterialSyncRequest) (learning.MaterialSyncResult, error) {
+	return s.content.SyncMaterials(o, p, r)
+}
 func (s *Service) UpdateMaterial(o string, p learning.Principal, id string, r learning.MaterialUpdateRequest) (learning.Material, error) {
 	return s.content.UpdateMaterial(o, p, id, r)
 }

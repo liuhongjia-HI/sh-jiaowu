@@ -63,6 +63,8 @@ type ContentRepository interface {
 	CreateQuestion(string, learning.Principal, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	UpdateQuestion(string, learning.Principal, string, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	CreateMaterial(string, learning.Principal, learning.MaterialUploadRequest) (learning.Material, error)
+	PreviewMaterialSync(learning.Principal, learning.MaterialSyncRequest) (learning.MaterialSyncPreview, error)
+	SyncMaterials(string, learning.Principal, learning.MaterialSyncRequest) (learning.MaterialSyncResult, error)
 	UpdateMaterial(string, learning.Principal, string, learning.MaterialUpdateRequest) (learning.Material, error)
 	ReorderMaterials(string, learning.Principal, learning.MaterialReorderRequest) error
 	ReorderHomework(string, learning.Principal, learning.HomeworkReorderRequest) error

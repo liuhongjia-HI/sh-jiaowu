@@ -722,6 +722,46 @@ func TestCopyCourseThroughAPI(t *testing.T) {
 	}
 }
 
+func TestMaterialSyncThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	adminPrincipal, err := app.store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := app.store.CreateCourse("超级管理员", adminPrincipal, learning.CourseUpsertRequest{
+		Name: "五年级英文 S+ 同步目标", LearningSpaceID: "space-g05-english-s1-q1-splus", Status: learning.StatusEnabled,
+		Curriculum: apiTestCurriculum("sync-target"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := app.store.CreateMaterial("超级管理员", adminPrincipal, learning.MaterialUploadRequest{
+		Title: "HD 同步接口测试", CourseID: "course-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "HD",
+		File: learning.FileAsset{ID: "sync-api-file", FileName: "HD.pdf", FileType: "PDF"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := learning.MaterialSyncRequest{
+		SourceCourseID: "course-g05-english-s1-q1", SourceLessonID: "course-g05-english-s1-q1-lesson-1", MaterialIDs: []string{source.ID},
+		Targets: []learning.MaterialSyncTarget{{CourseID: target.ID, LessonID: "sync-target-lesson-1"}},
+	}
+	app.doJSON(t, http.MethodPost, "/api/materials/sync-preview", app.loginStudent(t), req, http.StatusForbidden, nil)
+	var preview learning.MaterialSyncPreview
+	admin := app.loginAdmin(t, "13800000002")
+	app.doJSON(t, http.MethodPost, "/api/materials/sync-preview", admin, req, http.StatusOK, &preview)
+	if preview.Snapshot == "" || len(preview.Targets) != 1 || preview.Targets[0].Items[0].Action != "create" {
+		t.Fatalf("unexpected sync preview: %#v", preview)
+	}
+	req.Snapshot = preview.Snapshot
+	var result learning.MaterialSyncResult
+	app.doJSON(t, http.MethodPost, "/api/materials/sync", admin, req, http.StatusOK, &result)
+	if len(result.Targets) != 1 || result.Targets[0].Created != 1 {
+		t.Fatalf("unexpected sync result: %#v", result)
+	}
+}
+
 func TestCreateDirectGrantThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
@@ -1366,7 +1406,7 @@ func TestStudentHomeworkDownloadUsesStudentSecureRoute(t *testing.T) {
 		t.Fatalf("teacher principal: %v", err)
 	}
 	homework, err := app.store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
-		Title: "学生习题下载测试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "Exam",
+		Title: "学生习题下载测试", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "TK",
 		File: learning.FileAsset{
 			ID: "file-student-homework-download", FileName: "homework.pdf", FileSize: int64(len(original)), FileType: "PDF",
 			ContentType: "application/pdf", OriginalPath: source, PreviewPath: source, PreviewStatus: "可预览",

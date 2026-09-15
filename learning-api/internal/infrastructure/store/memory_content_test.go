@@ -134,12 +134,12 @@ func TestContentTagsAreStoredAndStudentStationsFollowContentOrder(t *testing.T) 
 		t.Fatalf("create question: %v", err)
 	}
 	homework, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
-		Title: "Exam 第一章练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "Exam", QuestionIDs: []string{question.ID}, Status: string(learning.StatusEnabled),
+		Title: "TK 第一章练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "TK", QuestionIDs: []string{question.ID}, Status: string(learning.StatusEnabled),
 	})
 	if err != nil {
 		t.Fatalf("create tagged homework: %v", err)
 	}
-	if homework.TagCode != "Exam" || homework.LessonID != "course-g05-english-s1-q1-lesson-1" {
+	if homework.TagCode != "TK" || homework.LessonID != "course-g05-english-s1-q1-lesson-1" {
 		t.Fatalf("homework dimensions not returned: %#v", homework)
 	}
 	detail, err := store.StudentCourseDetail(student, "course-g05-english-s1-q1")
@@ -301,32 +301,32 @@ func TestContentTagKindsRejectCrossCategoryTags(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := learning.MaterialUploadRequest{
-		Title: "错误分类讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "Exam",
+		Title: "错误分类讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: "TK",
 	}
-	if _, err := store.CreateMaterial("英语老师", teacher, base); err == nil || !strings.Contains(err.Error(), "HD、Blank、HW 或 TK") {
+	if _, err := store.CreateMaterial("英语老师", teacher, base); err == nil || !strings.Contains(err.Error(), "Exam 或 Special") {
 		t.Fatalf("material should reject homework tag, got %v", err)
 	}
 
 	if _, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
 		Title: "错误分类练习", CourseID: base.CourseID, LearningSpaceID: base.LearningSpaceID, LessonID: base.LessonID, TagCode: "HD",
-	}); err == nil || !strings.Contains(err.Error(), "Exam 或 Special") {
+	}); err == nil || !strings.Contains(err.Error(), "TK") {
 		t.Fatalf("homework should reject material tag, got %v", err)
 	}
 
 	if _, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
-		Title: "错误分类练习", CourseID: base.CourseID, LearningSpaceID: base.LearningSpaceID, LessonID: base.LessonID, TagCode: "HW",
-	}); err == nil || !strings.Contains(err.Error(), "Exam 或 Special") {
-		t.Fatalf("homework should reject moved HW tag, got %v", err)
+		Title: "错误分类练习", CourseID: base.CourseID, LearningSpaceID: base.LearningSpaceID, LessonID: base.LessonID, TagCode: "Exam",
+	}); err == nil || !strings.Contains(err.Error(), "TK") {
+		t.Fatalf("homework should reject material Exam tag, got %v", err)
 	}
 }
 
-func TestMaterialAcceptsHandoutTagsIncludingHWAndTK(t *testing.T) {
+func TestMaterialAcceptsHandoutTagsIncludingExamAndSpecial(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tag := range []string{"HW", "TK"} {
+	for _, tag := range []string{"HW", "Exam", "Special"} {
 		material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
 			Title: tag + " 讲义", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1", TagCode: tag,
 		})
@@ -338,13 +338,13 @@ func TestMaterialAcceptsHandoutTagsIncludingHWAndTK(t *testing.T) {
 		}
 	}
 	inferred, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
-		Title: "TK_G5S1Q1_1.1.2 Answer Key", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1",
+		Title: "Special_G5S1Q1_1.1.2 Supplement", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1",
 	})
 	if err != nil {
-		t.Fatalf("create inferred TK material: %v", err)
+		t.Fatalf("create inferred Special material: %v", err)
 	}
-	if inferred.TagCode != "TK" {
-		t.Fatalf("expected inferred TK tag, got %#v", inferred)
+	if inferred.TagCode != "Special" {
+		t.Fatalf("expected inferred Special tag, got %#v", inferred)
 	}
 }
 

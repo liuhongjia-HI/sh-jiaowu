@@ -1326,7 +1326,7 @@ export function UploadDialog({
                 <Button icon={<UploadOutlined />}>选择文件</Button>
               </Upload>
             </Form.Item>
-            <Typography.Text type="secondary">支持 PDF、PPT、Word，一次可上传该课的 HD / Blank / HW / TK；同一标签再传会替换，不新增重复。单个文件不超过 50MB。</Typography.Text>
+            <Typography.Text type="secondary">支持 PDF、PPT、Word，一次可上传该课的 HD / Blank / HW / Exam / Special；同一标签再传会替换，不新增重复。单个文件不超过 50MB。</Typography.Text>
             {lessonId ? (
               <Alert
                 type="info"
@@ -1335,7 +1335,7 @@ export function UploadDialog({
                 message={lessonLabel ? `本课：${lessonLabel}` : '已选择课节'}
                 description={(
                   <div>
-                    <div>{existingTags.length ? `当前已有 ${existingTags.join('、')}` : '当前还没有 HD / Blank / HW / TK'}</div>
+                    <div>{existingTags.length ? `当前已有 ${existingTags.join('、')}` : '当前还没有 HD / Blank / HW / Exam / Special'}</div>
                     {plan.length ? (
                       <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
                         {plan.map((item) => (
@@ -1347,7 +1347,7 @@ export function UploadDialog({
                 )}
               />
             ) : null}
-            <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、TK_ 开头时会自动识别。只有文件名无法识别时才需要手动选择；手动选择会应用到本次全部文件。">
+            <Form.Item name="tagCode" label="主标签" extra="文件名以 HD_、Blank_、HW_、Exam_、Special_ 开头时会自动识别。只有文件名无法识别时才需要手动选择；手动选择会应用到本次全部文件。">
               <Select allowClear placeholder="通常留空，由文件名自动识别" options={materialTagOptions} />
             </Form.Item>
             <Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item>

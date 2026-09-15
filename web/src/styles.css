@@ -844,12 +844,6 @@ body {
   gap: 14px;
 }
 
-.schedule-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-}
-
 .schedule-candidate-card {
   display: grid;
   gap: 6px;
@@ -914,27 +908,6 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.schedule-summary-item {
-  min-height: 72px;
-  display: grid;
-  gap: 4px;
-  align-content: center;
-  padding: 12px 14px;
-  border: 1px solid #e6ebf2;
-  border-radius: 8px;
-  background: #f9fbff;
-}
-
-.schedule-summary-item span {
-  color: #64748b;
-  font-size: 13px;
-}
-
-.schedule-summary-item strong {
-  font-size: 24px;
-  line-height: 1;
 }
 
 .schedule-filterbar {
@@ -1310,8 +1283,7 @@ body {
   background: #fff;
 }
 
-/* 列数由实际天数决定，不写死 7：工作周视图只有 5 列，
-   写死 7 会多出两条空列，而且 min-width 撐着不放会让 5 列被压窄。 */
+/* 时间轴列数与实际显示的天数保持一致。 */
 .schedule-timeline-grid {
   --day-count: 7;
   min-width: calc(64px + var(--day-count) * 128px);
@@ -2786,10 +2758,6 @@ button.schedule-block:hover {
     text-align: left;
   }
 
-  .schedule-summary-grid {
-    grid-template-columns: 1fr;
-  }
-
   .week-board {
     grid-template-columns: 1fr;
     overflow-x: visible;
@@ -3110,4 +3078,17 @@ button.schedule-block:hover {
 .student-opening-actions-summary summary {
   cursor: pointer;
   color: #45947d;
+}
+.material-sync-target-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr);
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .material-sync-target-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
 }

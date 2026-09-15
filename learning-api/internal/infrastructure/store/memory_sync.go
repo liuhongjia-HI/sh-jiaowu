@@ -216,6 +216,18 @@ func (s *MemoryStore) CreateMaterial(operator string, principal learning.Princip
 	return result1, err
 }
 
+func (s *MemoryStore) PreviewMaterialSync(principal learning.Principal, req learning.MaterialSyncRequest) (learning.MaterialSyncPreview, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.previewMaterialSyncUnlocked(principal, req)
+}
+
+func (s *MemoryStore) SyncMaterials(operator string, principal learning.Principal, req learning.MaterialSyncRequest) (learning.MaterialSyncResult, error) {
+	return noticeMutation(s, func(work *MemoryStore) (learning.MaterialSyncResult, error) {
+		return work.syncMaterialsUnlocked(operator, principal, req)
+	}, nil)
+}
+
 func (s *MemoryStore) UpdateMaterial(operator string, principal learning.Principal, id string, req learning.MaterialUpdateRequest) (learning.Material, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

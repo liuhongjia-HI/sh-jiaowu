@@ -123,6 +123,55 @@ type MaterialReorderRequest struct {
 	CourseID    string   `json:"courseId"`
 	MaterialIDs []string `json:"materialIds"`
 }
+
+type MaterialSyncTarget struct {
+	CourseID string `json:"courseId"`
+	LessonID string `json:"lessonId"`
+}
+
+type MaterialSyncRequest struct {
+	SourceCourseID string               `json:"sourceCourseId"`
+	SourceLessonID string               `json:"sourceLessonId"`
+	MaterialIDs    []string             `json:"materialIds"`
+	Targets        []MaterialSyncTarget `json:"targets"`
+	Snapshot       string               `json:"snapshot,omitempty"`
+}
+
+type MaterialSyncItemPreview struct {
+	SourceMaterialID string `json:"sourceMaterialId"`
+	Title            string `json:"title"`
+	TagCode          string `json:"tagCode"`
+	Action           string `json:"action"`
+	ExistingID       string `json:"existingId,omitempty"`
+	ExistingTitle    string `json:"existingTitle,omitempty"`
+	ExistingVersion  string `json:"-"`
+}
+
+type MaterialSyncTargetPreview struct {
+	CourseID   string                    `json:"courseId"`
+	CourseName string                    `json:"courseName"`
+	LessonID   string                    `json:"lessonId"`
+	Curriculum CurriculumPath            `json:"curriculum"`
+	Items      []MaterialSyncItemPreview `json:"items"`
+}
+
+type MaterialSyncPreview struct {
+	Snapshot string                      `json:"snapshot"`
+	Targets  []MaterialSyncTargetPreview `json:"targets"`
+}
+
+type MaterialSyncTargetResult struct {
+	CourseID    string   `json:"courseId"`
+	CourseName  string   `json:"courseName"`
+	Created     int      `json:"created"`
+	Replaced    int      `json:"replaced"`
+	MaterialIDs []string `json:"materialIds"`
+}
+
+type MaterialSyncResult struct {
+	AlreadySynced bool                       `json:"alreadySynced"`
+	Targets       []MaterialSyncTargetResult `json:"targets"`
+}
 type HomeworkReorderRequest struct {
 	CourseID    string   `json:"courseId"`
 	HomeworkIDs []string `json:"homeworkIds"`

@@ -51,6 +51,8 @@
 - `PUT /api/courses/{id}`
 - `GET /api/materials`
 - `POST /api/materials`
+- `POST /api/materials/sync-preview`
+- `POST /api/materials/sync`
 - `PUT /api/materials/{id}`
 - `GET /api/homework`
 - `POST /api/homework`
@@ -269,6 +271,28 @@
 学习资料 `status` 推荐使用 `已发布`、`停用`，学生端只展示已发布内容；后端兼容历史值 `启用` 并按已发布处理。练习仍支持 `启用`、`草稿`、`停用`，草稿和停用内容只保留在后台。
 
 学习资料返回对象会包含 `grade`、`semester`、`subject`，这些字段由绑定的学习空间派生，后台可直接按年级、学期和学科筛选。学习资料本身不带学年——学习空间是跨学年复用的课程目录，同一个五年级英文 S1 阶段的资料每年可能更新但不需要按学年分别建档，见架构文档「学习数据权限」一节。
+
+上传一批课程讲义后，可以将本次成功上传的资料单向同步到同年级、学科、学期和阶段的其他课程。先调用 `POST /api/materials/sync-preview` 检查目标课节会新增或替换哪些标签资料：
+
+```json
+{
+  "sourceCourseId": "course-g05-english-s1-q1",
+  "sourceLessonId": "course-g05-english-s1-q1-lesson-1",
+  "materialIds": ["material-001", "material-002"],
+  "targets": [
+    { "courseId": "course-g05-english-s1-q1-splus", "lessonId": "splus-lesson-1" },
+    { "courseId": "course-g05-english-s1-q1-h", "lessonId": "h-lesson-1" }
+  ]
+}
+```
+
+预检查返回 `snapshot` 和按目标课程分组的 `items`；每项 `action` 为 `create` 或 `replace`。确认后以相同请求调用 `POST /api/materials/sync`，并增加预检查返回的 `snapshot`。执行规则如下：
+
+- 目标课节同标签已有资料时原位替换，保留目标资料 ID、浏览数和排序；其他标签不变。
+- 目标资料复用源资料的 `fileId`，不会重复上传或生成文件预览任务；各课程的资料记录保持独立。
+- 每个目标课程合并产生一次课程内容通知和一条审计记录；整批目标在同一事务内写入。
+- 预检查后源资料或目标资料发生变化时执行会失败，客户端需重新预检查。网络超时后重复提交相同请求不会重复创建资料或通知。
+- 同步失败不回滚此前已成功的源课程上传；客户端可保留选择并重试同步。
 
 题库题目的 `stem` 支持轻量富文本，可包含加粗、列表、颜色和图片 URL。学生端会按富文本渲染题干，适合阅读理解、图形题等复杂题型；结构化题型仍建议使用选项和答案字段，便于自动判分。
 

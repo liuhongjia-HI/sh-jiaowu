@@ -537,6 +537,45 @@ export type MaterialReorderRequest = {
   materialIds: string[];
 };
 
+export type MaterialSyncTarget = { courseId: string; lessonId: string };
+
+export type MaterialSyncRequest = {
+  sourceCourseId: string;
+  sourceLessonId: string;
+  materialIds: string[];
+  targets: MaterialSyncTarget[];
+  snapshot?: string;
+};
+
+export type MaterialSyncItemPreview = {
+  sourceMaterialId: string;
+  title: string;
+  tagCode: string;
+  action: 'create' | 'replace';
+  existingId?: string;
+  existingTitle?: string;
+};
+
+export type MaterialSyncTargetPreview = {
+  courseId: string;
+  courseName: string;
+  lessonId: string;
+  curriculum: CurriculumPath;
+  items: MaterialSyncItemPreview[];
+};
+
+export type MaterialSyncPreview = { snapshot: string; targets: MaterialSyncTargetPreview[] };
+
+export type MaterialSyncTargetResult = {
+  courseId: string;
+  courseName: string;
+  created: number;
+  replaced: number;
+  materialIds: string[];
+};
+
+export type MaterialSyncResult = { alreadySynced: boolean; targets: MaterialSyncTargetResult[] };
+
 export type Homework = {
   id: string;
   title: string;

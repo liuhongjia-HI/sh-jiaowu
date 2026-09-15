@@ -56,6 +56,37 @@ func (h *LearningHandler) CreateMaterial(c *gin.Context) {
 	OK(c, created)
 }
 
+func (h *LearningHandler) PreviewMaterialSync(c *gin.Context) {
+	var req learning.MaterialSyncRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	preview, err := h.service.PreviewMaterialSync(principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, preview)
+}
+
+func (h *LearningHandler) SyncMaterials(c *gin.Context) {
+	var req learning.MaterialSyncRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.SyncMaterials(operator.(string), principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
 func (h *LearningHandler) UpdateMaterial(c *gin.Context) {
 	var req learning.MaterialUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -901,33 +901,57 @@ test('教师可以新增题目并发布课后练习', async ({ page }) => {
 
 test('上传课程讲义和课后练习可以用年级学科筛选课程范围', async ({ page }) => {
   await login(page, '13800000002');
+  const suffix = Date.now();
+  const grade5Course = `五年级英文筛选验收 ${suffix}`;
+  const grade4Course = `四年级英文筛选验收 ${suffix}`;
+  const created = await page.evaluate(async ({ grade5Course, grade4Course, suffix }) => {
+    const token = localStorage.getItem('starline_admin_token');
+    const create = async (name: string, learningSpaceId: string, prefix: string) => {
+      const response = await fetch('/api/courses', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name, learningSpaceId, status: '启用',
+          curriculum: [
+            { id: `${prefix}-unit`, type: 'unit', name: 'Unit 1', sortOrder: 1 },
+            { id: `${prefix}-chapter`, parentId: `${prefix}-unit`, type: 'chapter', name: 'Chapter 1', sortOrder: 1 },
+            { id: `${prefix}-lesson`, parentId: `${prefix}-chapter`, type: 'lesson', name: '基础巩固', sortOrder: 1 }
+          ]
+        })
+      });
+      return response.ok ? '' : await response.text();
+    };
+    return (await create(grade5Course, 'space-g05-english-s1-q1', `filter-g5-${suffix}`)) || (await create(grade4Course, 'space-g04-english-s1-q1', `filter-g4-${suffix}`));
+  }, { grade5Course, grade4Course, suffix });
+  expect(created).toBe('');
 
   await expectPageHeading(page, '/materials', '课程讲义');
   await page.getByRole('button', { name: '上传讲义' }).click();
   const dialog = page.getByRole('dialog', { name: '给课节上传资料' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('快捷筛选')).toBeVisible();
-  await expect(dialog.getByText('一次可上传该课的 HD / Blank / HW / TK', { exact: false })).toBeVisible();
+  await expect(dialog.getByText('一次可上传该课的 HD / Blank / HW / Exam / Special', { exact: false })).toBeVisible();
 
-  await dialog.getByRole('combobox', { name: '年级' }).click();
-  await page.getByRole('option', { name: '五年级', exact: true }).click();
-  await dialog.getByRole('combobox', { name: '学科' }).click();
-  await page.getByRole('option', { name: 'English', exact: true }).click();
+  await dialog.locator('.ant-space-compact .ant-select-selector').nth(0).click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('五年级', { exact: true }).last().click();
+  await dialog.locator('.ant-space-compact .ant-select-selector').nth(1).click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('English', { exact: true }).last().click();
 
-  await selectOption(page, dialog, '课程范围', '五年级英文S1Q1课程');
+  await selectOption(page, dialog, '课程范围', grade5Course);
   const courseField = dialog.locator('.ant-form-item').filter({ hasText: '课程范围' }).first();
-  await expect(courseField).toContainText('五年级英文S1Q1课程');
+  await expect(courseField).toContainText(grade5Course);
 
-  await dialog.getByRole('combobox', { name: '年级' }).click();
-  await page.getByRole('option', { name: '四年级', exact: true }).click();
-  await expect(courseField).not.toContainText('五年级英文S1Q1课程');
+  await dialog.locator('.ant-space-compact .ant-select-selector').nth(0).click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('四年级', { exact: true }).last().click();
+  await expect(courseField).not.toContainText(grade5Course);
 
   await courseField.locator('.ant-select-selector').click();
   const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
-  await expect(dropdown.getByText('四年级英文S1Q1课程', { exact: false })).toBeVisible();
-  await expect(dropdown.getByText('五年级英文S1Q1课程', { exact: false })).toHaveCount(0);
+  await expect(dropdown.getByText(grade4Course, { exact: false })).toBeVisible();
+  await expect(dropdown.getByText(grade5Course, { exact: false })).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await dialog.getByRole('button', { name: '取消' }).click();
+  await dialog.locator('.ant-drawer-close').click();
+  await expect(dialog).toBeHidden();
 
   await expectPageHeading(page, '/homework', '课后练习');
   await page.getByRole('button', { name: '新建课后练习' }).click();
@@ -936,6 +960,64 @@ test('上传课程讲义和课后练习可以用年级学科筛选课程范围',
   await expect(homeworkDialog.getByText('快捷筛选')).toBeVisible();
   await expect(homeworkDialog.getByRole('combobox', { name: '年级' })).toBeVisible();
   await expect(homeworkDialog.getByRole('combobox', { name: '学科' })).toBeVisible();
+});
+
+test('上传课程讲义后可以预检查并同步到同阶段课程', async ({ page }) => {
+  await login(page, '13800000002');
+  const suffix = Date.now();
+  const sourceName = `五年级英文 S 同步验收 ${suffix}`;
+  const targetName = `五年级英文 S+ 同步验收 ${suffix}`;
+  const targetPrefix = `sync-e2e-${suffix}`;
+  const created = await page.evaluate(async ({ sourceName, targetName, prefix }) => {
+    const token = localStorage.getItem('starline_admin_token');
+    const create = async (name: string, learningSpaceId: string, nodePrefix: string) => {
+      const response = await fetch('/api/courses', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name, learningSpaceId, status: '启用',
+          curriculum: [
+            { id: `${nodePrefix}-unit`, type: 'unit', name: 'Unit 1', sortOrder: 1 },
+            { id: `${nodePrefix}-chapter`, parentId: `${nodePrefix}-unit`, type: 'chapter', name: 'Chapter 1', sortOrder: 1 },
+            { id: `${nodePrefix}-lesson`, parentId: `${nodePrefix}-chapter`, type: 'lesson', name: '基础巩固', sortOrder: 1 }
+          ]
+        })
+      });
+      return { ok: response.ok, body: await response.text() };
+    };
+    const source = await create(sourceName, 'space-g05-english-s1-q1', `${prefix}-source`);
+    if (!source.ok) return source;
+    return create(targetName, 'space-g05-english-s1-q1-splus', `${prefix}-target`);
+  }, { sourceName, targetName, prefix: targetPrefix });
+  expect(created.ok, created.body).toBeTruthy();
+
+  await expectPageHeading(page, '/materials', '课程讲义');
+  await page.getByRole('button', { name: '上传讲义' }).click();
+  const upload = page.getByRole('dialog', { name: '给课节上传资料' });
+  await selectOption(page, upload, '课程范围', sourceName);
+  await selectOption(page, upload, '课节', '基础巩固');
+  await upload.locator('input[type="file"]').setInputFiles({
+    name: `HD_同步验收_${suffix}.pdf`,
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF')
+  });
+  await page.locator('.ant-drawer-footer button.ant-btn-primary').click();
+  await expect(upload).toBeHidden();
+
+  const sync = page.getByRole('dialog', { name: '同步本次课程讲义' });
+  await expect(sync).toBeVisible();
+  await sync.getByRole('checkbox', { name: targetName, exact: false }).check();
+  await expect(sync.getByText('基础巩固', { exact: false })).toBeVisible();
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(sync).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const targetColumns = await sync.locator('.material-sync-target-row').filter({ hasText: targetName }).evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+  expect(targetColumns).toBe(1);
+  await sync.getByRole('button', { name: '检查同步内容' }).click();
+  await expect(sync.getByText(targetName, { exact: true })).toBeVisible();
+  await expect(sync.getByText('新增', { exact: true })).toBeVisible();
+  await sync.getByRole('button', { name: '确认同步到 1 门课程' }).click();
+  await expect(sync).toBeHidden();
 });
 
 test('校区管理员可以从周历入口新建排课', async ({ page }) => {
