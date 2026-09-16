@@ -265,3 +265,37 @@ test("failed read-state save keeps the message unread and allows retry", async (
   await flushPromises();
   assert.equal(page.data.visibleNotices[0].isRead, true);
 });
+
+test("read filters combine with category and batch read updates badges only after success", async () => {
+  let fail = true;
+  const notices = [
+    { id: "c1", relatedType: "course", isRead: false },
+    { id: "c2", relatedType: "course", isRead: true },
+    { id: "h1", relatedType: "homework", isRead: false }
+  ];
+  const page = loadNoticesPage((path) => {
+    if (path === "/student/accounts") return Promise.resolve([]);
+    if (path === "/student/notices/read-all") {
+      return fail ? Promise.reject(new Error("offline")) : Promise.resolve(notices.map(n => ({ ...n, isRead: true })));
+    }
+    return Promise.resolve(notices);
+  });
+  const badges = [];
+  global.wx.setTabBarBadge = ({ text }) => badges.push(text);
+  global.wx.removeTabBarBadge = () => badges.push("0");
+  await page.loadNotices();
+  page.changeFilter({ currentTarget: { dataset: { filter: "课程" } } });
+  page.changeReadFilter({ currentTarget: { dataset: { filter: "未读" } } });
+  assert.deepEqual(page.data.visibleNotices.map(n => n.id), ["c1"]);
+  assert.equal(page.data.unreadCount, 2);
+  await page.markAllRead();
+  assert.equal(page.data.unreadCount, 2);
+  assert.equal(page.data.markingAll, false);
+  fail = false;
+  await page.markAllRead();
+  assert.equal(page.data.unreadCount, 0);
+  assert.equal(page.data.visibleNotices.length, 0);
+  assert.equal(badges.at(-1), "0");
+  page.changeReadFilter({ currentTarget: { dataset: { filter: "已读" } } });
+  assert.equal(page.data.visibleNotices.length, 2);
+});

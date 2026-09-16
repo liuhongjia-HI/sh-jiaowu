@@ -1,3 +1,4 @@
+const { refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
 const { subjectLabel } = require("../../utils/subject");
 const { showPhoneAuthFailed, isCancel } = require("../../utils/phone-auth");
@@ -64,6 +65,7 @@ Page({
     }
   },
   onShow() {
+    refreshNoticeBadge();
     if (!this.data.loading) {
       this.loadMe({ silent: !!this.data.me });
     }
@@ -104,6 +106,7 @@ Page({
     request(`/student/accounts/${studentId}/switch`, { method: "POST", data: {} }).then((result) => {
       wx.setStorageSync("starline_token", result.token);
       wx.setStorageSync("starline_student_id", studentId);
+      refreshNoticeBadge();
       wx.showToast({ title: `已切换到${result.user.name}`, icon: "success" });
       this.setData({ switchingStudentId: "" });
       this.loadMe();

@@ -131,6 +131,7 @@ type CommercialRepository interface {
 }
 
 type NoticeRepository interface {
+	MarkAllStudentNoticesRead(learning.Principal) ([]learning.Notice, error)
 	Notices(learning.Principal) []learning.Notice
 	MarkStudentNoticeRead(learning.Principal, string) (learning.Notice, error)
 	CreateNotice(string, learning.Principal, learning.NoticeCreateRequest) (learning.Notice, error)

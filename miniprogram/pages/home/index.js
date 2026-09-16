@@ -1,3 +1,4 @@
+const { refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
 const { subjectLabel, subjectsMatchName } = require("../../utils/subject");
 
@@ -66,6 +67,7 @@ Page({
     };
   },
   onShow() {
+    refreshNoticeBadge();
     this.homeHidden = false;
     this.refreshGreeting();
     if (!hasStudentToken()) {

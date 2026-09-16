@@ -141,7 +141,7 @@ func watermarkPageScript(watermarkText string) string {
 	return `/StarlineWatermark {
   gsave
   initgraphics
-  0.92 setgray
+  0.82 setgray
 	/Helvetica findfont
   8 scalefont setfont
   /WatermarkText ` + encoded + ` def

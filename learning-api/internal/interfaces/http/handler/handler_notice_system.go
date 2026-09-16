@@ -131,3 +131,13 @@ func (h *LearningHandler) MarkStudentNoticeRead(c *gin.Context) {
 	}
 	OK(c, notice)
 }
+
+func (h *LearningHandler) MarkAllStudentNoticesRead(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	notices, err := h.service.MarkAllStudentNoticesRead(principal)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, notices)
+}

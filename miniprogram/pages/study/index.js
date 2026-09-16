@@ -1,3 +1,4 @@
+const { refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
 const { subjectEmoji, subjectsMatchName } = require("../../utils/subject");
 
@@ -37,6 +38,7 @@ Page({
     };
   },
   onShow() {
+    refreshNoticeBadge();
     if (!hasStudentToken()) {
       if (!this.data.loginPrompted) {
         this.promptLogin();

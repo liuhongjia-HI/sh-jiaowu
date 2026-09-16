@@ -1,3 +1,4 @@
+const { updateNoticeBadge, refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
 
 Page({
@@ -6,6 +7,10 @@ Page({
     error: "",
     emptyMessage: "课程上传新内容时，会提醒你。",
     activeFilter: "全部",
+    readFilter: "全部",
+    readFilters: ["全部", "未读", "已读"],
+    unreadCount: 0,
+    markingAll: false,
     filters: [
       { label: "全部", className: "active" },
       { label: "课程", className: "" },
@@ -24,6 +29,7 @@ Page({
     this.loadNotices();
   },
   onShow() {
+    refreshNoticeBadge();
     if (this._skipInitialShowRefresh) {
       this._skipInitialShowRefresh = false;
       return;
@@ -32,11 +38,14 @@ Page({
   },
   loadNotices() {
     this.setData({ loading: true, error: "" });
-    Promise.all([
+    const token = noticeToken();
+    const generation = this._generation = (this._generation || 0) + 1;
+    return Promise.all([
       request("/student/notices"),
       request("/student/accounts", { silent: true }).catch(() => [])
     ])
       .then(([notices, accounts]) => {
+        if (generation !== this._generation || token !== noticeToken()) return;
         const active = (accounts || []).find((item) => item.active) || {};
         this.setData({
           notices: decorateNotices(notices || [], active),
@@ -47,11 +56,14 @@ Page({
           loading: false
         }, () => this.applyFilters());
       })
-      .catch((error) => this.setData({
-        error: error.message || "加载失败",
-        emptyMessage: error.message || "课程上传新内容时，会提醒你。",
-        loading: false
-      }));
+      .catch((error) => {
+        if (generation !== this._generation || token !== noticeToken()) return;
+        this.setData({
+          error: error.message || "加载失败",
+          emptyMessage: error.message || "课程上传新内容时，会提醒你。",
+          loading: false
+        });
+      });
   },
   onShareAppMessage() {
     return {
@@ -79,8 +91,11 @@ Page({
   },
   markNoticeRead(notice) {
     if (notice.isRead) return;
+    const token = noticeToken();
+    const generation = this._generation;
     return request(`/student/notices/${encodeURIComponent(notice.id)}/read`, { method: "POST", silent: true })
       .then(() => {
+        if (generation !== this._generation || token !== noticeToken()) return;
         this.setData({
           notices: this.data.notices.map((item) => item.id === notice.id ? { ...item, isRead: true } : item)
         }, () => this.applyFilters());
@@ -95,12 +110,31 @@ Page({
       filters: this.data.filters.map((item) => ({ ...item, className: item.label === activeFilter ? "active" : "" }))
     }, () => this.applyFilters());
   },
+  changeReadFilter(event) {
+    this.setData({ readFilter: event.currentTarget.dataset.filter }, () => this.applyFilters());
+  },
+  markAllRead() {
+    if (this.data.loading || this.data.error || this.data.markingAll || !this.data.unreadCount) return;
+    const token = noticeToken();
+    const generation = this._generation;
+    this.setData({ markingAll: true });
+    return request("/student/notices/read-all", { method: "POST", silent: true })
+      .then((notices) => {
+        if (generation !== this._generation || token !== noticeToken()) return;
+        const student = { name: this.data.currentStudentName, grade: this.data.currentStudentGrade };
+        this.setData({ notices: decorateNotices(notices || [], student) }, () => this.applyFilters());
+      })
+      .catch(() => {})
+      .finally(() => this.setData({ markingAll: false }));
+  },
   applyFilters() {
-    const activeFilter = this.data.activeFilter;
-    const visibleNotices = activeFilter === "全部"
-      ? this.data.notices
-      : this.data.notices.filter((notice) => notice.category === activeFilter);
-    this.setData({ visibleNotices });
+    const { activeFilter, readFilter, notices } = this.data;
+    const visibleNotices = notices.filter((notice) =>
+      (activeFilter === "全部" || notice.category === activeFilter) &&
+      (readFilter === "全部" || notice.isRead === (readFilter === "已读"))
+    );
+    this.setData({ visibleNotices, unreadCount: notices.filter((notice) => !notice.isRead).length });
+    updateNoticeBadge(notices);
   }
 });
 
@@ -160,4 +194,8 @@ function noticeCategory(notice) {
   if (/课程|上课|调课|排课/.test(text)) return "课程";
   if (/作业|挑战|练习|批改|反馈/.test(text)) return "作业";
   return "系统";
+}
+
+function noticeToken() {
+  return wx.getStorageSync ? wx.getStorageSync("starline_token") || "" : "";
 }

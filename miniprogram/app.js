@@ -1,3 +1,4 @@
+const { refreshNoticeBadge } = require("./utils/notice-badge");
 const PRODUCTION_API_BASE_URL = "https://gate.starlineeducation.com.cn/api";
 const SUBSCRIBE_TEMPLATE_IDS = ["vePubb0t7OgxNsZA0J3s60urpzf8_XJjLH4JhPynHd0"];
 
@@ -25,6 +26,7 @@ function resolveUseRealWechatLogin() {
 
 App({
   onLaunch() {},
+  onShow() { refreshNoticeBadge(); },
   ensureLogin(options = {}) {
     const cachedToken = wx.getStorageSync("starline_token");
     if (cachedToken && !options.force) {

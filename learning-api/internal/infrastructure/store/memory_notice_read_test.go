@@ -71,3 +71,38 @@ func TestMarkStudentNoticeReadPersistsOnlyAfterCommit(t *testing.T) {
 		}
 	}
 }
+
+func TestMarkAllStudentNoticesRead(t *testing.T) {
+	s := noticeReadTestStore()
+	p, _ := s.PrincipalByUserID("user-student-001")
+	for i := 0; i < 2; i++ {
+		notices, err := s.MarkAllStudentNoticesRead(p)
+		if err != nil || len(notices) != 1 || !notices[0].IsRead {
+			t.Fatalf("unexpected inbox: %#v, %v", notices, err)
+		}
+	}
+	if s.notices[1].IsRead || s.notices[2].IsRead {
+		t.Fatal("changed other student or hidden notice")
+	}
+	if _, err := s.MarkAllStudentNoticesRead(learning.Principal{}); err == nil {
+		t.Fatal("must reject unbound account")
+	}
+}
+
+func TestMarkAllStudentNoticesReadRollback(t *testing.T) {
+	mutationDriverState.reset(true)
+	db, err := sql.Open(mutationTestDriverName, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := noticeReadTestStore()
+	s.db = db
+	p, _ := s.PrincipalByUserID("user-student-001")
+	if _, err := s.MarkAllStudentNoticesRead(p); err == nil {
+		t.Fatal("expected write failure")
+	}
+	if s.notices[0].IsRead {
+		t.Fatal("failed write changed read state")
+	}
+}

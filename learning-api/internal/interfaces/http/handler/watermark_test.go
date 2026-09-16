@@ -32,8 +32,8 @@ func TestWatermarkBeginPageScriptDrawsBehindContent(t *testing.T) {
 	if strings.Contains(script, "/EndPage") || strings.Contains(script, "/showpage") {
 		t.Fatalf("watermark must draw before the PDF content instead of overriding page output: %s", script)
 	}
-	if !strings.Contains(script, "0.92 setgray") {
-		t.Fatalf("watermark should use a light gray shade, got %s", script)
+	if !strings.Contains(script, "0.82 setgray") {
+		t.Fatalf("watermark should balance screen readability with print visibility, got %s", script)
 	}
 	if strings.Contains(script, "15 scalefont") {
 		t.Fatalf("watermark should not use the old oversized font, got %s", script)
