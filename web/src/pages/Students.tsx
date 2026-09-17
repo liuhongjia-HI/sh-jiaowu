@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Checkbox,
-  Collapse,
   Descriptions,
   Drawer,
   Empty,
@@ -30,9 +29,11 @@ import {
 import type { TableColumnsType, UploadFile } from 'antd';
 import { BellOutlined, CheckCircleOutlined, DeleteOutlined, EditOutlined, EyeOutlined, ImportOutlined, LockOutlined, PlusOutlined, StopOutlined, UnlockOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { deleteData, getData, postData, postForm, putData } from '../services/http';
+import { StudentOpeningOverview, openingSelectionLabel } from '../components/StudentOpeningOverview';
+import type { OpeningSelection } from '../components/StudentOpeningOverview';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
 import { gradeOptions as curriculumGradeOptions, subjectLabel, subjectOptions, useSubjectCatalog } from '../utils/curriculum';
@@ -156,7 +157,9 @@ function TutoringTeacherNames({ assignments }: { assignments?: TutoringAssignmen
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
-  const [openingFilter, setOpeningFilter] = useState<StudentActiveOpening | null>(null);
+  const [openingFilter, setOpeningFilter] = useState<OpeningSelection | null>(null);
+  const [openingLevel, setOpeningLevel] = useState<string | undefined>();
+  const studentListRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState<StudentFilters>({});
   const [keywordInput, setKeywordInput] = useState('');
   const [studentForm] = Form.useForm<StudentFormValues>();
@@ -330,7 +333,7 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: () => message.error('导入失败，请确认 CSV 文件格式是否正确。')
   });
 
-  const rows = (students.data ?? []).filter((student) => !openingFilter || student.activeOpenings?.some((scope) => openingKey(scope) === openingKey(openingFilter)));
+  const rows = (students.data ?? []).filter((student) => !openingFilter || student.activeOpenings?.some((scope) => scope.grade === openingFilter.grade && scope.subject === openingFilter.subject && (openingFilter.level === undefined || scope.level === openingFilter.level)));
   const allRows = allStudents.data ?? [];
   const gradeOptions = useMemo(() => uniqueOptions(rows.map((item) => item.grade)), [rows]);
   const learningOptions = useMemo(() => uniqueOptions(rows.map((item) => item.learningStatus)), [rows]);
@@ -341,21 +344,6 @@ export default function Students({ user }: { user: CurrentUser }) {
     waiting: allRows.filter((item) => item.followUpStatus === '待跟进').length,
     disabled: allRows.filter((item) => item.accountStatus === '停用').length
   }), [allRows]);
-  const openingSummary = useMemo(() => {
-    const groups = new Map<string, StudentActiveOpening & { count: number }>();
-    for (const student of allRows) {
-      const seen = new Set<string>();
-      for (const scope of student.activeOpenings ?? []) {
-        const key = openingKey(scope);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const group = groups.get(key) ?? { ...scope, count: 0 };
-        group.count++;
-        groups.set(key, group);
-      }
-    }
-    return [...groups.values()].sort((a, b) => compareStudentGrades(a.grade, b.grade) || compareStudentText(a.subject, b.subject) || compareStudentText(a.level, b.level));
-  }, [allRows]);
   const hasActiveFilters = Boolean(openingFilter) || Object.values(filters).some(Boolean);
 
   function applyQuickFilter(nextFilters: StudentFilters) {
@@ -551,33 +539,18 @@ export default function Students({ user }: { user: CurrentUser }) {
         <Card><Statistic title="已停用" value={stats.disabled} /></Card>
       </div>
 
-      <Collapse items={[{
-        key: 'active-openings',
-        label: '当前开通概览',
-        extra: allStudents.isError ? '加载失败' : allStudents.isPending ? '加载中…' : `覆盖 ${new Set(openingSummary.map((item) => item.grade)).size} 个年级 · ${new Set(openingSummary.map((item) => item.subject)).size} 门科目 · ${new Set(openingSummary.map((item) => item.level).filter(Boolean)).size} 种班型`,
-        children: <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Typography.Text type="secondary">全部可见学生 · 仅统计当前有效授权（套餐及单独开通）；同一学生在同一组合下去重，各行人数不可直接相加。</Typography.Text>
-          {allStudents.isError ? <Alert type="error" message="开通概览加载失败" action={<Button onClick={() => allStudents.refetch()}>重试</Button>} /> : <Table
-            size="small"
-            rowKey={openingKey}
-            loading={allStudents.isPending}
-            dataSource={openingSummary}
-            pagination={{ pageSize: 8, hideOnSinglePage: true }}
-            scroll={{ x: 500 }}
-            locale={{ emptyText: '暂无当前有效开通' }}
-            columns={[
-              { title: '开通年级', dataIndex: 'grade' },
-              { title: '科目', dataIndex: 'subject', render: subjectLabel },
-              { title: '班型', dataIndex: 'level', render: (level: string) => level ? `${level}班` : '未设置' },
-              { title: '有效开通人数', dataIndex: 'count', render: (count: number, scope) => <Button type="link" onClick={() => { applyQuickFilter({}); setOpeningFilter(scope); }}>{count} 人 · 查看学生</Button> }
-            ]}
-          />}
-        </Space>
-      }]} />
+      <StudentOpeningOverview students={allRows} loading={allStudents.isPending} error={allStudents.isError}
+        onRetry={() => { void allStudents.refetch(); }} selection={openingFilter} level={openingLevel}
+        onLevelChange={(level) => { setOpeningLevel(level); setOpeningFilter(current => current ? { ...current, level } : null); }}
+        onSelect={(scope) => {
+          applyQuickFilter({}); setOpeningFilter(scope);
+          studentListRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+        }}
+      />
 
       <Card>
-        <div className="list-panel">
-          {openingFilter && <Space wrap><Typography.Text>开通范围：</Typography.Text><Tag closable onClose={() => setOpeningFilter(null)}>{openingLabel(openingFilter)}</Tag><Typography.Text type="secondary">符合当前条件：{rows.length} 人</Typography.Text></Space>}
+        <div className="list-panel student-list-anchor" ref={studentListRef}>
+          {openingFilter && <Space wrap><Typography.Text>开通范围：</Typography.Text><Tag closable onClose={() => setOpeningFilter(null)}>{openingSelectionLabel(openingFilter)}</Tag><Typography.Text type="secondary">符合当前条件：{rows.length} 人</Typography.Text></Space>}
           <div className="list-toolbar">
             <Space wrap>
               <Input.Search

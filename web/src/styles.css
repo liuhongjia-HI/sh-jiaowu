@@ -3092,3 +3092,27 @@ button.schedule-block:hover {
     gap: 8px;
   }
 }
+
+/* Compact current-access distribution: one cell per grade and subject. */
+.opening-overview { min-width: 0; max-width: 100%; }
+.opening-overview .ant-card-head { min-height: 48px; }
+.opening-overview .ant-card-body { padding: 12px 20px; }
+.opening-overview-toolbar, .opening-overview-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.opening-overview-toolbar { margin-bottom: 8px; }
+.opening-matrix-scroll { overflow-x: auto; }
+.opening-matrix { width: 100%; border-collapse: separate; border-spacing: 4px; table-layout: fixed; }
+.opening-matrix th { min-width: 100px; padding: 5px 4px; font-size: 12px; font-weight: 500; color: #52666c; text-align: center; overflow-wrap: anywhere; }
+.opening-matrix th:first-child { width: 86px; text-align: left; }
+.opening-matrix td { min-width: 100px; padding: 0; vertical-align: top; }
+.opening-matrix-cell { display: flex; width: 100%; min-width: 100px; min-height: 48px; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 4px 8px; border: 0; border-radius: 6px; background: color-mix(in srgb, #07996b var(--opening-intensity), white); color: #193b32; font: inherit; cursor: pointer; }
+.opening-matrix-cell strong { font-size: 20px; line-height: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.opening-matrix-cell span { font-size: 12px; line-height: 16px; }
+.opening-matrix-cell:hover { box-shadow: inset 0 0 0 1px #07996b; }
+.opening-matrix-cell[aria-pressed="true"] { outline: 2px solid #007a55; outline-offset: 0; }
+.opening-matrix-cell:focus-visible { outline: 3px solid #145ad0; outline-offset: 1px; }
+.opening-matrix-empty { display: grid; place-items: center; min-width: 100px; min-height: 48px; background: #f4f7f6; color: #697a75; border-radius: 6px; }
+.opening-overview-footer { margin-top: 6px; font-size: 12px; }
+.opening-matrix-legend { display: flex; align-items: center; gap: 6px; color: #52666c; font-size: 12px; }
+.opening-matrix-legend i { width: 60px; height: 8px; border-radius: 3px; background: linear-gradient(90deg, #eaf7f2, #a0d8c7); }
+.student-list-anchor { scroll-margin-top: 88px; }
+@media (max-width: 640px) { .opening-overview .ant-card-body { padding: 12px; } .opening-matrix { table-layout: auto; } }
