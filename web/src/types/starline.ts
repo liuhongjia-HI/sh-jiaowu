@@ -163,7 +163,10 @@ export type PackageUpsertRequest = {
   status: string;
 };
 
+export type StudentActiveOpening = { grade: string; subject: string; level: string };
+
 export type Student = {
+  activeOpenings: StudentActiveOpening[];
   id: string;
   name: string;
   nickname?: string;

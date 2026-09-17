@@ -38,6 +38,7 @@ func (s *MemoryStore) visibleStudent(principal learning.Principal, id string) (l
 
 func (s *MemoryStore) decorateStudent(student learning.Student) learning.Student {
 	applyDerivedGrade(&student, s.configuredAcademicYear())
+	student.ActiveOpenings = s.studentActiveOpenings(student.ID)
 	student.ActiveTutoringAssignments = s.activeTutoringAssignmentsForStudent(student.ID)
 	student.AverageScore = s.studentAverageScore(student.ID)
 	if user, ok := s.findUserByStudentID(student.ID); ok && strings.TrimSpace(user.OpenID) != "" {
@@ -2145,4 +2146,37 @@ func (s *MemoryStore) learningSpaceExists(id string) bool {
 		}
 	}
 	return false
+}
+
+// studentActiveOpenings uses the same grant/access validity rules as course access.
+func (s *MemoryStore) studentActiveOpenings(studentID string) []learning.StudentActiveOpening {
+	out := make([]learning.StudentActiveOpening, 0)
+	seen := make(map[learning.StudentActiveOpening]bool)
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || !grantActive(grant) {
+			continue
+		}
+		for _, id := range s.learningSpaceIDsForGrant(grant.ID) {
+			space, ok := s.findLearningSpace(id)
+			if !ok {
+				continue
+			}
+			subject := subjectEnglishName(space.Subject)
+			scope := learning.StudentActiveOpening{Grade: space.Grade, Subject: subject, Level: strings.TrimSpace(space.Level)}
+			if !seen[scope] {
+				seen[scope] = true
+				out = append(out, scope)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Grade != out[j].Grade {
+			return out[i].Grade < out[j].Grade
+		}
+		if out[i].Subject != out[j].Subject {
+			return out[i].Subject < out[j].Subject
+		}
+		return out[i].Level < out[j].Level
+	})
+	return out
 }

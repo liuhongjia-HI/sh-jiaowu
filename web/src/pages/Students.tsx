@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Collapse,
   Descriptions,
   Drawer,
   Empty,
@@ -44,6 +45,7 @@ import type {
   GrantRevokeResult,
   LearningSpace,
   Student,
+  StudentActiveOpening,
   StudentDetail,
   StudentImportResult,
   StudentOpeningCell,
@@ -111,7 +113,7 @@ function bindStatusText(status: string) {
 
 function packageStatusLabel(student: Student) {
   if (student.followUpStatus === '待跟进') return '待跟进';
-  return (student.openedPackages?.length ?? 0) > 0 ? '已开通' : '未开通';
+  return (student.activeOpenings?.length ?? 0) > 0 ? '已开通' : '未开通';
 }
 
 function packageStatusTag(student: Student) {
@@ -154,6 +156,7 @@ function TutoringTeacherNames({ assignments }: { assignments?: TutoringAssignmen
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
+  const [openingFilter, setOpeningFilter] = useState<StudentActiveOpening | null>(null);
   const [filters, setFilters] = useState<StudentFilters>({});
   const [keywordInput, setKeywordInput] = useState('');
   const [studentForm] = Form.useForm<StudentFormValues>();
@@ -327,20 +330,36 @@ export default function Students({ user }: { user: CurrentUser }) {
     onError: () => message.error('导入失败，请确认 CSV 文件格式是否正确。')
   });
 
-  const rows = students.data ?? [];
+  const rows = (students.data ?? []).filter((student) => !openingFilter || student.activeOpenings?.some((scope) => openingKey(scope) === openingKey(openingFilter)));
   const allRows = allStudents.data ?? [];
   const gradeOptions = useMemo(() => uniqueOptions(rows.map((item) => item.grade)), [rows]);
   const learningOptions = useMemo(() => uniqueOptions(rows.map((item) => item.learningStatus)), [rows]);
   const accountOptions = useMemo(() => uniqueOptions(rows.map((item) => item.accountStatus)), [rows]);
   const stats = useMemo(() => ({
     total: allRows.length,
-    opened: allRows.filter((item) => (item.openedPackages?.length ?? 0) > 0).length,
+    opened: allRows.filter((item) => (item.activeOpenings?.length ?? 0) > 0).length,
     waiting: allRows.filter((item) => item.followUpStatus === '待跟进').length,
     disabled: allRows.filter((item) => item.accountStatus === '停用').length
   }), [allRows]);
-  const hasActiveFilters = Object.values(filters).some(Boolean);
+  const openingSummary = useMemo(() => {
+    const groups = new Map<string, StudentActiveOpening & { count: number }>();
+    for (const student of allRows) {
+      const seen = new Set<string>();
+      for (const scope of student.activeOpenings ?? []) {
+        const key = openingKey(scope);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const group = groups.get(key) ?? { ...scope, count: 0 };
+        group.count++;
+        groups.set(key, group);
+      }
+    }
+    return [...groups.values()].sort((a, b) => compareStudentGrades(a.grade, b.grade) || compareStudentText(a.subject, b.subject) || compareStudentText(a.level, b.level));
+  }, [allRows]);
+  const hasActiveFilters = Boolean(openingFilter) || Object.values(filters).some(Boolean);
 
   function applyQuickFilter(nextFilters: StudentFilters) {
+    setOpeningFilter(null);
     setKeywordInput('');
     setFilters(nextFilters);
   }
@@ -402,11 +421,11 @@ export default function Students({ user }: { user: CurrentUser }) {
       render: (_, record) => packageStatusInfo(record)
     },
     {
-      title: '课程',
-      dataIndex: 'openedPackageRefs',
+      title: '当前已开通',
+      dataIndex: 'activeOpenings',
       width: 220,
-      sorter: (left, right) => compareStudentText(publicPackageRefs(left.openedPackageRefs).map((item) => item.packageName).join('、'), publicPackageRefs(right.openedPackageRefs).map((item) => item.packageName).join('、')),
-      render: (values: StudentPackageRef[], record) => <PackageLinks values={values} onOpen={() => openStudentDetail(record, 'courses')} />
+      sorter: (left, right) => compareStudentText((left.activeOpenings ?? []).map(openingLabel).join('、'), (right.activeOpenings ?? []).map(openingLabel).join('、')),
+      render: (values: StudentActiveOpening[], record) => <ActiveOpeningSummary values={values} onOpen={() => openStudentDetail(record, 'courses')} />
     },
     {
       title: '辅导老师',
@@ -515,7 +534,7 @@ export default function Students({ user }: { user: CurrentUser }) {
           onClick={() => applyQuickFilter(filters.packageState === '已开通' ? {} : { packageState: '已开通' })}
           onKeyDown={(event) => activateQuickFilter(event, () => applyQuickFilter(filters.packageState === '已开通' ? {} : { packageState: '已开通' }))}
         >
-          <Statistic title="已开通课程（点击筛选）" value={stats.opened} />
+          <Statistic title="当前有效开通学生（点击筛选）" value={stats.opened} />
         </Card>
         <Card
           hoverable
@@ -532,8 +551,33 @@ export default function Students({ user }: { user: CurrentUser }) {
         <Card><Statistic title="已停用" value={stats.disabled} /></Card>
       </div>
 
+      <Collapse items={[{
+        key: 'active-openings',
+        label: '当前开通概览',
+        extra: allStudents.isError ? '加载失败' : allStudents.isPending ? '加载中…' : `覆盖 ${new Set(openingSummary.map((item) => item.grade)).size} 个年级 · ${new Set(openingSummary.map((item) => item.subject)).size} 门科目 · ${new Set(openingSummary.map((item) => item.level).filter(Boolean)).size} 种班型`,
+        children: <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Typography.Text type="secondary">全部可见学生 · 仅统计当前有效授权（套餐及单独开通）；同一学生在同一组合下去重，各行人数不可直接相加。</Typography.Text>
+          {allStudents.isError ? <Alert type="error" message="开通概览加载失败" action={<Button onClick={() => allStudents.refetch()}>重试</Button>} /> : <Table
+            size="small"
+            rowKey={openingKey}
+            loading={allStudents.isPending}
+            dataSource={openingSummary}
+            pagination={{ pageSize: 8, hideOnSinglePage: true }}
+            scroll={{ x: 500 }}
+            locale={{ emptyText: '暂无当前有效开通' }}
+            columns={[
+              { title: '开通年级', dataIndex: 'grade' },
+              { title: '科目', dataIndex: 'subject', render: subjectLabel },
+              { title: '班型', dataIndex: 'level', render: (level: string) => level ? `${level}班` : '未设置' },
+              { title: '有效开通人数', dataIndex: 'count', render: (count: number, scope) => <Button type="link" onClick={() => { applyQuickFilter({}); setOpeningFilter(scope); }}>{count} 人 · 查看学生</Button> }
+            ]}
+          />}
+        </Space>
+      }]} />
+
       <Card>
         <div className="list-panel">
+          {openingFilter && <Space wrap><Typography.Text>开通范围：</Typography.Text><Tag closable onClose={() => setOpeningFilter(null)}>{openingLabel(openingFilter)}</Tag><Typography.Text type="secondary">符合当前条件：{rows.length} 人</Typography.Text></Space>}
           <div className="list-toolbar">
             <Space wrap>
               <Input.Search
@@ -554,7 +598,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               <Select
                 allowClear
                 value={filters.packageState}
-                placeholder="套餐开通状态"
+                placeholder="当前开通状态"
                 options={[{ label: '已开通', value: '已开通' }, { label: '未开通', value: '未开通' }]}
                 style={{ width: 140 }}
                 onChange={(packageState) => setFilters((prev) => ({ ...prev, packageState }))}
@@ -573,7 +617,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                 <InfoCard
                   className={record.followUpStatus === '待跟进' ? 'student-follow-up-card' : undefined}
                   title={<Badge dot={record.followUpStatus === '待跟进'} color="#ff4d4f">{record.name}</Badge>}
-                  subtitle={`${record.grade} · ${record.phone}`}
+                  subtitle={<Space direction="vertical" size={8}><span>{record.grade} · {record.phone}</span><span><Typography.Text type="secondary" style={{ display: 'block' }}>当前已开通</Typography.Text><ActiveOpeningSummary values={record.activeOpenings} onOpen={() => openStudentDetail(record, 'courses')} /></span></Space>}
                   status={<Space direction="vertical" size={2} align="end"><Space size={4}><Tag color={record.accountStatus === '正常' ? 'green' : record.accountStatus === '停用' ? 'default' : 'orange'}>{record.accountStatus}</Tag>{packageStatusTag(record)}</Space>{packageExpiryReminder(record.effectiveUntil) && <ExpiryReminder endTime={record.effectiveUntil} />}</Space>}
                   fields={[
                     { label: '微信关联', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{bindStatusText(record.bindStatus)}</Tag> },
@@ -1656,4 +1700,21 @@ function submissionStatusColor(status?: string) {
   if (status === '待复核') return 'blue';
   if (status === '待批改') return 'orange';
   return 'default';
+}
+
+function openingKey(scope: StudentActiveOpening) {
+  return JSON.stringify([scope.grade, scope.subject, scope.level]);
+}
+
+function openingLabel(scope: StudentActiveOpening) {
+  return `${scope.grade} · ${subjectLabel(scope.subject)} · ${scope.level ? `${scope.level}班` : '未设置班型'}`;
+}
+
+function ActiveOpeningSummary({ values = [], onOpen }: { values?: StudentActiveOpening[]; onOpen: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!values.length) return <Typography.Text type="secondary">暂无有效开通</Typography.Text>;
+  return <Space direction="vertical" size={2}>
+    {(expanded ? values : values.slice(0, 2)).map((scope) => <Typography.Link key={openingKey(scope)} onClick={onOpen}>{openingLabel(scope)}</Typography.Link>)}
+    {values.length > 2 && <Button type="link" size="small" onClick={() => setExpanded(!expanded)}>{expanded ? '收起' : `展开全部 ${values.length} 项`}</Button>}
+  </Space>;
 }

@@ -1,6 +1,16 @@
 package learning
 
+// StudentActiveOpening is a deduplicated currently effective course scope.
+type StudentActiveOpening struct {
+	Grade   string `json:"grade"`
+	Subject string `json:"subject"`
+	Level   string `json:"level"`
+}
+
 type Student struct {
+	// ActiveOpenings derives current access independently of historical package records.
+	ActiveOpenings []StudentActiveOpening `json:"activeOpenings"`
+
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Nickname  string `json:"nickname,omitempty"`

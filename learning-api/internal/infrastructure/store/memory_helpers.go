@@ -451,10 +451,10 @@ func matchesStudentQuery(student learning.Student, query learning.StudentQuery) 
 	if query.LearningStatus != "" && student.LearningStatus != query.LearningStatus {
 		return false
 	}
-	if query.PackageState == "已开通" && len(student.OpenedPackages) == 0 {
+	if query.PackageState == "已开通" && len(student.ActiveOpenings) == 0 {
 		return false
 	}
-	if query.PackageState == "未开通" && len(student.OpenedPackages) > 0 {
+	if query.PackageState == "未开通" && len(student.ActiveOpenings) > 0 {
 		return false
 	}
 	if query.FollowUpState != "" && student.FollowUpStatus != query.FollowUpState {
