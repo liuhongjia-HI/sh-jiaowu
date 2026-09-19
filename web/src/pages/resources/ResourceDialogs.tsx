@@ -1114,6 +1114,10 @@ function CourseScopeSelect({
 }) {
   const [grade, setGrade] = useState(initialCourse?.grade || undefined);
   const [subject, setSubject] = useState(initialCourse?.subject || undefined);
+  useEffect(() => {
+    setGrade(initialCourse?.grade || undefined);
+    setSubject(initialCourse?.subject || undefined);
+  }, [initialCourse?.grade, initialCourse?.id, initialCourse?.subject]);
   const gradeSelectOptions = useMemo(() => (
     sortScopeValues(uniqueValues(courses.map((course) => course.grade)), gradeIndex).map((value) => ({ label: value, value }))
   ), [courses]);
@@ -1221,6 +1225,7 @@ export function UploadDialog({
   questions,
   learningSpaces,
   materials,
+  initialCourse,
   onManageCurriculum,
   onCancel,
   onSubmit
@@ -1232,6 +1237,7 @@ export function UploadDialog({
   questions: QuestionBankItem[];
   learningSpaces: LearningSpace[];
   materials?: Material[];
+  initialCourse?: Course;
   onManageCurriculum?: (course: Course) => void;
   onCancel: () => void;
   onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
@@ -1247,6 +1253,10 @@ export function UploadDialog({
   const lessonMaterials = (materials ?? []).filter((item) => item.courseId === courseId && item.lessonId === lessonId);
   const existingTags = uniqueValues(lessonMaterials.map((item) => item.tagCode || ''));
   const plan = lessonUploadPlan(fileList ?? [], lessonMaterials, formTagCode);
+  useEffect(() => {
+    if (!open || !initialCourse || !courses.some((course) => course.id === initialCourse.id)) return;
+    form.setFieldValue('courseId', initialCourse.id);
+  }, [courses, form, initialCourse, open]);
   return (
     <FormDrawer
       title={kind === 'materials' ? '给课节上传资料' : '新建课后练习'}
@@ -1266,6 +1276,7 @@ export function UploadDialog({
         <CourseScopeSelect
           form={form}
           courses={courses}
+          initialCourse={initialCourse}
           onCourseChange={() => {
             form.setFieldValue('lessonId', undefined);
             if (kind === 'homework') form.setFieldValue('questionIds', []);

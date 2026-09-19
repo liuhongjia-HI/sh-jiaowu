@@ -899,6 +899,21 @@ test('教师可以新增题目并发布课后练习', async ({ page }) => {
   await expect(page.getByText(homeworkTitle)).toBeVisible();
 });
 
+test('从课程进入讲义上传时自动带入年级学科和课程范围', async ({ page }) => {
+  await login(page, '13800000002');
+  await expectPageHeading(page, '/content?tab=materials&courseId=course-g05-english-s1-q1', '课程讲义');
+  await expect(page.getByText('正在查看“五年级英文S1Q1课程”的全部课程讲义。')).toBeVisible();
+
+  await page.getByRole('button', { name: '上传讲义' }).click();
+  const dialog = page.getByRole('dialog', { name: '给课节上传资料' });
+  const scopeFilter = dialog.locator('.ant-form-item').filter({ hasText: '快捷筛选' }).first();
+  const courseField = dialog.locator('.ant-form-item').filter({ hasText: '课程范围' }).first();
+
+  await expect(scopeFilter.locator('.ant-select-selection-item').nth(0)).toHaveText('五年级');
+  await expect(scopeFilter.locator('.ant-select-selection-item').nth(1)).toHaveText('English');
+  await expect(courseField.locator('.ant-select-selection-item')).toContainText('五年级英文S1Q1课程');
+});
+
 test('上传课程讲义和课后练习可以用年级学科筛选课程范围', async ({ page }) => {
   await login(page, '13800000002');
   const suffix = Date.now();
