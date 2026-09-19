@@ -554,7 +554,7 @@ export type MaterialSyncItemPreview = {
   sourceMaterialId: string;
   title: string;
   tagCode: string;
-  action: 'create' | 'replace';
+  action: 'create';
   existingId?: string;
   existingTitle?: string;
 };

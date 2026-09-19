@@ -81,7 +81,7 @@ func TestMaterialSyncCreatesMultipleTargetsAndIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestMaterialSyncReplacesInPlaceAndRejectsStalePreview(t *testing.T) {
+func TestMaterialSyncAddsAlongsideExistingSameTag(t *testing.T) {
 	store, admin, source, target, _, sourceMaterial := materialSyncFixture(t)
 	existing, err := store.CreateMaterial("超级管理员", admin, learning.MaterialUploadRequest{
 		Title: "旧讲义", CourseID: target.ID, LessonID: "splus-lesson", TagCode: "HD",
@@ -98,26 +98,25 @@ func TestMaterialSyncReplacesInPlaceAndRejectsStalePreview(t *testing.T) {
 	}
 	req := learning.MaterialSyncRequest{SourceCourseID: source.ID, SourceLessonID: source.Curriculum[2].ID, MaterialIDs: []string{sourceMaterial.ID}, Targets: []learning.MaterialSyncTarget{{CourseID: target.ID, LessonID: "splus-lesson"}}}
 	preview, err := store.PreviewMaterialSync(admin, req)
-	if err != nil || preview.Targets[0].Items[0].Action != "replace" {
-		t.Fatalf("preview replace: %#v %v", preview, err)
-	}
-	store.materials[store.materialSlotIndex(target.ID, "splus-lesson", "HD")].Title = "预检查后被修改"
-	req.Snapshot = preview.Snapshot
-	if _, err := store.SyncMaterials("超级管理员", admin, req); err == nil || !strings.Contains(err.Error(), "重新预检查") {
-		t.Fatalf("stale preview should fail, got %v", err)
-	}
-	preview, err = store.PreviewMaterialSync(admin, req)
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || preview.Targets[0].Items[0].Action != "create" {
+		t.Fatalf("preview create: %#v %v", preview, err)
 	}
 	req.Snapshot = preview.Snapshot
 	result, err := store.SyncMaterials("超级管理员", admin, req)
-	if err != nil || result.Targets[0].Replaced != 1 {
-		t.Fatalf("replace: %#v %v", result, err)
+	if err != nil || result.Targets[0].Created != 1 || result.Targets[0].Replaced != 0 {
+		t.Fatalf("create alongside existing material: %#v %v", result, err)
 	}
 	matches := store.materialSlotMatches(target.ID, "splus-lesson", "HD")
-	if len(matches) != 1 || matches[0].ID != existing.ID || matches[0].FileID != sourceMaterial.FileID || matches[0].ViewCount != 17 || matches[0].SortOrder != 9 {
-		t.Fatalf("replace must preserve target identity and counters: %#v", matches)
+	if len(matches) != 2 {
+		t.Fatalf("both same-tag materials should remain: %#v", matches)
+	}
+	var keptExisting, addedSource bool
+	for _, match := range matches {
+		keptExisting = keptExisting || (match.ID == existing.ID && match.FileID == "old-file" && match.ViewCount == 17 && match.SortOrder == 9)
+		addedSource = addedSource || (match.ID != existing.ID && match.FileID == sourceMaterial.FileID)
+	}
+	if !keptExisting || !addedSource {
+		t.Fatalf("sync should preserve the existing item and add the source item: %#v", matches)
 	}
 }
 

@@ -14,7 +14,7 @@ type ResourceKind = 'materials' | 'homework';
 type UploadValues = { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
 type ContentValues = Omit<UploadValues, 'fileList'> & { status: string };
 type MaterialUploadFailure = { fileName: string; reason: string; file: File; title: string; tagCode: string; allowDownload: boolean };
-type MaterialUploadResult = { sourceCourseId: string; sourceLessonId: string; uploaded: Material[]; added: number; replaced: number; failures: MaterialUploadFailure[] };
+type MaterialUploadResult = { sourceCourseId: string; sourceLessonId: string; uploaded: Material[]; added: number; failures: MaterialUploadFailure[] };
 
 function materialTitleFromFile(fileName: string) {
   return fileName.replace(/\.[^.]+$/, '').trim() || fileName;
@@ -156,13 +156,9 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       const files = (values.fileList ?? []).map((item) => item.originFileObj).filter(Boolean) as File[];
       if (files.length === 0) throw new Error('请选择文件');
       const lessonLabel = formatResourceCurriculumLabel({ lessonId: values.lessonId }, course);
-      const existingSource = allMaterials.data ?? (resources.data ?? []).filter((item): item is Material => !('assessmentType' in item));
-      const existingTags = new Set(existingSource.filter((item) => item.courseId === course.id && item.lessonId === values.lessonId && Boolean(item.tagCode)).map((item) => item.tagCode as string));
-      const uploadedByTag = new Map<string, Material>();
+      const uploaded: Material[] = [];
       const failures: MaterialUploadFailure[] = [];
       let added = 0;
-      let replaced = 0;
-      const seenTags = new Set<string>();
       for (const file of files) {
         const tagCode = values.tagCode || suggestMaterialTagCode(file.name);
         const data = new FormData();
@@ -175,26 +171,19 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
 		data.append('allowDownload', values.allowDownload ? 'true' : 'false');
         data.append('file', file);
         try {
-          const uploaded = await postForm<Material>('/materials', data);
-          uploadedByTag.set(uploaded.tagCode || tagCode || uploaded.id, uploaded);
-          if (tagCode && (existingTags.has(tagCode) || seenTags.has(tagCode))) replaced += 1;
-          else added += 1;
-          if (tagCode) seenTags.add(tagCode);
+          uploaded.push(await postForm<Material>('/materials', data));
+          added += 1;
         } catch (error) {
           failures.push({ fileName: file.name, reason: error instanceof Error ? error.message : '上传失败', file, title: uploadTitle, tagCode, allowDownload: Boolean(values.allowDownload) });
         }
       }
-      const uploaded = Array.from(uploadedByTag.values());
       if (!uploaded.length) throw new Error(failures[0]?.reason || '上传失败，请稍后重试。');
-      return { sourceCourseId: course.id, sourceLessonId: values.lessonId, uploaded, added, replaced, failures };
+      return { sourceCourseId: course.id, sourceLessonId: values.lessonId, uploaded, added, failures };
     },
     onSuccess: (result) => {
       if (kind === 'materials' && result && typeof result === 'object' && 'added' in result) {
-        const parts = [];
-        if (result.added) parts.push(`新增 ${result.added} 个`);
-        if (result.replaced) parts.push(`替换 ${result.replaced} 个`);
-        if (result.failures.length) message.warning(`本课资料已更新：${parts.join('，')}；${result.failures.length} 个文件失败，可重新上传。`);
-        else message.success(parts.length ? `本课资料已更新：${parts.join('，')}。` : '本课资料已更新。');
+        if (result.failures.length) message.warning(`本课资料已新增 ${result.added} 个；${result.failures.length} 个文件失败，可重新上传。`);
+        else message.success(`本课资料已新增 ${result.added} 个。`);
         setSyncBatch(result);
         setSyncCourseIds([]);
         setSyncLessonIds({});
@@ -251,9 +240,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     onSuccess: ({ succeeded, failures }) => {
       setSyncBatch((current) => {
         if (!current) return current;
-        const byTag = new Map(current.uploaded.map((item) => [item.tagCode || item.id, item]));
-        for (const item of succeeded) byTag.set(item.tagCode || item.id, item);
-        return { ...current, uploaded: Array.from(byTag.values()), failures };
+        return { ...current, uploaded: [...current.uploaded, ...succeeded], added: current.added + succeeded.length, failures };
       });
       setSyncPreview(null);
       if (failures.length) message.warning(`${succeeded.length} 个文件重试成功，仍有 ${failures.length} 个失败。`);
@@ -266,8 +253,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     mutationFn: () => postData<MaterialSyncResult>('/materials/sync', { ...materialSyncRequest(), snapshot: syncPreview?.snapshot || '' }),
     onSuccess: (result) => {
       const created = result.targets.reduce((total, item) => total + item.created, 0);
-      const replaced = result.targets.reduce((total, item) => total + item.replaced, 0);
-      message.success(result.alreadySynced ? '这些资料已经同步完成。' : `已同步到 ${result.targets.length} 门课程：新增 ${created} 个，替换 ${replaced} 个。`);
+      message.success(result.alreadySynced ? '这些资料已经同步完成。' : `已同步到 ${result.targets.length} 门课程：新增 ${created} 个。`);
       setSyncBatch(null);
       setSyncPreview(null);
       client.invalidateQueries({ queryKey: ['materials'] });
@@ -525,6 +511,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
                   return (
                     <Space key={item.id} size={4} wrap>
                       <Tag>{item.tagCode || '未标签'}</Tag>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>{item.fileName || item.title}</Typography.Text>
                       <ActionButton tooltip={`预览${item.tagCode || ''}`} icon={<EyeOutlined />} disabled={item.previewStatus !== '可预览'} onClick={() => openFile(item.previewUrl, false, item.fileName)} />
                       {canManage && <ActionButton tooltip={`编辑${item.tagCode || ''}`} icon={<EditOutlined />} onClick={() => openEdit(item)} />}
                       {deleteAction}
@@ -589,7 +576,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
           : <Button key="preview" type="primary" loading={previewSync.isPending} disabled={!syncCourseIds.length || syncCourseIds.some((id) => !syncLessonIds[id])} onClick={() => previewSync.mutate()}>检查同步内容</Button>
       ]}
     >
-      <Alert type="info" showIcon message={`源课程已上传 ${syncBatch?.uploaded.length || 0} 份资料，可选择同步到同年级、学科、学期和阶段的课程。`} description="同步后各课程资料独立维护；目标课节同标签资料将先展示并确认替换。" style={{ marginBottom: 16 }} />
+      <Alert type="info" showIcon message={`源课程已上传 ${syncBatch?.uploaded.length || 0} 份资料，可选择同步到同年级、学科、学期和阶段的课程。`} description="同步后各课程资料独立维护；即使目标课节已有同标签资料，本次文件也会独立新增。" style={{ marginBottom: 16 }} />
       {syncBatch?.failures.length ? <Alert type="warning" showIcon message={`${syncBatch.failures.length} 个文件上传失败，不会参与同步`} description={<div><div>{syncBatch.failures.map((item) => `${item.fileName}：${item.reason}`).join('；')}</div><Button size="small" style={{ marginTop: 8 }} loading={retryFailedUploads.isPending} onClick={() => retryFailedUploads.mutate()}>只重新上传失败文件</Button></div>} style={{ marginBottom: 16 }} /> : null}
       <Typography.Text strong>本次资料</Typography.Text>
       <div style={{ margin: '8px 0 16px' }}>{syncBatch?.uploaded.map((item) => <Tag key={item.id}>{item.tagCode || '未标签'} · {item.fileName}</Tag>)}</div>
@@ -604,7 +591,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         <Typography.Text strong>确认变更</Typography.Text>
         {syncPreview.targets.map((target) => <Card key={target.courseId} size="small" title={target.courseName} style={{ marginTop: 10 }}>
           <div style={{ marginBottom: 8 }}>{[target.curriculum.unit, target.curriculum.chapter, target.curriculum.lesson].filter(Boolean).join(' · ')}</div>
-          {target.items.map((item) => <div key={item.sourceMaterialId}><Tag color={item.action === 'replace' ? 'orange' : 'green'}>{item.action === 'replace' ? '替换' : '新增'}</Tag>{item.tagCode} · {item.title}{item.existingTitle ? `（原：${item.existingTitle}）` : ''}</div>)}
+          {target.items.map((item) => <div key={item.sourceMaterialId}><Tag color="green">新增</Tag>{item.tagCode} · {item.title}</div>)}
         </Card>)}
       </div> : null}
     </Modal>

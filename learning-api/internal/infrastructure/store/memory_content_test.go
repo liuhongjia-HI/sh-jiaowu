@@ -348,7 +348,7 @@ func TestMaterialAcceptsHandoutTagsIncludingExamAndSpecial(t *testing.T) {
 	}
 }
 
-func TestCreateMaterialReplacesSameLessonAndTag(t *testing.T) {
+func TestCreateMaterialKeepsMultipleFilesWithSameLessonAndTag(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")
 	if err != nil {
@@ -369,22 +369,22 @@ func TestCreateMaterialReplacesSameLessonAndTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create Blank: %v", err)
 	}
-	replaced, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+	secondHD, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
 		Title: "第一课", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD",
 		AllowDownload: true,
 		File:          learning.FileAsset{ID: "file-hd-new", FileName: "new-hd.pdf", FileSize: 34, FileType: "PDF", PreviewStatus: "待转换"},
 	})
 	if err != nil {
-		t.Fatalf("replace HD: %v", err)
+		t.Fatalf("create second HD: %v", err)
 	}
-	if replaced.ID != first.ID {
-		t.Fatalf("same lesson HD should keep id %q, got %q", first.ID, replaced.ID)
+	if secondHD.ID == first.ID {
+		t.Fatalf("same lesson HD files should have independent ids, got %q", secondHD.ID)
 	}
-	if replaced.FileID != "file-hd-new" || replaced.FileName != "new-hd.pdf" || replaced.FileSize != 34 || !replaced.AllowDownload {
-		t.Fatalf("replaced HD file not updated: %#v", replaced)
+	if first.FileID != "file-hd-old" || secondHD.FileID != "file-hd-new" || secondHD.FileName != "new-hd.pdf" || secondHD.FileSize != 34 || !secondHD.AllowDownload {
+		t.Fatalf("both HD files should be preserved independently: first=%#v second=%#v", first, secondHD)
 	}
-	if replaced.SortOrder != first.SortOrder {
-		t.Fatalf("replaced HD should keep sort order %d, got %d", first.SortOrder, replaced.SortOrder)
+	if secondHD.SortOrder == first.SortOrder {
+		t.Fatalf("independent HD files should have different sort orders, got %d", first.SortOrder)
 	}
 	hdCount, blankCount := 0, 0
 	for _, item := range store.materials {
@@ -398,8 +398,8 @@ func TestCreateMaterialReplacesSameLessonAndTag(t *testing.T) {
 			blankCount++
 		}
 	}
-	if hdCount != 1 || blankCount != 1 || blank.ID == first.ID {
-		t.Fatalf("expected one HD and one Blank, hd=%d blank=%d", hdCount, blankCount)
+	if hdCount != 2 || blankCount != 1 || blank.ID == first.ID {
+		t.Fatalf("expected two HD and one Blank, hd=%d blank=%d", hdCount, blankCount)
 	}
 
 	untagged, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
@@ -421,7 +421,7 @@ func TestCreateMaterialReplacesSameLessonAndTag(t *testing.T) {
 	}
 }
 
-func TestUpdateMaterialRejectsDuplicateLessonTag(t *testing.T) {
+func TestUpdateMaterialAllowsDuplicateLessonTag(t *testing.T) {
 	store := NewMemoryStore()
 	teacher, err := store.PrincipalByUserID("user-teacher")
 	if err != nil {
@@ -440,17 +440,17 @@ func TestUpdateMaterialRejectsDuplicateLessonTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create Blank: %v", err)
 	}
-	_, err = store.UpdateMaterial("英语老师", teacher, blank.ID, learning.MaterialUpdateRequest{
+	updated, err := store.UpdateMaterial("英语老师", teacher, blank.ID, learning.MaterialUpdateRequest{
 		Title: "Blank", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD", Status: "已发布",
 	})
-	if err == nil || !strings.Contains(err.Error(), "已有 HD") {
-		t.Fatalf("expected duplicate tag rejection, got %v", err)
+	if err != nil || updated.TagCode != "HD" {
+		t.Fatalf("editing to a duplicate tag should succeed, material=%#v err=%v", updated, err)
 	}
 	_, err = store.UpdateMaterial("英语老师", teacher, hd.ID, learning.MaterialUpdateRequest{
 		Title: "HD 更新", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: lessonID, TagCode: "HD", Status: "已发布",
 	})
 	if err != nil {
-		t.Fatalf("updating the existing HD slot should succeed: %v", err)
+		t.Fatalf("updating an HD item should succeed: %v", err)
 	}
 }
 

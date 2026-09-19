@@ -48,7 +48,6 @@ func (s *MemoryStore) materialSyncPlan(principal learning.Principal, req learnin
 	}
 	seenMaterials := map[string]bool{}
 	sources := make([]learning.Material, 0, len(req.MaterialIDs))
-	seenTags := map[string]bool{}
 	for _, rawID := range req.MaterialIDs {
 		id := strings.TrimSpace(rawID)
 		if id == "" || seenMaterials[id] {
@@ -68,10 +67,6 @@ func (s *MemoryStore) materialSyncPlan(principal learning.Principal, req learnin
 		if _, exists := s.fileAssets[item.FileID]; !exists {
 			return materialSyncPlan{}, errors.New("源课程讲义文件不存在，不能同步")
 		}
-		if seenTags[item.TagCode] {
-			return materialSyncPlan{}, errors.New("同一批次不能包含重复标签")
-		}
-		seenTags[item.TagCode] = true
 		sources = append(sources, item)
 	}
 	if len(sources) == 0 {
@@ -110,17 +105,7 @@ func (s *MemoryStore) materialSyncPlan(principal learning.Principal, req learnin
 		}
 		items := make([]learning.MaterialSyncItemPreview, 0, len(sources))
 		for _, source := range sources {
-			matches := s.materialSlotMatches(course.ID, lessonID, source.TagCode)
-			if len(matches) > 1 {
-				return materialSyncPlan{}, fmt.Errorf("目标课程“%s”的 %s 标签存在重复资料，请先处理冲突", course.Name, source.TagCode)
-			}
 			item := learning.MaterialSyncItemPreview{SourceMaterialID: source.ID, Title: source.Title, TagCode: source.TagCode, Action: "create"}
-			if len(matches) == 1 {
-				item.Action = "replace"
-				item.ExistingID = matches[0].ID
-				item.ExistingTitle = matches[0].Title
-				item.ExistingVersion = fmt.Sprintf("%s|%t|%s|%s", matches[0].FileID, matches[0].AllowDownload, matches[0].Status, matches[0].CreatedAt)
-			}
 			items = append(items, item)
 		}
 		targetCourses = append(targetCourses, course)
@@ -196,6 +181,10 @@ func (s *MemoryStore) applyMaterialSyncUnlocked(operator string, principal learn
 		}
 		return learning.MaterialSyncResult{}, errors.New("课程讲义或目标课节已发生变化，请重新预检查")
 	}
+	if result, ok := s.materialSyncAlreadyCompleted(plan); ok {
+		result.AlreadySynced = true
+		return result, nil
+	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
 	stamp := time.Now().Format("20060102150405.000000000")
@@ -204,33 +193,6 @@ func (s *MemoryStore) applyMaterialSyncUnlocked(operator string, principal learn
 		preview := plan.preview.Targets[targetIndex]
 		targetResult := learning.MaterialSyncTargetResult{CourseID: target.ID, CourseName: target.Name}
 		for sourceIndex, source := range plan.sources {
-			action := preview.Items[sourceIndex]
-			if action.Action == "replace" {
-				for index := range s.materials {
-					if s.materials[index].ID != action.ExistingID {
-						continue
-					}
-					targetItem := &s.materials[index]
-					targetItem.Title = source.Title
-					targetItem.FileID = source.FileID
-					targetItem.FileName = source.FileName
-					targetItem.FileSize = source.FileSize
-					targetItem.FileType = source.FileType
-					targetItem.PreviewStatus = source.PreviewStatus
-					targetItem.PreviewError = source.PreviewError
-					targetItem.PreviewURL = source.PreviewURL
-					targetItem.DownloadURL = source.DownloadURL
-					targetItem.AllowDownload = source.AllowDownload
-					targetItem.OwnerTeacherID = principal.UserID
-					targetItem.OwnerTeacherName = principal.Name
-					targetItem.PublishStatus = "已发布"
-					targetItem.Status = learning.StatusEnabled
-					targetResult.Replaced++
-					targetResult.MaterialIDs = append(targetResult.MaterialIDs, targetItem.ID)
-					break
-				}
-				continue
-			}
 			item := source
 			item.ID = fmt.Sprintf("material-sync-%s-%d-%d", stamp, targetIndex, sourceIndex)
 			item.CourseID = target.ID
@@ -249,7 +211,7 @@ func (s *MemoryStore) applyMaterialSyncUnlocked(operator string, principal learn
 			targetResult.Created++
 			targetResult.MaterialIDs = append(targetResult.MaterialIDs, item.ID)
 		}
-		s.prependLogDetail(operator, "同步课程讲义", target.Name, fmt.Sprintf("%s/%s → %s/%s；新增 %d，替换 %d", req.SourceCourseID, req.SourceLessonID, target.ID, preview.LessonID, targetResult.Created, targetResult.Replaced))
+		s.prependLogDetail(operator, "同步课程讲义", target.Name, fmt.Sprintf("%s/%s → %s/%s；新增 %d", req.SourceCourseID, req.SourceLessonID, target.ID, preview.LessonID, targetResult.Created))
 		s.notifyCourseContentUploaded(target)
 		result.Targets = append(result.Targets, targetResult)
 	}
@@ -261,12 +223,21 @@ func (s *MemoryStore) materialSyncAlreadyCompleted(plan materialSyncPlan) (learn
 	for targetIndex, target := range plan.targets {
 		preview := plan.preview.Targets[targetIndex]
 		targetResult := learning.MaterialSyncTargetResult{CourseID: target.ID, CourseName: target.Name}
+		used := map[string]bool{}
 		for _, source := range plan.sources {
 			matches := s.materialSlotMatches(target.ID, preview.LessonID, source.TagCode)
-			if len(matches) != 1 || matches[0].FileID != source.FileID || matches[0].Title != source.Title || matches[0].AllowDownload != source.AllowDownload {
+			matchedID := ""
+			for _, match := range matches {
+				if !used[match.ID] && match.FileID == source.FileID && match.Title == source.Title && match.AllowDownload == source.AllowDownload {
+					matchedID = match.ID
+					break
+				}
+			}
+			if matchedID == "" {
 				return learning.MaterialSyncResult{}, false
 			}
-			targetResult.MaterialIDs = append(targetResult.MaterialIDs, matches[0].ID)
+			used[matchedID] = true
+			targetResult.MaterialIDs = append(targetResult.MaterialIDs, matchedID)
 		}
 		result.Targets = append(result.Targets, targetResult)
 	}

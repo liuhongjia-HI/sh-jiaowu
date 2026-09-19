@@ -1197,24 +1197,16 @@ function CourseScopeSelect({
 }
 
 
-function lessonUploadPlan(files: UploadFile[], existing: Material[], formTag?: string) {
-  const occupied = new Set(existing.map((item) => item.tagCode).filter(Boolean));
-  const seenInBatch = new Set<string>();
+function lessonUploadPlan(files: UploadFile[], formTag?: string) {
   return files.map((file) => {
     const fileName = uploadFileTitle(file);
     const tagCode = String(formTag || '').trim() || suggestMaterialTagCode(fileName);
-    if (!tagCode) return { fileName, tagCode: '', action: 'add' as const };
-    const action = seenInBatch.has(tagCode) ? 'batch-replace' as const : occupied.has(tagCode) ? 'replace' as const : 'add' as const;
-    seenInBatch.add(tagCode);
-    return { fileName, tagCode, action };
+    return { fileName, tagCode };
   });
 }
 
-function uploadPlanActionText(item: { tagCode: string; action: 'add' | 'replace' | 'batch-replace' }) {
-  const slot = item.tagCode || '未识别标签';
-  if (item.action === 'replace') return `${slot} 将替换现有文件`;
-  if (item.action === 'batch-replace') return `${slot} 将替换本次上传中的上一份`;
-  return item.tagCode ? `${slot} 将新增` : '未识别标签，将作为补充资料新增';
+function uploadPlanActionText(item: { tagCode: string }) {
+  return item.tagCode ? `${item.tagCode} 将作为独立文件新增` : '未识别标签，将作为补充资料新增';
 }
 
 export function UploadDialog({
@@ -1252,7 +1244,7 @@ export function UploadDialog({
   const lessonLabel = curriculumLessonOptions(selectedCourse?.curriculum).find((item) => item.value === lessonId)?.label || '';
   const lessonMaterials = (materials ?? []).filter((item) => item.courseId === courseId && item.lessonId === lessonId);
   const existingTags = uniqueValues(lessonMaterials.map((item) => item.tagCode || ''));
-  const plan = lessonUploadPlan(fileList ?? [], lessonMaterials, formTagCode);
+  const plan = lessonUploadPlan(fileList ?? [], formTagCode);
   useEffect(() => {
     if (!open || !initialCourse || !courses.some((course) => course.id === initialCourse.id)) return;
     form.setFieldValue('courseId', initialCourse.id);
@@ -1337,7 +1329,7 @@ export function UploadDialog({
                 <Button icon={<UploadOutlined />}>选择文件</Button>
               </Upload>
             </Form.Item>
-            <Typography.Text type="secondary">支持 PDF、PPT、Word，一次可上传该课的 HD / Blank / HW / Exam / Special；同一标签再传会替换，不新增重复。单个文件不超过 50MB。</Typography.Text>
+            <Typography.Text type="secondary">支持 PDF、PPT、Word，可一次选择多个文件；同一单元允许上传多份 HD、Blank、HW、Exam 或 Special，所有文件都会独立新增。单个文件不超过 50MB。</Typography.Text>
             {lessonId ? (
               <Alert
                 type="info"
@@ -1346,14 +1338,17 @@ export function UploadDialog({
                 message={lessonLabel ? `本课：${lessonLabel}` : '已选择课节'}
                 description={(
                   <div>
-                    <div>{existingTags.length ? `当前已有 ${existingTags.join('、')}` : '当前还没有 HD / Blank / HW / Exam / Special'}</div>
+                    <div>{existingTags.length ? `当前已有 ${existingTags.map((tag) => {
+                      const count = lessonMaterials.filter((item) => item.tagCode === tag).length;
+                      return count > 1 ? `${tag} × ${count}` : tag;
+                    }).join('、')}` : '当前还没有 HD / Blank / HW / Exam / Special'}</div>
                     {plan.length ? (
                       <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
                         {plan.map((item) => (
                           <li key={`${item.tagCode}-${item.fileName}`}>{item.fileName} · {uploadPlanActionText(item)}</li>
                         ))}
                       </ul>
-                    ) : <div>选择文件后，会按文件名识别标签并预览新增或替换。</div>}
+                    ) : <div>选择文件后，会按文件名识别标签并逐个新增。</div>}
                   </div>
                 )}
               />

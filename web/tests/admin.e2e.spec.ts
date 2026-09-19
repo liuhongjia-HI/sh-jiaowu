@@ -912,6 +912,14 @@ test('从课程进入讲义上传时自动带入年级学科和课程范围', as
   await expect(scopeFilter.locator('.ant-select-selection-item').nth(0)).toHaveText('五年级');
   await expect(scopeFilter.locator('.ant-select-selection-item').nth(1)).toHaveText('English');
   await expect(courseField.locator('.ant-select-selection-item')).toContainText('五年级英文S1Q1课程');
+
+  await selectOption(page, dialog, '课节', '基础巩固');
+  await dialog.locator('input[type="file"]').setInputFiles([
+    { name: 'HD_作业A.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') },
+    { name: 'HD_作业B.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') }
+  ]);
+  await expect(dialog.getByText('HD_作业A.pdf · HD 将作为独立文件新增')).toBeVisible();
+  await expect(dialog.getByText('HD_作业B.pdf · HD 将作为独立文件新增')).toBeVisible();
 });
 
 test('上传课程讲义和课后练习可以用年级学科筛选课程范围', async ({ page }) => {
