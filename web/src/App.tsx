@@ -430,7 +430,7 @@ function Shell({ user }: { user: CurrentUser }) {
               <Route path="/materials" element={<Navigate to="/content?tab=materials" replace />} />
               <Route path="/homework" element={<Navigate to="/content?tab=homework" replace />} />
               <Route path="/review" element={<Navigate to="/content?tab=review" replace />} />
-              <Route path="/notices" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><NoticesPage /></GuardedRoute>} />
+              <Route path="/notices" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><NoticesPage user={user} /></GuardedRoute>} />
               <Route path="/banners" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><Banners /></GuardedRoute>} />
               <Route path="/launch-campaign" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><LaunchCampaignPage /></GuardedRoute>} />
               <Route path="/class-reservations" element={<GuardedRoute user={user} roles={['ops_staff', 'campus_admin', 'super_admin']}><ClassReservations /></GuardedRoute>} />

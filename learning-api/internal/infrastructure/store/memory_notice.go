@@ -269,6 +269,9 @@ func (s *MemoryStore) logsUnlocked() []learning.OperationLog {
 func (s *MemoryStore) settingsUnlocked() map[string]string {
 	out := make(map[string]string, len(s.settings))
 	for key, value := range s.settings {
+		if strings.HasPrefix(key, "wechat.") {
+			continue
+		}
 		out[key] = value
 	}
 	return out

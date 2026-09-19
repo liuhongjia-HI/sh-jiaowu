@@ -140,6 +140,17 @@ type NoticeRepository interface {
 	StudentPermissions() []learning.StudentPermissionSummary
 	PackagePermissions() []learning.PackagePermissionSummary
 	ContentPermissions() []learning.ContentPermissionSummary
+	OfficialTemplates() []learning.OfficialTemplate
+	SyncOfficialTemplates(string) ([]learning.OfficialTemplate, error)
+	PreviewOfficialAudience(learning.OfficialAudiencePreviewRequest) (learning.OfficialAudiencePreview, error)
+	OfficialCampaigns() []learning.OfficialCampaign
+	OfficialCampaign(string) (learning.OfficialCampaignDetail, error)
+	CreateOfficialCampaign(string, learning.OfficialCampaignCreateRequest) (learning.OfficialCampaign, error)
+	RetryOfficialCampaign(string, string) (learning.OfficialCampaign, error)
+	SyncOfficialFollowers(string) (learning.OfficialFollowerSyncResult, error)
+	VerifyOfficialCallback(string, string, string) bool
+	DecryptOfficialCallback(string, string, string, string) ([]byte, error)
+	HandleOfficialCallback(string, string, int64) error
 }
 
 type BannerRepository interface {
@@ -160,4 +171,6 @@ type SystemRepository interface {
 	DeleteSubjectMetadata(string, string) error
 	GradeSubjects() []learning.GradeSubjectMetadata
 	UpdateGradeSubjects(string, learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error)
+	WechatSettings() learning.WechatSettings
+	UpdateWechatSettings(string, learning.WechatSettingsUpdateRequest) (learning.WechatSettings, error)
 }

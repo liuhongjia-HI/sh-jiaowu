@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 func (s *MemoryStore) loadAllFromDatabase() error {
 	loaders := []func() error{
+		s.loadOfficialMessagingFromDB,
 		s.loadSubjectsFromDB,
 		s.loadLearningSpacesFromDB,
 		s.loadStudentsFromDB,
@@ -58,6 +60,89 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 	if err := s.loadLessonFeedbacksFromDB(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *MemoryStore) loadOfficialMessagingFromDB() error {
+	templateRows, err := s.db.Query(`SELECT template_id, title, content, example, fields_json, status, synced_at FROM official_account_templates ORDER BY title`)
+	if err != nil {
+		return err
+	}
+	templates := []learning.OfficialTemplate{}
+	for templateRows.Next() {
+		var item learning.OfficialTemplate
+		var fieldsJSON string
+		var syncedAt sql.NullTime
+		if err := templateRows.Scan(&item.ID, &item.Title, &item.Content, &item.Example, &fieldsJSON, &item.Status, &syncedAt); err != nil {
+			templateRows.Close()
+			return err
+		}
+		_ = json.Unmarshal([]byte(fieldsJSON), &item.Fields)
+		item.SyncedAt = dateTimeString(syncedAt)
+		templates = append(templates, item)
+	}
+	if err := templateRows.Close(); err != nil {
+		return err
+	}
+	followerRows, err := s.db.Query(`SELECT official_open_id, union_id, subscribed, subscribed_at, unsubscribed_at, synced_at FROM wechat_official_followers ORDER BY official_open_id`)
+	if err != nil {
+		return err
+	}
+	followers := []learning.OfficialFollower{}
+	for followerRows.Next() {
+		var item learning.OfficialFollower
+		var subscribedAt, unsubscribedAt, syncedAt sql.NullTime
+		if err := followerRows.Scan(&item.OpenID, &item.UnionID, &item.Subscribed, &subscribedAt, &unsubscribedAt, &syncedAt); err != nil {
+			followerRows.Close()
+			return err
+		}
+		item.SubscribedAt, item.UnsubscribedAt, item.SyncedAt = dateTimeString(subscribedAt), dateTimeString(unsubscribedAt), dateTimeString(syncedAt)
+		followers = append(followers, item)
+	}
+	if err := followerRows.Close(); err != nil {
+		return err
+	}
+	campaignRows, err := s.db.Query(`SELECT id, template_id, template_title, grades_json, values_json, page_path, target_count, success_count, failure_count, status, created_by, created_at, sent_at FROM official_message_campaigns ORDER BY created_at DESC`)
+	if err != nil {
+		return err
+	}
+	campaigns := []learning.OfficialCampaign{}
+	for campaignRows.Next() {
+		var item learning.OfficialCampaign
+		var gradesJSON, valuesJSON string
+		var createdAt time.Time
+		var sentAt sql.NullTime
+		if err := campaignRows.Scan(&item.ID, &item.TemplateID, &item.TemplateTitle, &gradesJSON, &valuesJSON, &item.PagePath, &item.TargetCount, &item.SuccessCount, &item.FailureCount, &item.Status, &item.CreatedBy, &createdAt, &sentAt); err != nil {
+			campaignRows.Close()
+			return err
+		}
+		_ = json.Unmarshal([]byte(gradesJSON), &item.Grades)
+		_ = json.Unmarshal([]byte(valuesJSON), &item.Values)
+		item.CreatedAt, item.SentAt = createdAt.Format("2006-01-02 15:04:05"), dateTimeString(sentAt)
+		campaigns = append(campaigns, item)
+	}
+	if err := campaignRows.Close(); err != nil {
+		return err
+	}
+	recipientRows, err := s.db.Query(`SELECT id, campaign_id, guardian_id, guardian_name, official_open_id, student_names, status, failure_reason, retry_count, sent_at FROM official_message_recipients ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	recipients := []learning.OfficialCampaignRecipient{}
+	for recipientRows.Next() {
+		var item learning.OfficialCampaignRecipient
+		var sentAt sql.NullTime
+		if err := recipientRows.Scan(&item.ID, &item.CampaignID, &item.GuardianID, &item.GuardianName, &item.OpenID, &item.StudentNames, &item.Status, &item.FailureReason, &item.RetryCount, &sentAt); err != nil {
+			recipientRows.Close()
+			return err
+		}
+		item.SentAt = dateTimeString(sentAt)
+		recipients = append(recipients, item)
+	}
+	if err := recipientRows.Close(); err != nil {
+		return err
+	}
+	s.officialTemplates, s.officialFollowers, s.officialCampaigns, s.officialCampaignRecipients = templates, followers, campaigns, recipients
 	return nil
 }
 

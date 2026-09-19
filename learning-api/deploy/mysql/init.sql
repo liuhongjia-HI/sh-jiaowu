@@ -529,6 +529,58 @@ CREATE TABLE IF NOT EXISTS system_settings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS official_account_templates (
+  template_id VARCHAR(191) PRIMARY KEY,
+  title VARCHAR(255) NOT NULL DEFAULT '',
+  content TEXT NOT NULL,
+  example TEXT NOT NULL,
+  fields_json TEXT NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT '启用',
+  synced_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS wechat_official_followers (
+  official_open_id VARCHAR(128) PRIMARY KEY,
+  union_id VARCHAR(128) NOT NULL DEFAULT '',
+  subscribed TINYINT(1) NOT NULL DEFAULT 1,
+  subscribed_at DATETIME NULL,
+  unsubscribed_at DATETIME NULL,
+  synced_at DATETIME NULL,
+  KEY idx_wechat_follower_union (union_id),
+  KEY idx_wechat_follower_subscribed (subscribed)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS official_message_campaigns (
+  id VARCHAR(191) PRIMARY KEY,
+  template_id VARCHAR(191) NOT NULL,
+  template_title VARCHAR(255) NOT NULL DEFAULT '',
+  grades_json TEXT NOT NULL,
+  values_json TEXT NOT NULL,
+  page_path VARCHAR(255) NOT NULL DEFAULT '',
+  target_count INT NOT NULL DEFAULT 0,
+  success_count INT NOT NULL DEFAULT 0,
+  failure_count INT NOT NULL DEFAULT 0,
+  status VARCHAR(32) NOT NULL DEFAULT '草稿',
+  created_by VARCHAR(64) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL,
+  sent_at DATETIME NULL,
+  KEY idx_official_campaign_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS official_message_recipients (
+  id VARCHAR(191) PRIMARY KEY,
+  campaign_id VARCHAR(191) NOT NULL,
+  guardian_id VARCHAR(64) NOT NULL DEFAULT '',
+  guardian_name VARCHAR(64) NOT NULL DEFAULT '',
+  official_open_id VARCHAR(128) NOT NULL DEFAULT '',
+  student_names TEXT NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT '待发送',
+  failure_reason VARCHAR(255) NOT NULL DEFAULT '',
+  retry_count INT NOT NULL DEFAULT 0,
+  sent_at DATETIME NULL,
+  KEY idx_official_recipient_campaign (campaign_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS commercial_orders (
   id VARCHAR(64) PRIMARY KEY,
   order_no VARCHAR(64) NOT NULL DEFAULT '',

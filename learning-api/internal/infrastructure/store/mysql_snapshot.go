@@ -24,6 +24,10 @@ func (s *MemoryStore) bootstrapPersistAll() error {
 
 func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	deletes := []string{
+		"DELETE FROM official_message_recipients",
+		"DELETE FROM official_message_campaigns",
+		"DELETE FROM wechat_official_followers",
+		"DELETE FROM official_account_templates",
 		"DELETE FROM student_tutoring_assignments",
 		"DELETE FROM parent_notices",
 		"DELETE FROM renewal_reminders",
@@ -75,6 +79,26 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	if err := s.persistStaticRowsTx(tx); err != nil {
 		return err
+	}
+	for _, item := range s.officialTemplates {
+		if _, err := tx.Exec(`INSERT INTO official_account_templates (template_id, title, content, example, fields_json, status, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, item.ID, item.Title, item.Content, item.Example, mustJSON(item.Fields), item.Status, nullableDateTime(item.SyncedAt)); err != nil {
+			return err
+		}
+	}
+	for _, item := range s.officialFollowers {
+		if _, err := tx.Exec(`INSERT INTO wechat_official_followers (official_open_id, union_id, subscribed, subscribed_at, unsubscribed_at, synced_at) VALUES (?, ?, ?, ?, ?, ?)`, item.OpenID, item.UnionID, item.Subscribed, nullableDateTime(item.SubscribedAt), nullableDateTime(item.UnsubscribedAt), nullableDateTime(item.SyncedAt)); err != nil {
+			return err
+		}
+	}
+	for _, item := range s.officialCampaigns {
+		if _, err := tx.Exec(`INSERT INTO official_message_campaigns (id, template_id, template_title, grades_json, values_json, page_path, target_count, success_count, failure_count, status, created_by, created_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.TemplateID, item.TemplateTitle, mustJSON(item.Grades), mustJSON(item.Values), item.PagePath, item.TargetCount, item.SuccessCount, item.FailureCount, item.Status, item.CreatedBy, nullableDateTime(item.CreatedAt), nullableDateTime(item.SentAt)); err != nil {
+			return err
+		}
+	}
+	for _, item := range s.officialCampaignRecipients {
+		if _, err := tx.Exec(`INSERT INTO official_message_recipients (id, campaign_id, guardian_id, guardian_name, official_open_id, student_names, status, failure_reason, retry_count, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.CampaignID, item.GuardianID, item.GuardianName, item.OpenID, item.StudentNames, item.Status, item.FailureReason, item.RetryCount, nullableDateTime(item.SentAt)); err != nil {
+			return err
+		}
 	}
 	for _, guardian := range s.guardians {
 		if _, err := tx.Exec(

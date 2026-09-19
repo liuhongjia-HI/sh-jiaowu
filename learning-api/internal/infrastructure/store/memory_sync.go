@@ -357,9 +357,10 @@ func (s *MemoryStore) LoginWithWechatCode(req learning.WechatLoginRequest) (lear
 	req.SelectedStudentID = strings.TrimSpace(req.SelectedStudentID)
 	s.mu.Lock()
 	wechatResolver := s.wechatResolver
+	wechatSessionResolver := s.wechatSessionResolver
 	phoneResolver := s.phoneResolver
 	s.mu.Unlock()
-	openID, err := resolveWechatOpenID(wechatResolver, req.Code)
+	openID, unionID, err := resolveWechatSession(wechatResolver, wechatSessionResolver, req.Code)
 	if err != nil {
 		return learning.Principal{}, err
 	}
@@ -371,8 +372,39 @@ func (s *MemoryStore) LoginWithWechatCode(req learning.WechatLoginRequest) (lear
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result1, err := s.loginWithWechatResolvedUnlocked(req, openID, wechatResolver != nil)
+	result1, err := s.loginWithWechatResolvedUnlocked(req, openID, wechatResolver != nil || wechatSessionResolver != nil)
+	if err == nil && unionID != "" && result1.GuardianID != "" {
+		for index := range s.guardians {
+			if s.guardians[index].ID == result1.GuardianID && s.guardians[index].UnionID != unionID {
+				guardianID := result1.GuardianID
+				if s.db != nil {
+					_, err = persistentMutation(s, func(work *MemoryStore) (struct{}, error) {
+						for i := range work.guardians {
+							if work.guardians[i].ID == guardianID {
+								work.guardians[i].UnionID = unionID
+							}
+						}
+						return struct{}{}, nil
+					})
+				} else {
+					s.guardians[index].UnionID = unionID
+				}
+				break
+			}
+		}
+	}
 	return result1, err
+}
+
+func resolveWechatSession(openIDResolver func(string) (string, error), sessionResolver func(string) (string, string, error), code string) (string, string, error) {
+	if code == "" {
+		return "", "", errors.New("wechat code is required")
+	}
+	if sessionResolver != nil {
+		return sessionResolver(code)
+	}
+	openID, err := resolveWechatOpenID(openIDResolver, code)
+	return openID, "", err
 }
 
 func resolveWechatOpenID(resolver func(string) (string, error), code string) (string, error) {
@@ -1057,6 +1089,16 @@ func (s *MemoryStore) UseOfficialAccountAPI(appID, secret, templateID string) er
 		return errors.New("official account configuration is startup-only")
 	}
 	s.useOfficialAccountAPIUnlocked(appID, secret, templateID)
+	return nil
+}
+
+func (s *MemoryStore) UseOfficialAccountMessaging(appID, secret, miniProgramAppID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db != nil {
+		return errors.New("official account configuration is startup-only")
+	}
+	s.useOfficialAccountMessagingUnlocked(appID, secret, miniProgramAppID)
 	return nil
 }
 

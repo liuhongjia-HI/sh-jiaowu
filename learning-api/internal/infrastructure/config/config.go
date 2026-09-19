@@ -33,8 +33,9 @@ type Config struct {
 		Password string
 	}
 	Wechat struct {
-		AppID  string
-		Secret string
+		AppID       string
+		Secret      string
+		CallbackURL string
 	}
 	OfficialAccount struct {
 		AppID      string
@@ -78,6 +79,7 @@ func MustLoad() *Config {
 	cfg.BootstrapAdmin.Password = getString("BOOTSTRAP_ADMIN_PASSWORD", "")
 	cfg.Wechat.AppID = getString("WECHAT_APPID", "")
 	cfg.Wechat.Secret = getString("WECHAT_SECRET", "")
+	cfg.Wechat.CallbackURL = getString("WECHAT_CALLBACK_URL", "")
 	cfg.OfficialAccount.AppID = getString("WECHAT_OFFICIAL_ACCOUNT_APPID", "")
 	cfg.OfficialAccount.Secret = getString("WECHAT_OFFICIAL_ACCOUNT_SECRET", "")
 	cfg.OfficialAccount.TemplateID = getString("WECHAT_OFFICIAL_ACCOUNT_TEMPLATE_ID", "")
@@ -135,7 +137,6 @@ func (c *Config) Validate() error {
 	officialAccountValues := []string{
 		strings.TrimSpace(c.OfficialAccount.AppID),
 		strings.TrimSpace(c.OfficialAccount.Secret),
-		strings.TrimSpace(c.OfficialAccount.TemplateID),
 	}
 	officialAccountConfigured := 0
 	for _, value := range officialAccountValues {
@@ -144,7 +145,7 @@ func (c *Config) Validate() error {
 		}
 	}
 	if officialAccountConfigured > 0 && officialAccountConfigured < len(officialAccountValues) {
-		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_APPID/SECRET/TEMPLATE_ID must be configured together")
+		missing = append(missing, "WECHAT_OFFICIAL_ACCOUNT_APPID/SECRET must be configured together")
 	}
 	if len(c.MiniProgramSubscribe.TemplateIDs) == 0 {
 		missing = append(missing, "WECHAT_MINIPROGRAM_SUBSCRIBE_TEMPLATE_IDS")

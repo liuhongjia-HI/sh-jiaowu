@@ -68,13 +68,24 @@ type MemoryStore struct {
 	scoreRecords                    []learning.StudentScoreRecord
 	banners                         []learning.Banner
 	classReservations               []learning.ClassReservationIntent
+	officialTemplates               []learning.OfficialTemplate
+	officialFollowers               []learning.OfficialFollower
+	officialCampaigns               []learning.OfficialCampaign
+	officialCampaignRecipients      []learning.OfficialCampaignRecipient
 	wechatResolver                  func(code string) (string, error)
+	wechatSessionResolver           func(code string) (string, string, error)
 	phoneResolver                   func(phoneCode string) (string, error)
 	officialNoticeSender            func(learning.Notice) error
+	officialTemplateSender          func(string, string, map[string]string, string) error
+	officialTemplateSyncer          func() ([]learning.OfficialTemplate, error)
+	officialFollowerSyncer          func() ([]learning.OfficialFollower, error)
 	pendingNoticeDeliveries         []learning.Notice
 	officialAccountReady            bool
 	miniProgramSubscribeTemplateIDs []string
 	db                              *sql.DB
+	wechatEncryptionKey             string
+	wechatCallbackURL               string
+	seedDemoData                    bool
 }
 
 type Options struct {
@@ -83,6 +94,8 @@ type Options struct {
 	BootstrapAdminName     string
 	BootstrapAdminPhone    string
 	BootstrapAdminPassword string
+	EncryptionKey          string
+	WechatCallbackURL      string
 }
 
 type packageGrant struct {
@@ -164,6 +177,12 @@ func NewMemoryStoreWithOptions(options Options) *MemoryStore {
 		favorites:               map[string]learning.Favorite{},
 		subscriptionPreferences: map[string]learning.StudentSubscriptionPreference{},
 		settings:                map[string]string{},
+		wechatEncryptionKey:     options.EncryptionKey,
+		wechatCallbackURL:       options.WechatCallbackURL,
+		seedDemoData:            options.SeedDemoData,
+	}
+	if store.wechatEncryptionKey == "" {
+		store.wechatEncryptionKey = "starline-local-dev-secret"
 	}
 	if !options.SkipBaseData {
 		store.seedBaseDictionaries()
@@ -172,6 +191,7 @@ func NewMemoryStoreWithOptions(options Options) *MemoryStore {
 		store.seedDemoUsers(adminPasswordHash)
 		seedPermissionDemoData(store)
 		seedSchedulingDemoData(store)
+		store.seedOfficialMessagingDemoData()
 	} else if strings.TrimSpace(options.BootstrapAdminPhone) != "" && strings.TrimSpace(options.BootstrapAdminPassword) != "" {
 		store.seedBootstrapAdmin(options)
 	}

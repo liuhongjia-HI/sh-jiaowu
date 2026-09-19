@@ -31,6 +31,8 @@ func main() {
 		BootstrapAdminName:     cfg.BootstrapAdmin.Name,
 		BootstrapAdminPhone:    cfg.BootstrapAdmin.Phone,
 		BootstrapAdminPassword: cfg.BootstrapAdmin.Password,
+		EncryptionKey:          cfg.Auth.TokenSecret,
+		WechatCallbackURL:      cfg.Wechat.CallbackURL,
 	})
 	if cfg.Wechat.AppID != "" && cfg.Wechat.Secret != "" {
 		if err := repo.UseWechatAPI(cfg.Wechat.AppID, cfg.Wechat.Secret); err != nil {
@@ -41,12 +43,19 @@ func main() {
 	} else {
 		log.Infof("wechat login running in demo mode (no WECHAT_APPID/WECHAT_SECRET)")
 	}
-	if cfg.OfficialAccount.AppID != "" && cfg.OfficialAccount.Secret != "" && cfg.OfficialAccount.TemplateID != "" {
-		if err := repo.UseOfficialAccountAPI(cfg.OfficialAccount.AppID, cfg.OfficialAccount.Secret, cfg.OfficialAccount.TemplateID); err != nil {
+	if cfg.OfficialAccount.AppID != "" && cfg.OfficialAccount.Secret != "" {
+		if err := repo.UseOfficialAccountMessaging(cfg.OfficialAccount.AppID, cfg.OfficialAccount.Secret, cfg.Wechat.AppID); err != nil {
 			log.Errorf("official account configuration failed: %v", err)
 			return
 		}
-		log.Infof("wechat official account template messages enabled")
+		// 旧的练习/排课自动提醒仍可继续使用一个默认模板；新的年级群发模板由公众号接口动态同步。
+		if cfg.OfficialAccount.TemplateID != "" {
+			if err := repo.UseOfficialAccountAPI(cfg.OfficialAccount.AppID, cfg.OfficialAccount.Secret, cfg.OfficialAccount.TemplateID); err != nil {
+				log.Errorf("official account default template configuration failed: %v", err)
+				return
+			}
+		}
+		log.Infof("wechat official account messaging enabled")
 	} else {
 		log.Infof("wechat official account template messages not configured")
 	}

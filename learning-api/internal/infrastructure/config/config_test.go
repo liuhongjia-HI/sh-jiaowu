@@ -71,7 +71,7 @@ func TestProductionConfigRejectsPartialOfficialAccountDelivery(t *testing.T) {
 	cfg.Demo.AdminPasswordLogin = true
 
 	err := cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), "WECHAT_OFFICIAL_ACCOUNT_APPID/SECRET/TEMPLATE_ID") {
+	if err == nil || !strings.Contains(err.Error(), "WECHAT_OFFICIAL_ACCOUNT_APPID/SECRET") {
 		t.Fatalf("expected partial official account config to fail, got %v", err)
 	}
 }

@@ -9,6 +9,12 @@ function resolveApiBaseUrl() {
   return import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? DEFAULT_PRODUCTION_API_BASE_URL : '/api');
 }
 
+export function resolveApiUrl(path: string) {
+  const base = resolveApiBaseUrl().replace(/\/$/, '');
+  const suffix = path.startsWith('/') ? path : `/${path}`;
+  return /^https?:\/\//i.test(base) ? `${base}${suffix}` : `${window.location.origin}${base}${suffix}`;
+}
+
 export const http = axios.create({
   baseURL: resolveApiBaseUrl(),
   timeout: 15000

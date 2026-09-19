@@ -1,7 +1,19 @@
 package store
 
 func engagementRows(s *MemoryStore) []persistenceRow {
-	rows := make([]persistenceRow, 0, len(s.notices)+len(s.logs)+len(s.settings)+len(s.subjects)+len(s.favorites)+len(s.subscriptionPreferences)+len(s.classReservations))
+	rows := make([]persistenceRow, 0, len(s.notices)+len(s.logs)+len(s.settings)+len(s.subjects)+len(s.favorites)+len(s.subscriptionPreferences)+len(s.classReservations)+len(s.officialTemplates)+len(s.officialFollowers)+len(s.officialCampaigns)+len(s.officialCampaignRecipients))
+	for _, item := range s.officialTemplates {
+		rows = append(rows, simpleRow("official_account_templates", "template_id", item.ID, `INSERT INTO official_account_templates (template_id, title, content, example, fields_json, status, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), example=VALUES(example), fields_json=VALUES(fields_json), status=VALUES(status), synced_at=VALUES(synced_at)`, item.ID, item.Title, item.Content, item.Example, mustJSON(item.Fields), item.Status, nullableDateTime(item.SyncedAt)))
+	}
+	for _, item := range s.officialFollowers {
+		rows = append(rows, simpleRow("wechat_official_followers", "official_open_id", item.OpenID, `INSERT INTO wechat_official_followers (official_open_id, union_id, subscribed, subscribed_at, unsubscribed_at, synced_at) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE union_id=VALUES(union_id), subscribed=VALUES(subscribed), subscribed_at=VALUES(subscribed_at), unsubscribed_at=VALUES(unsubscribed_at), synced_at=VALUES(synced_at)`, item.OpenID, item.UnionID, item.Subscribed, nullableDateTime(item.SubscribedAt), nullableDateTime(item.UnsubscribedAt), nullableDateTime(item.SyncedAt)))
+	}
+	for _, item := range s.officialCampaigns {
+		rows = append(rows, simpleRow("official_message_campaigns", "id", item.ID, `INSERT INTO official_message_campaigns (id, template_id, template_title, grades_json, values_json, page_path, target_count, success_count, failure_count, status, created_by, created_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE template_title=VALUES(template_title), grades_json=VALUES(grades_json), values_json=VALUES(values_json), page_path=VALUES(page_path), target_count=VALUES(target_count), success_count=VALUES(success_count), failure_count=VALUES(failure_count), status=VALUES(status), sent_at=VALUES(sent_at)`, item.ID, item.TemplateID, item.TemplateTitle, mustJSON(item.Grades), mustJSON(item.Values), item.PagePath, item.TargetCount, item.SuccessCount, item.FailureCount, item.Status, item.CreatedBy, nullableDateTime(item.CreatedAt), nullableDateTime(item.SentAt)))
+	}
+	for _, item := range s.officialCampaignRecipients {
+		rows = append(rows, simpleRow("official_message_recipients", "id", item.ID, `INSERT INTO official_message_recipients (id, campaign_id, guardian_id, guardian_name, official_open_id, student_names, status, failure_reason, retry_count, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE guardian_name=VALUES(guardian_name), student_names=VALUES(student_names), status=VALUES(status), failure_reason=VALUES(failure_reason), retry_count=VALUES(retry_count), sent_at=VALUES(sent_at)`, item.ID, item.CampaignID, item.GuardianID, item.GuardianName, item.OpenID, item.StudentNames, item.Status, item.FailureReason, item.RetryCount, nullableDateTime(item.SentAt)))
+	}
 	for _, item := range s.classReservations {
 		rows = append(rows, simpleRow("class_reservation_intents", "id", item.ID, `INSERT INTO class_reservation_intents (id, student_id, student_name, grade, campaign_id, time_option, status, remark, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE student_name=VALUES(student_name), grade=VALUES(grade), time_option=VALUES(time_option), status=VALUES(status), remark=VALUES(remark), updated_at=VALUES(updated_at)`, item.ID, item.StudentID, item.StudentName, item.Grade, item.CampaignID, item.TimeOption, item.Status, item.Remark, nullableDateTime(item.CreatedAt), nullableDateTime(item.UpdatedAt)))
 	}

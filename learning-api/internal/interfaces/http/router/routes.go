@@ -37,6 +37,8 @@ func registerPublicRoutes(api *gin.RouterGroup, h *handler.LearningHandler) {
 	api.POST("/auth/admin-password-login", h.AdminPasswordLogin)
 	api.POST("/auth/demo-student-login", h.DemoStudentLogin)
 	api.GET("/auth/captcha", h.Captcha)
+	api.GET("/wechat/official-account/callback", h.VerifyOfficialAccountCallback)
+	api.POST("/wechat/official-account/callback", h.OfficialAccountCallback)
 }
 
 func registerAuthenticatedRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
@@ -143,6 +145,14 @@ func registerOpsRoutes(api *gin.RouterGroup, service *learningapp.Service, token
 	g.POST("/commercial/lesson-consumptions", h.CreateLessonConsumption)
 	g.POST("/commercial/renewal-reminders", h.CreateRenewalReminder)
 	g.POST("/commercial/parent-notices", h.CreateParentNotice)
+	g.GET("/official-account/templates", h.OfficialTemplates)
+	g.POST("/official-account/templates/sync", h.SyncOfficialTemplates)
+	g.POST("/official-account/followers/sync", h.SyncOfficialFollowers)
+	g.POST("/official-account/campaigns/preview", h.PreviewOfficialAudience)
+	g.GET("/official-account/campaigns", h.OfficialCampaigns)
+	g.GET("/official-account/campaigns/:id", h.OfficialCampaign)
+	g.POST("/official-account/campaigns", h.CreateOfficialCampaign)
+	g.POST("/official-account/campaigns/:id/retry", h.RetryOfficialCampaign)
 	g.POST("/scheduling/candidates", h.ScheduleCandidates)
 	// 审核动作只给管理员；建课/改课下放给老师，见 registerAdminRoutes。
 	g.GET("/schedule-classes/pending", h.PendingScheduleClasses)
@@ -165,6 +175,8 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g.GET("/logs", h.Logs)
 	g.GET("/system/readiness", h.SystemReadiness)
 	g.PUT("/settings", h.UpdateSetting)
+	g.GET("/wechat/settings", h.WechatSettings)
+	g.PUT("/wechat/settings", h.UpdateWechatSettings)
 	g.PUT("/subjects/:id", h.UpdateSubjectMetadata)
 	g.DELETE("/subjects/:id", h.DeleteSubjectMetadata)
 	g.PUT("/grade-subjects", h.UpdateGradeSubjects)

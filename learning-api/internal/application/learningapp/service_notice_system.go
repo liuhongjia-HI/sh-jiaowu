@@ -41,3 +41,41 @@ func (s *Service) UpdateGradeSubjects(o string, r learning.GradeSubjectCatalogUp
 func (s *Service) MarkAllStudentNoticesRead(p learning.Principal) ([]learning.Notice, error) {
 	return s.notice.MarkAllStudentNoticesRead(p)
 }
+
+func (s *Service) OfficialTemplates() []learning.OfficialTemplate {
+	return s.notice.OfficialTemplates()
+}
+func (s *Service) SyncOfficialTemplates(o string) ([]learning.OfficialTemplate, error) {
+	return s.notice.SyncOfficialTemplates(o)
+}
+func (s *Service) PreviewOfficialAudience(r learning.OfficialAudiencePreviewRequest) (learning.OfficialAudiencePreview, error) {
+	return s.notice.PreviewOfficialAudience(r)
+}
+func (s *Service) OfficialCampaigns() []learning.OfficialCampaign {
+	return s.notice.OfficialCampaigns()
+}
+func (s *Service) OfficialCampaign(id string) (learning.OfficialCampaignDetail, error) {
+	return s.notice.OfficialCampaign(id)
+}
+func (s *Service) CreateOfficialCampaign(o string, r learning.OfficialCampaignCreateRequest) (learning.OfficialCampaign, error) {
+	return s.notice.CreateOfficialCampaign(o, r)
+}
+func (s *Service) RetryOfficialCampaign(o, id string) (learning.OfficialCampaign, error) {
+	return s.notice.RetryOfficialCampaign(o, id)
+}
+func (s *Service) WechatSettings() learning.WechatSettings { return s.system.WechatSettings() }
+func (s *Service) UpdateWechatSettings(o string, r learning.WechatSettingsUpdateRequest) (learning.WechatSettings, error) {
+	return s.system.UpdateWechatSettings(o, r)
+}
+func (s *Service) SyncOfficialFollowers(o string) (learning.OfficialFollowerSyncResult, error) {
+	return s.notice.SyncOfficialFollowers(o)
+}
+func (s *Service) VerifyOfficialCallback(signature, timestamp, nonce string) bool {
+	return s.notice.VerifyOfficialCallback(signature, timestamp, nonce)
+}
+func (s *Service) DecryptOfficialCallback(signature, timestamp, nonce, encrypted string) ([]byte, error) {
+	return s.notice.DecryptOfficialCallback(signature, timestamp, nonce, encrypted)
+}
+func (s *Service) HandleOfficialCallback(openID, event string, createTime int64) error {
+	return s.notice.HandleOfficialCallback(openID, event, createTime)
+}

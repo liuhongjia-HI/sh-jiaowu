@@ -127,6 +127,36 @@ export type SystemReadiness = {
   items: ReadinessItem[];
 };
 
+export type WechatSettings = {
+  miniProgramName: string;
+  miniProgramAppId: string;
+  miniProgramSecretConfigured: boolean;
+  officialAccountName: string;
+  officialAccountAppId: string;
+  officialAccountOriginalId: string;
+  officialAccountSecretConfigured: boolean;
+  callbackTokenConfigured: boolean;
+  encodingAesKeyConfigured: boolean;
+  callbackUrl: string;
+};
+
+export type WechatSettingsUpdateRequest = {
+  miniProgramName: string;
+  miniProgramAppId: string;
+  miniProgramAppSecret?: string;
+  officialAccountName: string;
+  officialAccountAppId: string;
+  officialAccountAppSecret?: string;
+  officialAccountOriginalId: string;
+  callbackToken?: string;
+  encodingAesKey?: string;
+};
+
+export type OfficialTemplateField = { key: string; label: string; example?: string; maxLength?: number };
+export type OfficialTemplate = { id: string; title: string; content: string; example?: string; fields: OfficialTemplateField[]; status: string; syncedAt: string };
+export type OfficialAudiencePreview = { studentCount: number; guardianCount: number; reachableCount: number; unreachableCount: number; unmatchedCount: number; duplicateCount: number; grades: string[]; unreachableReasons?: string[] };
+export type OfficialCampaign = { id: string; templateId: string; templateTitle: string; grades: string[]; values: Record<string, string>; pagePath: string; targetCount: number; successCount: number; failureCount: number; status: string; createdBy: string; createdAt: string; sentAt?: string };
+
 export type StudyPackage = {
   id: string;
   name: string;

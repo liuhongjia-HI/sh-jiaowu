@@ -74,6 +74,17 @@ func (s *MemoryStore) connectDatabaseUnlocked(dsn string) error {
 		s.db = nil
 		return err
 	}
+	if s.seedDemoData && len(s.officialTemplates) == 0 {
+		s.seedOfficialMessagingDemoData()
+		for _, item := range s.officialTemplates {
+			if _, err := s.db.Exec(`INSERT IGNORE INTO official_account_templates (template_id, title, content, example, fields_json, status, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, item.ID, item.Title, item.Content, item.Example, mustJSON(item.Fields), item.Status, nullableDateTime(item.SyncedAt)); err != nil {
+				db.Close()
+				s.db = nil
+				return err
+			}
+		}
+	}
+	s.applyStoredWechatSettingsUnlocked()
 	if err := s.reconcileBaseLearningSpaces(); err != nil {
 		db.Close()
 		s.db = nil

@@ -429,6 +429,30 @@
 
 学生端只返回当前学生的课程内容更新通知：老师给某门课上传或重新发布讲义时，系统按当时已开通该课讲义的学生逐条投递，文案为 `{年级码}{学科}课已上传新内容，请查看`，`relatedType=course`。后开通课程的学生看不到进班前的历史消息。练习发布、批改、排课和后台手动通知仍可在管理端/公众号链路中保留，但不会进入小程序通知页。`公众号模板消息` 原始记录、`待配置`、`发送失败` 的通知只在后台保留，供教务查看失败原因和补发。
 
+### 公众号模板群发
+
+微信基础配置为单例，不区分开发、测试和生产配置组：
+
+- `GET /api/wechat/settings`：返回脱敏配置。
+- `PUT /api/wechat/settings`：保存小程序和公众号配置；敏感值留空表示不修改。
+- `GET|POST /api/wechat/official-account/callback`：公众号服务器验证及关注/取消关注事件回调，支持明文和安全模式。
+
+模板和关注者：
+
+- `GET /api/official-account/templates`
+- `POST /api/official-account/templates/sync`
+- `POST /api/official-account/followers/sync`
+
+群发活动：
+
+- `POST /api/official-account/campaigns/preview`：按年级计算学生、家长和可触达人数。
+- `POST /api/official-account/campaigns`：保存草稿或创建发送任务。
+- `GET /api/official-account/campaigns`
+- `GET /api/official-account/campaigns/:id`
+- `POST /api/official-account/campaigns/:id/retry`
+
+模板结构和字段顺序来自公众号接口，管理端只编辑字段值。接收人由年级学生经 `guardian_students`、家长 `union_id` 和公众号关注者关系计算，同一个公众号 OpenID 在一次活动中只发送一次。
+
 ### 学生管理
 
 教师可按负责课程和班级查看学生；运营教务、校区管理员、超级管理员可新增、编辑、导入、提醒和开通套餐。

@@ -1,11 +1,11 @@
 import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
-import { CalendarOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
+import { CalendarOutlined, CopyOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteData, getData, putData } from '../../services/http';
+import { deleteData, getData, putData, resolveApiUrl } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton } from '../../components/ListViews';
-import type { SettingUpdateRequest, SubjectMetadata, SubjectMetadataUpdateRequest } from '../../types/starline';
+import type { SettingUpdateRequest, SubjectMetadata, SubjectMetadataUpdateRequest, WechatSettings, WechatSettingsUpdateRequest } from '../../types/starline';
 import { subjectLabel } from '../../utils/curriculum';
 
 const CALENDAR_KEY = 'academicCalendar';
@@ -15,7 +15,6 @@ const SPRING_LABEL = 'S2 第二学期';
 // 三个 Tab 分组：系统设置项一多，摊平成一张大表格谁都懒得找。分组按“运营会想在什么场景下打开这一项”来划，
 // 不按数据类型分——校历天天要看，接入状态一年调一次，放在一起只会互相淹没。
 const contentKeys = ['grades', 'semesters', 'watermarkRule'];
-const integrationKeys = ['miniProgramDomainStatus', 'officialAccountBindingStatus', 'templateMessageStatus', 'miniProgramSubscribeStatus', 'productionApiDomain'];
 
 const labels: Record<string, string> = {
   grades: '适用年级',
@@ -382,6 +381,100 @@ function SubjectMetadataCard() {
   );
 }
 
+function WechatSettingsCard() {
+  const [form] = Form.useForm<WechatSettingsUpdateRequest>();
+  const queryClient = useQueryClient();
+  const config = useQuery({ queryKey: ['wechat-settings'], queryFn: () => getData<WechatSettings>('/wechat/settings') });
+  const save = useMutation({
+    mutationFn: (values: WechatSettingsUpdateRequest) => putData<WechatSettings>('/wechat/settings', values),
+    onSuccess: () => {
+      message.success('微信配置已保存。');
+      form.setFieldsValue({ miniProgramAppSecret: '', officialAccountAppSecret: '', callbackToken: '', encodingAesKey: '' });
+      queryClient.invalidateQueries({ queryKey: ['wechat-settings'] });
+    },
+    onError: (error: Error) => message.error(error.message || '微信配置保存失败。')
+  });
+
+  if (config.isLoading) return <Skeleton active />;
+  if (config.error || !config.data) return <Alert type="error" message="微信配置加载失败，请稍后重试。" />;
+
+  const current = config.data;
+  const callbackUrl = current.callbackUrl || resolveApiUrl('/wechat/official-account/callback');
+  return (
+    <Form
+      form={form}
+      layout="vertical"
+      requiredMark={false}
+      initialValues={{
+        miniProgramName: current.miniProgramName,
+        miniProgramAppId: current.miniProgramAppId,
+        officialAccountName: current.officialAccountName,
+        officialAccountAppId: current.officialAccountAppId,
+        officialAccountOriginalId: current.officialAccountOriginalId
+      }}
+      onFinish={(values) => save.mutate(values)}
+    >
+      <div className="wechat-settings-grid">
+        <Card title="小程序配置">
+          <Form.Item name="miniProgramName" label="小程序名称" rules={[{ required: true, message: '请输入小程序名称' }]}>
+            <Input placeholder="例如：星线教育" />
+          </Form.Item>
+          <Form.Item name="miniProgramAppId" label="AppID" rules={[{ required: true, message: '请输入小程序 AppID' }]}>
+            <Input placeholder="wx..." autoComplete="off" />
+          </Form.Item>
+          <Form.Item name="miniProgramAppSecret" label="AppSecret">
+            <Input.Password
+              placeholder={current.miniProgramSecretConfigured ? '已保存，留空不修改' : '请输入小程序 AppSecret'}
+              autoComplete="new-password"
+            />
+          </Form.Item>
+        </Card>
+
+        <Card title="公众号配置">
+          <Form.Item name="officialAccountName" label="公众号名称" rules={[{ required: true, message: '请输入公众号名称' }]}>
+            <Input placeholder="例如：星线教育" />
+          </Form.Item>
+          <div className="wechat-form-row">
+            <Form.Item name="officialAccountAppId" label="AppID" rules={[{ required: true, message: '请输入公众号 AppID' }]}>
+              <Input placeholder="wx..." autoComplete="off" />
+            </Form.Item>
+            <Form.Item name="officialAccountOriginalId" label="原始 ID" rules={[{ required: true, message: '请输入公众号原始 ID' }]}>
+              <Input placeholder="gh_..." autoComplete="off" />
+            </Form.Item>
+          </div>
+          <Form.Item name="officialAccountAppSecret" label="AppSecret">
+            <Input.Password placeholder={current.officialAccountSecretConfigured ? '已保存，留空不修改' : '请输入公众号 AppSecret'} autoComplete="new-password" />
+          </Form.Item>
+          <div className="wechat-form-row">
+            <Form.Item name="callbackToken" label="回调 Token">
+              <Input.Password placeholder={current.callbackTokenConfigured ? '已保存，留空不修改' : '请输入回调 Token'} autoComplete="new-password" />
+            </Form.Item>
+            <Form.Item name="encodingAesKey" label="EncodingAESKey">
+              <Input.Password placeholder={current.encodingAesKeyConfigured ? '已保存，留空不修改' : '请输入 EncodingAESKey'} autoComplete="new-password" />
+            </Form.Item>
+          </div>
+          <Form.Item label="微信服务器回调地址">
+            <Space.Compact block>
+              <Input readOnly value={callbackUrl} />
+              <Button
+                icon={<CopyOutlined />}
+                onClick={async () => {
+                  await navigator.clipboard.writeText(callbackUrl);
+                  message.success('回调地址已复制。');
+                }}
+              >复制</Button>
+            </Space.Compact>
+          </Form.Item>
+        </Card>
+      </div>
+      <div className="wechat-settings-actions">
+        <Button onClick={() => form.resetFields()}>取消</Button>
+        <Button type="primary" htmlType="submit" loading={save.isPending}>保存配置</Button>
+      </div>
+    </Form>
+  );
+}
+
 export default function SettingsPage() {
   const [form] = Form.useForm<SettingUpdateRequest>();
   const [editing, setEditing] = useState<Record<string, string> | null>(null);
@@ -412,7 +505,6 @@ export default function SettingsPage() {
   const allEntries = Object.entries(settings.data ?? {}).filter(([key]) => key !== CALENDAR_KEY && key !== 'academicYear' && key !== 'academicPeriods');
   const toRows = (keys: string[]) => allEntries.filter(([key]) => keys.includes(key)).map(([key, value]) => ({ key, value })).sort((a, b) => keys.indexOf(a.key) - keys.indexOf(b.key));
   const contentRows = toRows(contentKeys);
-  const integrationRows = toRows(integrationKeys);
 
   return (
     <div className="page-stack">
@@ -444,13 +536,7 @@ export default function SettingsPage() {
               {
                 key: 'integration',
                 label: <span><LinkOutlined /> 小程序与公众号</span>,
-                children: (
-                  <FlatSettingsCard
-                    rows={integrationRows}
-                    onEdit={openEdit}
-                    extra={<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => settings.refetch()} />}
-                  />
-                )
+                children: <WechatSettingsCard />
               }
             ]}
           />

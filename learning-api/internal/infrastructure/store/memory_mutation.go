@@ -44,10 +44,17 @@ func (s *MemoryStore) persistMutation(after *MemoryStore) error {
 
 func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	work := &MemoryStore{
-		wechatResolver:       s.wechatResolver,
-		phoneResolver:        s.phoneResolver,
-		officialNoticeSender: s.officialNoticeSender,
-		officialAccountReady: s.officialAccountReady,
+		wechatResolver:         s.wechatResolver,
+		wechatSessionResolver:  s.wechatSessionResolver,
+		phoneResolver:          s.phoneResolver,
+		officialNoticeSender:   s.officialNoticeSender,
+		officialTemplateSender: s.officialTemplateSender,
+		officialTemplateSyncer: s.officialTemplateSyncer,
+		officialFollowerSyncer: s.officialFollowerSyncer,
+		officialAccountReady:   s.officialAccountReady,
+		wechatEncryptionKey:    s.wechatEncryptionKey,
+		wechatCallbackURL:      s.wechatCallbackURL,
+		seedDemoData:           s.seedDemoData,
 	}
 	work.users = cloneUsers(s.users)
 	work.packages = clonePackages(s.packages)
@@ -105,6 +112,10 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	work.scoreRecords = append([]learning.StudentScoreRecord(nil), s.scoreRecords...)
 	work.banners = append([]learning.Banner(nil), s.banners...)
 	work.classReservations = append([]learning.ClassReservationIntent(nil), s.classReservations...)
+	work.officialTemplates = cloneOfficialTemplates(s.officialTemplates)
+	work.officialFollowers = append([]learning.OfficialFollower(nil), s.officialFollowers...)
+	work.officialCampaigns = cloneOfficialCampaigns(s.officialCampaigns)
+	work.officialCampaignRecipients = append([]learning.OfficialCampaignRecipient(nil), s.officialCampaignRecipients...)
 	work.miniProgramSubscribeTemplateIDs = cloneStrings(s.miniProgramSubscribeTemplateIDs)
 	work.pendingNoticeDeliveries = append([]learning.Notice(nil), s.pendingNoticeDeliveries...)
 	return work
@@ -193,6 +204,37 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.scoreRecords = work.scoreRecords
 	s.banners = work.banners
 	s.classReservations = work.classReservations
+	s.officialTemplates = work.officialTemplates
+	s.officialFollowers = work.officialFollowers
+	s.officialCampaigns = work.officialCampaigns
+	s.officialCampaignRecipients = work.officialCampaignRecipients
+	s.wechatResolver = work.wechatResolver
+	s.wechatSessionResolver = work.wechatSessionResolver
+	s.phoneResolver = work.phoneResolver
+	s.officialNoticeSender = work.officialNoticeSender
+	s.officialTemplateSender = work.officialTemplateSender
+	s.officialTemplateSyncer = work.officialTemplateSyncer
+	s.officialFollowerSyncer = work.officialFollowerSyncer
+	s.officialAccountReady = work.officialAccountReady
 	s.miniProgramSubscribeTemplateIDs = work.miniProgramSubscribeTemplateIDs
 	s.pendingNoticeDeliveries = work.pendingNoticeDeliveries
+}
+
+func cloneOfficialTemplates(values []learning.OfficialTemplate) []learning.OfficialTemplate {
+	out := make([]learning.OfficialTemplate, len(values))
+	for i, value := range values {
+		value.Fields = append([]learning.OfficialTemplateField(nil), value.Fields...)
+		out[i] = value
+	}
+	return out
+}
+
+func cloneOfficialCampaigns(values []learning.OfficialCampaign) []learning.OfficialCampaign {
+	out := make([]learning.OfficialCampaign, len(values))
+	for i, value := range values {
+		value.Grades = cloneStrings(value.Grades)
+		value.Values = cloneMap(value.Values)
+		out[i] = value
+	}
+	return out
 }
