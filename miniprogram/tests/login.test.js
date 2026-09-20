@@ -471,3 +471,48 @@ test("login page does not submit binding when wx.login returns no code", async (
   assert.equal(calls.some((item) => item[0] === "request"), false);
   assert.equal(calls.some((item) => item[1] === "登录失败，请重试"), true);
 });
+
+for (const method of ["silentLogin", "doLogin"]) {
+  for (const outcome of ["success", "failure"]) {
+    test(`${method} ignores late ${outcome} after returning home`, async () => {
+      let resolve, reject;
+      const pending = new Promise((yes, no) => { resolve = yes; reject = no; });
+      const calls = [];
+      const page = loadLoginPage(() => pending, {
+        login(args) { args.success({ code: "code" }); },
+        getStorageSync() { return ""; },
+        setStorageSync(key) { calls.push(["write", key]); },
+        removeStorageSync(key) { calls.push(["remove", key]); },
+        switchTab(args) { calls.push(["navigate", args.url]); },
+        showToast(args) { calls.push(["toast", args.title]); }
+      });
+      page[method]({ code: "code" });
+      page.leaveLogin();
+      const afterExit = calls.slice();
+      if (outcome === "success") resolve({ token: "late-token" });
+      else reject(new Error("late failure"));
+      await flushPromises();
+      assert.deepEqual(calls, afterExit);
+    });
+  }
+}
+
+test("native back ignores pending wx.login callback", () => {
+  let callback;
+  let requests = 0;
+  const page = loadLoginPage(() => { requests++; return Promise.resolve({}); }, {
+    login(args) { callback = args.success; },
+    removeStorageSync() {},
+    setStorageSync() {}
+  });
+  page.onLoad();
+  page.onUnload();
+  callback({ code: "late-code" });
+  assert.equal(requests, 0);
+});
+
+test("return home remains available while binding", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/login/index.wxml"), "utf8");
+  const button = template.match(/<button[^>]*bindtap="leaveLogin"[^>]*>/)[0];
+  assert.doesNotMatch(button, /disabled=/);
+});

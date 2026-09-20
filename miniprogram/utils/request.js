@@ -1,5 +1,7 @@
 const LOGIN_RETURN_KEY = "starline_after_login";
 let loginRedirectInFlight = false;
+let loginRedirectTimer = null;
+let loginRedirectRevision = 0;
 
 function request(path, options = {}) {
   const app = getApp();
@@ -99,10 +101,14 @@ function handleUnauthorized(message) {
   wx.removeStorageSync("starline_token");
   rememberLoginDestination();
   wx.showToast({ title: message, icon: "none" });
-  setTimeout(() => {
+  const revision = loginRedirectRevision;
+  loginRedirectTimer = setTimeout(() => {
+    if (revision !== loginRedirectRevision) return;
+    loginRedirectTimer = null;
     wx.navigateTo({
       url: "/pages/login/index",
       fail() {
+        if (revision !== loginRedirectRevision) return;
         wx.redirectTo({ url: "/pages/login/index" });
       }
     });
@@ -110,6 +116,11 @@ function handleUnauthorized(message) {
 }
 
 function completeLoginRedirect() {
+  loginRedirectRevision++;
+  if (loginRedirectTimer !== null) {
+    clearTimeout(loginRedirectTimer);
+    loginRedirectTimer = null;
+  }
   loginRedirectInFlight = false;
 }
 

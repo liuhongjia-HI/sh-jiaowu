@@ -29,6 +29,7 @@ Page({
     }
   },
   onLoad(options = {}) {
+    this.loginCancelled = false;
     const grade = String(options.grade || "").trim();
     const gradeIndex = this.data.gradeOptions.indexOf(grade);
     if (gradeIndex >= 0) {
@@ -37,6 +38,7 @@ Page({
     this.silentLogin();
   },
   onUnload() {
+    this.loginCancelled = true;
     completeLoginRedirect();
     wx.removeStorageSync(LOGIN_RETURN_KEY);
     if (wx.setStorageSync) {
@@ -87,6 +89,7 @@ Page({
     }
     wx.login({
       success: (res) => {
+        if (this.loginCancelled) return;
         const code = res.code;
         if (!code) {
           return;
@@ -95,6 +98,7 @@ Page({
         const data = selectedStudentId ? { code, selectedStudentId } : { code };
         request("/auth/wechat-login", { method: "POST", data })
           .then((result) => {
+            if (this.loginCancelled) return;
             wx.setStorageSync("starline_token", result.token);
             if (result.user && result.user.studentId) {
               wx.setStorageSync(STUDENT_SELECTION_KEY, result.user.studentId);
@@ -102,6 +106,7 @@ Page({
             resumeAfterLogin();
           })
           .catch((error) => {
+            if (this.loginCancelled) return;
             const message = error && error.message ? error.message : "";
             if (message.indexOf("微信账号未绑定") === -1) {
               wx.removeStorageSync("starline_token");
@@ -117,6 +122,7 @@ Page({
   login() {
     wx.login({
       success: (res) => {
+        if (this.loginCancelled) return;
         const code = res.code;
         if (!code) {
           wx.showToast({ title: "登录失败", icon: "none" });
@@ -131,11 +137,12 @@ Page({
   },
   // 手机号绑定：getPhoneNumber 授权后，把手机号随登录一起上送给后端完成绑定。
   bindPhone(event) {
+    if (this.loginCancelled) return;
     const detail = event.detail || {};
     if (isCancel(detail)) {
       wx.showModal({
-      title: "已取消手机号授权",
-      content: "可继续填写资料，也可以返回首页后再绑定。",
+        title: "已取消手机号授权",
+        content: "可继续填写资料，也可以返回首页后再绑定。",
         confirmText: "返回首页",
         cancelText: "继续填写",
         success: ({ confirm }) => {
@@ -155,6 +162,7 @@ Page({
     }
     wx.login({
       success: (res) => {
+        if (this.loginCancelled) return;
         const code = res.code;
         if (!code) {
           wx.showToast({ title: "登录失败，请重试", icon: "none" });
@@ -174,6 +182,7 @@ Page({
     });
   },
   leaveLogin() {
+    this.loginCancelled = true;
     completeLoginRedirect();
     wx.removeStorageSync(LOGIN_RETURN_KEY);
     if (wx.setStorageSync) {
@@ -187,12 +196,13 @@ Page({
     });
   },
   doLogin(payload, path = "/auth/wechat-login") {
-    if (this.data.binding) {
+    if (this.loginCancelled || this.data.binding) {
       return;
     }
     this.setData({ binding: true });
     request(path, { method: "POST", data: payload })
       .then((result) => {
+        if (this.loginCancelled) return;
         // 多子女：手机号命中多个学生档案时后端不报错，而是返回候选列表，
         // 这里弹出选择框，选中后带着 selectedStudentId 重新提交同一份登录请求。
         // binding 必须在调起选择框之前就复位——resubmit 会再走一次 doLogin，
@@ -212,6 +222,7 @@ Page({
         this.setData({ binding: false });
       })
       .catch((error) => {
+        if (this.loginCancelled) return;
         this.showLoginError(error);
         this.setData({ binding: false });
       });

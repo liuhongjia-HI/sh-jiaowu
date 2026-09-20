@@ -293,3 +293,27 @@ test("auth API unauthorized response does not trigger global login redirect", as
   assert.equal(calls.some((item) => item[0] === "navigateTo"), false);
   assert.equal(calls.some((item) => item[0] === "showToast"), false);
 });
+
+test("leaving login cancels a queued unauthorized redirect", async () => {
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  let queued;
+  const calls = [];
+  global.setTimeout = (fn) => { queued = fn; return 123; };
+  global.clearTimeout = (id) => calls.push(["clear", id]);
+  try {
+    const request = loadRequestWithWx({
+      getStorageSync() { return ""; },
+      removeStorageSync() {},
+      showToast() {},
+      navigateTo() { calls.push(["navigate"]); }
+    });
+    await assert.rejects(request("/student/home"));
+    require("../utils/request").completeLoginRedirect();
+    queued();
+    assert.deepEqual(calls, [["clear", 123]]);
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+});
