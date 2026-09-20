@@ -73,6 +73,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.POST("/questions", h.CreateQuestion)
 	g.PUT("/questions/:id", h.UpdateQuestion)
 	g.GET("/materials", h.Materials)
+	g.GET("/materials/overview", h.MaterialOverview)
 	g.POST("/materials", h.CreateMaterial)
 	g.POST("/materials/sync-preview", h.PreviewMaterialSync)
 	g.POST("/materials/sync", h.SyncMaterials)

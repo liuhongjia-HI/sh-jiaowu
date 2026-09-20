@@ -6,6 +6,7 @@ import { deleteData, getData, http, postData, postForm, putData } from '../../se
 import { ActionButton } from '../../components/ListViews';
 import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog, homeworkTagOptions, materialTagOptions } from './ResourceDialogs';
 import { canUpload, suggestMaterialTagCode } from './resource-shared';
+import { MaterialUploadOverview } from './MaterialUploadOverview';
 import { curriculumLessonOptions, formatResourceCurriculumLabel, prepareCurriculumForSave, subjectLabel, suggestEquivalentCurriculumLessonId } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, MaterialSyncPreview, MaterialSyncRequest, MaterialSyncResult, QuestionBankItem, StudyPackage } from '../../types/starline';
 import type { UploadFile } from 'antd';
@@ -133,6 +134,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const [syncCourseIds, setSyncCourseIds] = useState<string[]>([]);
   const [syncLessonIds, setSyncLessonIds] = useState<Record<string, string>>({});
   const [syncPreview, setSyncPreview] = useState<MaterialSyncPreview | null>(null);
+  const [uploadTarget, setUploadTarget] = useState<{ courseId: string; lessonId: string } | null>(null);
   const materialParams = Object.fromEntries(Object.entries({ keyword, subject, tagCode, uploaderId, uploadedFrom, uploadedTo }).filter(([, value]) => Boolean(value))) as Record<string, string>;
   const resources = useQuery({ queryKey: [kind, materialParams], queryFn: () => getData<(Material | Homework)[]>(path, kind === 'materials' ? materialParams : undefined) });
   const allMaterials = useQuery({ queryKey: ['materials', 'all-for-reorder'], enabled: kind === 'materials', queryFn: () => getData<Material[]>('/materials') });
@@ -192,7 +194,9 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         message.success('课后练习已发布。');
       }
       setOpen(false);
+      setUploadTarget(null);
       client.invalidateQueries({ queryKey: [kind] });
+      client.invalidateQueries({ queryKey: ['materials-overview'] });
       if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials', 'all-for-reorder'] });
     },
     onError: (error: Error) => message.error(error.message || '保存失败，请稍后重试。')
@@ -246,6 +250,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       if (failures.length) message.warning(`${succeeded.length} 个文件重试成功，仍有 ${failures.length} 个失败。`);
       else message.success('失败文件已全部重新上传，可继续同步。');
       client.invalidateQueries({ queryKey: ['materials'] });
+      client.invalidateQueries({ queryKey: ['materials-overview'] });
     },
     onError: (error: Error) => message.error(error.message || '重新上传失败，请稍后重试。')
   });
@@ -257,6 +262,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       setSyncBatch(null);
       setSyncPreview(null);
       client.invalidateQueries({ queryKey: ['materials'] });
+      client.invalidateQueries({ queryKey: ['materials-overview'] });
       client.invalidateQueries({ queryKey: ['courses'] });
       client.invalidateQueries({ queryKey: ['content'] });
     },
@@ -299,6 +305,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       contentForm.resetFields();
       client.invalidateQueries({ queryKey: [kind] });
       client.invalidateQueries({ queryKey: ['permissions'] });
+      if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials-overview'] });
     },
     onError: (error: Error) => message.error(error.message || '保存失败，请检查课程范围和发布状态。')
   });
@@ -320,6 +327,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       client.invalidateQueries({ queryKey: ['courses-for-content-resources'] });
       client.invalidateQueries({ queryKey: ['courses'] });
       client.invalidateQueries({ queryKey: ['content'] });
+      client.invalidateQueries({ queryKey: ['materials-overview'] });
     },
     onError: (error: Error) => message.error(error.message || '保存课程目录失败，请检查层级关系。')
   });
@@ -329,6 +337,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       message.success(kind === 'materials' ? '课程讲义已删除。' : '课后练习已删除。');
       client.invalidateQueries({ queryKey: [kind] });
 		if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials', 'all-for-reorder'] });
+      if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials-overview'] });
     },
     onError: (error: Error) => message.error(error.message || '删除失败，请稍后重试。')
   });
@@ -345,6 +354,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     onSuccess: () => {
       message.success('讲义展示顺序已保存，小程序会同步更新。');
       client.invalidateQueries({ queryKey: ['materials'] });
+      client.invalidateQueries({ queryKey: ['materials-overview'] });
     },
     onError: (error: Error) => message.error(error.message || '排序保存失败，请刷新后重试。')
   });
@@ -355,7 +365,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   });
   const removeSelected = useMutation({
     mutationFn: async (ids: string[]) => { for (const id of ids) await deleteData(`${path}/${id}`); },
-    onSuccess: (_data, ids) => { message.success(`已删除 ${ids.length} 项内容。`); setSelectedRowKeys([]); client.invalidateQueries({ queryKey: [kind] }); },
+    onSuccess: (_data, ids) => { message.success(`已删除 ${ids.length} 项内容。`); setSelectedRowKeys([]); client.invalidateQueries({ queryKey: [kind] }); if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials-overview'] }); },
     onError: (error: Error) => message.error(error.message || '批量删除失败，请稍后重试。')
   });
   const openFile = async (url: unknown, download = false, name?: unknown) => {
@@ -394,6 +404,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     });
   };
   const selectedCourse = (courses.data ?? []).find((item) => item.id === courseId);
+  const uploadCourse = (courses.data ?? []).find((item) => item.id === uploadTarget?.courseId) ?? selectedCourse;
   const selectedPackage = (packages.data ?? []).find((item) => item.id === packageId);
   const packageIncludesMaterials = Boolean(selectedPackage?.contentTypeCodes?.includes('handout'));
   const packageSpaceIds = new Set(selectedPackage?.learningSpaceIds ?? []);
@@ -468,8 +479,9 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         <Typography.Title level={3}>{title}</Typography.Title>
         <Typography.Text type="secondary">{kind === 'materials' ? filterDescription : '从题库选题并发布到学习空间。'}</Typography.Text>
       </div>
-      {canManage && <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => setOpen(true)}>{kind === 'materials' ? '上传讲义' : '新建课后练习'}</Button>}
+      {canManage && <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => { setUploadTarget(null); setOpen(true); }}>{kind === 'materials' ? '上传讲义' : '新建课后练习'}</Button>}
     </div>
+    {kind === 'materials' && !courseId && !packageId && <MaterialUploadOverview courses={courses.data ?? []} canManage={canManage} onUpload={(targetCourseId, lessonId) => { setUploadTarget({ courseId: targetCourseId, lessonId }); setOpen(true); }} onOpenFile={(item, download) => openFile(download ? item.downloadUrl : item.previewUrl, download, item.fileName)} />}
     {kind === 'materials' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索课节或文件名" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear placeholder="学科" value={subject} onChange={setSubject} options={subjectOptions} style={{ width: 130 }} /><Select allowClear showSearch placeholder="上传人" value={uploaderId} onChange={setUploaderId} options={uploaderOptions} style={{ width: 150 }} /><Input type="date" value={uploadedFrom} onChange={(event) => setUploadedFrom(event.target.value)} /><Input type="date" value={uploadedTo} onChange={(event) => setUploadedTo(event.target.value)} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setSubject(undefined); setTagCode(undefined); setUploaderId(undefined); setUploadedFrom(''); setUploadedTo(''); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
     {kind === 'homework' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
     {canManage && selectedDeleteIds.length > 0 && <div style={{ marginBottom: 12 }}><Popconfirm title={`确定删除选中的 ${selectedDeleteIds.length} 项内容吗？`} description="删除后学生将无法再查看这些内容。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: removeSelected.isPending }} onConfirm={() => removeSelected.mutate(selectedDeleteIds)}><Button danger icon={<DeleteOutlined />}>批量删除（{selectedDeleteIds.length}）</Button></Popconfirm></div>}
@@ -561,7 +573,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       )}
     </Card>}
     <HomeworkSubmissionDialog homework={submissionHomework} summary={submissionSummary.data} loading={submissionSummary.isLoading} error={Boolean(submissionSummary.error)} onCancel={() => setSubmissionHomework(null)} />
-    <UploadDialog kind={kind} open={open} loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} materials={(kind === 'materials' ? (resources.data ?? []) : []) as Material[]} initialCourse={selectedCourse} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => setOpen(false)} onSubmit={(values) => create.mutate(values)} />
+    {open && <UploadDialog kind={kind} open loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} materials={(kind === 'materials' ? (resources.data ?? []) : []) as Material[]} initialCourse={uploadCourse} initialLessonId={uploadTarget?.lessonId} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => { setOpen(false); setUploadTarget(null); }} onSubmit={(values) => create.mutate(values)} />}
     <ContentEditDialog kind={kind} form={contentForm} item={editing} loading={save.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setEditing(null)} onSubmit={(values) => save.mutate(values)} />
     <CourseDialog form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
     <Modal

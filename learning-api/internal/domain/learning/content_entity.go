@@ -108,6 +108,59 @@ type MaterialQuery struct {
 	TagCode      string `form:"tagCode"`
 }
 
+type MaterialOverviewQuery struct {
+	Semester string `form:"semester"`
+	Phase    string `form:"phase"`
+	Level    string `form:"level"`
+	TagCode  string `form:"tagCode"`
+}
+
+type MaterialOverviewLevelCount struct {
+	Level     string `json:"level"`
+	FileCount int    `json:"fileCount"`
+}
+
+type MaterialOverviewCell struct {
+	Grade              string                       `json:"grade"`
+	Subject            string                       `json:"subject"`
+	FileCount          int                          `json:"fileCount"`
+	CoveredLessonCount int                          `json:"coveredLessonCount"`
+	MissingLessonCount int                          `json:"missingLessonCount"`
+	LevelCounts        []MaterialOverviewLevelCount `json:"levelCounts"`
+}
+
+type MaterialOverviewLesson struct {
+	CourseID        string         `json:"courseId"`
+	CourseName      string         `json:"courseName"`
+	LearningSpaceID string         `json:"learningSpaceId"`
+	Grade           string         `json:"grade"`
+	Subject         string         `json:"subject"`
+	Semester        string         `json:"semester"`
+	Phase           string         `json:"phase"`
+	Level           string         `json:"level"`
+	LessonID        string         `json:"lessonId"`
+	Curriculum      CurriculumPath `json:"curriculum"`
+	Materials       []Material     `json:"materials"`
+}
+
+type MaterialOverviewSummary struct {
+	FileCount          int `json:"fileCount"`
+	CoveredLessonCount int `json:"coveredLessonCount"`
+	MissingLessonCount int `json:"missingLessonCount"`
+	UnclassifiedCount  int `json:"unclassifiedCount"`
+}
+
+type MaterialOverview struct {
+	Summary   MaterialOverviewSummary  `json:"summary"`
+	Grades    []string                 `json:"grades"`
+	Subjects  []string                 `json:"subjects"`
+	Semesters []string                 `json:"semesters"`
+	Phases    []string                 `json:"phases"`
+	Levels    []string                 `json:"levels"`
+	Cells     []MaterialOverviewCell   `json:"cells"`
+	Lessons   []MaterialOverviewLesson `json:"lessons"`
+}
+
 type MaterialUpdateRequest struct {
 	Title           string `json:"title"`
 	CourseID        string `json:"courseId"`

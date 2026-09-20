@@ -1218,6 +1218,7 @@ export function UploadDialog({
   learningSpaces,
   materials,
   initialCourse,
+  initialLessonId,
   onManageCurriculum,
   onCancel,
   onSubmit
@@ -1230,6 +1231,7 @@ export function UploadDialog({
   learningSpaces: LearningSpace[];
   materials?: Material[];
   initialCourse?: Course;
+  initialLessonId?: string;
   onManageCurriculum?: (course: Course) => void;
   onCancel: () => void;
   onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
@@ -1248,7 +1250,10 @@ export function UploadDialog({
   useEffect(() => {
     if (!open || !initialCourse || !courses.some((course) => course.id === initialCourse.id)) return;
     form.setFieldValue('courseId', initialCourse.id);
-  }, [courses, form, initialCourse, open]);
+    if (initialLessonId && curriculumLessonOptions(initialCourse.curriculum).some((item) => item.value === initialLessonId)) {
+      form.setFieldValue('lessonId', initialLessonId);
+    }
+  }, [courses, form, initialCourse, initialLessonId, open]);
   return (
     <FormDrawer
       title={kind === 'materials' ? '给课节上传资料' : '新建课后练习'}
@@ -1259,7 +1264,7 @@ export function UploadDialog({
       submitting={loading}
       width={kind === 'homework' ? 'min(720px, 100vw)' : undefined}
     >
-      <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
+      <Form form={form} layout="vertical" preserve={false} initialValues={{ courseId: initialCourse?.id, lessonId: initialLessonId }} onFinish={onSubmit}>
         {kind === 'homework' && (
           <Form.Item name="title" label="练习标题" rules={[{ required: true, message: '请输入标题' }]}>
             <Input placeholder="例如：五年级英语 S1 Q1 阅读练习" />

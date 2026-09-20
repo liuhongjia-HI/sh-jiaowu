@@ -556,6 +556,39 @@ export type Material = {
   status: string;
 };
 
+export type MaterialOverviewLevelCount = { level: string; fileCount: number };
+export type MaterialOverviewCell = {
+  grade: string;
+  subject: string;
+  fileCount: number;
+  coveredLessonCount: number;
+  missingLessonCount: number;
+  levelCounts: MaterialOverviewLevelCount[];
+};
+export type MaterialOverviewLesson = {
+  courseId: string;
+  courseName: string;
+  learningSpaceId: string;
+  grade: string;
+  subject: string;
+  semester: string;
+  phase: string;
+  level: string;
+  lessonId: string;
+  curriculum: CurriculumPath;
+  materials: Material[];
+};
+export type MaterialOverview = {
+  summary: { fileCount: number; coveredLessonCount: number; missingLessonCount: number; unclassifiedCount: number };
+  grades: string[];
+  subjects: string[];
+  semesters: string[];
+  phases: string[];
+  levels: string[];
+  cells: MaterialOverviewCell[];
+  lessons: MaterialOverviewLesson[];
+};
+
 export type MaterialUpdateRequest = {
   title: string;
   courseId: string;

@@ -372,6 +372,40 @@ func TestMaterialReorderEndpointChangesStudentCourseDisplayOrder(t *testing.T) {
 	}
 }
 
+func TestMaterialOverviewCountsFilesAndMissingLessons(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+
+	var overview learning.MaterialOverview
+	app.doJSON(t, http.MethodGet, "/api/materials/overview", app.loginAdmin(t, "13800000001"), nil, http.StatusOK, &overview)
+	if len(overview.Cells) == 0 || len(overview.Lessons) == 0 {
+		t.Fatalf("expected overview cells and lessons, got %#v", overview)
+	}
+	fileCount, coveredCount, missingCount := 0, 0, 0
+	for _, lesson := range overview.Lessons {
+		if lesson.CourseID == "" || lesson.LessonID == "" {
+			t.Fatalf("overview lesson lacks course identity: %#v", lesson)
+		}
+		fileCount += len(lesson.Materials)
+		if len(lesson.Materials) > 0 {
+			coveredCount++
+		} else {
+			missingCount++
+		}
+	}
+	if overview.Summary.FileCount != fileCount || overview.Summary.CoveredLessonCount != coveredCount || overview.Summary.MissingLessonCount != missingCount {
+		t.Fatalf("summary = %#v, recomputed files=%d covered=%d missing=%d", overview.Summary, fileCount, coveredCount, missingCount)
+	}
+
+	var filtered learning.MaterialOverview
+	app.doJSON(t, http.MethodGet, "/api/materials/overview?level=H", app.loginAdmin(t, "13800000001"), nil, http.StatusOK, &filtered)
+	for _, lesson := range filtered.Lessons {
+		if lesson.Level != "H" {
+			t.Fatalf("level filter returned %#v", lesson)
+		}
+	}
+}
+
 func TestAdminAuthAndPermissionBoundaries(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
