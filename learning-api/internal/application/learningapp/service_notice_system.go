@@ -37,6 +37,9 @@ func (s *Service) GradeSubjects() []learning.GradeSubjectMetadata { return s.sys
 func (s *Service) UpdateGradeSubjects(o string, r learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error) {
 	return s.system.UpdateGradeSubjects(o, r)
 }
+func (s *Service) UpsertGradeSubject(o, id string, item learning.GradeSubjectMetadata) (learning.GradeSubjectMetadata, error) {
+	return s.system.UpsertGradeSubject(o, id, item)
+}
 
 func (s *Service) MarkAllStudentNoticesRead(p learning.Principal) ([]learning.Notice, error) {
 	return s.notice.MarkAllStudentNoticesRead(p)

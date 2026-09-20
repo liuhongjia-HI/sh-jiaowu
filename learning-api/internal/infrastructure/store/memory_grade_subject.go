@@ -130,6 +130,60 @@ func (s *MemoryStore) updateGradeSubjectsUnlocked(operator string, req learning.
 	return items, nil
 }
 
+// upsertGradeSubjectUnlocked merges one directory item into the latest catalog
+// while holding the store lock. This avoids a stale browser overwriting changes
+// another administrator made to a different grade or subject.
+func (s *MemoryStore) upsertGradeSubjectUnlocked(operator, id string, item learning.GradeSubjectMetadata) (learning.GradeSubjectMetadata, error) {
+	if s.db != nil {
+		return persistentMutation(s, func(work *MemoryStore) (learning.GradeSubjectMetadata, error) {
+			return work.upsertGradeSubjectUnlocked(operator, id, item)
+		})
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return learning.GradeSubjectMetadata{}, errors.New("目录编号不能为空")
+	}
+	if gradeIndexOf(item.Grade) < 0 {
+		return learning.GradeSubjectMetadata{}, errors.New("年级不在 G1-G12 范围内")
+	}
+	item.ID = id
+	items := s.gradeSubjectCatalogUnlocked()
+	found := false
+	for index := range items {
+		if items[index].ID == id {
+			if items[index].Grade != strings.TrimSpace(item.Grade) || !subjectsMatch(items[index].Subject, item.Subject) {
+				return learning.GradeSubjectMetadata{}, errors.New("已有目录项不能修改年级或学科")
+			}
+			items[index] = item
+			found = true
+			break
+		}
+	}
+	if !found {
+		subjectEnabled := false
+		for _, subject := range s.subjects {
+			if subjectsMatch(subject.Name, item.Subject) && subject.Status == "启用" {
+				subjectEnabled = true
+				break
+			}
+		}
+		if !subjectEnabled {
+			return learning.GradeSubjectMetadata{}, errors.New("只能添加已启用的已有学科")
+		}
+		items = append(items, item)
+	}
+	updated, err := s.updateGradeSubjectsUnlocked(operator, learning.GradeSubjectCatalogUpdateRequest{Items: items})
+	if err != nil {
+		return learning.GradeSubjectMetadata{}, err
+	}
+	for _, candidate := range updated {
+		if candidate.ID == id {
+			return candidate, nil
+		}
+	}
+	return learning.GradeSubjectMetadata{}, errors.New("年级课程目录保存失败")
+}
+
 func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.StudentSubjectCard {
 	cards := make([]learning.StudentSubjectCard, 0)
 	grade := effectiveStudentGrade(student)

@@ -89,7 +89,7 @@ test('超级管理员可以打开管理后台全部一级功能页', async ({ pa
     ['/admin-staff', '管理人员'],
     ['/teachers', '老师管理'],
     ['/logs', '操作记录'],
-    ['/grade-subjects', '年级课程目录'],
+    ['/teaching-settings', '教学配置'],
     ['/settings', '系统设置']
   ];
 
@@ -426,7 +426,7 @@ test('课程方案可按年级、科目和等级筛选', async ({ page }) => {
 
 test('学年校历只维护学期起止和期中日期', async ({ page }) => {
   await login(page, '13800000001');
-  await expectPageHeading(page, '/settings', '系统设置');
+  await expectPageHeading(page, '/teaching-settings?tab=calendar', '教学配置');
 
   await page.getByRole('button', { name: '新增学年' }).click();
   const drawer = page.getByRole('dialog', { name: '新增学年' });
@@ -436,6 +436,13 @@ test('学年校历只维护学期起止和期中日期', async ({ page }) => {
   await expect(drawer.getByText('春季学期期中', { exact: true })).toBeVisible();
   await expect(drawer.getByText('秋季学期期末')).toHaveCount(0);
   await expect(drawer.getByText('春季学期期末')).toHaveCount(0);
+});
+
+test('旧年级课程目录地址跳转到教学配置', async ({ page }) => {
+  await login(page, '13800000001');
+  await page.goto('/grade-subjects');
+  await expect(page).toHaveURL(/\/teaching-settings\?tab=catalog$/);
+  await expect(page.getByRole('heading', { name: '教学配置' })).toBeVisible();
 });
 
 test('点击课程方案名称可查看该方案的课程讲义', async ({ page }) => {

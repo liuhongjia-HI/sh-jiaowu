@@ -37,6 +37,32 @@ func TestDeleteUnusedSubjectMetadata(t *testing.T) {
 	}
 }
 
+func TestUpsertGradeSubjectPreservesOtherRecentChanges(t *testing.T) {
+	store := NewMemoryStore()
+	initial := store.GradeSubjects()
+	if len(initial) < 2 {
+		t.Fatal("expected default grade subject catalog")
+	}
+	first, second := initial[0], initial[1]
+	first.Summary = "first administrator change"
+	if _, err := store.UpsertGradeSubject("管理员一", first.ID, first); err != nil {
+		t.Fatalf("save first catalog item: %v", err)
+	}
+	second.Summary = "second administrator change"
+	if _, err := store.UpsertGradeSubject("管理员二", second.ID, second); err != nil {
+		t.Fatalf("save second catalog item: %v", err)
+	}
+
+	got := store.GradeSubjects()
+	values := map[string]string{}
+	for _, item := range got {
+		values[item.ID] = item.Summary
+	}
+	if values[first.ID] != first.Summary || values[second.ID] != second.Summary {
+		t.Fatalf("single-item saves should preserve both changes, got %#v", values)
+	}
+}
+
 func TestDeleteBuiltInSubjectMetadataRejected(t *testing.T) {
 	store := NewMemoryStore()
 	err := store.DeleteSubjectMetadata("测试管理员", "english")

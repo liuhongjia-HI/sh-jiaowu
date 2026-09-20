@@ -309,9 +309,11 @@
 }
 ```
 
-可维护的 `key` 包括：`grades`、`semesters`、`watermarkRule`、`downloadPolicy`、`miniProgramDomainStatus`、`productionApiDomain`、`officialAccountBindingStatus`、`templateMessageStatus`。`downloadPolicy` 只能为“仅在线预览”或“允许下载带水印PDF”。允许下载时，学生拿到的是服务端写入专属水印、使用 AES-256 加密并设置禁止复制/编辑/打印权限位的 PDF；学生从不获取原始文件。PDF 权限位用于阻止普通阅读器操作，不能替代 DRM，也不能保证绝对防截图或 OCR。当前学年由系统按日期自动判断（每年 7 月 1 日切换），无需维护；套餐开通有效期按“学年校历”自动计算。成功后返回完整设置对象，并记录操作日志。
+可维护的 `key` 包括：`grades`、`semesters`、`watermarkRule`、`downloadPolicy`、`miniProgramDomainStatus`、`productionApiDomain`、`officialAccountBindingStatus`、`templateMessageStatus`。管理端使用固定的 G1-G12 年级定义，不再提供 `grades` 自由文本入口；该历史键继续保留以兼容旧数据。`semesters` 和学年校历在“教学配置”维护，水印与微信接入在“系统设置”维护。`downloadPolicy` 只能为“仅在线预览”或“允许下载带水印PDF”。允许下载时，学生拿到的是服务端写入专属水印、使用 AES-256 加密并设置禁止复制/编辑/打印权限位的 PDF；学生从不获取原始文件。PDF 权限位用于阻止普通阅读器操作，不能替代 DRM，也不能保证绝对防截图或 OCR。当前学年由系统按日期自动判断（每年 7 月 1 日切换），无需维护；套餐开通有效期按“学年校历”自动计算。成功后返回完整设置对象，并记录操作日志。
 
 学科颜色、简称和排序属于学科元数据，不放入系统设置 JSON：`GET /api/subjects` 获取完整列表，校区管理员和超级管理员可通过 `PUT /api/subjects/{id}` 维护 `shortLabel`、`color`、`sortOrder` 与 `status`。学科名称不在此接口修改，避免破坏已有课程、学习空间和历史数据的关联。列表项带只读字段 `deletable`；仅当学科不是系统内置、且未被课程、套餐、资料、练习、题库、辅导关系或成绩引用时为 `true`。空的残留学习空间不阻止删除，相关年级目录项会同步移除。校区管理员和超级管理员可通过 `DELETE /api/subjects/{id}` 删除这类残留学科。内置学科（含已停用的综合科学、历史）不能删除，如不再开设请改为停用。
+
+`GET /api/grade-subjects` 返回年级课程目录。校区管理员和超级管理员通过 `PUT /api/grade-subjects/{id}` 单条新增或修改目录项；服务端在锁内合并最新目录，避免旧页面全量覆盖其他管理员刚保存的内容。新增项的年级必须属于 G1-G12，学科必须来自当前已启用的学科主数据；已有项不能改变年级或学科，但可继续维护展示别名、封面、简介、排序、体验课程和目录显示状态。`status=启用` 表示在学生端目录显示，`status=停用` 表示隐藏，不改变课程、学生权限或历史学习记录。旧的批量 `PUT /api/grade-subjects` 接口继续保留用于兼容。
 
 `GET /api/system/readiness` 返回上线配置检查结果：
 

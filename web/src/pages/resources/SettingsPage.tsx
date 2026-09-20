@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
-import { CalendarOutlined, CopyOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
+import { CopyOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, putData, resolveApiUrl } from '../../services/http';
@@ -12,13 +12,10 @@ const CALENDAR_KEY = 'academicCalendar';
 const FALL_LABEL = 'S1 第一学期';
 const SPRING_LABEL = 'S2 第二学期';
 
-// 三个 Tab 分组：系统设置项一多，摊平成一张大表格谁都懒得找。分组按“运营会想在什么场景下打开这一项”来划，
-// 不按数据类型分——校历天天要看，接入状态一年调一次，放在一起只会互相淹没。
-const contentKeys = ['grades', 'semesters', 'watermarkRule'];
+// 教学相关配置已集中到“教学配置”；系统设置只保留资料保护和微信接入。
+const contentKeys = ['watermarkRule'];
 
 const labels: Record<string, string> = {
-  grades: '适用年级',
-  semesters: '学期设置',
   watermarkRule: '水印规则',
   miniProgramDomainStatus: '小程序域名状态',
   miniProgramSubscribeStatus: '小程序订阅消息状态',
@@ -132,7 +129,7 @@ function DateField(props: { value?: string; onChange?: (value: string) => void }
   return <Input type="date" value={props.value ?? ''} onChange={(event) => props.onChange?.(event.target.value)} />;
 }
 
-function AcademicCalendarCard({
+export function AcademicCalendarCard({
   rawValue,
   onSave,
   saving
@@ -284,7 +281,7 @@ function FlatSettingsCard({
   );
 }
 
-function SubjectMetadataCard() {
+export function SubjectMetadataCard() {
   const [form] = Form.useForm<SubjectMetadataUpdateRequest>();
   const [editing, setEditing] = useState<SubjectMetadata | null>(null);
   const queryClient = useQueryClient();
@@ -292,7 +289,7 @@ function SubjectMetadataCard() {
   const save = useMutation({
     mutationFn: (values: SubjectMetadataUpdateRequest) => putData<SubjectMetadata>(`/subjects/${editing?.id}`, values),
     onSuccess: () => {
-      message.success('学科显示配置已保存。');
+      message.success('学科配置已保存。');
       setEditing(null);
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
@@ -304,7 +301,7 @@ function SubjectMetadataCard() {
       queryClient.invalidateQueries({ queryKey: ['learning-spaces-for-questions'] });
       queryClient.invalidateQueries({ queryKey: ['logs'] });
     },
-    onError: (error: Error) => message.error(error.message || '保存学科显示配置失败，请检查输入。')
+    onError: (error: Error) => message.error(error.message || '保存学科配置失败，请检查输入。')
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteData(`/subjects/${id}`),
@@ -329,9 +326,9 @@ function SubjectMetadataCard() {
   }
 
   return (
-    <Card title="学科显示配置" extra={<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => subjects.refetch()} />}>
+    <Card title="学科管理" extra={<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => subjects.refetch()} />}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        学科元数据是课程方案、年级课程目录等页面的下拉来源。启用后会出现在新建选项中，停用后不再出现。政治、生物等非内置残留学科可以删除；仍被课程或方案使用的不能删。内置学科只能停用。
+        这里维护全系统共用的学科基础信息。启用后可用于新增课程、课程方案和年级目录；停用后不能新增，但不会删除历史课程或学生已有权限。非内置残留学科在未被使用时可以删除，内置学科只能停用。
       </Typography.Paragraph>
       {subjects.isLoading ? <Skeleton active /> : subjects.error ? <Alert type="error" message="学科配置加载失败，请稍后重试。" /> : (
         <Table
@@ -346,7 +343,7 @@ function SubjectMetadataCard() {
             { title: '状态', dataIndex: 'status', render: (status: SubjectMetadata['status']) => <Tag color={status === '启用' ? 'green' : 'default'}>{status}</Tag> },
             { title: '操作', width: 108, render: (_: unknown, row: SubjectMetadata) => (
               <Space size={4}>
-                <ActionButton tooltip="编辑显示配置" icon={<EditOutlined />} onClick={() => openEdit(row)} />
+                <ActionButton tooltip="编辑学科" icon={<EditOutlined />} onClick={() => openEdit(row)} />
                 <Popconfirm title={`确定删除「${subjectLabel(row.name)}」？`} description="删除后不可恢复。内置学科或仍被课程、方案使用的学科会删除失败。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: remove.isPending }} onConfirm={() => remove.mutate(row.id)}>
                   <ActionButton danger tooltip="删除学科" icon={<DeleteOutlined />} />
                 </Popconfirm>
@@ -356,7 +353,7 @@ function SubjectMetadataCard() {
         />
       )}
       <FormDrawer
-        title={editing ? `编辑${subjectLabel(editing.name)}显示配置` : '编辑学科显示配置'}
+        title={editing ? `编辑${subjectLabel(editing.name)}` : '编辑学科'}
         open={Boolean(editing)}
         onCancel={() => setEditing(null)}
         onSubmit={() => form.submit()}
@@ -493,10 +490,6 @@ export default function SettingsPage() {
     onError: () => message.error('保存设置失败，请检查设置值。')
   });
 
-  function saveCalendar(value: string) {
-    save.mutate({ key: CALENDAR_KEY, value });
-  }
-
   function openEdit(row: { key: string; value: string }) {
     setEditing(row);
     form.setFieldsValue(row);
@@ -511,7 +504,7 @@ export default function SettingsPage() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>系统设置</Typography.Title>
-          <Typography.Text type="secondary">维护学年、水印和提醒规则。</Typography.Text>
+          <Typography.Text type="secondary">维护资料保护和微信接入配置。</Typography.Text>
         </div>
       </div>
       {settings.isLoading ? (
@@ -521,17 +514,12 @@ export default function SettingsPage() {
       ) : (
         <>
           <Tabs
-            defaultActiveKey="calendar"
+            defaultActiveKey="protection"
             items={[
               {
-                key: 'calendar',
-                label: <span><CalendarOutlined /> 学年校历</span>,
-                children: <AcademicCalendarCard rawValue={settings.data?.[CALENDAR_KEY]} onSave={saveCalendar} saving={save.isPending} />
-              },
-              {
-                key: 'content',
-                label: <span><SafetyOutlined /> 内容与安全</span>,
-                children: <Space direction="vertical" size={16} style={{ width: '100%' }}><FlatSettingsCard title="资料保护" rows={contentRows} onEdit={openEdit} /><SubjectMetadataCard /></Space>
+                key: 'protection',
+                label: <span><SafetyOutlined /> 资料保护</span>,
+                children: <FlatSettingsCard title="资料保护" rows={contentRows} onEdit={openEdit} />
               },
               {
                 key: 'integration',

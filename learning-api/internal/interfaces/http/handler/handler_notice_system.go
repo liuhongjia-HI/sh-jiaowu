@@ -255,6 +255,21 @@ func (h *LearningHandler) UpdateGradeSubjects(c *gin.Context) {
 	OK(c, items)
 }
 
+func (h *LearningHandler) UpsertGradeSubject(c *gin.Context) {
+	var item learning.GradeSubjectMetadata
+	if err := c.ShouldBindJSON(&item); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	updated, err := h.service.UpsertGradeSubject(operator.(string), c.Param("id"), item)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, updated)
+}
+
 func (h *LearningHandler) StudentNotices(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	home, err := h.service.StudentHome(principal)

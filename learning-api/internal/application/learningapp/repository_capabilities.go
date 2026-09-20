@@ -171,6 +171,7 @@ type SystemRepository interface {
 	DeleteSubjectMetadata(string, string) error
 	GradeSubjects() []learning.GradeSubjectMetadata
 	UpdateGradeSubjects(string, learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error)
+	UpsertGradeSubject(string, string, learning.GradeSubjectMetadata) (learning.GradeSubjectMetadata, error)
 	WechatSettings() learning.WechatSettings
 	UpdateWechatSettings(string, learning.WechatSettingsUpdateRequest) (learning.WechatSettings, error)
 }
