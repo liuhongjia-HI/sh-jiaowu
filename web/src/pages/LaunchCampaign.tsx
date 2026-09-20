@@ -153,13 +153,13 @@ export default function LaunchCampaignPage() {
           title="当前开屏活动"
           extra={<Space><Tag color={campaign.enabled ? 'green' : 'default'}>{campaign.enabled ? '投放中' : '未投放'}</Tag><Switch checked={campaign.enabled} checkedChildren="投放中" unCheckedChildren="未投放" aria-label="开屏活动投放状态" loading={save.isPending} onChange={(enabled) => save.mutate(campaignFormValues({ ...campaign, enabled }))} /></Space>}
         >
-          <Descriptions column={{ xs: 1, sm: 2 }} size="small">
+          <Descriptions column={1} size="small">
             <Descriptions.Item label="活动名称">{campaign.title || '未命名活动'}</Descriptions.Item>
             <Descriptions.Item label="活动类型">{templateLabel(campaign.templateType)}</Descriptions.Item>
-            <Descriptions.Item label="投放时间" span={2}>{rangeLabel(campaign)}</Descriptions.Item>
+            <Descriptions.Item label="投放时间">{rangeLabel(campaign)}</Descriptions.Item>
             <Descriptions.Item label="展示频次">{frequencyLabel(campaign.frequency)}</Descriptions.Item>
             <Descriptions.Item label="优先级">{campaign.priority}</Descriptions.Item>
-            <Descriptions.Item label="活动说明" span={2}>{campaign.message || '—'}</Descriptions.Item>
+            <Descriptions.Item label="活动说明">{campaign.message || '—'}</Descriptions.Item>
           </Descriptions>
         </Card>
       )}
