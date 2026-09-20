@@ -218,3 +218,21 @@ func bindCourse(c *gin.Context) (learning.CourseUpsertRequest, bool) {
 	req.Status = learning.Status(strings.TrimSpace(string(req.Status)))
 	return req, true
 }
+
+func (h *LearningHandler) TeacherLibrary(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	result, err := h.service.TeacherLibrary(p)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+func (h *LearningHandler) RecordTeacherMaterialView(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	if err := h.service.RecordTeacherMaterialView(p, c.Param("id")); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"saved": true})
+}

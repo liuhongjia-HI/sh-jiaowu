@@ -3186,3 +3186,9 @@ button.schedule-block:hover {
 .wechat-inputbar i { height: 32px; border-radius: 6px; background: #fff; }
 @media (max-width: 1180px) { .official-message-layout { grid-template-columns: 1fr; } .official-preview-card { position: static; } .wechat-phone-stage { min-height: 520px; } .wechat-settings-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .official-field-head, .official-field-row { grid-template-columns: 120px minmax(0, 1fr); } .official-field-table, .official-page-path, .official-audience-summary, .official-template-select-row { margin-left: 0; } .official-actionbar > .ant-space { width: 100%; flex-wrap: wrap; } .wechat-form-row { grid-template-columns: 1fr; gap: 0; } }
+
+.teacher-library-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
+.teacher-library-directory .ant-tree { margin-top: 16px; max-height: 65vh; overflow: auto; }
+.teacher-library-directory .ant-tree-title { overflow-wrap: anywhere; }
+.teacher-preview-frame { width: 100%; height: 70vh; border: 1px solid #e5e7eb; border-radius: 8px; background: #f5f6f8; }
+.teacher-preview-placeholder { min-height: 60vh; display: flex; align-items: center; justify-content: center; background: #f5f6f8; border-radius: 8px; }

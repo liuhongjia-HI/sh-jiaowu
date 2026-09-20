@@ -215,14 +215,14 @@ func (h *LearningHandler) PreviewFile(c *gin.Context) {
 		return
 	}
 	if asset.PreviewStatus != "可预览" || asset.PreviewPath == "" {
-		BadRequest(c, "预览文件还没有生成，请下载原文件查看")
+		BadRequest(c, "预览文件尚未生成，请稍后重试或联系资料负责人")
 		return
 	}
 	if _, err := os.Stat(asset.PreviewPath); err != nil {
 		// 预览文件已经从磁盘消失（例如历史发布把它写在被清理的 release 目录里）。
 		// 回写成转换失败，列表里才会出现「重新生成预览」入口。
 		_ = h.service.MarkPreviewFileMissing(asset.ID, "预览文件已丢失，请重新生成预览")
-		BadRequest(c, "预览文件不存在，请重新生成预览或下载原文件查看")
+		BadRequest(c, "预览文件已丢失，请联系资料负责人重新生成")
 		return
 	}
 	c.Header("Content-Disposition", "inline; filename=\"preview.pdf\"")
@@ -409,6 +409,10 @@ func previewUnavailableMessage(asset learning.FileAsset) string {
 
 func (h *LearningHandler) DownloadFile(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
+	if !principal.CanDownloadTeacherMaterial() {
+		Forbidden(c, "当前账号仅支持在线查看讲义")
+		return
+	}
 	asset, err := h.service.ContentFile(principal, c.Param("id"))
 	if err != nil {
 		BadRequest(c, err.Error())

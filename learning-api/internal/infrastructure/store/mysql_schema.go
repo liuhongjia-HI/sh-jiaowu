@@ -400,6 +400,8 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"users", "password_hash", "TEXT NOT NULL"},
 		{"users", "must_change_password", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"users", "token_version", "INT NOT NULL DEFAULT 0"},
+		{"users", "teacher_library_json", "TEXT NULL"},
+		{"materials", "updated_at", "DATETIME NULL"},
 		{"students", "remark", "VARCHAR(255) NOT NULL DEFAULT ''"},
 		{"students", "nickname", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"guardians", "avatar_url", "TEXT NOT NULL"},

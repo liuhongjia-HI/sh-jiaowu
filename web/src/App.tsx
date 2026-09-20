@@ -40,6 +40,7 @@ const SettingsPage = lazy(() => import('./pages/resources/SettingsPage'));
 const TeachingSettingsPage = lazy(() => import('./pages/resources/TeachingSettingsPage'));
 const LaunchCampaignPage = lazy(() => import('./pages/LaunchCampaign'));
 const AdminStaff = lazy(() => import('./pages/AdminStaff'));
+const TeacherLibrary = lazy(() => import('./pages/TeacherLibrary'));
 const Teachers = lazy(() => import('./pages/Teachers'));
 const Students = lazy(() => import('./pages/Students'));
 const Scheduling = lazy(() => import('./pages/scheduling/SchedulingPage'));
@@ -65,6 +66,7 @@ type NavGroup = {
 type NavNode = NavItem | NavGroup;
 
 const navItems: NavNode[] = [
+  {key: '/teacher-library', icon: <ReadOutlined />, label: '我的讲义', roles: ['teacher']},
   {
     key: '/dashboard',
     icon: <DashboardOutlined />,
@@ -124,7 +126,10 @@ function isNavGroup(item: NavNode): item is NavGroup {
   return 'children' in item;
 }
 
+function teacherLanding(user: CurrentUser) { return user.roles.includes('teacher') && !user.roles.some(r => ['ops_staff', 'campus_admin', 'super_admin'].includes(r)) ? '/teacher-library' : '/dashboard'; }
+function readOnlyTeacher(user: CurrentUser) { return teacherLanding(user) === '/teacher-library' && user.teacherLibrary?.canManageCourses === false && !user.canUploadHandout && !user.canUploadQuestion && !user.canReview; }
 function buildMenuItems(user: CurrentUser): MenuProps['items'] {
+  if (readOnlyTeacher(user)) return [{key: '/teacher-library', icon: <ReadOutlined />, label: <Link to='/teacher-library'>我的讲义</Link>}];
   const items: MenuProps['items'] = [];
 	const teacherOnly = user.roles.includes('teacher') && !user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 
@@ -191,6 +196,8 @@ function roleLabel(user: CurrentUser) {
 }
 
 function GuardedRoute({ user, roles, children }: { user: CurrentUser; roles: Role[]; children: React.ReactNode }) {
+  const location = useLocation();
+  if (readOnlyTeacher(user) && location.pathname !== '/teacher-library') return <Navigate to='/teacher-library' replace />;
   if (!hasAnyRole(user, roles)) {
     return <Result status="403" title="没有权限" subTitle="当前账号不能访问这个功能" />;
   }
@@ -416,7 +423,8 @@ function Shell({ user }: { user: CurrentUser }) {
         <Content className="app-content">
           <Suspense fallback={<PageLoading />}>
             <Routes>
-			  <Route path="/dashboard" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Dashboard user={user} /></GuardedRoute>} />
+			  <Route path="/teacher-library" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><TeacherLibrary user={user} /></GuardedRoute>} />
+              <Route path="/dashboard" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Dashboard user={user} /></GuardedRoute>} />
               <Route path="/packages" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><PackagesPage user={user} /></GuardedRoute>} />
               <Route path="/open" element={<Navigate to="/students" replace />} />
               <Route path="/permissions" element={<Navigate to="/students" replace />} />
@@ -438,7 +446,7 @@ function Shell({ user }: { user: CurrentUser }) {
               <Route path="/settings" element={<GuardedRoute user={user} roles={['campus_admin', 'super_admin']}><SettingsPage /></GuardedRoute>} />
               <Route path="/teaching-settings" element={<GuardedRoute user={user} roles={['campus_admin', 'super_admin']}><TeachingSettingsPage /></GuardedRoute>} />
               <Route path="/grade-subjects" element={<Navigate to="/teaching-settings?tab=catalog" replace />} />
-              <Route path="*" element={<Navigate to="/dashboard" />} />
+              <Route path="*" element={<Navigate to={teacherLanding(user)} />} />
             </Routes>
           </Suspense>
         </Content>
@@ -489,5 +497,5 @@ export default function App() {
   if (me.data.mustChangePassword && me.data.authMethod === 'password') {
     return <BrowserRouter><Routes><Route path="*" element={<MustChangePasswordPage user={me.data} />} /></Routes></BrowserRouter>;
   }
-  return <BrowserRouter><Routes><Route path="/login" element={<Navigate to="/dashboard" />} /><Route path="*" element={<Shell user={me.data} />} /></Routes></BrowserRouter>;
+  return <BrowserRouter><Routes><Route path="/login" element={<Navigate to={teacherLanding(me.data)} />} /><Route path="*" element={<Shell user={me.data} />} /></Routes></BrowserRouter>;
 }

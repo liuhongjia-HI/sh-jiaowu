@@ -9,24 +9,25 @@ const (
 )
 
 type User struct {
-	ID                 string   `json:"id"`
-	Name               string   `json:"name"`
-	Phone              string   `json:"phone"`
-	OpenID             string   `json:"openId"`
-	UnionID            string   `json:"unionId"`
-	PasswordHash       string   `json:"-"`
-	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
-	TokenVersion       int      `json:"tokenVersion,omitempty"`
-	AccountStatus      string   `json:"accountStatus"`
-	Remark             string   `json:"remark,omitempty"`
-	Roles              []Role   `json:"roles"`
-	StudentID          string   `json:"studentId,omitempty"`
-	CampusID           string   `json:"campusId,omitempty"`
-	CampusScopes       []string `json:"campusScopes,omitempty"`
-	LearningSpaceIDs   []string `json:"learningSpaceIds,omitempty"`
-	CanUploadHandout   bool     `json:"canUploadHandout,omitempty"`
-	CanUploadQuestion  bool     `json:"canUploadQuestion,omitempty"`
-	CanReview          bool     `json:"canReview,omitempty"`
+	ID                 string                `json:"id"`
+	Name               string                `json:"name"`
+	Phone              string                `json:"phone"`
+	OpenID             string                `json:"openId"`
+	UnionID            string                `json:"unionId"`
+	PasswordHash       string                `json:"-"`
+	MustChangePassword bool                  `json:"mustChangePassword,omitempty"`
+	TokenVersion       int                   `json:"tokenVersion,omitempty"`
+	AccountStatus      string                `json:"accountStatus"`
+	Remark             string                `json:"remark,omitempty"`
+	Roles              []Role                `json:"roles"`
+	StudentID          string                `json:"studentId,omitempty"`
+	CampusID           string                `json:"campusId,omitempty"`
+	CampusScopes       []string              `json:"campusScopes,omitempty"`
+	LearningSpaceIDs   []string              `json:"learningSpaceIds,omitempty"`
+	TeacherLibrary     *TeacherLibraryPolicy `json:"teacherLibrary,omitempty"`
+	CanUploadHandout   bool                  `json:"canUploadHandout,omitempty"`
+	CanUploadQuestion  bool                  `json:"canUploadQuestion,omitempty"`
+	CanReview          bool                  `json:"canReview,omitempty"`
 }
 
 type Principal struct {
@@ -38,16 +39,17 @@ type Principal struct {
 	// GuardianID 只在学生端登录（家长身份）时有值，标记这个 principal 背后是
 	// 哪个家长；StudentID 仍然是当前查看哪个孩子——多子女切换只换 StudentID，
 	// 不换 GuardianID。老师/管理员登录不涉及家长身份，这个字段留空。
-	GuardianID         string   `json:"guardianId,omitempty"`
-	CampusID           string   `json:"campusId,omitempty"`
-	Roles              []Role   `json:"roles"`
-	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
-	TokenVersion       int      `json:"tokenVersion,omitempty"`
-	CampusScopes       []string `json:"campusScopes,omitempty"`
-	LearningSpaceIDs   []string `json:"learningSpaceIds,omitempty"`
-	CanUploadHandout   bool     `json:"canUploadHandout,omitempty"`
-	CanUploadQuestion  bool     `json:"canUploadQuestion,omitempty"`
-	CanReview          bool     `json:"canReview,omitempty"`
+	GuardianID         string                `json:"guardianId,omitempty"`
+	CampusID           string                `json:"campusId,omitempty"`
+	Roles              []Role                `json:"roles"`
+	MustChangePassword bool                  `json:"mustChangePassword,omitempty"`
+	TokenVersion       int                   `json:"tokenVersion,omitempty"`
+	CampusScopes       []string              `json:"campusScopes,omitempty"`
+	LearningSpaceIDs   []string              `json:"learningSpaceIds,omitempty"`
+	TeacherLibrary     *TeacherLibraryPolicy `json:"teacherLibrary,omitempty"`
+	CanUploadHandout   bool                  `json:"canUploadHandout,omitempty"`
+	CanUploadQuestion  bool                  `json:"canUploadQuestion,omitempty"`
+	CanReview          bool                  `json:"canReview,omitempty"`
 }
 
 type AuthResult struct {

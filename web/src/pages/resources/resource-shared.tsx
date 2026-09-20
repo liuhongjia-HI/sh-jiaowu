@@ -396,7 +396,7 @@ export function canManagePackages(user?: CurrentUser) {
 }
 
 export function canManageCourses(user?: CurrentUser) {
-  return Boolean(user?.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role)));
+  return Boolean(user?.roles.some((role) => (['ops_staff', 'campus_admin', 'super_admin'].includes(role) || role === 'teacher' && user?.teacherLibrary?.canManageCourses !== false)));
 }
 
 export function hasAdminContentScope(user?: CurrentUser) {

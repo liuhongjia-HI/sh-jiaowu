@@ -298,7 +298,7 @@ func (s *MemoryStore) loadGuardianStudentsFromDB() error {
 }
 
 func (s *MemoryStore) loadUsersFromDB() error {
-	rows, err := s.db.Query(`SELECT id, name, phone, open_id, union_id, password_hash, must_change_password, token_version, account_status, remark, student_id, campus_id FROM users ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, phone, open_id, union_id, password_hash, must_change_password, token_version, account_status, remark, student_id, campus_id, teacher_library_json FROM users ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -307,8 +307,14 @@ func (s *MemoryStore) loadUsersFromDB() error {
 	for rows.Next() {
 		var item learning.User
 		var mustChange int
-		if err := rows.Scan(&item.ID, &item.Name, &item.Phone, &item.OpenID, &item.UnionID, &item.PasswordHash, &mustChange, &item.TokenVersion, &item.AccountStatus, &item.Remark, &item.StudentID, &item.CampusID); err != nil {
+		var library sql.NullString
+		if err := rows.Scan(&item.ID, &item.Name, &item.Phone, &item.OpenID, &item.UnionID, &item.PasswordHash, &mustChange, &item.TokenVersion, &item.AccountStatus, &item.Remark, &item.StudentID, &item.CampusID, &library); err != nil {
 			return err
+		}
+		if library.Valid && library.String != "" {
+			if err := json.Unmarshal([]byte(library.String), &item.TeacherLibrary); err != nil {
+				return err
+			}
 		}
 		item.MustChangePassword = mustChange == 1
 		out = append(out, item)
@@ -520,7 +526,7 @@ func (s *MemoryStore) loadCourseCurriculumFromDB() error {
 }
 
 func (s *MemoryStore) loadMaterialsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, allow_download, sort_order, created_at FROM materials ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, created_at, id`)
+	rows, err := s.db.Query(`SELECT id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, allow_download, sort_order, created_at, updated_at FROM materials ORDER BY course_id, CASE WHEN sort_order = 0 THEN 1 ELSE 0 END, sort_order, created_at, id`)
 	if err != nil {
 		return err
 	}
@@ -528,14 +534,15 @@ func (s *MemoryStore) loadMaterialsFromDB() error {
 	out := []learning.Material{}
 	for rows.Next() {
 		var item learning.Material
-		var createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.LessonID, &item.Title, &item.Chapter, &item.TagCode, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &item.AllowDownload, &item.SortOrder, &createdAt); err != nil {
+		var createdAt, updatedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.CourseID, &item.LessonID, &item.Title, &item.Chapter, &item.TagCode, &item.Type, &item.OwnerTeacherID, &item.OwnerTeacherName, &item.PublishStatus, &item.Status, &item.ViewCount, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.PreviewStatus, &item.PreviewURL, &item.DownloadURL, &item.AllowDownload, &item.SortOrder, &createdAt, &updatedAt); err != nil {
 			return err
 		}
 		item.Status = normalizeMaterialStatus(item.Status)
 		item.PublishStatus = publishStatus(item.Status)
 		item.Course = s.courseName(item.CourseID)
 		item.CreatedAt = dateTimeString(createdAt)
+		item.UpdatedAt = dateTimeString(updatedAt)
 		out = append(out, item)
 	}
 	s.materials = out

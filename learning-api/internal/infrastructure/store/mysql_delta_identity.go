@@ -29,8 +29,8 @@ func identityRows(s *MemoryStore) []persistenceRow {
 	}
 	for _, user := range s.users {
 		rows = append(rows, simpleRow("users", "id", user.ID,
-			`INSERT INTO users (id, name, phone, open_id, union_id, account_status, remark, student_id, campus_id, password_hash, must_change_password, token_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), phone=VALUES(phone), open_id=VALUES(open_id), union_id=VALUES(union_id), account_status=VALUES(account_status), remark=VALUES(remark), student_id=VALUES(student_id), campus_id=VALUES(campus_id), password_hash=VALUES(password_hash), must_change_password=VALUES(must_change_password), token_version=VALUES(token_version)`,
-			user.ID, user.Name, user.Phone, user.OpenID, user.UnionID, user.AccountStatus, user.Remark, user.StudentID, user.CampusID, user.PasswordHash, boolInt(user.MustChangePassword), user.TokenVersion))
+			`INSERT INTO users (id, name, phone, open_id, union_id, account_status, remark, student_id, campus_id, password_hash, must_change_password, token_version, teacher_library_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), phone=VALUES(phone), open_id=VALUES(open_id), union_id=VALUES(union_id), account_status=VALUES(account_status), remark=VALUES(remark), student_id=VALUES(student_id), campus_id=VALUES(campus_id), password_hash=VALUES(password_hash), must_change_password=VALUES(must_change_password), token_version=VALUES(token_version), teacher_library_json=VALUES(teacher_library_json)`,
+			user.ID, user.Name, user.Phone, user.OpenID, user.UnionID, user.AccountStatus, user.Remark, user.StudentID, user.CampusID, user.PasswordHash, boolInt(user.MustChangePassword), user.TokenVersion, teacherLibraryJSON(user.TeacherLibrary)))
 		for _, role := range user.Roles {
 			rows = append(rows, relationRow("user_roles", []string{"user_id", "role_code"}, []any{user.ID, role},
 				`INSERT INTO user_roles (user_id, role_code) VALUES (?, ?) ON DUPLICATE KEY UPDATE role_code=VALUES(role_code)`, user.ID, role))

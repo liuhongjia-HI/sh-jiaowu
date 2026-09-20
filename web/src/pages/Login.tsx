@@ -32,9 +32,9 @@ export default function Login() {
   async function handleLogin(values: LoginFormValues) {
     setLoading(true);
     try {
-      await loginWithAdminPassword(values.phone, values.password, captcha ? { captchaId: captcha.captchaId, captchaAnswer: values.captchaAnswer } : undefined);
+      const result = await loginWithAdminPassword(values.phone, values.password, captcha ? { captchaId: captcha.captchaId, captchaAnswer: values.captchaAnswer } : undefined);
       message.success('登录成功');
-      window.location.href = '/dashboard';
+      window.location.href = result.user.roles.includes('teacher') && !result.user.roles.some(r => ['ops_staff', 'campus_admin', 'super_admin'].includes(r)) ? '/teacher-library' : '/dashboard';
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || '登录失败，请检查手机号和密码。';
       message.error(errorMessage);

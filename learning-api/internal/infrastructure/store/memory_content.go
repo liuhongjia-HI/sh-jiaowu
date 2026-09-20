@@ -23,6 +23,9 @@ func (s *MemoryStore) coursesUnlocked(principal learning.Principal) []learning.C
 }
 
 func (s *MemoryStore) createCourseUnlocked(operator string, principal learning.Principal, req learning.CourseUpsertRequest) (learning.Course, error) {
+	if !principal.CanMaintainCourses() {
+		return learning.Course{}, errors.New("当前账号没有维护课程权限")
+	}
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.Course, error) {
 			return work.createCourseUnlocked(operator, principal, req)
@@ -32,6 +35,9 @@ func (s *MemoryStore) createCourseUnlocked(operator string, principal learning.P
 }
 
 func (s *MemoryStore) copyCourseUnlocked(operator string, principal learning.Principal, id string, req learning.CourseCopyRequest) (learning.CourseCopyResult, error) {
+	if !principal.CanMaintainCourses() {
+		return learning.CourseCopyResult{}, errors.New("当前账号没有维护课程权限")
+	}
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.CourseCopyResult, error) {
 			return work.copyCourseUnlocked(operator, principal, id, req)
@@ -126,6 +132,7 @@ func (s *MemoryStore) copyCourseMaterials(course learning.Course, sourceID strin
 		item.LessonID = lessonID
 		item.ViewCount = 0
 		item.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
+		item.UpdatedAt = item.CreatedAt
 		if path, err := curriculumPathForLesson(course, lessonID); err == nil {
 			item.Curriculum = path
 		}
@@ -184,6 +191,9 @@ func (s *MemoryStore) copyCourseHomework(course learning.Course, sourceID string
 }
 
 func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.Principal, id string, req learning.CourseUpsertRequest) (learning.Course, error) {
+	if !principal.CanMaintainCourses() {
+		return learning.Course{}, errors.New("当前账号没有维护课程权限")
+	}
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.Course, error) {
 			return work.updateCourseUnlocked(operator, principal, id, req)
@@ -212,6 +222,9 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 }
 
 func (s *MemoryStore) deleteCourseUnlocked(operator string, principal learning.Principal, id string) error {
+	if !principal.CanMaintainCourses() {
+		return errors.New("当前账号没有维护课程权限")
+	}
 	if s.db != nil {
 		return persistentMutationError(s, func(work *MemoryStore) error { return work.deleteCourseUnlocked(operator, principal, id) })
 	}
@@ -256,8 +269,7 @@ func filterHomeworkByCourse(items []learning.Homework, courseID string) []learni
 }
 
 func (s *MemoryStore) materialsUnlocked(principal learning.Principal) []learning.Material {
-	courses := courseNames(s.coursesUnlocked(principal))
-	return orderMaterialsByCourse(s.materialsForCourses(courses))
+	return s.teacherLibraryMaterialsUnlocked(principal)
 }
 
 func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, query learning.MaterialQuery) []learning.Material {
@@ -266,7 +278,7 @@ func (s *MemoryStore) materialsFilteredUnlocked(principal learning.Principal, qu
 	rows := s.materialsUnlocked(principal)
 	out := make([]learning.Material, 0, len(rows))
 	for _, item := range rows {
-		if keyword != "" && !strings.Contains(strings.ToLower(item.Title), keyword) {
+		if keyword != "" && !strings.Contains(strings.ToLower(item.Title+" "+item.FileName+" "+item.Course+" "+materialCurriculumSearch(item)), keyword) {
 			continue
 		}
 		if query.Subject = strings.TrimSpace(query.Subject); query.Subject != "" && item.Subject != query.Subject {
@@ -581,6 +593,7 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 			return learning.Material{}, errors.New("不能维护未负责的学习资料")
 		}
 		before := s.materials[index]
+		s.materials[index].UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
 		s.materials[index].Title = req.Title
 		s.materials[index].CourseID = course.ID
 		s.materials[index].Course = course.Name
@@ -1173,12 +1186,16 @@ func (s *MemoryStore) contentFileUnlocked(principal learning.Principal, fileID s
 	if !ok {
 		return learning.FileAsset{}, errors.New("文件不存在")
 	}
-	for _, material := range s.materialsUnlocked(principal) {
+	for _, material := range s.teacherLibraryMaterialsUnlocked(principal) {
 		if material.FileID == fileID {
 			return asset, nil
 		}
 	}
 	for _, item := range s.homeworkUnlocked(principal) {
+		course, exists := s.findCourse(item.CourseID)
+		if !exists || course.LearningSpaceID != item.LearningSpaceID || !canSeeCourse(principal, course) {
+			continue
+		}
 		if item.FileID == fileID {
 			return asset, nil
 		}

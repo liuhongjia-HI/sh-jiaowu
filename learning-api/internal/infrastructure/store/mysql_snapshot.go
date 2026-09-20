@@ -144,9 +144,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, user := range s.users {
 		if _, err := tx.Exec(
-			`INSERT INTO users (id, name, phone, open_id, union_id, account_status, remark, student_id, campus_id, password_hash, must_change_password, token_version)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			user.ID, user.Name, user.Phone, user.OpenID, user.UnionID, user.AccountStatus, user.Remark, user.StudentID, user.CampusID, user.PasswordHash, boolInt(user.MustChangePassword), user.TokenVersion,
+			`INSERT INTO users (id, name, phone, open_id, union_id, account_status, remark, student_id, campus_id, password_hash, must_change_password, token_version, teacher_library_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			user.ID, user.Name, user.Phone, user.OpenID, user.UnionID, user.AccountStatus, user.Remark, user.StudentID, user.CampusID, user.PasswordHash, boolInt(user.MustChangePassword), user.TokenVersion, teacherLibraryJSON(user.TeacherLibrary),
 		); err != nil {
 			return err
 		}
@@ -207,11 +207,11 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, material := range s.materials {
 		if _, err := tx.Exec(
-			`INSERT INTO materials (id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, allow_download, sort_order)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO materials (id, learning_space_id, course_id, lesson_id, title, chapter_name, tag_code, material_type, owner_teacher_id, owner_teacher_name, publish_status, status, view_count, file_id, file_name, file_size, file_type, preview_status, preview_url, download_url, allow_download, sort_order, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			material.ID, material.LearningSpaceID, material.CourseID, material.LessonID, material.Title, material.Chapter, material.TagCode, material.Type, material.OwnerTeacherID,
 			material.OwnerTeacherName, material.PublishStatus, material.Status, material.ViewCount, material.FileID, material.FileName,
-			material.FileSize, material.FileType, material.PreviewStatus, material.PreviewURL, material.DownloadURL, material.AllowDownload, material.SortOrder,
+			material.FileSize, material.FileType, material.PreviewStatus, material.PreviewURL, material.DownloadURL, material.AllowDownload, material.SortOrder, nullableDateTime(material.UpdatedAt),
 		); err != nil {
 			return err
 		}

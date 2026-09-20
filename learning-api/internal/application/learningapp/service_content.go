@@ -239,3 +239,10 @@ func (s *Service) AssignReview(o string, p learning.Principal, id string, r lear
 func (s *Service) CompleteReview(o string, p learning.Principal, id string, r learning.ReviewCompleteRequest) (learning.Submission, error) {
 	return s.content.CompleteReview(o, p, id, r)
 }
+
+func (s *Service) TeacherLibrary(p learning.Principal) (learning.TeacherLibrary, error) {
+	return s.content.TeacherLibrary(p)
+}
+func (s *Service) RecordTeacherMaterialView(p learning.Principal, id string) error {
+	return s.content.RecordTeacherMaterialView(p, id)
+}

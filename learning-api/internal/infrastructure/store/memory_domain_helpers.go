@@ -1989,6 +1989,9 @@ func (s *MemoryStore) learningSpaceName(id string) string {
 }
 
 func (s *MemoryStore) decorateMaterial(material learning.Material) learning.Material {
+	if material.UpdatedAt == "" {
+		material.UpdatedAt = material.CreatedAt
+	}
 	material.Type = "课程讲义"
 	material.TagCode = contentTagCodeOrInferred(material.TagCode, material.Title, material.FileName)
 	material.Curriculum = s.liveCurriculumPath(material.CourseID, material.LessonID, material.Curriculum)

@@ -51,6 +51,21 @@ func registerAuthenticatedRoutes(api *gin.RouterGroup, service *learningapp.Serv
 
 func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
 	g := protected(api, service, tokens, learning.RoleTeacher, learning.RoleOpsStaff, learning.RoleCampusAdmin, learning.RoleSuperAdmin)
+	g.Use(func(c *gin.Context) {
+		p, _ := middleware.CurrentPrincipal(c)
+		readOnlyPaths := map[string]bool{
+			"GET /api/teacher/library": true, "POST /api/teacher/materials/:id/view": true,
+			"GET /api/files/:id/preview": true, "GET /api/files/:id/download": true,
+			"GET /api/subjects": true, "GET /api/materials": true,
+		}
+		if p.IsReadOnlyTeacher() && !readOnlyPaths[c.Request.Method+" "+c.FullPath()] {
+			c.AbortWithStatusJSON(403, gin.H{"code": 403, "message": "当前账号仅有资料查阅权限", "data": nil})
+			return
+		}
+		c.Next()
+	})
+	g.GET("/teacher/library", h.TeacherLibrary)
+	g.POST("/teacher/materials/:id/view", h.RecordTeacherMaterialView)
 	g.GET("/dashboard/overview", h.Dashboard)
 	g.GET("/settings", h.Settings)
 	g.GET("/subjects", h.Subjects)

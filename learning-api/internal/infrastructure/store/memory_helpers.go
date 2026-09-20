@@ -112,16 +112,6 @@ func (s *MemoryStore) replaceSpaceAccessForGrant(grant packageGrant) {
 	s.syncSpaceAccessForGrant(grant)
 }
 
-func (s *MemoryStore) materialsForCourses(courses []string) []learning.Material {
-	out := make([]learning.Material, 0)
-	for _, material := range s.materials {
-		if containsString(courses, material.Course) {
-			out = append(out, s.decorateMaterial(material))
-		}
-	}
-	return out
-}
-
 func (s *MemoryStore) homeworkForCourses(courses []string) []learning.Homework {
 	out := make([]learning.Homework, 0)
 	for _, item := range s.homework {
@@ -227,6 +217,7 @@ func teacherAuditSnapshot(item learning.Teacher) map[string]any {
 		"phone":             item.Phone,
 		"campusId":          item.CampusID,
 		"learningSpaceIds":  item.LearningSpaceIDs,
+		"teacherLibrary":    item.TeacherLibrary,
 		"canUploadHandout":  item.CanUploadHandout,
 		"canUploadQuestion": item.CanUploadQuestion,
 		"canReview":         item.CanReview,
@@ -535,6 +526,7 @@ func principalFromUser(user learning.User) learning.Principal {
 		TokenVersion:       user.TokenVersion,
 		CampusScopes:       append([]string(nil), user.CampusScopes...),
 		LearningSpaceIDs:   append([]string(nil), user.LearningSpaceIDs...),
+		TeacherLibrary:     cloneTeacherLibrary(user.TeacherLibrary),
 		CanUploadHandout:   user.CanUploadHandout,
 		CanUploadQuestion:  user.CanUploadQuestion,
 		CanReview:          user.CanReview,
@@ -555,6 +547,7 @@ func (s *MemoryStore) teacherFromUser(user learning.User) learning.Teacher {
 		LearningSpaces:    s.learningSpaceNames(user.LearningSpaceIDs),
 		Grades:            s.learningSpaceGrades(user.LearningSpaceIDs),
 		Subjects:          s.learningSpaceSubjects(user.LearningSpaceIDs),
+		TeacherLibrary:    cloneTeacherLibrary(user.TeacherLibrary),
 		CanUploadHandout:  user.CanUploadHandout,
 		CanUploadQuestion: user.CanUploadQuestion,
 		CanReview:         user.CanReview,
@@ -646,7 +639,7 @@ func (s *MemoryStore) normalizeTeacherRequest(principal learning.Principal, req 
 	if req.Phone == "" {
 		return req, errors.New("请输入手机号")
 	}
-	if len(req.LearningSpaceIDs) == 0 {
+	if len(req.LearningSpaceIDs) == 0 && (req.TeacherLibrary == nil || len(req.TeacherLibrary.SpaceIDs)+len(req.TeacherLibrary.Scopes) == 0) {
 		return req, errors.New("请选择教师负责范围")
 	}
 	for _, spaceID := range req.LearningSpaceIDs {
@@ -654,8 +647,36 @@ func (s *MemoryStore) normalizeTeacherRequest(principal learning.Principal, req 
 			return req, errors.New("教师负责范围不存在")
 		}
 	}
-	if !req.CanUploadHandout && !req.CanUploadQuestion && !req.CanReview {
-		return req, errors.New("请至少选择一项教师权限")
+	if req.TeacherLibrary == nil && !req.CanUploadHandout && !req.CanUploadQuestion && !req.CanReview {
+		req.TeacherLibrary = &learning.TeacherLibraryPolicy{SpaceIDs: cloneStrings(req.LearningSpaceIDs)}
+	}
+	if req.TeacherLibrary != nil {
+		if len(req.TeacherLibrary.SpaceIDs)+len(req.TeacherLibrary.Scopes) == 0 {
+			return req, errors.New("请配置资料查阅范围")
+		}
+		if len(req.LearningSpaceIDs) == 0 && (req.CanUploadHandout || req.CanUploadQuestion || req.CanReview || req.TeacherLibrary.CanManageCourses) {
+			return req, errors.New("开启教学操作权限时，请配置教学管理范围")
+		}
+		req.TeacherLibrary = cloneTeacherLibrary(req.TeacherLibrary)
+		req.TeacherLibrary.RecentMaterialIDs = nil
+		for _, id := range req.TeacherLibrary.SpaceIDs {
+			if !s.learningSpaceExists(id) {
+				return req, errors.New("资料查阅范围不存在")
+			}
+		}
+		for index, scope := range req.TeacherLibrary.Scopes {
+			valid := false
+			for _, space := range s.learningSpaces {
+				if subjectsMatch(space.Subject, scope.Subject) && (scope.Grade == "" || space.Grade == scope.Grade) {
+					req.TeacherLibrary.Scopes[index].Subject = space.Subject
+					valid = true
+					break
+				}
+			}
+			if scope.Subject == "" || !valid {
+				return req, errors.New("请选择有效的资料学科与年级")
+			}
+		}
 	}
 	if !allowStatus || req.AccountStatus == "" {
 		req.AccountStatus = "正常"

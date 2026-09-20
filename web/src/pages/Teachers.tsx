@@ -5,13 +5,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, postData, putData, resetTeacherPassword } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../components/ListViews';
-import type { LearningSpace, PasswordResetResult, Teacher, TeacherUpsertRequest } from '../types/starline';
+import type { LearningSpace, PasswordResetResult, Teacher, TeacherUpsertRequest, TeacherLibraryPolicy } from '../types/starline';
 import { subjectLabel } from '../utils/curriculum';
 
 type TeacherFormValues = {
   name: string;
   phone: string;
   learningSpaceIds: string[];
+  teacherLibrary: TeacherLibraryPolicy;
   canUploadHandout: boolean;
   canUploadQuestion: boolean;
   canReview: boolean;
@@ -45,6 +46,7 @@ export default function Teachers() {
         name: values.name,
         phone: values.phone,
         learningSpaceIds: values.learningSpaceIds ?? [],
+        teacherLibrary: values.teacherLibrary,
         canUploadHandout: Boolean(values.canUploadHandout),
         canUploadQuestion: Boolean(values.canUploadQuestion),
         canReview: Boolean(values.canReview),
@@ -63,7 +65,7 @@ export default function Teachers() {
       setEditing(null);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
     },
-    onError: () => message.error('保存失败，请检查姓名、手机号和负责学习空间。')
+    onError: (error: Error) => message.error(error.message || '保存失败，请检查教师资料和查阅范围。')
   });
 
   const resetPassword = useMutation({
@@ -83,9 +85,10 @@ export default function Teachers() {
       name: '',
       phone: '',
       learningSpaceIds: [],
-      canUploadHandout: true,
-      canUploadQuestion: true,
-      canReview: true,
+      teacherLibrary: { spaceIds: [], scopes: [], canDownload: true, canManageCourses: false, canViewDrafts: false },
+      canUploadHandout: false,
+      canUploadQuestion: false,
+      canReview: false,
       remark: '',
       enabled: true
     });
@@ -100,6 +103,7 @@ export default function Teachers() {
       name: teacher.name,
       phone: teacher.phone,
       learningSpaceIds: teacher.learningSpaceIds,
+      teacherLibrary: teacher.teacherLibrary ?? { spaceIds: teacher.learningSpaceIds, scopes: [], canDownload: true, canManageCourses: true, canViewDrafts: true },
       canUploadHandout: teacher.canUploadHandout,
       canUploadQuestion: teacher.canUploadQuestion,
       canReview: teacher.canReview,
@@ -138,7 +142,7 @@ export default function Teachers() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>老师管理</Typography.Title>
-          <Typography.Text type="secondary">维护教师账号、课程范围和批改权限。</Typography.Text>
+          <Typography.Text type="secondary">维护教师账号、资料查阅范围和教学操作权限。</Typography.Text>
         </div>
         <div className="page-heading-actions">
           <ListViewToggle storageKey="starline:list-view:teachers" value={viewMode} onChange={setViewMode} />
@@ -151,7 +155,7 @@ export default function Teachers() {
           <CardList
             rows={rows}
             rowKey={(record) => record.id}
-            emptyText="还没有教师，先新增教师并设置负责学习空间。"
+            emptyText="还没有教师，先新增教师并设置资料查阅范围。"
             renderCard={(record) => (
               <InfoCard
                 title={record.name}
@@ -160,11 +164,12 @@ export default function Teachers() {
                 fields={[
                   { label: '微信绑定', value: <Tag color={record.bindStatus === '已绑定' ? 'green' : 'orange'}>{record.bindStatus}</Tag> },
                   { label: '登录方式', value: passwordFallbackTag(record.bindStatus) },
+                  { label: '资料查阅范围', value: libraryScopeTags(record, learningSpaces.data ?? []) },
                   { label: '可上传内容', value: uploadTags(record) },
                   { label: '可批改', value: <Tag color={record.canReview ? 'green' : 'default'}>{record.canReview ? '是' : '否'}</Tag> },
                   { label: '备注', value: record.remark || '-' }
                 ]}
-                tags={<TagGroup values={record.learningSpaces} color="blue" emptyText="未分配负责学习空间" />}
+                tags={<TagGroup values={record.learningSpaces} color="blue" emptyText="未配置教学管理范围" />}
                 actions={(
                   <>
                     <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
@@ -175,13 +180,14 @@ export default function Teachers() {
             )}
           />
         ) : rows.length === 0 ? (
-          <Empty description="还没有教师，先新增教师并设置负责学习空间。" />
+          <Empty description="还没有教师，先新增教师并设置资料查阅范围。" />
         ) : (
           <Table
             rowKey="id"
             dataSource={rows}
             pagination={false}
             columns={[
+          { title: '资料查阅范围', key: 'library', render: (_: unknown, record: Teacher) => libraryScopeTags(record, learningSpaces.data ?? []) },
               { title: '姓名', dataIndex: 'name', width: 120 },
               { title: '手机号', dataIndex: 'phone', width: 140 },
               { title: '微信绑定', dataIndex: 'bindStatus', width: 110, render: (value: string) => <Tag color={value === '已绑定' ? 'green' : 'orange'}>{value}</Tag> },
@@ -229,7 +235,22 @@ export default function Teachers() {
           <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}>
             <Input placeholder="用于首次登录和身份确认" />
           </Form.Item>
-          <Form.Item label="快捷筛选负责范围">
+          <Typography.Title level={5}>资料查阅范围</Typography.Title>
+          <Typography.Paragraph type="secondary">以下规则与教学管理范围分别生效。按学科、年级授权后，新增的匹配课程自动可见。</Typography.Paragraph>
+          <Form.List name={['teacherLibrary', 'scopes']}>
+            {(fields, { add, remove }) => <><Space direction="vertical" style={{ width: '100%' }}>{fields.map(({ key, name, ...rest }) => <Space key={key} align="baseline">
+              <Form.Item {...rest} name={[name, 'subject']} rules={[{ required: true, message: '请选择学科' }]}><Select style={{ width: 150 }} aria-label="查阅学科" placeholder="学科" options={Array.from(new Set((learningSpaces.data ?? []).map(s => s.subject))).map(value => ({ value, label: subjectLabel(value) }))} /></Form.Item>
+              <Form.Item {...rest} name={[name, 'grade']}><Select aria-label="查阅年级" style={{ width: 140 }} options={[{value: '', label: '全部年级'}, ...scopeGradeOptions]} /></Form.Item>
+              <Button type="link" onClick={() => remove(name)}>移除</Button>
+            </Space>)}</Space><Button onClick={() => add({ subject: undefined, grade: '' })}>添加学科范围</Button></>}
+          </Form.List>
+          <Form.Item name={['teacherLibrary', 'spaceIds']} label="精确补充范围" extra="仅需授权个别班型或阶段时，可直接选择具体学习空间。">
+            <Select mode="multiple" allowClear showSearch optionFilterProp="label" options={(learningSpaces.data ?? []).map(s => ({value: s.id, label: s.name}))} />
+          </Form.Item>
+          <Form.Item name={['teacherLibrary', 'canDownload']} label="允许下载原文件" valuePropName="checked"><Switch /></Form.Item>
+          <Form.Item name={['teacherLibrary', 'canViewDrafts']} label="允许查看草稿及停用资料" valuePropName="checked"><Switch /></Form.Item>
+          <Typography.Title level={5}>教学操作权限</Typography.Title>
+          <Form.Item label="筛选教学管理范围">
             <Space.Compact block>
               <Select
                 allowClear
@@ -250,7 +271,7 @@ export default function Teachers() {
               />
             </Space.Compact>
           </Form.Item>
-          <Form.Item name="learningSpaceIds" label="负责学习空间" rules={[{ required: true, message: '请选择负责学习空间' }]}>
+          <Form.Item name="learningSpaceIds" label="教学管理范围" extra="用于课程维护、上传和批改；纯查阅老师可留空。">
             <Select
               mode="multiple"
               allowClear
@@ -260,6 +281,7 @@ export default function Teachers() {
               placeholder="按上方筛选后选择具体学习空间"
             />
           </Form.Item>
+          <Form.Item name={['teacherLibrary', 'canManageCourses']} label="允许维护课程" valuePropName="checked"><Switch /></Form.Item>
           <Form.Item name="canUploadHandout" label="可上传学习资料" valuePropName="checked">
             <Switch />
           </Form.Item>
@@ -325,4 +347,10 @@ function scopeTags(values: string[], color: string, emptyText: string) {
       {values.map((value) => <Tag key={value} color={color}>{value}</Tag>)}
     </Space>
   );
+}
+
+function libraryScopeTags(record: Teacher, spaces: LearningSpace[]) {
+ const policy = record.teacherLibrary;
+ const labels = policy ? [...(policy.scopes ?? []).map(s => `${subjectLabel(s.subject)} · ${s.grade || '全部年级'}`), ...(policy.spaceIds ?? []).map(id => spaces.find(s => s.id === id)?.name || '指定学习空间')] : record.learningSpaces;
+ return scopeTags(labels, 'blue', '尚未分配');
 }

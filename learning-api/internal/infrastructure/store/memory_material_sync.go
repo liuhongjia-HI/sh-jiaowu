@@ -206,6 +206,7 @@ func (s *MemoryStore) applyMaterialSyncUnlocked(operator string, principal learn
 			item.PublishStatus = "已发布"
 			item.Status = learning.StatusEnabled
 			item.CreatedAt = now
+			item.UpdatedAt = now
 			item.SortOrder = s.nextMaterialSortOrder(target.ID)
 			s.materials = append([]learning.Material{item}, s.materials...)
 			targetResult.Created++

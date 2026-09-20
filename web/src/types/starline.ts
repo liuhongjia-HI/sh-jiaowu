@@ -1,3 +1,12 @@
+export type TeacherLibraryPolicy = {
+ spaceIds: string[];
+ scopes: { subject: string; grade: string }[];
+ canDownload: boolean;
+ canManageCourses: boolean;
+ canViewDrafts: boolean;
+ recentMaterialIds?: string[];
+};
+export type TeacherLibraryData = { policy?: TeacherLibraryPolicy; courses: Course[]; materials: Material[]; spaces: LearningSpace[]; recentMaterialIds: string[]; canDownload: boolean };
 export type ApiResponse<T> = {
   code: number;
   message: string;
@@ -16,6 +25,7 @@ export type CurrentUser = {
   mustChangePassword?: boolean;
   campusScopes?: string[];
   learningSpaceIds?: string[];
+  teacherLibrary?: TeacherLibraryPolicy;
   canUploadHandout?: boolean;
   canUploadQuestion?: boolean;
   canReview?: boolean;
@@ -47,6 +57,7 @@ export type Teacher = {
   learningSpaces: string[];
   grades: string[];
   subjects: string[];
+  teacherLibrary?: TeacherLibraryPolicy;
   canUploadHandout: boolean;
   canUploadQuestion: boolean;
   canReview: boolean;
@@ -64,6 +75,7 @@ export type TeacherUpsertRequest = {
   phone: string;
   campusId?: string;
   learningSpaceIds: string[];
+  teacherLibrary?: TeacherLibraryPolicy;
   canUploadHandout: boolean;
   canUploadQuestion: boolean;
   canReview: boolean;
@@ -524,6 +536,7 @@ export type GradeSubjectMetadata = {
 export type GradeSubjectCatalogUpdateRequest = { items: GradeSubjectMetadata[] };
 
 export type Material = {
+  updatedAt?: string;
   id: string;
   title: string;
   courseId?: string;

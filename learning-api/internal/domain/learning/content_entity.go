@@ -94,6 +94,7 @@ type Material struct {
 	AllowDownload    bool           `json:"allowDownload"`
 	WatermarkText    string         `json:"watermarkText,omitempty"`
 	SecurityNotice   string         `json:"securityNotice,omitempty"`
+	UpdatedAt        string         `json:"updatedAt,omitempty"`
 	CreatedAt        string         `json:"createdAt,omitempty"`
 	SortOrder        int            `json:"sortOrder"`
 	Status           Status         `json:"status"`

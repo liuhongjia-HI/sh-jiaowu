@@ -132,6 +132,7 @@ func cloneMap[K comparable, V any](source map[K]V) map[K]V {
 func cloneUsers(values []learning.User) []learning.User {
 	out := make([]learning.User, len(values))
 	for index, value := range values {
+		value.TeacherLibrary = cloneTeacherLibrary(value.TeacherLibrary)
 		value.Roles = append([]learning.Role(nil), value.Roles...)
 		value.CampusScopes = cloneStrings(value.CampusScopes)
 		value.LearningSpaceIDs = cloneStrings(value.LearningSpaceIDs)

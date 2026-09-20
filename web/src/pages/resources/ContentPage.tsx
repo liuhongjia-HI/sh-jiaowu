@@ -48,7 +48,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
   const courses = useQuery({ queryKey: ['content'], queryFn: () => getData<Course[]>('/courses') });
   const spaces = useQuery({ queryKey: ['learning-spaces-for-content'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const subjectCatalog = useSubjectCatalog();
-  const canManage = Boolean(user?.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role)));
+  const canManage = Boolean(user?.roles.some((role) => (['ops_staff', 'campus_admin', 'super_admin'].includes(role) || role === 'teacher' && user?.teacherLibrary?.canManageCourses !== false)));
   const unrestricted = Boolean(user?.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role)));
   const save = useMutation({
     mutationFn: (values: CourseFormValues) => {

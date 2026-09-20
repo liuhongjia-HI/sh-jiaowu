@@ -138,6 +138,7 @@ func (s *MemoryStore) createTeacherUnlocked(operator string, principal learning.
 		Roles:              []learning.Role{learning.RoleTeacher},
 		CampusID:           req.CampusID,
 		LearningSpaceIDs:   cloneStrings(req.LearningSpaceIDs),
+		TeacherLibrary:     cloneTeacherLibrary(req.TeacherLibrary),
 		CanUploadHandout:   req.CanUploadHandout,
 		CanUploadQuestion:  req.CanUploadQuestion,
 		CanReview:          req.CanReview,
@@ -185,6 +186,13 @@ func (s *MemoryStore) updateTeacherUnlocked(operator string, principal learning.
 		s.users[i].Phone = req.Phone
 		s.users[i].CampusID = req.CampusID
 		s.users[i].LearningSpaceIDs = cloneStrings(req.LearningSpaceIDs)
+		if req.TeacherLibrary != nil {
+			policy := cloneTeacherLibrary(req.TeacherLibrary)
+			if s.users[i].TeacherLibrary != nil {
+				policy.RecentMaterialIDs = cloneStrings(s.users[i].TeacherLibrary.RecentMaterialIDs)
+			}
+			s.users[i].TeacherLibrary = policy
+		}
 		s.users[i].CanUploadHandout = req.CanUploadHandout
 		s.users[i].CanUploadQuestion = req.CanUploadQuestion
 		s.users[i].CanReview = req.CanReview

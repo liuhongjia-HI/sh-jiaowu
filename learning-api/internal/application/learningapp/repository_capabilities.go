@@ -57,6 +57,8 @@ type ContentRepository interface {
 	DeleteCourse(string, learning.Principal, string) error
 	Questions(learning.Principal, learning.QuestionBankQuery) []learning.QuestionBankItem
 	Materials(learning.Principal, learning.MaterialQuery) []learning.Material
+	TeacherLibrary(learning.Principal) (learning.TeacherLibrary, error)
+	RecordTeacherMaterialView(learning.Principal, string) error
 	Homework(learning.Principal) []learning.Homework
 	Reviews(learning.Principal) []learning.Review
 	AssignReview(string, learning.Principal, string, learning.ReviewAssignRequest) (learning.Review, error)
