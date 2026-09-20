@@ -11,7 +11,6 @@
 
 .home-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18rpx; }
 .home-page-title { flex: 1; text-align: center; color: #111827; font-size: 38rpx; font-weight: 850; }
-.home-center-button { margin-left: -150rpx; padding: 16rpx 28rpx; border-radius: 40rpx; background: #f56b36; color: #fff; font-size: 25rpx; font-weight: 800; }
 
 .search-panel {
   min-height: 82rpx;

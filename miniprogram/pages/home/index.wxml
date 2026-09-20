@@ -2,7 +2,6 @@
   <view class="home-top">
     <view class="home-title-row">
       <view class="home-page-title">首页</view>
-      <view class="home-center-button" data-action="study" bindtap="handleShortcut">查看学习中心</view>
     </view>
     <view class="search-panel">
       <view class="search-icon">⌕</view>
