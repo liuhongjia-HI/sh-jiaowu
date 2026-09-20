@@ -929,6 +929,37 @@ test('从课程进入讲义上传时自动带入年级学科和课程范围', as
   await expect(dialog.getByText('HD_作业B.pdf · HD 将作为独立文件新增')).toBeVisible();
 });
 
+test('讲义上传使用大面积拖拽区并阻止文件拖偏后被浏览器打开', async ({ page }) => {
+  await login(page, '13800000002');
+  await expectPageHeading(page, '/materials', '课程讲义');
+  await page.getByRole('button', { name: '上传讲义' }).click();
+  const dialog = page.getByRole('dialog', { name: '给课节上传资料' });
+  const dropzone = dialog.locator('.material-upload-dragger .ant-upload-drag');
+
+  await expect(dropzone).toBeVisible();
+  await expect(dialog.getByText('点击或将文件拖到此区域上传')).toBeVisible();
+  const dropzoneBox = await dropzone.boundingBox();
+  expect(dropzoneBox?.width).toBeGreaterThan(400);
+  expect(dropzoneBox?.height).toBeGreaterThanOrEqual(168);
+
+  const preventsAccidentalFileNavigation = await dialog.locator('form.ant-form').evaluate((element) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File(['test'], 'outside.pdf', { type: 'application/pdf' }));
+    const event = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer });
+    return !element.dispatchEvent(event);
+  });
+  expect(preventsAccidentalFileNavigation).toBeTruthy();
+
+  await dialog.locator('.material-upload-dragger .ant-upload-btn').evaluate((element) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File(['%PDF-1.4\n%%EOF'], 'HD_拖拽区验收.pdf', { type: 'application/pdf' }));
+    element.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }));
+    element.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
+    element.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+  });
+  await expect(dialog.getByText('HD_拖拽区验收.pdf', { exact: true })).toBeVisible();
+});
+
 test('上传课程讲义和课后练习可以用年级学科筛选课程范围', async ({ page }) => {
   await login(page, '13800000002');
   const suffix = Date.now();

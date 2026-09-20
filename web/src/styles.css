@@ -3125,6 +3125,8 @@ button.schedule-block:hover {
 .material-overview-summary button:hover { color: #007a55; }
 .opening-matrix-cell.material-matrix-missing { background: #fff7e6; color: #8c5a00; }
 .opening-matrix-cell.material-matrix-missing strong { font-size: 15px; }
+.material-upload-dragger .ant-upload.ant-upload-drag { min-height: 168px; }
+.material-upload-dragger .ant-upload-btn { padding-block: 28px; }
 .student-list-anchor { scroll-margin-top: 88px; }
 @media (max-width: 640px) { .opening-overview .ant-card-body, .material-overview .ant-card-body { padding: 12px; } .opening-matrix { table-layout: auto; } }
 

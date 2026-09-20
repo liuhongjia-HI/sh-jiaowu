@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Checkbox, Empty, Form, Input, InputNumber, Modal, Pagination, Radio, Select, Skeleton, Space, Table, Tag, Typography, Upload, message } from 'antd';
 import type { FormInstance, TableColumnsType, UploadFile } from 'antd';
-import { CheckCircleOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, InboxOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
@@ -1264,7 +1264,19 @@ export function UploadDialog({
       submitting={loading}
       width={kind === 'homework' ? 'min(720px, 100vw)' : undefined}
     >
-      <Form form={form} layout="vertical" preserve={false} initialValues={{ courseId: initialCourse?.id, lessonId: initialLessonId }} onFinish={onSubmit}>
+      <Form
+        form={form}
+        layout="vertical"
+        preserve={false}
+        initialValues={{ courseId: initialCourse?.id, lessonId: initialLessonId }}
+        onDragOver={(event) => {
+          if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault();
+        }}
+        onFinish={onSubmit}
+      >
         {kind === 'homework' && (
           <Form.Item name="title" label="练习标题" rules={[{ required: true, message: '请输入标题' }]}>
             <Input placeholder="例如：五年级英语 S1 Q1 阅读练习" />
@@ -1330,9 +1342,11 @@ export function UploadDialog({
                 }
               ]}
             >
-              <Upload beforeUpload={() => false} multiple accept=".pdf,.ppt,.pptx,.doc,.docx">
-                <Button icon={<UploadOutlined />}>选择文件</Button>
-              </Upload>
+              <Upload.Dragger className="material-upload-dragger" beforeUpload={() => false} multiple accept=".pdf,.ppt,.pptx,.doc,.docx">
+                <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+                <p className="ant-upload-text">点击或将文件拖到此区域上传</p>
+                <p className="ant-upload-hint">支持一次选择或拖入多个文件</p>
+              </Upload.Dragger>
             </Form.Item>
             <Typography.Text type="secondary">支持 PDF、PPT、Word，可一次选择多个文件；同一单元允许上传多份 HD、Blank、HW、Exam 或 Special，所有文件都会独立新增。单个文件不超过 50MB。</Typography.Text>
             {lessonId ? (
