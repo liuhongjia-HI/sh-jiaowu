@@ -152,6 +152,36 @@ test("lesson entry shows the content list before opening a material", async () =
   assert.equal(page.data.contentTagLabel, "All");
 });
 
+test("lesson content list uses the curriculum number without Unit or Chapter labels", async () => {
+  const page = loadMaterialPreviewPage((path) => {
+    if (path === "/student/study/course-1") return Promise.resolve({
+      course: { curriculum: [
+        { id: "unit-1", type: "unit", name: "Unit 1", sortOrder: 1 },
+        { id: "chapter-1", parentId: "unit-1", type: "chapter", name: "Chapter 1 · What is Science", sortOrder: 1 }
+      ] },
+      materials: [
+        { id: "mat-hd", title: "Unit 1 · 1 · Chapter 1 · What is Science", lessonId: "chapter-1", courseId: "course-1", tagCode: "HD" },
+        { id: "mat-blank", title: "Unit 1 · 1 · Chapter 1 · What is Science", lessonId: "chapter-1", courseId: "course-1", tagCode: "Blank" }
+      ],
+      homework: [
+        { id: "hw-1", title: "Unit 1 · 1 · Chapter 1 · What is Science", lessonId: "chapter-1", tagCode: "HW", questionNum: 4 }
+      ]
+    });
+    return Promise.reject(new Error("unexpected path " + path));
+  }, baseWxMock());
+
+  page.onLoad({ courseId: "course-1", lessonId: "chapter-1" });
+  await flushPromises();
+
+  assert.equal(page.data.displayTitle, "What is Science");
+  assert.deepEqual(page.data.tagItems.map((item) => item.displayName), [
+    "1.1 · What is Science",
+    "1.1 · What is Science",
+    "1.1 · What is Science"
+  ]);
+  assert.equal(page.data.tagItems.some((item) => /Unit|Chapter/.test(item.displayName)), false);
+});
+
 test("lesson list strips HD/Blank/HW filename wrappers including starred topic names", async () => {
   const page = loadMaterialPreviewPage((path) => {
     if (path === "/student/study/course-1") return Promise.resolve({

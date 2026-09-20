@@ -122,15 +122,18 @@ Page({
     request(`/student/study/${this.courseId}`).then((detail) => {
       const courseMaterials = detail.materials || [];
       const courseHomework = detail.homework || [];
+      const curriculum = (detail.course && detail.course.curriculum) || [];
+      const lesson = curriculum.find((node) => node.id === this.lessonId);
+      const rawLessonTitle = prettyContentTitle((lesson && lesson.name) || this.data.lessonTitle);
+      const resolvedLessonTitle = cleanCurriculumTitle(rawLessonTitle) || rawLessonTitle;
+      const lessonListTitle = formatLessonListTitle(curriculum, this.lessonId, resolvedLessonTitle);
       // 从课程目录进入时，只展示当前课节的讲义和练习，避免串到其他章节。
       const contents = [
-        ...courseMaterials.map((item) => ({ ...item, contentType: "material", tagCode: normalizeTagCode(item.tagCode) || "HD", displayName: prettyContentTitle(item.title) })),
-        ...courseHomework.map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "Exam", displayName: prettyContentTitle(item.title) }))
+        ...courseMaterials.map((item) => ({ ...item, contentType: "material", tagCode: normalizeTagCode(item.tagCode) || "HD", displayName: lessonListTitle || prettyContentTitle(item.title) })),
+        ...courseHomework.map((item) => ({ ...item, contentType: "homework", tagCode: normalizeTagCode(item.tagCode) || "Exam", displayName: lessonListTitle || prettyContentTitle(item.title) }))
       ].filter((item) => item.lessonId === this.lessonId);
-      const lesson = ((detail.course && detail.course.curriculum) || []).find((node) => node.id === this.lessonId);
       this.lessonContents = contents;
       const tags = TAG_DEFINITIONS.map((tag) => ({ ...tag, count: countForTag(contents, tag) }));
-      const resolvedLessonTitle = prettyContentTitle((lesson && lesson.name) || this.data.lessonTitle);
       this.setData({
         tags,
         activeTag: "ALL",
@@ -590,6 +593,33 @@ function prettyContentTitle(title) {
   const spaced = rest.match(/^[A-Za-z0-9._-]+\s+(.+)$/);
   if (spaced) return spaced[1].trim();
   return raw;
+}
+
+function formatLessonListTitle(nodes, lessonId, fallbackTitle) {
+  const list = nodes || [];
+  const byId = list.reduce((result, node) => {
+    result[node.id] = node;
+    return result;
+  }, {});
+  const leaf = byId[lessonId];
+  if (!leaf) return "";
+  const path = [];
+  const visited = {};
+  for (let current = leaf; current && !visited[current.id]; current = byId[current.parentId]) {
+    visited[current.id] = true;
+    path.unshift(current);
+  }
+  // 没有 Unit / Chapter 层级的旧目录不强行补一个孤立的“1”。
+  if (path.length < 2) return "";
+  const number = path.map((node) => Number(node.sortOrder) || 1).join(".");
+  const topic = cleanCurriculumTitle((leaf && leaf.name) || fallbackTitle);
+  return topic ? `${number} · ${topic}` : number;
+}
+
+function cleanCurriculumTitle(title) {
+  const parts = String(title || "").split(/\s*·\s*/).map((part) => part.trim()).filter(Boolean);
+  const descriptive = parts.filter((part) => !/^(?:Unit|Chapter|Lesson)(?:\s*\d+)?$/i.test(part) && !/^\d+(?:\.\d+)*$/.test(part));
+  return descriptive.join(" · ");
 }
 
 function buildDisplayHeader(material, lessonTitle) {
