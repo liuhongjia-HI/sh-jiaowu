@@ -24,6 +24,26 @@ func TestCourseCurriculumCountsAnyLeafNode(t *testing.T) {
 	if course.LessonCount != 1 || len(course.Curriculum) != 1 {
 		t.Fatalf("unexpected unit-only course: %#v", course)
 	}
+	material, err := store.CreateMaterial("英语老师", teacher, learning.MaterialUploadRequest{
+		Title: "Unit 1 讲义", CourseID: course.ID, LearningSpaceID: course.LearningSpaceID, LessonID: "unit-only",
+	})
+	if err != nil {
+		t.Fatalf("create material for unit leaf: %v", err)
+	}
+	if material.LessonID != "unit-only" || material.Curriculum.Lesson != "Unit 1" {
+		t.Fatalf("material curriculum = %#v", material)
+	}
+
+	_, err = store.UpdateCourse("英语老师", teacher, course.ID, learning.CourseUpsertRequest{
+		Name: course.Name, LearningSpaceID: course.LearningSpaceID, Status: learning.StatusEnabled,
+		Curriculum: []learning.CurriculumNode{
+			{ID: "unit-only", Type: learning.CurriculumUnit, Name: "Unit 1"},
+			{ID: "chapter-new", ParentID: "unit-only", Type: learning.CurriculumChapter, Name: "Chapter 1"},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "先迁移内容") {
+		t.Fatalf("expected adding a child below a bound unit to fail, got %v", err)
+	}
 }
 
 func TestContentMustBindToLeafLessonInItsCourseCurriculum(t *testing.T) {

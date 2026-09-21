@@ -81,7 +81,7 @@ func (s *Service) MaterialOverview(p learning.Principal, q learning.MaterialOver
 		}
 		leafNodes := make([]learning.CurriculumNode, 0)
 		for _, node := range course.Curriculum {
-			if node.Type == learning.CurriculumLesson || node.Type == learning.CurriculumChapter && !children[node.ID] {
+			if !children[node.ID] {
 				leafNodes = append(leafNodes, node)
 			}
 		}

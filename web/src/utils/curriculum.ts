@@ -306,7 +306,8 @@ export function formatCurriculumLessonLabel(nodes: CurriculumNode[] | undefined,
 export function curriculumLessonOptions(nodes: CurriculumNode[] | undefined) {
   const list = nodes ?? [];
   const byID = new Map(list.map((node) => [node.id, node]));
-  const leaves = list.filter((node) => node.type === 'lesson' || (node.type === 'chapter' && !list.some((child) => child.parentId === node.id)));
+  const parentIDs = new Set(list.map((node) => node.parentId).filter(Boolean));
+  const leaves = list.filter((node) => !parentIDs.has(node.id));
   const sortKey = (node: CurriculumNode) => {
     const orders = [curriculumNodeOrder(node)];
     for (let current = byID.get(node.parentId || ''); current; current = byID.get(current.parentId || '')) {
@@ -346,7 +347,8 @@ export function suggestEquivalentCurriculumLessonId(sourceNodes: CurriculumNode[
   const sourcePath = curriculumNodePath(sourceNodes, sourceLessonId);
   if (!sourcePath.length || sourcePath.some((node) => !node.name.trim())) return undefined;
   const sourceKey = sourcePath.map((node) => `${node.type}:${node.name.trim()}`).join('/');
-  const targetLeaves = targetNodes.filter((node) => node.type === 'lesson' || (node.type === 'chapter' && !targetNodes.some((child) => child.parentId === node.id)));
+  const targetParentIDs = new Set(targetNodes.map((node) => node.parentId).filter(Boolean));
+  const targetLeaves = targetNodes.filter((node) => !targetParentIDs.has(node.id));
   const matches = targetLeaves.filter((leaf) => {
     const path = curriculumNodePath(targetNodes, leaf.id);
     return path.length > 0 && path.every((node) => node.name.trim()) && path.map((node) => `${node.type}:${node.name.trim()}`).join('/') === sourceKey;

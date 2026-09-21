@@ -375,6 +375,17 @@ func TestMaterialReorderEndpointChangesStudentCourseDisplayOrder(t *testing.T) {
 func TestMaterialOverviewCountsFilesAndMissingLessons(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
+	admin, err := app.store.PrincipalByUserID("user-super")
+	if err != nil {
+		t.Fatalf("admin principal: %v", err)
+	}
+	unitCourse, err := app.store.CreateCourse("超级管理员", admin, learning.CourseUpsertRequest{
+		Name: "Unit-only 数学课程", LearningSpaceID: "space-g05-math-s1-q1", Status: learning.StatusEnabled,
+		Curriculum: []learning.CurriculumNode{{ID: "unit-only-overview", Type: learning.CurriculumUnit, Name: "分数运算"}},
+	})
+	if err != nil {
+		t.Fatalf("create unit-only course: %v", err)
+	}
 
 	var overview learning.MaterialOverview
 	app.doJSON(t, http.MethodGet, "/api/materials/overview", app.loginAdmin(t, "13800000001"), nil, http.StatusOK, &overview)
@@ -382,6 +393,7 @@ func TestMaterialOverviewCountsFilesAndMissingLessons(t *testing.T) {
 		t.Fatalf("expected overview cells and lessons, got %#v", overview)
 	}
 	fileCount, coveredCount, missingCount := 0, 0, 0
+	foundUnitOnly := false
 	for _, lesson := range overview.Lessons {
 		if lesson.CourseID == "" || lesson.LessonID == "" {
 			t.Fatalf("overview lesson lacks course identity: %#v", lesson)
@@ -392,6 +404,12 @@ func TestMaterialOverviewCountsFilesAndMissingLessons(t *testing.T) {
 		} else {
 			missingCount++
 		}
+		if lesson.CourseID == unitCourse.ID && lesson.LessonID == "unit-only-overview" && lesson.Curriculum.Unit == "分数运算" {
+			foundUnitOnly = true
+		}
+	}
+	if !foundUnitOnly {
+		t.Fatalf("unit-only curriculum leaf missing from overview: %#v", overview.Lessons)
 	}
 	if overview.Summary.FileCount != fileCount || overview.Summary.CoveredLessonCount != coveredCount || overview.Summary.MissingLessonCount != missingCount {
 		t.Fatalf("summary = %#v, recomputed files=%d covered=%d missing=%d", overview.Summary, fileCount, coveredCount, missingCount)

@@ -211,6 +211,9 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 		if s.courses[index].ID != id {
 			continue
 		}
+		if err := s.validateCourseContentBindings(course); err != nil {
+			return learning.Course{}, err
+		}
 		before := s.decorateCourse(s.courses[index])
 		s.courses[index] = course
 		s.syncCourseReferences(course)
@@ -219,6 +222,30 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 		return after, nil
 	}
 	return learning.Course{}, errors.New("课程不存在")
+}
+
+func (s *MemoryStore) validateCourseContentBindings(course learning.Course) error {
+	boundNodeIDs := make(map[string]bool)
+	availableNodeIDs := make(map[string]bool, len(course.Curriculum))
+	for _, node := range course.Curriculum {
+		availableNodeIDs[node.ID] = true
+	}
+	for _, item := range s.materials {
+		if item.CourseID == course.ID && strings.TrimSpace(item.LessonID) != "" {
+			boundNodeIDs[item.LessonID] = true
+		}
+	}
+	for _, item := range s.homework {
+		if item.CourseID == course.ID && strings.TrimSpace(item.LessonID) != "" {
+			boundNodeIDs[item.LessonID] = true
+		}
+	}
+	for nodeID := range boundNodeIDs {
+		if availableNodeIDs[nodeID] && !curriculumLeaf(course.Curriculum, nodeID) {
+			return errors.New("已有讲义或练习绑定到新增下级的目录，请先迁移内容再修改课程目录")
+		}
+	}
+	return nil
 }
 
 func (s *MemoryStore) deleteCourseUnlocked(operator string, principal learning.Principal, id string) error {

@@ -1293,7 +1293,7 @@ export function UploadDialog({
         />
         {selectedCourse && onManageCurriculum && (
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => onManageCurriculum(selectedCourse)} style={{ marginTop: -16, marginBottom: 12, paddingInline: 0 }}>
-            维护本课程的 Unit · Chapter · Lesson
+            维护本课程目录（可直接使用末级 Unit）
           </Button>
         )}
         {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="标题以 TK_ 开头时会自动识别；也可手动选择。">
@@ -1478,7 +1478,7 @@ export function ContentEditDialog({
 
 function LessonSelect({ course }: { course?: Course }) {
 	const options = curriculumLessonOptions(course?.curriculum);
-	return <Form.Item name="lessonId" label="课节" rules={[{ required: true, message: '请选择课节' }]} extra={options.length ? undefined : <>请先在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 维护 Unit、Chapter 和 Lesson。</>}>
-		<Select placeholder="选择 Unit · Chapter · Lesson" options={options} notFoundContent="该课程尚未维护完整目录" />
+	return <Form.Item name="lessonId" label="课节" rules={[{ required: true, message: '请选择课节' }]} extra={options.length ? undefined : <>请先在 <Typography.Link href="/content">教学内容 · 课程</Typography.Link> 维护至少一个有名称的末级目录节点。</>}>
+		<Select placeholder="选择上传目录" options={options} notFoundContent="该课程尚未维护可用目录" />
 	</Form.Item>;
 }

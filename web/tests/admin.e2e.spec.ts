@@ -929,6 +929,35 @@ test('从课程进入讲义上传时自动带入年级学科和课程范围', as
   await expect(dialog.getByText('HD_作业B.pdf · HD 将作为独立文件新增')).toBeVisible();
 });
 
+test('只有 Unit 的课程可以直接选择 Unit 上传讲义', async ({ page }) => {
+  await login(page, '13800000001');
+  const suffix = Date.now();
+  const courseName = `Unit-only 数学课程 ${suffix}`;
+  const created = await page.evaluate(async ({ courseName, suffix }) => {
+    const token = localStorage.getItem('starline_admin_token');
+    const response = await fetch('/api/courses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: courseName,
+        learningSpaceId: 'space-g05-math-s1-q1',
+        status: '启用',
+        curriculum: [{ id: `unit-only-${suffix}`, type: 'unit', name: '分数运算', sortOrder: 1 }]
+      })
+    });
+    const body = await response.json();
+    return { ok: response.ok, id: body.data?.id || '', message: body.message || '' };
+  }, { courseName, suffix });
+  expect(created.ok, created.message).toBeTruthy();
+
+  await expectPageHeading(page, `/content?tab=materials&courseId=${created.id}`, '课程讲义');
+  await page.getByRole('button', { name: '上传讲义' }).click();
+  const dialog = page.getByRole('dialog', { name: '给课节上传资料' });
+  await expect(dialog.getByText('维护本课程目录（可直接使用末级 Unit）')).toBeVisible();
+  await selectOption(page, dialog, '课节', 'Unit 1 · 分数运算');
+  await expect(dialog.locator('.ant-form-item').filter({ hasText: '课节' }).first().locator('.ant-select-selection-item')).toHaveText('Unit 1 · 分数运算');
+});
+
 test('讲义上传使用大面积拖拽区并阻止文件拖偏后被浏览器打开', async ({ page }) => {
   await login(page, '13800000002');
   await expectPageHeading(page, '/materials', '课程讲义');
