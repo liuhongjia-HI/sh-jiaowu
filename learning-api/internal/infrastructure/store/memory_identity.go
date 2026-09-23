@@ -33,9 +33,16 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 			}
 			matches = append(matches, i)
 		}
+		matches, unavailableErr := s.availableStudentLoginMatches(matches)
 		if len(matches) == 0 {
 			if principal, ok, err := s.bindExistingStudentByMaskedPhone(openID, req); ok || err != nil {
 				return principal, err
+			}
+			if unavailableErr != nil {
+				return learning.Principal{}, unavailableErr
+			}
+			if req.SelectedStudentID != "" {
+				return learning.Principal{}, errors.New("选择的学生账号不存在，请重新选择")
 			}
 			return s.createWechatStudentAccount(openID, req)
 		}
@@ -62,6 +69,9 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 		}
 		i := matches[0]
 		user := s.users[i]
+		if req.SelectedStudentID != "" && user.StudentID != req.SelectedStudentID {
+			return learning.Principal{}, errors.New("选择的学生账号不存在，请重新选择")
+		}
 		if !canRebindByPhone(user, openID, realWechatLogin) {
 			if hasRole(user.Roles, learning.RoleStudent) {
 				return learning.Principal{}, errors.New("该学生已绑定其他微信，请联系老师处理")
@@ -159,13 +169,22 @@ func (s *MemoryStore) loginWithWechatResolvedUnlocked(req learning.WechatLoginRe
 
 func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learning.WechatLoginRequest) (learning.Principal, bool, error) {
 	matches := make([]int, 0, 1)
+	var unavailableErr error
 	for i, student := range s.students {
-		if phoneSame(student.Phone, req.Phone) {
-			matches = append(matches, i)
+		if !phoneSame(student.Phone, req.Phone) {
+			continue
 		}
+		if err := s.studentPhoneLoginAvailability(student); err != nil {
+			if unavailableErr == nil {
+				unavailableErr = err
+			}
+			continue
+		}
+		matches = append(matches, i)
 	}
 	if len(matches) == 0 {
-		return learning.Principal{}, false, nil
+		// 已有停用档案不能当成新手机号重新注册。
+		return learning.Principal{}, unavailableErr != nil, unavailableErr
 	}
 	if len(matches) > 1 {
 		// 多子女：几个孩子还没有各自的登录账号（user 记录），只有学生档案。
@@ -199,6 +218,9 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 		}
 	}
 	student := s.students[matches[0]]
+	if req.SelectedStudentID != "" && student.ID != req.SelectedStudentID {
+		return learning.Principal{}, true, errors.New("选择的学生账号不存在，请重新选择")
+	}
 	userIndex := s.findUserIndexByStudentID(student.ID)
 	user := learning.User{
 		ID:            "user-" + student.ID,
@@ -237,6 +259,47 @@ func (s *MemoryStore) bindExistingStudentByMaskedPhone(openID string, req learni
 	principal := principalFromUser(user)
 	principal.GuardianID = s.ensureGuardianLink(req.Phone, openID, student.ID)
 	return principal, true, nil
+}
+
+// 只过滤纯学生账号；教师或管理员共用手机号仍沿用原有冲突校验。
+func (s *MemoryStore) availableStudentLoginMatches(matches []int) ([]int, error) {
+	for _, idx := range matches {
+		roles := s.users[idx].Roles
+		if len(roles) != 1 || roles[0] != learning.RoleStudent {
+			return matches, nil
+		}
+	}
+	available := make([]int, 0, len(matches))
+	var unavailableErr error
+	for _, idx := range matches {
+		user := s.users[idx]
+		student, ok := s.findRawStudent(user.StudentID)
+		var err error
+		if !ok {
+			err = errors.New("学生档案不存在，请联系老师确认")
+		} else {
+			err = s.studentPhoneLoginAvailability(student)
+		}
+		if err != nil {
+			if unavailableErr == nil {
+				unavailableErr = err
+			}
+			continue
+		}
+		available = append(available, idx)
+	}
+	return available, unavailableErr
+}
+
+// 档案和登录账号都正常才可绑定，兼容尚未创建登录账号的学生。
+func (s *MemoryStore) studentPhoneLoginAvailability(student learning.Student) error {
+	if student.AccountStatus != "正常" {
+		return unavailableAccountLoginError(student.AccountStatus)
+	}
+	if idx := s.findUserIndexByStudentID(student.ID); idx >= 0 && s.users[idx].AccountStatus != "正常" {
+		return unavailableAccountLoginError(s.users[idx].AccountStatus)
+	}
+	return nil
 }
 
 func unavailableAccountLoginError(status string) error {
