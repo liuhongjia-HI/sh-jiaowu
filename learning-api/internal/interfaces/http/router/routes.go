@@ -54,6 +54,8 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.Use(func(c *gin.Context) {
 		p, _ := middleware.CurrentPrincipal(c)
 		readOnlyPaths := map[string]bool{
+			"GET /api/teaching-plans": true, "GET /api/teaching-plans/:id": true,
+			"GET /api/teaching-plans/:id/preview": true, "GET /api/teaching-plans/:id/download": true,
 			"GET /api/teacher/library": true, "POST /api/teacher/materials/:id/view": true,
 			"GET /api/files/:id/preview": true, "GET /api/files/:id/download": true,
 			"GET /api/subjects": true, "GET /api/materials": true,
@@ -65,6 +67,12 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 		c.Next()
 	})
 	g.GET("/teacher/library", h.TeacherLibrary)
+	g.GET("/teaching-plans", h.TeachingPlans)
+	g.POST("/teaching-plans", h.CreateTeachingPlan)
+	g.GET("/teaching-plans/:id", h.TeachingPlan)
+	g.GET("/teaching-plans/:id/preview", h.TeachingPlanPreview)
+	g.GET("/teaching-plans/:id/download", h.TeachingPlanDownload)
+	g.POST("/teaching-plans/:id/preview/retry", h.RetryTeachingPlanPreview)
 	g.POST("/teacher/materials/:id/view", h.RecordTeacherMaterialView)
 	g.GET("/dashboard/overview", h.Dashboard)
 	g.GET("/settings", h.Settings)
@@ -80,6 +88,11 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/students/:id/tutoring-assignments", h.StudentTutoringAssignments)
 	g.GET("/students/:id/scores", h.StudentScores)
 	g.GET("/courses", h.Courses)
+	g.GET("/course-families", h.CourseFamilies)
+	g.POST("/course-families", h.CreateCourseFamily)
+	g.POST("/course-families/import", h.ImportCourseFamily)
+	g.PUT("/course-families/:id", h.UpdateCourseFamily)
+	g.POST("/course-families/:id/courses", h.AddCourseFamilyCourse)
 	g.POST("/courses", h.CreateCourse)
 	g.POST("/courses/:id/copy", h.CopyCourse)
 	g.PUT("/courses/:id", h.UpdateCourse)

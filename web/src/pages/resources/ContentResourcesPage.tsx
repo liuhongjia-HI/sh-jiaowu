@@ -15,7 +15,7 @@ type ResourceKind = 'materials' | 'homework';
 type UploadValues = { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
 type ContentValues = Omit<UploadValues, 'fileList'> & { status: string };
 type MaterialUploadFailure = { fileName: string; reason: string; file: File; title: string; tagCode: string; allowDownload: boolean };
-type MaterialUploadResult = { sourceCourseId: string; sourceLessonId: string; uploaded: Material[]; added: number; failures: MaterialUploadFailure[] };
+type MaterialUploadResult = { sourceCourseId: string; sourceLessonId: string; uploaded: Material[]; added: number; failures: MaterialUploadFailure[]; manual?: boolean };
 
 function materialTitleFromFile(fileName: string) {
   return fileName.replace(/\.[^.]+$/, '').trim() || fileName;
@@ -205,6 +205,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const sourceSyncSpace = sourceSyncCourse ? (learningSpaces.data ?? []).find((item) => item.id === sourceSyncCourse.learningSpaceId) : undefined;
   const syncCandidates = sourceSyncCourse && sourceSyncSpace ? (courses.data ?? []).filter((course) => {
     if (course.id === sourceSyncCourse.id || course.grade !== sourceSyncCourse.grade || course.subject.trim().toLowerCase() !== sourceSyncCourse.subject.trim().toLowerCase()) return false;
+    if (sourceSyncCourse.familyId && course.familyId !== sourceSyncCourse.familyId) return false;
     const space = (learningSpaces.data ?? []).find((item) => item.id === course.learningSpaceId);
     return Boolean(space && space.semester === sourceSyncSpace.semester && space.phase === sourceSyncSpace.phase);
   }) : [];
@@ -214,6 +215,17 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     materialIds: syncBatch?.uploaded.map((item) => item.id) || [],
     targets: syncCourseIds.map((courseId) => ({ courseId, lessonId: syncLessonIds[courseId] || '' }))
   });
+  const startManualSync = (row: MaterialPackRow) => {
+    const published = row.materials.filter((item) => item.fileId && item.tagCode && ['启用', '已发布', '可预览'].includes(item.status) && (!item.publishStatus || item.publishStatus === '已发布'));
+    if (!row.courseId || !row.lessonId || !published.length) {
+      message.warning('当前课节没有可同步的已发布讲义。');
+      return;
+    }
+    setSyncBatch({ sourceCourseId: row.courseId, sourceLessonId: row.lessonId, uploaded: published, added: 0, failures: [], manual: true });
+    setSyncCourseIds([]);
+    setSyncLessonIds({});
+    setSyncPreview(null);
+  };
   const previewSync = useMutation({
     mutationFn: () => postData<MaterialSyncPreview>('/materials/sync-preview', materialSyncRequest()),
     onSuccess: setSyncPreview,
@@ -266,7 +278,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       client.invalidateQueries({ queryKey: ['courses'] });
       client.invalidateQueries({ queryKey: ['content'] });
     },
-    onError: (error: Error) => message.error(`源课程已上传，目标同步未完成：${error.message || '请稍后重试。'}`)
+    onError: (error: Error) => message.error(`目标同步未完成：${error.message || '请稍后重试。'}`)
   });
   const closeSync = () => {
     setSyncBatch(null);
@@ -511,6 +523,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
             { title: '状态', render: (_: unknown, row: MaterialPackRow) => packPreviewStatus(row.materials) },
             { title: '操作', render: (_: unknown, row: MaterialPackRow) => (
               <div className="lesson-pack-actions">
+                {canManage && row.lessonId && <Button size="small" onClick={() => startManualSync(row)}>跨班型同步</Button>}
                 {row.materials.map((item) => {
                   const deleteAction = canManage ? <Popconfirm
                     title={`确定删除“${item.tagCode || item.title}”吗？`}
@@ -577,9 +590,10 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     <ContentEditDialog kind={kind} form={contentForm} item={editing} loading={save.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setEditing(null)} onSubmit={(values) => save.mutate(values)} />
     <CourseDialog form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
     <Modal
-      title="同步本次课程讲义"
+      title={syncBatch?.manual ? '跨班型同步课节讲义' : '同步本次课程讲义'}
       open={Boolean(syncBatch)}
       width={760}
+      styles={{ body: { maxHeight: '60vh', overflowY: 'auto' } }}
       onCancel={closeSync}
       footer={[
         <Button key="cancel" onClick={closeSync}>暂不同步</Button>,
@@ -588,12 +602,12 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
           : <Button key="preview" type="primary" loading={previewSync.isPending} disabled={!syncCourseIds.length || syncCourseIds.some((id) => !syncLessonIds[id])} onClick={() => previewSync.mutate()}>检查同步内容</Button>
       ]}
     >
-      <Alert type="info" showIcon message={`源课程已上传 ${syncBatch?.uploaded.length || 0} 份资料，可选择同步到同年级、学科、学期和阶段的课程。`} description="同步后各课程资料独立维护；即使目标课节已有同标签资料，本次文件也会独立新增。" style={{ marginBottom: 16 }} />
+      <Alert type="info" showIcon message={`${syncBatch?.manual ? '当前课节已选取' : '源课程已上传'} ${syncBatch?.uploaded.length || 0} 份已发布资料，可选择同步到同年级、学科、学期和阶段的课程。`} description="同步后各课程资料独立维护；即使目标课节已有同标签资料，本次文件也会独立新增。" style={{ marginBottom: 16 }} />
       {syncBatch?.failures.length ? <Alert type="warning" showIcon message={`${syncBatch.failures.length} 个文件上传失败，不会参与同步`} description={<div><div>{syncBatch.failures.map((item) => `${item.fileName}：${item.reason}`).join('；')}</div><Button size="small" style={{ marginTop: 8 }} loading={retryFailedUploads.isPending} onClick={() => retryFailedUploads.mutate()}>只重新上传失败文件</Button></div>} style={{ marginBottom: 16 }} /> : null}
-      <Typography.Text strong>本次资料</Typography.Text>
+      <Typography.Text strong>{syncBatch?.manual ? '源课节资料' : '本次资料'}</Typography.Text>
       <div style={{ margin: '8px 0 16px' }}>{syncBatch?.uploaded.map((item) => <Tag key={item.id}>{item.tagCode || '未标签'} · {item.fileName}</Tag>)}</div>
       <Typography.Text strong>目标课程</Typography.Text>
-      {syncCandidates.length ? <Checkbox.Group value={syncCourseIds} onChange={(values) => changeSyncCourses(values.map(String))} style={{ display: 'grid', gap: 12, marginTop: 10 }}>
+      {syncCandidates.length ? <Checkbox.Group value={syncCourseIds} onChange={(values) => changeSyncCourses(values.map(String))} style={{ display: 'grid', gap: 12, marginTop: 10, maxHeight: 240, overflowY: 'auto' }}>
         {syncCandidates.map((course) => <div key={course.id} className="material-sync-target-row">
           <Checkbox value={course.id}>{course.name} <Tag>{course.status}</Tag></Checkbox>
           <Select showSearch optionFilterProp="label" placeholder="选择对应课节" disabled={!syncCourseIds.includes(course.id)} value={syncLessonIds[course.id]} options={curriculumLessonOptions(course.curriculum)} onChange={(lessonId) => { setSyncLessonIds((current) => ({ ...current, [course.id]: lessonId })); setSyncPreview(null); }} />

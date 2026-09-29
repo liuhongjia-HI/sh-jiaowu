@@ -50,6 +50,16 @@ type StudentRepository interface {
 }
 
 type ContentRepository interface {
+	CourseFamilies(learning.Principal) []learning.CourseFamily
+	CreateCourseFamily(string, learning.Principal, learning.CourseFamilyCreateRequest) (learning.CourseFamily, error)
+	UpdateCourseFamily(string, learning.Principal, string, learning.CourseFamilyUpdateRequest) (learning.CourseFamily, error)
+	AddCourseFamilyCourse(string, learning.Principal, string, learning.CourseFamilyAddCourseRequest) (learning.Course, error)
+	ImportCourseFamily(string, learning.Principal, learning.CourseFamilyImportRequest) (learning.CourseFamily, error)
+	TeachingPlans(learning.Principal) learning.TeachingPlanList
+	TeachingPlan(learning.Principal, string) (learning.TeachingPlan, error)
+	CreateTeachingPlan(string, learning.Principal, learning.TeachingPlanUploadRequest) (learning.TeachingPlan, error)
+	TeachingPlanFile(learning.Principal, string) (learning.FileAsset, error)
+	RetryTeachingPlanPreview(string, learning.Principal, string) error
 	Courses(learning.Principal) []learning.Course
 	CreateCourse(string, learning.Principal, learning.CourseUpsertRequest) (learning.Course, error)
 	CopyCourse(string, learning.Principal, string, learning.CourseCopyRequest) (learning.CourseCopyResult, error)

@@ -25,6 +25,7 @@ type CurriculumPath struct {
 
 type Course struct {
 	ID              string           `json:"id"`
+	FamilyID        string           `json:"familyId,omitempty"`
 	Name            string           `json:"name"`
 	Subject         string           `json:"subject"`
 	Grade           string           `json:"grade"`
@@ -37,6 +38,39 @@ type Course struct {
 	MaterialNum  int      `json:"materialNum"`
 	HomeworkNum  int      `json:"homeworkNum"`
 	Status       Status   `json:"status"`
+}
+
+// CourseFamily owns one curriculum shared by an arbitrary set of level courses.
+// Course-specific materials, homework and access remain attached to Course.ID.
+type CourseFamily struct {
+	ID         string           `json:"id"`
+	Name       string           `json:"name"`
+	Grade      string           `json:"grade"`
+	Subject    string           `json:"subject"`
+	Semester   string           `json:"semester"`
+	Phase      string           `json:"phase"`
+	Curriculum []CurriculumNode `json:"curriculum"`
+	Courses    []Course         `json:"courses"`
+}
+
+type CourseFamilyCreateRequest struct {
+	Name             string           `json:"name"`
+	LearningSpaceIDs []string         `json:"learningSpaceIds"`
+	Curriculum       []CurriculumNode `json:"curriculum"`
+}
+
+type CourseFamilyUpdateRequest struct {
+	Name       string           `json:"name"`
+	Curriculum []CurriculumNode `json:"curriculum"`
+}
+
+type CourseFamilyAddCourseRequest struct {
+	LearningSpaceID string `json:"learningSpaceId"`
+}
+
+type CourseFamilyImportRequest struct {
+	Name      string   `json:"name"`
+	CourseIDs []string `json:"courseIds"`
 }
 
 type CourseUpsertRequest struct {

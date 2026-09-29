@@ -7,7 +7,7 @@ import { deleteData, getData, postData, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../../components/ListViews';
 import { CourseDialog, type CourseFormValues } from './ResourceDialogs';
 import { DEFAULT_PHASES, DEFAULT_SEMESTERS, formatLearningSpace, gradeOptions, phaseLabel, prepareCurriculumForSave, semesterLabel, subjectLabel, subjectOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
-import type { Course, CourseCopyResult, CourseUpsertRequest, CurrentUser, LearningSpace } from '../../types/starline';
+import type { Course, CourseCopyResult, CourseFamily, CourseUpsertRequest, CurrentUser, LearningSpace } from '../../types/starline';
 import { useSearchParams } from 'react-router-dom';
 import MaterialsPage from './MaterialsPage';
 import HomeworkPage from './HomeworkPage';
@@ -28,6 +28,7 @@ export default function ContentPage({ user }: { user?: CurrentUser }) {
 
 function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMaterials: (courseId: string) => void }) {
   const [form] = Form.useForm<CourseFormValues>();
+  const [familyForm] = Form.useForm<CourseFormValues>();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
   const [copiedFrom, setCopiedFrom] = useState<string>();
@@ -43,13 +44,48 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
   const [statusFilter, setStatusFilter] = useState<string>();
   const [page, setPage] = useState(1);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
+  const [familyScopeKey, setFamilyScopeKey] = useState<string>();
+  const [familySpaceIDs, setFamilySpaceIDs] = useState<string[]>([]);
+  const [familySetupOpen, setFamilySetupOpen] = useState(false);
+  const [familyEditing, setFamilyEditing] = useState<CourseFamily | null>(null);
+  const [familyCreateOpen, setFamilyCreateOpen] = useState(false);
+  const [familyAdding, setFamilyAdding] = useState<CourseFamily | null>(null);
+  const [familyAddSpaceID, setFamilyAddSpaceID] = useState<string>();
+  const [familyImportOpen, setFamilyImportOpen] = useState(false);
+  const [familyImportName, setFamilyImportName] = useState('');
   const [viewMode, setViewMode] = useListViewMode('starline:list-view:courses', 'table');
   const client = useQueryClient();
   const courses = useQuery({ queryKey: ['content'], queryFn: () => getData<Course[]>('/courses') });
+  const families = useQuery({ queryKey: ['course-families'], queryFn: () => getData<CourseFamily[]>('/course-families') });
   const spaces = useQuery({ queryKey: ['learning-spaces-for-content'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
   const subjectCatalog = useSubjectCatalog();
   const canManage = Boolean(user?.roles.some((role) => (['ops_staff', 'campus_admin', 'super_admin'].includes(role) || role === 'teacher' && user?.teacherLibrary?.canManageCourses !== false)));
   const unrestricted = Boolean(user?.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role)));
+  const familyCreate = useMutation({
+    mutationFn: (values: CourseFormValues) => postData<CourseFamily>('/course-families', { name: values.name, learningSpaceIds: familySpaceIDs, curriculum: prepareCurriculumForSave(values.curriculum || []) }),
+    onSuccess: () => { message.success('课程系列已创建，所选班型共用一套目录。'); setFamilyCreateOpen(false); familyForm.resetFields(); refreshCourses(); },
+    onError: (error: Error) => message.error(error.message || '创建课程系列失败。')
+  });
+  const familyUpdate = useMutation({
+    mutationFn: (values: CourseFormValues) => putData<CourseFamily>(`/course-families/${familyEditing?.id}`, { name: values.name, curriculum: prepareCurriculumForSave(values.curriculum || []) }),
+    onSuccess: () => { message.success('共享目录已更新。'); setFamilyEditing(null); familyForm.resetFields(); refreshCourses(); },
+    onError: (error: Error) => message.error(error.message || '保存共享目录失败。')
+  });
+  const familyAdd = useMutation({
+    mutationFn: () => postData<Course>(`/course-families/${familyAdding?.id}/courses`, { learningSpaceId: familyAddSpaceID }),
+    onSuccess: () => { message.success('班型已加入课程系列，共用现有目录。'); setFamilyAdding(null); setFamilyAddSpaceID(undefined); refreshCourses(); },
+    onError: (error: Error) => message.error(error.message || '添加班型失败。')
+  });
+  const familyImport = useMutation({
+    mutationFn: () => postData<CourseFamily>('/course-families/import', { name: familyImportName.trim(), courseIds: selectedRowKeys }),
+    onSuccess: () => { message.success('原有班型课程已合并为共享目录，讲义和练习已映射到对应课节。'); setFamilyImportOpen(false); setSelectedRowKeys([]); refreshCourses(); },
+    onError: (error: Error) => message.error(error.message || '合并课程系列失败。')
+  });
+  function refreshCourses() {
+    client.invalidateQueries({ queryKey: ['course-families'] });
+    client.invalidateQueries({ queryKey: ['content'] });
+    client.invalidateQueries({ queryKey: ['courses'] });
+  }
   const save = useMutation({
     mutationFn: (values: CourseFormValues) => {
       const { grade: _grade, subject: _subject, curriculum = [], ...courseValues } = values;
@@ -109,6 +145,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
   const rows = useMemo(() => {
     const term = keyword.toLowerCase();
     return (courses.data ?? []).filter((item) => {
+      if (item.familyId) return false;
       if (gradeFilter && item.grade !== gradeFilter) return false;
       if (subjectFilter && item.subject !== subjectFilter) return false;
       if (termFilter && courseTermKey(item, spaceById) !== termFilter) return false;
@@ -118,6 +155,37 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
       return haystack.includes(term);
     });
   }, [courses.data, gradeFilter, keyword, spaceById, statusFilter, subjectFilter, termFilter]);
+  const familyRows = (families.data ?? []).filter((family) => {
+    if (gradeFilter && family.grade !== gradeFilter) return false;
+    if (subjectFilter && family.subject !== subjectFilter) return false;
+    if (termFilter && termKey(family.semester, family.phase) !== termFilter) return false;
+    if (statusFilter && !family.courses.some((course) => (course.status || '启用') === statusFilter)) return false;
+    return !keyword.trim() || `${family.name} ${family.grade} ${family.subject} ${family.courses.map((course) => spaceById.get(course.learningSpaceId || '')?.level || '').join(' ')}`.toLowerCase().includes(keyword.trim().toLowerCase());
+  });
+  const scopeSpaces = (spaces.data ?? []).filter((space) => space.status !== '停用' && (unrestricted || (user?.learningSpaceIds ?? []).includes(space.id)));
+  const scopeGroups = Array.from(new Map(scopeSpaces.map((space) => [familyScopeOf(space), { value: familyScopeOf(space), label: `${space.grade} · ${subjectLabel(space.subject)} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)}` }])).values());
+  const selectedFamilySpaces = scopeSpaces.filter((space) => familyScopeOf(space) === familyScopeKey);
+  function startFamilyCreate() {
+    setFamilyScopeKey(undefined);
+    setFamilySpaceIDs([]);
+    setFamilySetupOpen(true);
+  }
+  function continueFamilyCreate() {
+    const first = scopeSpaces.find((space) => space.id === familySpaceIDs[0]);
+    if (!first) return;
+    familyForm.setFieldsValue({ name: `${first.grade}${first.subject} ${first.semester} ${first.phase} 课程`, grade: first.grade, subject: first.subject, learningSpaceId: first.id, curriculum: [], status: '启用' });
+    setFamilySetupOpen(false);
+    setFamilyCreateOpen(true);
+  }
+  function editFamily(family: CourseFamily) {
+    const first = family.courses[0];
+    familyForm.setFieldsValue({ name: family.name, grade: family.grade, subject: family.subject, learningSpaceId: first?.learningSpaceId, curriculum: family.curriculum, status: '启用' });
+    setFamilyEditing(family);
+  }
+  function availableFamilySpaces(family: CourseFamily) {
+    const used = new Set(family.courses.map((course) => spaceById.get(course.learningSpaceId || '')?.level));
+    return scopeSpaces.filter((space) => space.grade === family.grade && space.subject === family.subject && space.semester === family.semester && space.phase === family.phase && !used.has(space.level));
+  }
   function closeEditor() {
     setOpen(false);
     setEditing(null);
@@ -161,8 +229,8 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
     setCopyMaterials(true);
     setCopyHomework(true);
   }
-  if (courses.isLoading || spaces.isLoading) return <Skeleton active />;
-  if (courses.error || spaces.error) return <Alert type="error" message="课程内容加载失败，请稍后重试。" />;
+  if (courses.isLoading || spaces.isLoading || families.isLoading) return <Skeleton active />;
+  if (courses.error || spaces.error || families.error) return <Alert type="error" message="课程内容加载失败，请稍后重试。" />;
   const paged = rows.slice((page - 1) * 10, page * 10);
   const hasFilters = Boolean(keyword || gradeFilter || subjectFilter || termFilter || statusFilter);
   const spaceLabel = (course: Course) => courseSpaceLabel(course, spaceById);
@@ -174,18 +242,19 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>课程内容</Typography.Title>
-          <Typography.Text type="secondary">维护 Unit、Chapter 和 Lesson，Unit 必填，其余层级可按教学需求灵活设置。已有课程可一键复制目录、讲义和练习到下一阶段。点击课程名称可查看该课程的全部课程讲义。</Typography.Text>
+          <Typography.Text type="secondary">同一年级、学科、学期和阶段维护一套目录，按实际需要开设班型；讲义和练习仍由各班型独立维护。</Typography.Text>
         </div>
         <div className="page-heading-actions">
           <ListViewToggle storageKey="starline:list-view:courses" value={viewMode} onChange={setViewMode} />
-          {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCopiedFrom(undefined); setCopySummary(undefined); setEditing(null); form.setFieldsValue({ name: '', grade: undefined, subject: undefined, learningSpaceId: undefined, curriculum: [], status: '启用' }); setOpen(true); }}>新增课程</Button>}
+          {canManage && <Button onClick={() => { setCopiedFrom(undefined); setCopySummary(undefined); setEditing(null); form.setFieldsValue({ name: '', grade: undefined, subject: undefined, learningSpaceId: undefined, curriculum: [], status: '启用' }); setOpen(true); }}>新增课程</Button>}
+          {canManage && <Button type="primary" icon={<PlusOutlined />} onClick={startFamilyCreate}>新增课程系列</Button>}
         </div>
       </div>
       <Card>
         <div className="list-toolbar" style={{ marginBottom: 16 }}>
           <div className="course-filter-bar">
             <Input.Search allowClear placeholder="搜索课程" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} style={{ width: 220 }} />
-            <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => courses.refetch()} />
+            <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => { courses.refetch(); families.refetch(); }} />
             <Select
               allowClear
               aria-label="年级"
@@ -242,6 +311,9 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
               }}>重置</Button>
             )}
             {canManage && selectedRowKeys.length > 0 && (
+              <Button disabled={selectedRowKeys.length < 2} onClick={() => { setFamilyImportName(rows.find((row) => row.id === selectedRowKeys[0])?.name || ''); setFamilyImportOpen(true); }}>合并为共享目录（{selectedRowKeys.length}）</Button>
+            )}
+            {canManage && selectedRowKeys.length > 0 && (
               <Popconfirm
                 title={`确定删除选中的 ${selectedRowKeys.length} 门课程吗？`}
                 description="课程下的讲义和练习也会被移除。"
@@ -255,7 +327,23 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
             )}
           </div>
         </div>
-        {viewMode === 'table' ? (
+        <Typography.Title level={5} style={{ padding: '0 16px' }}>共享目录课程系列</Typography.Title>
+        <Table<CourseFamily>
+          rowKey="id"
+          dataSource={familyRows}
+          pagination={{ pageSize: 10 }}
+          locale={{ emptyText: '暂无课程系列。点击右上角新增后，一次创建所需班型。' }}
+          columns={[
+            { title: '课程系列', render: (_: unknown, family: CourseFamily) => <div><Typography.Link onClick={() => editFamily(family)}>{family.name}</Typography.Link><div className="sub">{family.grade} · {subjectLabel(family.subject)}</div></div> },
+            { title: '学期 · 阶段', render: (_: unknown, family: CourseFamily) => `${semesterLabel(family.semester)} · ${phaseLabel(family.phase)}` },
+            { title: '班型', render: (_: unknown, family: CourseFamily) => <Space wrap size={4}>{family.courses.map((course) => <Tag key={course.id} color="green">{spaceById.get(course.learningSpaceId || '')?.level || '未标记'}</Tag>)}</Space> },
+            { title: '共享目录', render: (_: unknown, family: CourseFamily) => `${family.curriculum.filter((node) => node.type === 'unit').length} Unit · ${family.curriculum.filter((node) => node.type === 'lesson').length} Lesson` },
+            { title: '各班型内容', render: (_: unknown, family: CourseFamily) => <Space wrap>{family.courses.map((course) => <Button type="link" size="small" key={course.id} onClick={() => onViewMaterials(course.id)}>{spaceById.get(course.learningSpaceId || '')?.level}: 讲义 {course.materialNum}</Button>)}</Space> },
+            ...(canManage ? [{ title: '操作', render: (_: unknown, family: CourseFamily) => <Space><Button size="small" onClick={() => editFamily(family)}>管理目录</Button><Button size="small" disabled={!availableFamilySpaces(family).length} onClick={() => { setFamilyAdding(family); setFamilyAddSpaceID(undefined); }}>添加班型</Button></Space> }] : [])
+          ]}
+        />
+        {rows.length > 0 && <Typography.Title level={5} style={{ padding: '12px 16px 0' }}>原有独立课程</Typography.Title>}
+        {rows.length > 0 && (viewMode === 'table' ? (
           <Table
             rowKey="id"
             rowSelection={rowSelection}
@@ -287,9 +375,28 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
               />
             )}
           />
-        )}
+        ))}
         {rows.length > 10 && <Pagination current={page} pageSize={10} total={rows.length} showSizeChanger={false} onChange={(nextPage) => setPage(nextPage)} style={{ marginTop: 16 }} />}
       </Card>
+      <Modal title="新增课程系列 · 选择班型" open={familySetupOpen} onCancel={() => setFamilySetupOpen(false)} onOk={continueFamilyCreate} okText="下一步：编辑共享目录" okButtonProps={{ disabled: !familySpaceIDs.length }}>
+        <Typography.Paragraph type="secondary">选择一个年级、学科、学期和阶段，再勾选本次实际开设的班型。班型来自现有学习空间配置。</Typography.Paragraph>
+        <Select showSearch optionFilterProp="label" aria-label="课程系列范围" placeholder="选择课程范围" style={{ width: '100%', marginBottom: 16 }} value={familyScopeKey} options={scopeGroups} onChange={(value) => { setFamilyScopeKey(value); setFamilySpaceIDs([]); }} />
+        <Checkbox.Group value={familySpaceIDs} onChange={(values) => setFamilySpaceIDs(values.map(String))} style={{ display: 'grid', gap: 10 }}>
+          {selectedFamilySpaces.map((space) => <Checkbox key={space.id} value={space.id}>{space.level || '未标记'} · {formatLearningSpace(space)}</Checkbox>)}
+        </Checkbox.Group>
+        {familyScopeKey && selectedFamilySpaces.length === 0 && <Alert type="warning" message="该范围暂无可用班型" style={{ marginTop: 12 }} />}
+      </Modal>
+      <Modal title="合并原有课程为共享目录" open={familyImportOpen} onCancel={() => setFamilyImportOpen(false)} onOk={() => familyImport.mutate()} okText="确认合并" okButtonProps={{ disabled: !familyImportName.trim() }} confirmLoading={familyImport.isPending}>
+        <Typography.Paragraph>已选择 {selectedRowKeys.length} 门独立课程。系统会以第一门课程的目录为准，逐层比较其他课程的节点类型、名称和顺序。</Typography.Paragraph>
+        <Typography.Paragraph type="secondary">只有同年级、学科、学期、阶段，且班型不同、目录完全一致时才能合并。原课程 ID、讲义和练习记录保留，课节绑定会映射到共享目录。</Typography.Paragraph>
+        <Input aria-label="合并后的课程系列名称" placeholder="课程系列名称" value={familyImportName} onChange={(event) => setFamilyImportName(event.target.value)} />
+        <div style={{ marginTop: 12 }}>{selectedRowKeys.map((id) => <Tag key={id}>{rows.find((row) => row.id === id)?.name || id}</Tag>)}</div>
+      </Modal>
+      <CourseDialog form={familyForm} open={familyCreateOpen || Boolean(familyEditing)} editing dialogTitle={familyEditing ? '编辑课程系列共享目录' : '新增课程系列 · 编辑共享目录'} scopeLocked scopeSpaceId={familyEditing?.courses[0]?.learningSpaceId || familySpaceIDs[0]} loading={familyCreate.isPending || familyUpdate.isPending} learningSpaces={spaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestricted} onCancel={() => { setFamilyCreateOpen(false); setFamilyEditing(null); familyForm.resetFields(); }} onSubmit={(values) => familyEditing ? familyUpdate.mutate(values) : familyCreate.mutate(values)} />
+      <Modal title={`为“${familyAdding?.name || ''}”添加班型`} open={Boolean(familyAdding)} onCancel={() => setFamilyAdding(null)} onOk={() => familyAdd.mutate()} okText="添加班型" okButtonProps={{ disabled: !familyAddSpaceID }} confirmLoading={familyAdd.isPending}>
+        <Typography.Paragraph type="secondary">新增班型直接使用系列共享目录；讲义和练习独立，从空内容开始。</Typography.Paragraph>
+        <Select showSearch optionFilterProp="label" aria-label="选择新增班型" placeholder="选择班型" style={{ width: '100%' }} value={familyAddSpaceID} options={familyAdding ? availableFamilySpaces(familyAdding).map((space) => ({ value: space.id, label: `${space.level} · ${formatLearningSpace(space)}` })) : []} onChange={setFamilyAddSpaceID} />
+      </Modal>
       <CourseDialog form={form} open={open} editing={Boolean(editing)} copiedFrom={copiedFrom} copySummary={copySummary} loading={save.isPending} learningSpaces={spaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestricted} onCancel={closeEditor} onSubmit={(values) => save.mutate(values)} />
       <Modal
         title="复制课程"
@@ -342,6 +449,10 @@ function courseTermKey(course: Course, spaceById: Map<string, LearningSpace>) {
 
 function termKey(semester: string, phase: string) {
   return `${semester}::${phase}`;
+}
+
+function familyScopeOf(space: LearningSpace) {
+  return `${space.grade}::${space.subject}::${space.semester}::${space.phase}`;
 }
 
 function termOptions(spaces: LearningSpace[]) {

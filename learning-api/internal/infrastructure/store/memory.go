@@ -38,8 +38,10 @@ type MemoryStore struct {
 	contentTypes                    []packageContentType
 	spaceAccess                     []learningSpaceAccess
 	courses                         []learning.Course
+	courseFamilies                  []learning.CourseFamily
 	questionBank                    []learning.QuestionBankItem
 	materials                       []learning.Material
+	teachingPlans                   []learning.TeachingPlan
 	homework                        []learning.Homework
 	fileAssets                      map[string]learning.FileAsset
 	previewJobs                     []learning.PreviewJob

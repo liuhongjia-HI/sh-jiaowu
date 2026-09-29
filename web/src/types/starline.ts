@@ -457,6 +457,7 @@ export type StudentRemindResult = {
 
 export type Course = {
   id: string;
+  familyId?: string;
   name: string;
   subject: string;
   grade: string;
@@ -466,6 +467,17 @@ export type Course = {
   materialNum: number;
   homeworkNum: number;
   status: string;
+};
+
+export type CourseFamily = {
+  id: string;
+  name: string;
+  grade: string;
+  subject: string;
+  semester: string;
+  phase: string;
+  curriculum: CurriculumNode[];
+  courses: Course[];
 };
 
 export type CourseUpsertRequest = {

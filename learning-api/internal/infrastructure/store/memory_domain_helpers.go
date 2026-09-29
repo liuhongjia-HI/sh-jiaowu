@@ -1256,12 +1256,22 @@ func (s *MemoryStore) syncCourseReferences(course learning.Course) {
 		if s.materials[index].CourseID == course.ID {
 			s.materials[index].Course = course.Name
 			s.materials[index].LearningSpaceID = course.LearningSpaceID
+			if s.materials[index].LessonID != "" {
+				if path, err := curriculumPathForLesson(course, s.materials[index].LessonID); err == nil {
+					s.materials[index].Curriculum = path
+				}
+			}
 		}
 	}
 	for index := range s.homework {
 		if s.homework[index].CourseID == course.ID {
 			s.homework[index].Course = course.Name
 			s.homework[index].LearningSpaceID = course.LearningSpaceID
+			if s.homework[index].LessonID != "" {
+				if path, err := curriculumPathForLesson(course, s.homework[index].LessonID); err == nil {
+					s.homework[index].Curriculum = path
+				}
+			}
 		}
 	}
 }

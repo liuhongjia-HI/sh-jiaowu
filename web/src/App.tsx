@@ -41,6 +41,7 @@ const TeachingSettingsPage = lazy(() => import('./pages/resources/TeachingSettin
 const LaunchCampaignPage = lazy(() => import('./pages/LaunchCampaign'));
 const AdminStaff = lazy(() => import('./pages/AdminStaff'));
 const TeacherLibrary = lazy(() => import('./pages/TeacherLibrary'));
+const TeachingPlans = lazy(() => import('./pages/TeachingPlans'));
 const Teachers = lazy(() => import('./pages/Teachers'));
 const Students = lazy(() => import('./pages/Students'));
 const Scheduling = lazy(() => import('./pages/scheduling/SchedulingPage'));
@@ -67,6 +68,7 @@ type NavNode = NavItem | NavGroup;
 
 const navItems: NavNode[] = [
   {key: '/teacher-library', icon: <ReadOutlined />, label: '我的讲义', roles: ['teacher']},
+  {key: '/teaching-plans', icon: <BookOutlined />, label: '教案', roles: ['teacher']},
   {
     key: '/dashboard',
     icon: <DashboardOutlined />,
@@ -89,6 +91,7 @@ const navItems: NavNode[] = [
     label: '教学内容',
     children: [
       { key: '/content', icon: <ReadOutlined />, label: '课程内容', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
+      { key: '/teaching-plans', icon: <BookOutlined />, label: '教案', roles: ['ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/scheduling', icon: <ScheduleOutlined />, label: '排课管理', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/questions', icon: <FormOutlined />, label: '题库', roles: ['teacher', 'ops_staff', 'campus_admin', 'super_admin'] },
       { key: '/teaching-settings', icon: <SettingOutlined />, label: '教学配置', roles: ['campus_admin', 'super_admin'] }
@@ -129,7 +132,7 @@ function isNavGroup(item: NavNode): item is NavGroup {
 function teacherLanding(user: CurrentUser) { return user.roles.includes('teacher') && !user.roles.some(r => ['ops_staff', 'campus_admin', 'super_admin'].includes(r)) ? '/teacher-library' : '/dashboard'; }
 function readOnlyTeacher(user: CurrentUser) { return teacherLanding(user) === '/teacher-library' && user.teacherLibrary?.canManageCourses === false && !user.canUploadHandout && !user.canUploadQuestion && !user.canReview; }
 function buildMenuItems(user: CurrentUser): MenuProps['items'] {
-  if (readOnlyTeacher(user)) return [{key: '/teacher-library', icon: <ReadOutlined />, label: <Link to='/teacher-library'>我的讲义</Link>}];
+  if (readOnlyTeacher(user)) return [{key: '/teacher-library', icon: <ReadOutlined />, label: <Link to='/teacher-library'>我的讲义</Link>}, {key: '/teaching-plans', icon: <BookOutlined />, label: <Link to='/teaching-plans'>教案</Link>}];
   const items: MenuProps['items'] = [];
 	const teacherOnly = user.roles.includes('teacher') && !user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
 
@@ -197,7 +200,7 @@ function roleLabel(user: CurrentUser) {
 
 function GuardedRoute({ user, roles, children }: { user: CurrentUser; roles: Role[]; children: React.ReactNode }) {
   const location = useLocation();
-  if (readOnlyTeacher(user) && location.pathname !== '/teacher-library') return <Navigate to='/teacher-library' replace />;
+  if (readOnlyTeacher(user) && !['/teacher-library', '/teaching-plans'].includes(location.pathname)) return <Navigate to='/teacher-library' replace />;
   if (!hasAnyRole(user, roles)) {
     return <Result status="403" title="没有权限" subTitle="当前账号不能访问这个功能" />;
   }
@@ -424,6 +427,7 @@ function Shell({ user }: { user: CurrentUser }) {
           <Suspense fallback={<PageLoading />}>
             <Routes>
 			  <Route path="/teacher-library" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><TeacherLibrary user={user} /></GuardedRoute>} />
+              <Route path="/teaching-plans" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><TeachingPlans /></GuardedRoute>} />
               <Route path="/dashboard" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><Dashboard user={user} /></GuardedRoute>} />
               <Route path="/packages" element={<GuardedRoute user={user} roles={['teacher', 'ops_staff', 'campus_admin', 'super_admin']}><PackagesPage user={user} /></GuardedRoute>} />
               <Route path="/open" element={<Navigate to="/students" replace />} />

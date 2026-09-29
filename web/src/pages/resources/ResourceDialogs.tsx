@@ -261,6 +261,9 @@ export function CourseDialog({
   form,
   open,
   editing,
+  dialogTitle,
+  scopeLocked,
+  scopeSpaceId,
   copiedFrom,
   copySummary,
   loading,
@@ -273,6 +276,9 @@ export function CourseDialog({
   form: ReturnType<typeof Form.useForm<CourseFormValues>>[0];
   open: boolean;
   editing: boolean;
+  dialogTitle?: string;
+  scopeLocked?: boolean;
+  scopeSpaceId?: string;
   copiedFrom?: string;
   copySummary?: { materialCopied: number; homeworkCopied: number; spaceChanged: boolean };
   loading: boolean;
@@ -404,7 +410,7 @@ export function CourseDialog({
 
   return (
     <FormDrawer
-      title={copiedFrom ? '确认复制的课程' : editing ? '编辑课程' : '新增课程'}
+      title={dialogTitle || (copiedFrom ? '确认复制的课程' : editing ? '编辑课程' : '新增课程')}
       open={open}
       onCancel={onCancel}
       onSubmit={() => form.submit()}
@@ -430,7 +436,7 @@ export function CourseDialog({
           style={{ marginBottom: 16 }}
         />
       )}
-      <Form form={form} layout="vertical" preserve={false} onFinish={(values) => {
+      <Form form={form} layout="vertical" preserve={false} initialValues={{ ...form.getFieldsValue(true), ...(scopeSpaceId ? { learningSpaceId: scopeSpaceId } : {}) }} onFinish={(values) => {
         const missing = missingCurriculumTypes();
         if (missing.length) {
           setCurriculumError(`请至少添加 1 个 ${missing.map((type) => ({ unit: 'Unit' })[type]).join('、')}`);
@@ -452,7 +458,7 @@ export function CourseDialog({
               showSearch
               optionFilterProp="label"
               placeholder="选择年级"
-              disabled={!availableSpaces.length}
+              disabled={scopeLocked || !availableSpaces.length}
               options={gradeSelectOptions}
               onChange={() => {
                 form.setFieldsValue({ subject: undefined, learningSpaceId: undefined });
@@ -464,7 +470,7 @@ export function CourseDialog({
               showSearch
               optionFilterProp="label"
               placeholder="选择科目"
-              disabled={!grade}
+              disabled={scopeLocked || !grade}
               options={subjectSelectOptions}
               onChange={() => {
                 form.setFieldValue('learningSpaceId', undefined);
@@ -477,7 +483,7 @@ export function CourseDialog({
             showSearch
             optionFilterProp="label"
             placeholder={subject ? '选择学期和阶段' : '请先选择年级和科目'}
-            disabled={!grade || !subject || !hasSpaceOptions}
+            disabled={scopeLocked || !grade || !subject || !hasSpaceOptions}
             notFoundContent={grade && subject ? '暂无匹配课程范围' : '请先选择年级和科目'}
             options={spaceOptions}
           />

@@ -7,7 +7,38 @@ import (
 	"starline/learning-api/internal/domain/learning"
 )
 
+func (s *Service) TeachingPlans(p learning.Principal) learning.TeachingPlanList {
+	return s.content.TeachingPlans(p)
+}
+func (s *Service) TeachingPlan(p learning.Principal, id string) (learning.TeachingPlan, error) {
+	return s.content.TeachingPlan(p, id)
+}
+func (s *Service) CreateTeachingPlan(o string, p learning.Principal, r learning.TeachingPlanUploadRequest) (learning.TeachingPlan, error) {
+	return s.content.CreateTeachingPlan(o, p, r)
+}
+func (s *Service) TeachingPlanFile(p learning.Principal, id string) (learning.FileAsset, error) {
+	return s.content.TeachingPlanFile(p, id)
+}
+func (s *Service) RetryTeachingPlanPreview(o string, p learning.Principal, id string) error {
+	return s.content.RetryTeachingPlanPreview(o, p, id)
+}
+
 func (s *Service) Courses(p learning.Principal) []learning.Course { return s.content.Courses(p) }
+func (s *Service) CourseFamilies(p learning.Principal) []learning.CourseFamily {
+	return s.content.CourseFamilies(p)
+}
+func (s *Service) CreateCourseFamily(o string, p learning.Principal, r learning.CourseFamilyCreateRequest) (learning.CourseFamily, error) {
+	return s.content.CreateCourseFamily(o, p, r)
+}
+func (s *Service) UpdateCourseFamily(o string, p learning.Principal, id string, r learning.CourseFamilyUpdateRequest) (learning.CourseFamily, error) {
+	return s.content.UpdateCourseFamily(o, p, id, r)
+}
+func (s *Service) AddCourseFamilyCourse(o string, p learning.Principal, id string, r learning.CourseFamilyAddCourseRequest) (learning.Course, error) {
+	return s.content.AddCourseFamilyCourse(o, p, id, r)
+}
+func (s *Service) ImportCourseFamily(o string, p learning.Principal, r learning.CourseFamilyImportRequest) (learning.CourseFamily, error) {
+	return s.content.ImportCourseFamily(o, p, r)
+}
 func (s *Service) CreateCourse(o string, p learning.Principal, r learning.CourseUpsertRequest) (learning.Course, error) {
 	return s.content.CreateCourse(o, p, r)
 }

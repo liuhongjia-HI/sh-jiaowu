@@ -141,7 +141,7 @@ test('新增课程按目录层级引导添加内容', async ({ page }) => {
   await login(page, '13800000001');
   await expectPageHeading(page, '/content', '课程内容');
 
-  await page.getByRole('button', { name: '新增课程' }).click();
+  await page.getByRole('button', { name: '新增课程', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: '新增课程' });
   await expect(drawer.getByRole('button', { name: '新增 Unit' })).toBeVisible();
   await expect(drawer.getByText('选择上级', { exact: true })).toHaveCount(0);
@@ -178,7 +178,7 @@ test('四年级课程可选择地理学科', async ({ page }) => {
   await login(page, '13800000001');
   await expectPageHeading(page, '/content', '课程内容');
 
-  await page.getByRole('button', { name: '新增课程' }).click();
+  await page.getByRole('button', { name: '新增课程', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: '新增课程' });
   await selectOption(page, drawer, '年级', '四年级');
   const subjectField = drawer.locator('.ant-form-item').filter({ hasText: '科目' }).first();
@@ -237,7 +237,7 @@ test('课程内容可按年级和学科快捷筛选', async ({ page }) => {
   await expect(page.getByText('G4S1Q1 Math')).toBeVisible();
   await expect(page.getByText('G5S1Q1 Geo')).toHaveCount(0);
 
-  await filters.getByRole('button', { name: '重置' }).click();
+  await filters.getByRole('button', { name: /重\s*置/ }).click();
   await expect(page.getByText('G5S1Q1 Geo')).toBeVisible();
 
   await filters.getByRole('combobox', { name: '学科' }).click();
@@ -1108,6 +1108,17 @@ test('上传课程讲义后可以预检查并同步到同阶段课程', async ({
   await expect(sync.getByText('新增', { exact: true })).toBeVisible();
   await sync.getByRole('button', { name: '确认同步到 1 门课程' }).click();
   await expect(sync).toBeHidden();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const sourceRow = page.locator('.ant-table-tbody tr').filter({ hasText: sourceName }).filter({ hasText: 'HD' }).last();
+  await sourceRow.getByRole('button', { name: '跨班型同步' }).click();
+  const manualSync = page.getByRole('dialog', { name: '跨班型同步课节讲义' });
+  await expect(manualSync).toBeVisible();
+  await manualSync.getByRole('checkbox', { name: targetName, exact: false }).check();
+  await manualSync.getByRole('button', { name: '检查同步内容' }).click();
+  await expect(manualSync.getByText(targetName, { exact: true })).toBeVisible();
+  await manualSync.screenshot({ path: '../docs/跨班型手动同步_实施预览.png' });
+  await manualSync.getByRole('button', { name: '确认同步到 1 门课程' }).click();
+  await expect(manualSync).toBeHidden();
 });
 
 test('校区管理员可以从周历入口新建排课', async ({ page }) => {

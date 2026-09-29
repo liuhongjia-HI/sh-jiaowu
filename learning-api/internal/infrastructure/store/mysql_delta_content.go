@@ -2,8 +2,17 @@ package store
 
 func contentRows(s *MemoryStore) []persistenceRow {
 	rows := make([]persistenceRow, 0, len(s.courses)+len(s.materials)+len(s.homework)+len(s.questionBank)+len(s.fileAssets)+len(s.previewJobs)+len(s.reviews)+len(s.submissions)+len(s.scoreRecords))
+	for _, family := range s.courseFamilies {
+		rows = append(rows, simpleRow("course_families", "id", family.ID, `INSERT INTO course_families (id, name, grade, subject, semester, phase, curriculum_json) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), grade=VALUES(grade), subject=VALUES(subject), semester=VALUES(semester), phase=VALUES(phase), curriculum_json=VALUES(curriculum_json)`, family.ID, family.Name, family.Grade, family.Subject, family.Semester, family.Phase, mustJSON(family.Curriculum)))
+	}
+	for _, item := range s.teachingPlans {
+		rows = append(rows, simpleRow("teaching_plans", "id", item.ID, `INSERT INTO teaching_plans (id, title, grade, subject, file_id, file_name, file_size, file_type, uploader_id, uploader_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), grade=VALUES(grade), subject=VALUES(subject), file_id=VALUES(file_id), file_name=VALUES(file_name), file_size=VALUES(file_size), file_type=VALUES(file_type), uploader_id=VALUES(uploader_id), uploader_name=VALUES(uploader_name)`, item.ID, item.Title, item.Grade, item.Subject, item.FileID, item.FileName, item.FileSize, item.FileType, item.UploaderID, item.UploaderName, nullableDateTime(item.CreatedAt)))
+	}
 	for _, item := range s.courses {
-		rows = append(rows, simpleRow("courses", "id", item.ID, `INSERT INTO courses (id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE learning_space_id=VALUES(learning_space_id), name=VALUES(name), subject=VALUES(subject), grade=VALUES(grade), status=VALUES(status), chapter_count=VALUES(chapter_count), chapters_json=VALUES(chapters_json)`, item.ID, item.LearningSpaceID, item.Name, item.Subject, item.Grade, item.Status, item.ChapterCount, mustJSON(item.Chapters)))
+		rows = append(rows, simpleRow("courses", "id", item.ID, `INSERT INTO courses (id, family_id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE family_id=VALUES(family_id), learning_space_id=VALUES(learning_space_id), name=VALUES(name), subject=VALUES(subject), grade=VALUES(grade), status=VALUES(status), chapter_count=VALUES(chapter_count), chapters_json=VALUES(chapters_json)`, item.ID, item.FamilyID, item.LearningSpaceID, item.Name, item.Subject, item.Grade, item.Status, item.ChapterCount, mustJSON(item.Chapters)))
+		if item.FamilyID != "" {
+			continue
+		}
 		for _, node := range item.Curriculum {
 			rows = append(rows, simpleRow("course_curriculum_nodes", "id", node.ID, `INSERT INTO course_curriculum_nodes (id, course_id, parent_id, node_type, name, sort_order) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE course_id=VALUES(course_id), parent_id=VALUES(parent_id), node_type=VALUES(node_type), name=VALUES(name), sort_order=VALUES(sort_order)`, node.ID, item.ID, node.ParentID, node.Type, nullableCurriculumName(node.Name), node.SortOrder))
 		}

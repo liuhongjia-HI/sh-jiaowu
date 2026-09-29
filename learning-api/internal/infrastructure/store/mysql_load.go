@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -21,10 +22,12 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadGuardiansFromDB,
 		s.loadGuardianStudentsFromDB,
 		s.loadPackagesFromDB,
+		s.loadCourseFamiliesFromDB,
 		s.loadCoursesFromDB,
 		s.loadCourseCurriculumFromDB,
 		s.loadQuestionBankFromDB,
 		s.loadMaterialsFromDB,
+		s.loadTeachingPlansFromDB,
 		s.loadHomeworkFromDB,
 		s.loadGrantsFromDB,
 		s.loadTrialsFromDB,
@@ -61,6 +64,26 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		return err
 	}
 	return nil
+}
+
+func (s *MemoryStore) loadTeachingPlansFromDB() error {
+	rows, err := s.db.Query(`SELECT id, title, grade, subject, file_id, file_name, file_size, file_type, uploader_id, uploader_name, created_at FROM teaching_plans ORDER BY created_at DESC, id DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	out := []learning.TeachingPlan{}
+	for rows.Next() {
+		var item learning.TeachingPlan
+		var createdAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.Title, &item.Grade, &item.Subject, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.UploaderID, &item.UploaderName, &createdAt); err != nil {
+			return err
+		}
+		item.CreatedAt = dateTimeString(createdAt)
+		out = append(out, item)
+	}
+	s.teachingPlans = out
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadOfficialMessagingFromDB() error {
@@ -479,7 +502,7 @@ func (s *MemoryStore) loadPackageContentTypes() ([]packageContentType, error) {
 }
 
 func (s *MemoryStore) loadCoursesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json FROM courses ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, family_id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json FROM courses ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -488,7 +511,7 @@ func (s *MemoryStore) loadCoursesFromDB() error {
 	for rows.Next() {
 		var item learning.Course
 		var chaptersJSON sql.NullString
-		if err := rows.Scan(&item.ID, &item.LearningSpaceID, &item.Name, &item.Subject, &item.Grade, &item.Status, &item.ChapterCount, &chaptersJSON); err != nil {
+		if err := rows.Scan(&item.ID, &item.FamilyID, &item.LearningSpaceID, &item.Name, &item.Subject, &item.Grade, &item.Status, &item.ChapterCount, &chaptersJSON); err != nil {
 			return err
 		}
 		item.Chapters = parseStringSliceJSON(chaptersJSON.String)
@@ -519,10 +542,40 @@ func (s *MemoryStore) loadCourseCurriculumFromDB() error {
 		return err
 	}
 	for index := range s.courses {
-		s.courses[index].Curriculum = byCourse[s.courses[index].ID]
+		if s.courses[index].FamilyID != "" {
+			familyIndex := s.courseFamilyIndex(s.courses[index].FamilyID)
+			if familyIndex < 0 {
+				return fmt.Errorf("course %s references missing family %s", s.courses[index].ID, s.courses[index].FamilyID)
+			}
+			s.courses[index].Curriculum = append([]learning.CurriculumNode(nil), s.courseFamilies[familyIndex].Curriculum...)
+		} else {
+			s.courses[index].Curriculum = byCourse[s.courses[index].ID]
+		}
 		s.courses[index].LessonCount = countCurriculumLessons(s.courses[index].Curriculum)
 	}
 	return nil
+}
+
+func (s *MemoryStore) loadCourseFamiliesFromDB() error {
+	rows, err := s.db.Query(`SELECT id, name, grade, subject, semester, phase, curriculum_json FROM course_families ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	families := []learning.CourseFamily{}
+	for rows.Next() {
+		var family learning.CourseFamily
+		var curriculumJSON string
+		if err := rows.Scan(&family.ID, &family.Name, &family.Grade, &family.Subject, &family.Semester, &family.Phase, &curriculumJSON); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(curriculumJSON), &family.Curriculum); err != nil {
+			return err
+		}
+		families = append(families, family)
+	}
+	s.courseFamilies = families
+	return rows.Err()
 }
 
 func (s *MemoryStore) loadMaterialsFromDB() error {

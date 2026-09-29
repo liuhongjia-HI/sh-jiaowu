@@ -66,11 +66,18 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	work.contentTypes = append([]packageContentType(nil), s.contentTypes...)
 	work.spaceAccess = append([]learningSpaceAccess(nil), s.spaceAccess...)
 	work.courses = append([]learning.Course(nil), s.courses...)
+	work.courseFamilies = make([]learning.CourseFamily, len(s.courseFamilies))
+	for index, family := range s.courseFamilies {
+		family.Curriculum = append([]learning.CurriculumNode(nil), family.Curriculum...)
+		family.Courses = nil
+		work.courseFamilies[index] = family
+	}
 	work.questionBank = make([]learning.QuestionBankItem, len(s.questionBank))
 	for index, item := range s.questionBank {
 		work.questionBank[index] = cloneQuestionBankItem(item)
 	}
 	work.materials = append([]learning.Material(nil), s.materials...)
+	work.teachingPlans = append([]learning.TeachingPlan(nil), s.teachingPlans...)
 	work.homework = make([]learning.Homework, len(s.homework))
 	for index, item := range s.homework {
 		work.homework[index] = cloneHomework(item)
@@ -175,8 +182,10 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.contentTypes = work.contentTypes
 	s.spaceAccess = work.spaceAccess
 	s.courses = work.courses
+	s.courseFamilies = work.courseFamilies
 	s.questionBank = work.questionBank
 	s.materials = work.materials
+	s.teachingPlans = work.teachingPlans
 	s.homework = work.homework
 	s.fileAssets = work.fileAssets
 	s.previewJobs = work.previewJobs

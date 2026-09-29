@@ -23,6 +23,17 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		return err
 	}
 	statements := []string{
+		`CREATE TABLE IF NOT EXISTS course_families (
+			id VARCHAR(64) PRIMARY KEY,
+			name VARCHAR(128) NOT NULL,
+			grade VARCHAR(32) NOT NULL,
+			subject VARCHAR(32) NOT NULL,
+			semester VARCHAR(32) NOT NULL,
+			phase VARCHAR(32) NOT NULL,
+			curriculum_json LONGTEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS official_account_templates (
 			template_id VARCHAR(191) PRIMARY KEY,
 			title VARCHAR(255) NOT NULL DEFAULT '',
@@ -117,6 +128,20 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			sort_order INT NOT NULL DEFAULT 0,
 			status VARCHAR(32) NOT NULL DEFAULT '启用',
 			UNIQUE KEY uk_subject_name (name)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS teaching_plans (
+			id VARCHAR(64) PRIMARY KEY,
+			title VARCHAR(128) NOT NULL,
+			grade VARCHAR(32) NOT NULL,
+			subject VARCHAR(32) NOT NULL,
+			file_id VARCHAR(64) NOT NULL,
+			file_name VARCHAR(255) NOT NULL,
+			file_size BIGINT NOT NULL DEFAULT 0,
+			file_type VARCHAR(32) NOT NULL DEFAULT '',
+			uploader_id VARCHAR(64) NOT NULL,
+			uploader_name VARCHAR(64) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			KEY idx_teaching_plan_scope (grade, subject, created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS starline_file_assets (
 			id VARCHAR(64) PRIMARY KEY,
@@ -397,6 +422,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		name  string
 		def   string
 	}{
+		{"courses", "family_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"users", "password_hash", "TEXT NOT NULL"},
 		{"users", "must_change_password", "TINYINT(1) NOT NULL DEFAULT 0"},
 		{"users", "token_version", "INT NOT NULL DEFAULT 0"},

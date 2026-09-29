@@ -211,6 +211,9 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 		if s.courses[index].ID != id {
 			continue
 		}
+		if s.courses[index].FamilyID != "" {
+			return learning.Course{}, errors.New("共享目录课程请在课程系列中编辑")
+		}
 		if err := s.validateCourseContentBindings(course); err != nil {
 			return learning.Course{}, err
 		}
@@ -267,7 +270,22 @@ func (s *MemoryStore) deleteCourseUnlocked(operator string, principal learning.P
 			return errors.New("不能删除未负责的课程")
 		}
 		name := course.Name
+		familyID := course.FamilyID
 		s.courses = append(s.courses[:i:i], s.courses[i+1:]...)
+		if familyID != "" {
+			remaining := false
+			for _, item := range s.courses {
+				if item.FamilyID == familyID {
+					remaining = true
+					break
+				}
+			}
+			if !remaining {
+				if index := s.courseFamilyIndex(familyID); index >= 0 {
+					s.courseFamilies = append(s.courseFamilies[:index:index], s.courseFamilies[index+1:]...)
+				}
+			}
+		}
 		s.materials = filterMaterialsByCourse(s.materials, id)
 		s.homework = filterHomeworkByCourse(s.homework, id)
 		s.prependLogDetail(operator, "删除课程", name, "")
