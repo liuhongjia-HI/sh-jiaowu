@@ -55,7 +55,7 @@ export function CalendarTimeline({ mode, date, people, lessons, slots, courseByI
       {columns.map(column => <div className="schedule-day-head schedule-lane-head" key={column.key}>
         <strong>{mode === 'day' ? column.person?.name ?? '全部课程' : `${Number(column.date.slice(5, 7))}/${Number(column.date.slice(8))} ${['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][weekdayOfDateText(column.date)]}`}</strong>
         <span>{column.person ? (column.person.kind === 'teacher' ? '教师' : '学生') : '课程总览'} · {column.lessons.filter(lesson => lesson.status !== '已取消').length} 节课</span>
-        {column.person && <small>{column.slots.length ? '已登记可上课时间' : '可上课时间未登记'}</small>}
+        {column.person && <small>{column.slots.some(slot => !slot.unavailable) ? '已登记可上课时间' : '当天可上课时间未登记'}</small>}
       </div>)}
       <div className="schedule-time-gutter schedule-time-axis" style={{ height }}>
         {Array.from({ length: (end - start) / 30 }, (_, i) => <div className="schedule-time-label" key={i} style={{ top: i * 44 }}>{minuteText(start + i * 30)}</div>)}

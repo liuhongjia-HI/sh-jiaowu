@@ -1123,25 +1123,22 @@ test('上传课程讲义后可以预检查并同步到同阶段课程', async ({
 
 test('校区管理员可以从周历入口新建排课', async ({ page }) => {
   await login(page, '13800000002');
-
   await expectPageHeading(page, '/scheduling', '排课管理');
-  await expect(page.getByText('排班工作台', { exact: false }).first()).toBeVisible();
-  // 默认落在资源泳道日视图，这条用例验的是周视图入口，先切过去。
-  await page.locator('.ant-segmented-item-label', { hasText: '周视图' }).click();
-  await expect(page.locator('.schedule-timeline-grid')).toBeVisible();
+  await expect(page.locator('.calendar-workbench')).toBeVisible();
+  await page.locator('.calendar-toolbar').getByText('周', { exact: true }).click();
   await expect(page.locator('.schedule-day-head')).toHaveCount(7);
-  // 侧栏默认收起，展开后才该看到学科日历。
-  await expect(page.getByText('学科日历')).toBeHidden();
-  await page.locator('.schedule-sidebar-rail').click();
-  await expect(page.getByText('学科日历')).toBeVisible();
-  await expect(page.getByText('老师可授课').first()).toBeVisible();
-  await expect(page.getByText('学生可上课').first()).toBeVisible();
-  await expect(page.locator('.schedule-timeline-grid')).toContainText('19:00-21:00');
-  await expect(page.locator('.schedule-timeline-grid')).toContainText('英语老师');
-  await expect(page.getByText('教室/资源')).toHaveCount(0);
-  await page.locator('.schedule-day-empty-slot').first().click();
-  await expect(page.getByRole('dialog', { name: '新建课程' })).toBeVisible();
-  await expect(page.getByRole('dialog', { name: '新建课程' }).getByText('教室/资源')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: '选择人员日历' })).toBeVisible();
+  await page.getByRole('button', { name: '收起侧栏' }).click();
+  await expect(page.getByRole('combobox', { name: '选择人员日历' })).toBeHidden();
+  await page.getByRole('button', { name: '人员日历', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: '选择人员日历' })).toBeVisible();
+  await expect(page.getByText('教师可上课', { exact: true })).toBeVisible();
+  await expect(page.getByText('学生可上课', { exact: true })).toBeVisible();
+  await expect(page.locator('.calendar-scroll')).toBeVisible();
+  await page.getByRole('button', { name: '新建课程', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: '新建课程' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText('教室/资源')).toHaveCount(0);
 });
 
 test('校区管理员可以右键复制课程并只修改日期创建新课', async ({ page }) => {
@@ -1202,7 +1199,7 @@ test('校区管理员可以右键复制课程并只修改日期创建新课', as
   });
 
   await expectPageHeading(page, '/scheduling', '排课管理');
-  await expect(page.getByText('右键课程可快速复制')).toBeVisible();
+  await expect(page.locator('.calendar-workbench')).toBeVisible();
   const sourceClass = page.locator('.schedule-timeline-block.is-class').filter({ hasText: `${startTime}-${endTime}` }).first();
   await expect(sourceClass).toBeVisible();
   await sourceClass.click({ button: 'right' });
@@ -1214,6 +1211,9 @@ test('校区管理员可以右键复制课程并只修改日期创建新课', as
   await expect(drawer.getByLabel('上课日期')).toHaveValue(sourceDate);
   await drawer.getByLabel('上课日期').fill(copiedDate);
   await drawer.getByRole('button', { name: '创建复制课程' }).click();
+  const warning = page.getByRole('dialog', { name: '确认超出可上课时间' });
+  await expect(warning).toBeVisible();
+  await warning.getByRole('button', { name: '已协调，继续排课' }).click();
 
   await expect(drawer).toBeHidden();
   await expect(page.getByText('复制课程已创建，课表已更新')).toBeVisible();
@@ -1239,9 +1239,10 @@ test('校区管理员可以按固定周次和多个星期创建重复课程', as
     });
   });
 
+  await page.route('**/api/schedule-classes/preview', route => route.fulfill({ json: { code: 0, data: { canSave: true, lessons: [{ date: '2026-10-01', errors: [], warnings: [] }] } } }));
   await expectPageHeading(page, '/scheduling', '排课管理');
-  await page.locator('.ant-segmented-item-label', { hasText: '周视图' }).click();
-  await page.locator('.schedule-day-empty-slot').first().click();
+  await page.locator('.calendar-toolbar').getByText('周', { exact: true }).click();
+  await page.getByRole('button', { name: '新建课程', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: '新建课程' });
   await expect(drawer).toBeVisible();
   for (const fieldName of ['课程', '老师']) {

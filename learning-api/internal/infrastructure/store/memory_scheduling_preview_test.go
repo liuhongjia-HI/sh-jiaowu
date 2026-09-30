@@ -145,7 +145,21 @@ func TestMySQLCalendarAvailabilityAndSeriesSurviveReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	date := time.Now().AddDate(0, 0, 45).Format("2006-01-02")
+	targetDate := time.Now().AddDate(0, 0, 45)
+	for {
+		occupied := false
+		date := targetDate.Format("2006-01-02")
+		for _, item := range s.scheduleClasses {
+			if item.TeacherID == "user-teacher" && item.LessonDate == date && item.Status != "已取消" && item.StartTime < "07:00" && item.EndTime > "06:00" {
+				occupied = true
+			}
+		}
+		if !occupied {
+			break
+		}
+		targetDate = targetDate.AddDate(0, 0, 1)
+	}
+	date := targetDate.Format("2006-01-02")
 	// Pick a unique time to avoid any seed lesson. Isolated test DB only.
 	req := learning.ScheduleClassCreateRequest{CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", CampusID: "campus-main", ClassType: "1V1", DurationMinutes: 60, StartTime: "06:00", EndTime: "07:00", StartDate: date, StudentIDs: []string{"stu-001"}, IgnoreWarnings: true, Repeat: &learning.ScheduleRepeat{Freq: "weekly", Interval: 1, Count: 3}}
 	first, err := s.CreateScheduleClass("测试教务", p, req)
@@ -184,6 +198,7 @@ func TestMySQLCalendarAvailabilityAndSeriesSurviveReload(t *testing.T) {
 	}
 	defer third.db.Close()
 	lessons = seriesLessons(third, first.SeriesID)
+	defer third.CancelScheduleClassScope("测试清理", p, first.ID, learning.EditScopeAll)
 	if lessons[0].Status == "已取消" || lessons[1].Status != "已取消" || lessons[2].Status != "已取消" {
 		t.Fatalf("scope did not persist: %#v", lessons)
 	}

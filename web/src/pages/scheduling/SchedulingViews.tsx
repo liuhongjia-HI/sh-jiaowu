@@ -1149,9 +1149,7 @@ export function classColumns(courseById: CourseLookup, teacherById: Record<strin
       render: (_, record) => record.status === '已取消' ? <Typography.Text type="secondary">-</Typography.Text> : (
         <Space size={4}>
           <ActionButton tooltip="调课" icon={<EditOutlined />} onClick={() => onEdit(record)} />
-          <Popconfirm title="取消这节课？" description="取消后该时间不再占用，可重新排课。" okText="取消课程" cancelText="保留" onConfirm={() => onCancel(record.id)}>
-            <ActionButton danger tooltip="取消课程" icon={<CloseCircleOutlined />} loading={canceling} />
-          </Popconfirm>
+          <ActionButton danger tooltip="取消课程" icon={<CloseCircleOutlined />} loading={canceling} onClick={() => onCancel(record.id)} />
         </Space>
       )
     });

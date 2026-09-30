@@ -3246,3 +3246,4 @@ button.schedule-block:hover {
 .calendar-workbench .schedule-mini-calendar { min-width: 0; }
 .calendar-workbench .schedule-mini-calendar { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .calendar-workbench .schedule-mini-day { min-width: 0; padding: 0; }
+.calendar-workbench .schedule-outlook-main { grid-template-columns: minmax(0, 1fr); }

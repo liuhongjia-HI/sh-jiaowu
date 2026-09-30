@@ -153,3 +153,14 @@ test('drag across week dates updates the date with explicit series scope', async
   expect(writes[0].body.startDate).toBe(targetDate);
   expect(writes[0].body.editScope).toBe('this');
 });
+
+test('wide list scroll stays inside table and keeps calendar controls visible', async ({ page }) => {
+  await page.getByText('列表', { exact: true }).click();
+  const toolbar = page.locator('.calendar-toolbar');
+  const before = await toolbar.boundingBox();
+  await page.getByRole('row').filter({ hasText: `${today} 10:00-11:30` }).getByRole('button', { name: '调课' }).click();
+  await expect(page.getByRole('dialog', { name: '课程详情' })).toBeVisible();
+  const after = await toolbar.boundingBox();
+  expect(after?.x).toBe(before?.x);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});

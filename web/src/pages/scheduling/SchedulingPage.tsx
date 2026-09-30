@@ -483,7 +483,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             <Button icon={<LeftOutlined />} aria-label="上一期" onClick={() => viewMode === 'month' ? goToDate(addMonths(calendarMonth, -1)) : goToDate(addDays(selectedDate, viewMode === 'day' ? -1 : -7))} />
             <Button onClick={() => goToDate(new Date())}>今天</Button>
             <Button icon={<RightOutlined />} aria-label="下一期" onClick={() => viewMode === 'month' ? goToDate(addMonths(calendarMonth, 1)) : goToDate(addDays(selectedDate, viewMode === 'day' ? 1 : 7))} />
-            <strong>{viewMode === 'day' ? localDateText(selectedDate) : viewMode === 'month' ? `${calendarMonth.getFullYear()} 年 ${calendarMonth.getMonth() + 1} 月` : formatWeekRange(selectedWeekStart)}</strong>
+            <strong>{viewMode === 'day' ? localDateText(selectedDate) : viewMode === 'list' ? '全部课次' : viewMode === 'month' ? `${calendarMonth.getFullYear()} 年 ${calendarMonth.getMonth() + 1} 月` : formatWeekRange(selectedWeekStart)}</strong>
             {canCreateClass && <Button aria-label="新建课程" type="primary" icon={<PlusOutlined />} onClick={() => openCreateClassForDay(localDateText(selectedDate))}>新建课程</Button>}
           </Space>
           <Segmented value={viewMode} onChange={value => setViewMode(value as CalendarMode)} options={[
@@ -526,7 +526,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               slots={availabilityOverview.data ?? []} courseById={courseById} teacherById={teacherById} studentById={studentById} canManage={canCreateClass}
               onCreate={openCreateClassForDay} onEdit={openEdit} onCopy={openCopy} onMove={confirmMoveClass} onResize={confirmResizeClass}
             /> : viewMode === 'month' ? <MonthScheduleBoard month={calendarMonth} classes={subjectVisibleClasses} courseById={courseById} teacherById={teacherById} canManage={canCreateClass} onEditClass={openEdit} onCopyClass={openCopy} onMoveClass={confirmMoveClass} />
-              : <Table rowKey="id" dataSource={subjectVisibleClasses} pagination={{ pageSize: 20 }} columns={classColumns(courseById, teacherById, canCreateClass, openEdit, requestCancel, cancelClass.isPending)} />}
+              : <Table rowKey="id" scroll={{ x: 1450 }} dataSource={subjectVisibleClasses} pagination={{ pageSize: 20 }} columns={classColumns(courseById, teacherById, canCreateClass, openEdit, requestCancel, cancelClass.isPending)} />}
           </main>
         </div>
       </div>
@@ -560,9 +560,15 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
                       </Form.Item>
                       <ActionButton danger tooltip="删除" icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
                       <Space wrap className="availability-date-fields">
-                        <Form.Item name={[field.name, 'startDate']}><Input type="date" aria-label="生效日期" /></Form.Item>
+                        <Form.Item name={[field.name, 'startDate']}><Input type="date" aria-label="生效日期" onChange={event => { if (availabilityForm.getFieldValue(['slots', field.name, 'unavailable']) && weekdayOfDateText(event.target.value)) availabilityForm.setFieldValue(['slots', field.name, 'dayOfWeek'], weekdayOfDateText(event.target.value)); }} /></Form.Item>
                         <Form.Item name={[field.name, 'endDate']}><Input type="date" aria-label="结束日期" /></Form.Item>
-                        <Form.Item name={[field.name, 'unavailable']} valuePropName="checked"><Switch checkedChildren="不可上课" unCheckedChildren="可上课" /></Form.Item>
+                        <Form.Item name={[field.name, 'unavailable']} valuePropName="checked"><Switch checkedChildren="不可上课" unCheckedChildren="可上课" onChange={checked => {
+                          if (!checked) return;
+                          const date = availabilityForm.getFieldValue(['slots', field.name, 'startDate']) || localDateText(selectedDate);
+                          availabilityForm.setFieldValue(['slots', field.name, 'startDate'], date);
+                          if (!availabilityForm.getFieldValue(['slots', field.name, 'endDate'])) availabilityForm.setFieldValue(['slots', field.name, 'endDate'], date);
+                          availabilityForm.setFieldValue(['slots', field.name, 'dayOfWeek'], weekdayOfDateText(date));
+                        }} /></Form.Item>
                       </Space>
                     </div>
                   ))}
