@@ -4,14 +4,14 @@ const { activateContentSecurity } = require("../../utils/content-security");
 Page({
   data: {
     homeworkId: "",
-    taskTitle: "课后练习",
+    taskTitle: "Exercises",
     deadlineText: "",
-    rewardText: "完成练习可获得徽章",
+    rewardText: "Complete exercises to earn badges",
     questions: [],
     downloadUrl: "",
-    watermarkText: "水印加载中",
-    watermarkTexts: ["水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中", "水印加载中"],
-    securityNotice: "仅供本人学习，请勿外传。",
+    watermarkText: "Loading watermark",
+    watermarkTexts: ["Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark", "Loading watermark"],
+    securityNotice: "For your personal study only. Please do not share.",
     favorited: false,
     favoriteId: "",
     saving: false,
@@ -20,7 +20,7 @@ Page({
   onLoad(options) {
     const id = options.id || "";
     if (!id) {
-      wx.showToast({ title: "题目信息缺失", icon: "none" });
+      wx.showToast({ title: "Question information missing", icon: "none" });
       return;
     }
     this.setData({ homeworkId: id });
@@ -35,36 +35,36 @@ Page({
         index: index + 1,
         options: ((question.type === "judge" && (!question.options || question.options.length === 0)) ? ["正确", "错误"] : (question.options || [])).map((text, optionIndex) => ({
           value: text,
-          label: `${letter(optionIndex)}. ${text}`,
+          label: `${letter(optionIndex)}. ${question.type === "judge" ? ({ "正确": "True", "错误": "False" }[text] || text) : text}`,
           className: ""
         })),
         choice: "",
         choices: [],
         text: ""
       }));
-      const watermarkText = homework.watermarkText || "水印加载中";
+      const watermarkText = homework.watermarkText || "Loading watermark";
       this.setData({
-        taskTitle: `${homework.assessmentType === "mock_exam" ? "模拟考试 · " : "练习 · "}${homework.title || "课后练习"}`,
-        deadlineText: homework.isOverdue ? "已截止" : (homework.deadlineAt ? `截止 ${formatDeadline(homework.deadlineAt)}` : (homework.deadline ? `${homework.deadline} 前完成` : "")),
-        rewardText: homework.course || "完成练习可获得徽章",
+        taskTitle: `${homework.assessmentType === "mock_exam" ? "Mock Exam · " : "Exercise · "}${homework.title || "Exercises"}`,
+        deadlineText: homework.isOverdue ? "Closed" : (homework.deadlineAt ? `Due ${formatDeadline(homework.deadlineAt)}` : (homework.deadline ? `Due ${homework.deadline}` : "")),
+        rewardText: homework.course || "Complete exercises to earn badges",
         questions: restoreDraftAnswers(id, questions),
         downloadUrl: homework.downloadUrl || "",
         watermarkText,
         watermarkTexts: buildWatermarks(watermarkText),
-        securityNotice: homework.securityNotice || "仅供本人学习，请勿外传。",
+        securityNotice: homework.securityNotice || "For your personal study only. Please do not share.",
         isOverdue: Boolean(homework.isOverdue)
       });
     }).catch(() => {
       this.setData({
-        rewardText: "题目加载失败",
-        securityNotice: "题目加载失败，请重新进入。"
+        rewardText: "Failed to load questions",
+        securityNotice: "Failed to load questions. Please reopen this page."
       });
     });
     this.refreshFavorite(id);
   },
   onShareAppMessage() {
     return {
-      title: this.data.taskTitle ? `Starline 练习：${this.data.taskTitle}` : "Starline 课后练习",
+      title: this.data.taskTitle ? `Starline Exercise: ${this.data.taskTitle}` : "Starline Exercises",
       path: this.data.homeworkId ? `/pages/answer/index?id=${encodeURIComponent(this.data.homeworkId)}` : "/pages/tasks/index"
     };
   },
@@ -77,16 +77,16 @@ Page({
   downloadHomework() {
     const downloadUrl = this.data.downloadUrl;
     if (!downloadUrl) {
-      wx.showToast({ title: "当前习题没有开放下载", icon: "none" });
+      wx.showToast({ title: "Downloads are not enabled for this exercise", icon: "none" });
       return;
     }
-    wx.showLoading({ title: "正在下载" });
+    wx.showLoading({ title: "Downloading" });
     downloadWithAuth(stripApiPrefix(downloadUrl)).then((tempFilePath) => new Promise((resolve, reject) => {
       wx.saveFile({ tempFilePath, success: resolve, fail: reject });
     })).then(() => {
-      wx.showToast({ title: "已保存习题", icon: "success" });
+      wx.showToast({ title: "Exercise saved", icon: "success" });
     }).catch((error) => {
-      showFileError("习题下载失败", error);
+      showFileError("Failed to download exercise", error);
     }).finally(() => wx.hideLoading());
   },
   refreshFavorite(homeworkId) {
@@ -104,7 +104,7 @@ Page({
     if (this.data.favorited && this.data.favoriteId) {
       request(`/student/favorites/${this.data.favoriteId}`, { method: "DELETE" })
         .then(() => {
-          wx.showToast({ title: "已取消收藏", icon: "none" });
+          wx.showToast({ title: "Removed from favorites", icon: "none" });
           this.setData({ favorited: false, favoriteId: "" });
         })
         .catch(() => {});
@@ -115,7 +115,7 @@ Page({
       data: { targetType: "homework", targetId: this.data.homeworkId }
     })
       .then((favorite) => {
-        wx.showToast({ title: "已收藏", icon: "success" });
+        wx.showToast({ title: "Added to favorites", icon: "success" });
         this.setData({ favorited: true, favoriteId: favorite.id });
       })
       .catch(() => {});
@@ -153,7 +153,7 @@ Page({
   },
   saveDraft() {
     if (!this.data.homeworkId) {
-      wx.showToast({ title: "题目信息缺失", icon: "none" });
+      wx.showToast({ title: "Question information missing", icon: "none" });
       return;
     }
     wx.setStorageSync(draftKey(this.data.homeworkId), {
@@ -165,18 +165,18 @@ Page({
         text: question.text || ""
       }))
     });
-    wx.showToast({ title: "草稿已保存", icon: "success" });
+    wx.showToast({ title: "Draft saved", icon: "success" });
   },
   submit() {
     if (this.data.saving || this.data.isOverdue) {
-      if (this.data.isOverdue) wx.showToast({ title: "本次练习已截止", icon: "none" });
+      if (this.data.isOverdue) wx.showToast({ title: "This exercise is closed", icon: "none" });
       return;
     }
     const unanswered = this.data.questions.find((question) =>
       question.type === "single" || question.type === "judge" ? !question.choice : question.type === "multiple" ? !(question.choices || []).length : !question.text.trim()
     );
     if (unanswered) {
-          wx.showToast({ title: "还有题目未完成", icon: "none" });
+          wx.showToast({ title: "Please answer all questions", icon: "none" });
       return;
     }
     this.setData({ saving: true });
@@ -194,7 +194,7 @@ Page({
     })
       .then((res) => {
         wx.removeStorageSync(draftKey(this.data.homeworkId));
-        wx.showToast({ title: "已提交", icon: "success" });
+        wx.showToast({ title: "Submitted", icon: "success" });
         wx.navigateTo({ url: `/pages/result/index?id=${res.submissionId}` });
       })
       .catch(() => {
@@ -247,7 +247,7 @@ function buildWatermarks(text) {
 function formatDeadline(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function downloadWithAuth(path) {
@@ -260,22 +260,22 @@ function downloadWithAuth(path) {
       },
       success(res) {
         if (res.statusCode !== 200) {
-          reject(new Error(`习题请求失败（${res.statusCode}）`));
+          reject(new Error(`Exercise request failed (${res.statusCode})`));
           return;
         }
         resolve(res.tempFilePath);
       },
       fail(err) {
-        reject(new Error((err && err.errMsg) || "网络下载失败"));
+        reject(new Error((err && err.errMsg) || "Download failed"));
       }
     });
   });
 }
 
 function showFileError(title, error) {
-  const content = (error && error.message) || "请稍后重试";
+  const content = (error && error.message) || "Please try again later";
   if (wx.showModal) {
-    wx.showModal({ title, content, showCancel: false, confirmText: "知道了" });
+    wx.showModal({ title, content, showCancel: false, confirmText: "OK" });
     return;
   }
   wx.showToast({ title: content, icon: "none" });

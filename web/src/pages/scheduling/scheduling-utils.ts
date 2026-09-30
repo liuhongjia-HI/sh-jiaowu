@@ -94,7 +94,7 @@ export function weekdayOfDateText(value?: string) {
 // 可上课时间是软提醒而不是硬约束：越界不会被直接拒绝，但要用户确认后才放行，
 // 所以这里提前把「谁没登记这个时段」列出来，让用户在提交前就看得见。
 export function availabilityCovers(slot: AvailabilitySlot, dayOfWeek: number, startTime: string, endTime: string, date: string) {
-  if (slot.dayOfWeek !== dayOfWeek) return false;
+  if (slot.unavailable || slot.dayOfWeek !== dayOfWeek) return false;
   if (slot.startTime > startTime || slot.endTime < endTime) return false;
   if (date) {
     if (slot.startDate && date < slot.startDate) return false;

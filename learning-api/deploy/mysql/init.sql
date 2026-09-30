@@ -322,6 +322,7 @@ CREATE TABLE IF NOT EXISTS availability_slots (
   start_date DATE NULL,
   end_date DATE NULL,
   remark VARCHAR(255) NOT NULL DEFAULT '',
+  unavailable BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_availability_owner (owner_type, owner_id),
   KEY idx_availability_day (day_of_week, start_time, end_time)

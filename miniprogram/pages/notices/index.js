@@ -5,17 +5,18 @@ Page({
   data: {
     loading: true,
     error: "",
-    emptyMessage: "课程上传新内容时，会提醒你。",
+    emptyMessage: "You will be notified when new course content is published.",
     activeFilter: "全部",
     readFilter: "全部",
     readFilters: ["全部", "未读", "已读"],
+    readFilterLabels: ["All", "Unread", "Read"],
     unreadCount: 0,
     markingAll: false,
     filters: [
-      { label: "全部", className: "active" },
-      { label: "课程", className: "" },
-      { label: "作业", className: "" },
-      { label: "系统", className: "" }
+      { label: "全部", displayLabel: "All", className: "active" },
+      { label: "课程", displayLabel: "Courses", className: "" },
+      { label: "作业", displayLabel: "Homework", className: "" },
+      { label: "系统", displayLabel: "System", className: "" }
     ],
     notices: [],
     visibleNotices: [],
@@ -59,15 +60,15 @@ Page({
       .catch((error) => {
         if (generation !== this._generation || token !== noticeToken()) return;
         this.setData({
-          error: error.message || "加载失败",
-          emptyMessage: error.message || "课程上传新内容时，会提醒你。",
+          error: error.message || "Failed to load",
+          emptyMessage: error.message || "You will be notified when new course content is published.",
           loading: false
         });
       });
   },
   onShareAppMessage() {
     return {
-      title: "Starline 学习消息提醒",
+      title: "Starline Learning Updates",
       path: "/pages/notices/index"
     };
   },
@@ -84,7 +85,7 @@ Page({
     const path = notice.destinationPath;
     if (!path) {
       this.markNoticeRead(notice);
-      wx.showToast({ title: "这条通知暂无可查看的详情", icon: "none" });
+      wx.showToast({ title: "No details available for this message", icon: "none" });
       return;
     }
     wx.navigateTo({ url: path, success: () => this.markNoticeRead(notice) });
@@ -142,7 +143,7 @@ function decorateNotices(notices, student) {
   return notices.map((notice) => ({
     ...notice,
     isRead: notice.isRead === true,
-    icon: notice.type || "新",
+    icon: ({ "课": "📚", "练": "✍️", "评": "💬", "新": "🔔" })[notice.type] || notice.type || "🔔",
     iconClass: notice.type === "评" ? "review" : "default",
     category: noticeCategory(notice),
     scopeText: noticeScopeText(notice),
@@ -173,10 +174,10 @@ function studentDisplay(student) {
 }
 
 function noticeScopeText(notice) {
-  if (String(notice.relatedType || "").toLowerCase() === "student") return "仅发给指定学生";
+  if (String(notice.relatedType || "").toLowerCase() === "student") return "For the selected student";
   const target = String(notice.target || "").trim();
-  if (!target || /全部|全体/.test(target)) return "面向全部学生";
-  return `通知范围：${target}`;
+  if (!target || /全部|全体/.test(target)) return "For all students";
+  return `Audience: ${target}`;
 }
 
 function noticeCategory(notice) {

@@ -40,7 +40,7 @@ App({
         success: (res) => {
           const code = res.code;
           if (!code) {
-            reject(new Error("微信登录失败"));
+            reject(new Error("WeChat login failed"));
             return;
           }
           wx.request({
@@ -61,7 +61,7 @@ App({
                 resolve(body.data.token);
                 return;
               }
-              reject(new Error(body.message || "微信登录失败"));
+              reject(new Error(body.message || "WeChat login failed"));
             },
             fail: reject
           });

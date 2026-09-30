@@ -1,13 +1,13 @@
 const { request } = require("../../utils/request");
 
 const weekOptions = [
-  { label: "周一", value: 1 },
-  { label: "周二", value: 2 },
-  { label: "周三", value: 3 },
-  { label: "周四", value: 4 },
-  { label: "周五", value: 5 },
-  { label: "周六", value: 6 },
-  { label: "周日", value: 7 }
+  { label: "Mon", value: 1 },
+  { label: "Tue", value: 2 },
+  { label: "Wed", value: 3 },
+  { label: "Thu", value: 4 },
+  { label: "Fri", value: 5 },
+  { label: "Sat", value: 6 },
+  { label: "Sun", value: 7 }
 ];
 
 Page({
@@ -18,14 +18,14 @@ Page({
     classes: [],
     nextClass: null,
     weekOptions,
-    weekFallback: "选择星期"
+    weekFallback: "Select day"
   },
   onLoad() {
     this.loadData();
   },
   onShareAppMessage() {
     return {
-      title: "Starline 学习课表",
+      title: "Starline Schedule",
       path: "/pages/schedule/index"
     };
   },
@@ -45,14 +45,14 @@ Page({
         });
       })
       .catch(() => {
-        this.setData({ loading: false, loadError: "课表加载失败，请稍后重试" });
-        wx.showToast && wx.showToast({ title: "课表加载失败", icon: "none" });
+        this.setData({ loading: false, loadError: "Failed to load schedule. Try again later." });
+        wx.showToast && wx.showToast({ title: "Failed to load schedule", icon: "none" });
       });
   },
   addSlot() {
     const availability = this.data.availability.concat({
       dayOfWeek: 3,
-      weekLabel: "周三",
+      weekLabel: "Wed",
       startTime: "19:00",
       endTime: "20:30"
     });
@@ -85,7 +85,7 @@ Page({
   saveAvailability() {
     const invalid = this.data.availability.some((slot) => !isValidTime(slot.startTime) || !isValidTime(slot.endTime) || slot.startTime >= slot.endTime);
     if (invalid) {
-      wx.showToast({ title: "请填写正确的时间段", icon: "none" });
+      wx.showToast({ title: "Enter a valid time range", icon: "none" });
       return;
     }
     request("/student/availability", {
@@ -93,7 +93,7 @@ Page({
       data: { slots: this.data.availability.map(({ weekLabel, ...slot }) => slot) }
     }).then((availability) => {
       this.setData({ availability: availability.map(withWeekLabel) });
-      wx.showToast({ title: "已保存", icon: "success" });
+      wx.showToast({ title: "Saved", icon: "success" });
     });
   }
 });
@@ -104,7 +104,7 @@ function getWeekLabel(day) {
 }
 
 function withWeekLabel(slot) {
-  return { ...slot, weekLabel: getWeekLabel(slot.dayOfWeek) || "选择星期" };
+  return { ...slot, weekLabel: getWeekLabel(slot.dayOfWeek) || "Select day" };
 }
 
 function withClassDisplay(item) {
@@ -114,7 +114,7 @@ function withClassDisplay(item) {
     weekLabel,
     timeText: [weekLabel, `${item.startTime || ""}-${item.endTime || ""}`].filter(Boolean).join(" "),
     periodText: formatPeriod(item.startDate, item.endDate),
-    statusText: item.status || "已确认"
+    statusText: item.status === "已确认" || !item.status ? "Confirmed" : item.status
   };
 }
 
@@ -124,15 +124,15 @@ function isConfirmedClass(item) {
 
 function formatPeriod(startDate, endDate) {
   if (startDate && endDate) {
-    return `${startDate} 至 ${endDate}`;
+    return `${startDate} to ${endDate}`;
   }
   if (startDate) {
-    return `${startDate} 起`;
+    return `${startDate} onwards`;
   }
   if (endDate) {
-    return `至 ${endDate}`;
+    return `Until ${endDate}`;
   }
-  return "固定课表";
+  return "Regular schedule";
 }
 
 function isValidTime(value) {

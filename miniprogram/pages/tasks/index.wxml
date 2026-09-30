@@ -1,34 +1,34 @@
 <view class="hero">
-  <view class="eyebrow">练习</view>
-  <view class="hero-title">完成今天的练习</view>
+  <view class="eyebrow">Exercises</view>
+  <view class="hero-title">Complete Today's Exercises</view>
 </view>
 
 <view class="section">
   <view class="filter-row">
-    <view wx:for="{{filters}}" wx:key="label" class="tag {{item.className}}" data-filter="{{item.label}}" bindtap="changeFilter">{{item.label}}</view>
+    <view wx:for="{{filters}}" wx:key="label" class="tag {{item.className}}" data-filter="{{item.label}}" bindtap="changeFilter">{{item.displayLabel}}</view>
   </view>
 </view>
-<view wx:if="{{loading}}" class="empty">正在加载练习...</view>
+<view wx:if="{{loading}}" class="empty">Loading exercises...</view>
 <view wx:elif="{{tasks.length === 0}}" class="section">
   <view class="empty-card">
-    <view class="title">今天没有待完成的练习</view>
+    <view class="title">No pending exercises today</view>
     <view class="sub">{{emptyMessage}}</view>
   </view>
 </view>
 <view wx:elif="{{visibleTasks.length === 0}}" class="section">
   <view class="empty-card">
-    <view class="title">这个分类还没有内容</view>
-    <view class="sub">切换到“全部”查看当前练习。</view>
+    <view class="title">No exercises in this category</view>
+    <view class="sub">Switch to All to view your exercises.</view>
   </view>
 </view>
 <view wx:else class="section">
   <view wx:for="{{visibleTasks}}" wx:key="id" class="card {{item.cardClass}}" bindtap="goAnswer" data-id="{{item.id}}">
     <view class="row">
       <view class="title">{{item.title}}</view>
-      <view class="tag">{{item.studentStatus}}</view>
+      <view class="tag">{{item.statusLabel}}</view>
     </view>
     <view class="sub">{{item.course}} · {{item.packageName}}</view>
-    <view class="sub">截止 {{item.deadline}} · {{item.questionNum}} 题</view>
+    <view class="sub">Due {{item.deadline}} · {{item.questionNum}} questions</view>
     <view class="badges">
       <view class="badge">🎁 {{item.rewardText}}</view>
       <view class="badge">{{item.estimateText}}</view>

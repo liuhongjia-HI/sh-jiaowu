@@ -49,6 +49,7 @@ test("notice tabs switch active state and filter messages by category", async ()
   await flushPromises();
 
   assert.equal(page.data.visibleNotices.length, 3);
+  assert.deepEqual(page.data.filters.map(item => item.displayLabel), ["All", "Courses", "Homework", "System"]);
   page.changeFilter({ currentTarget: { dataset: { filter: "作业" } } });
   assert.equal(page.data.activeFilter, "作业");
   assert.deepEqual(page.data.visibleNotices.map((item) => item.id), ["homework-1"]);
@@ -161,7 +162,7 @@ test("notice without a related detail stays on the list and explains why", async
   await flushPromises();
   page.goNotice({ currentTarget: { dataset: { id: "system-1" } } });
 
-  assert.deepEqual(toasts, [{ title: "这条通知暂无可查看的详情", icon: "none" }]);
+  assert.deepEqual(toasts, [{ title: "No details available for this message", icon: "none" }]);
 });
 
 test("notice header only identifies the student selected in personal center", async () => {

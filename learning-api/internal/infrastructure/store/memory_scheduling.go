@@ -76,6 +76,9 @@ func (s *MemoryStore) saveAvailabilityUnlocked(operator string, principal learni
 		slot.StartDate = strings.TrimSpace(slot.StartDate)
 		slot.EndDate = strings.TrimSpace(slot.EndDate)
 		slot.Remark = strings.TrimSpace(slot.Remark)
+		if slot.Unavailable && (slot.StartDate == "" || slot.EndDate == "") {
+			return nil, errors.New("临时不可上课时段必须填写起止日期")
+		}
 		if slot.DayOfWeek < 1 || slot.DayOfWeek > 7 {
 			return nil, errors.New("请选择星期")
 		}
@@ -200,6 +203,9 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 	candidates := make([]learning.ScheduleCandidate, 0)
 	for _, teacher := range teachers {
 		for _, teacherSlot := range s.ownerAvailability("teacher", teacher.ID) {
+			if teacherSlot.Unavailable {
+				continue
+			}
 			startMin, _ := parseClock(teacherSlot.StartTime)
 			endMin, _ := parseClock(teacherSlot.EndTime)
 			if !dateRangeContains(teacherSlot.StartDate, teacherSlot.EndDate, req.StartDate, req.EndDate) {
@@ -207,7 +213,7 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 			}
 			for candidateStart := startMin; candidateStart+req.DurationMinutes <= endMin; candidateStart += 30 {
 				candidateEnd := candidateStart + req.DurationMinutes
-				if s.hasScheduleConflict("teacher", teacher.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd, req.StartDate, req.EndDate) {
+				if s.hasScheduleConflict("teacher", teacher.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd, req.StartDate, req.EndDate) || !s.teacherAvailable(teacher.ID, teacherSlot.DayOfWeek, candidateStart, candidateEnd, req.StartDate, req.EndDate) {
 					continue
 				}
 				available := make([]learning.CandidateStudent, 0)
@@ -769,33 +775,14 @@ func (s *MemoryStore) updateScheduleSeriesUnlocked(operator string, principal le
 		return learning.ScheduleClass{}, err
 	}
 
-	today := time.Now().Format("2006-01-02")
-	// 「整个系列」也从今天算起：历史课次不参与重排。
-	boundary := today
-	if scope == learning.EditScopeThisAndFuture && anchor.LessonDate > boundary {
-		boundary = anchor.LessonDate
+	targets, err := s.seriesTargets(principal, anchor, scope)
+	if err != nil {
+		return learning.ScheduleClass{}, err
 	}
-
 	original := s.scheduleClasses
-	targets := make([]learning.ScheduleClass, 0, 8)
 	targetIDs := map[string]bool{}
-	for _, item := range original {
-		if item.SeriesID != anchor.SeriesID || item.Detached || item.Status == "已取消" {
-			continue
-		}
-		if item.LessonDate < boundary {
-			continue
-		}
-		// 批量调整必须逐节校验权限，不能只信任作为入口的锚点课次。
-		// 同一系列可能部分已通过、部分仍待审核，教师不能借后者修改前者。
-		if err := scheduleEditPermission(principal, item); err != nil {
-			return learning.ScheduleClass{}, errors.New("系列中包含无权调整的课程：" + err.Error())
-		}
-		targets = append(targets, item)
+	for _, item := range targets {
 		targetIDs[item.ID] = true
-	}
-	if len(targets) == 0 {
-		return learning.ScheduleClass{}, errors.New("这个系列没有可调整的未来课次")
 	}
 
 	// 先把待重排的课次从课表里摘掉再逐节重建，否则系列整体平移时，

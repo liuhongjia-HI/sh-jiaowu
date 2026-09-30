@@ -41,3 +41,10 @@ func (s *Service) UpsertLessonFeedback(o string, p learning.Principal, id string
 func (s *Service) StudentSchedule(p learning.Principal) ([]learning.ScheduleClass, error) {
 	return s.scheduling.StudentSchedule(p)
 }
+
+func (s *Service) PreviewScheduleClass(p learning.Principal, r learning.SchedulePreviewRequest) (learning.SchedulePreview, error) {
+	return s.scheduling.PreviewScheduleClass(p, r)
+}
+func (s *Service) CancelScheduleClassScope(o string, p learning.Principal, id, scope string) (learning.ScheduleClass, error) {
+	return s.scheduling.CancelScheduleClassScope(o, p, id, scope)
+}

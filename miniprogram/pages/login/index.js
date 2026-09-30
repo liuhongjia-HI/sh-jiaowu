@@ -20,6 +20,7 @@ function rememberedStudentID() {
 Page({
   data: {
     binding: false,
+    gradeLabels: Array.from({ length: 12 }, (_, index) => `Grade ${index + 1}`),
     gradeOptions: ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级"],
     gradeIndex: -1,
     form: {
@@ -47,7 +48,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "加入 Starline 学习",
+      title: "Join Starline Learning",
       path: "/pages/home/index"
     };
   },
@@ -66,21 +67,21 @@ Page({
   validateProfile() {
     const form = this.data.form;
     if (!(form.studentName || "").trim()) {
-      wx.showToast({ title: "请输入学生姓名", icon: "none" });
+      wx.showToast({ title: "Enter the student name", icon: "none" });
       return false;
     }
     if (!(form.grade || "").trim()) {
-      wx.showToast({ title: "请输入年级", icon: "none" });
+      wx.showToast({ title: "Select a grade", icon: "none" });
       return false;
     }
     return true;
   },
-  showLoginError(error, fallback = "登录失败") {
+  showLoginError(error, fallback = "Login failed") {
     if (error && error.userNotified) {
       return;
     }
     const message = error && error.message ? error.message : fallback;
-    const title = message.indexOf("微信账号未绑定") !== -1 ? "请先用手机号一键登录" : message;
+    const title = message.indexOf("微信账号未绑定") !== -1 ? "Please log in with your phone number first." : message;
     wx.showToast({ title, icon: "none" });
   },
   silentLogin() {
@@ -125,13 +126,13 @@ Page({
         if (this.loginCancelled) return;
         const code = res.code;
         if (!code) {
-          wx.showToast({ title: "登录失败", icon: "none" });
+          wx.showToast({ title: "Login failed", icon: "none" });
           return;
         }
         this.doLogin({ code });
       },
       fail: () => {
-        wx.showToast({ title: "登录失败", icon: "none" });
+        wx.showToast({ title: "Login failed", icon: "none" });
       }
     });
   },
@@ -141,10 +142,10 @@ Page({
     const detail = event.detail || {};
     if (isCancel(detail)) {
       wx.showModal({
-        title: "已取消手机号授权",
-        content: "可继续填写资料，也可以返回首页后再绑定。",
-        confirmText: "返回首页",
-        cancelText: "继续填写",
+        title: "Phone authorization cancelled",
+        content: "Continue filling in your details, or return home and link your account later.",
+        confirmText: "Home",
+        cancelText: "Edit",
         success: ({ confirm }) => {
           if (confirm) {
             this.leaveLogin();
@@ -165,7 +166,7 @@ Page({
         if (this.loginCancelled) return;
         const code = res.code;
         if (!code) {
-          wx.showToast({ title: "登录失败，请重试", icon: "none" });
+          wx.showToast({ title: "Login failed. Please try again.", icon: "none" });
           return;
         }
         // detail.code 为手机号凭据，后端调用 getuserphonenumber 解析后绑定。
@@ -178,7 +179,7 @@ Page({
           grade: (form.grade || "").trim()
         });
       },
-      fail: () => wx.showToast({ title: "登录失败", icon: "none" })
+      fail: () => wx.showToast({ title: "Login failed", icon: "none" })
     });
   },
   leaveLogin() {
@@ -217,7 +218,7 @@ Page({
         if (result.user && result.user.studentId) {
           wx.setStorageSync(STUDENT_SELECTION_KEY, result.user.studentId);
         }
-        wx.showToast({ title: "绑定成功", icon: "success" });
+        wx.showToast({ title: "Account linked", icon: "success" });
         resumeAfterLogin();
         this.setData({ binding: false });
       })
@@ -229,7 +230,7 @@ Page({
   },
   promptStudentSelection(candidates, payload, path) {
     if (!candidates.length) {
-      wx.showToast({ title: "未找到可绑定的学生，请联系老师确认", icon: "none" });
+      wx.showToast({ title: "No student account found. Contact your teacher.", icon: "none" });
       return;
     }
     wx.showActionSheet({

@@ -11,6 +11,7 @@ Page({
     switchingStudentId: "",
     addingStudent: false,
     studentAddOpen: false,
+    gradeLabels: Array.from({ length: 12 }, (_, index) => `Grade ${index + 1}`),
     gradeOptions: ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级", "七年级", "八年级", "九年级", "十年级", "十一年级", "十二年级"],
     studentAddGradeIndex: -1,
     studentAddForm: {
@@ -21,8 +22,8 @@ Page({
     savingProfile: false,
     savingBasicProfile: false,
     profileEditing: false,
-    profileEditText: "编辑",
-    emptyMessage: "登录后可同步学习记录和老师反馈。",
+    profileEditText: "Edit",
+    emptyMessage: "Log in to sync learning records and teacher feedback.",
     me: null,
     home: null,
     continueCourse: null,
@@ -49,7 +50,7 @@ Page({
   onShareAppMessage() {
     const studentName = this.data.studentProfile && this.data.studentProfile.name;
     return {
-      title: studentName ? `${studentName} 的 Starline 学习主页` : "Starline 学习主页",
+      title: studentName ? `${studentName}  - Starline Learning Profile` : "Starline Learning Profile",
       path: "/pages/home/index"
     };
   },
@@ -81,9 +82,9 @@ Page({
         this.loadStudentAccounts();
       })
       .catch((error) => {
-        const message = error.message || "登录后可同步学习记录和老师反馈。";
+        const message = error.message || "Log in to sync learning records and teacher feedback.";
         if (options.silent && this.data.me) {
-          wx.showToast({ title: error.message || "学习记录更新失败", icon: "none" });
+          wx.showToast({ title: error.message || "Failed to update learning records", icon: "none" });
           return;
         }
         this.setData({
@@ -107,7 +108,7 @@ Page({
       wx.setStorageSync("starline_token", result.token);
       wx.setStorageSync("starline_student_id", studentId);
       refreshNoticeBadge();
-      wx.showToast({ title: `已切换到${result.user.name}`, icon: "success" });
+      wx.showToast({ title: `Switched to ${result.user.name}`, icon: "success" });
       this.setData({ switchingStudentId: "" });
       this.loadMe();
     }).catch(() => this.setData({ switchingStudentId: "" }));
@@ -142,17 +143,17 @@ Page({
     const grade = (form.grade || "").trim();
     const schoolName = (form.schoolName || "").trim();
     if (!name || !grade || !schoolName) {
-      wx.showToast({ title: "请填写姓名、年级和学校", icon: "none" });
+      wx.showToast({ title: "Enter the name, grade, and school", icon: "none" });
       return;
     }
     this.setData({ addingStudent: true });
     request("/student/accounts", { method: "POST", data: { name, grade, schoolName } })
       .then(() => {
         this.setData({ studentAddOpen: false });
-        wx.showToast({ title: "添加成功，已开通体验", icon: "success" });
+        wx.showToast({ title: "Student added. Trial access enabled.", icon: "success" });
         this.loadStudentAccounts();
       })
-      .catch((error) => wx.showToast({ title: error.message || "提交失败，请重试", icon: "none" }))
+      .catch((error) => wx.showToast({ title: error.message || "Submission failed. Please try again.", icon: "none" }))
       .then(() => this.setData({ addingStudent: false }));
   },
   goLogin() {
@@ -213,7 +214,7 @@ Page({
   onChooseAvatar(event) {
     const avatarUrl = event.detail && event.detail.avatarUrl;
     if (!avatarUrl) {
-      wx.showToast({ title: "没有获取到头像，请重试", icon: "none" });
+      wx.showToast({ title: "Avatar not received. Please try again.", icon: "none" });
       return;
     }
     if (this.data.savingProfile) {
@@ -228,7 +229,7 @@ Page({
     const app = getApp();
     const baseUrl = app && app.globalData ? app.globalData.apiBaseUrl : "";
     if (!baseUrl || !wx.uploadFile) {
-      wx.showToast({ title: "当前环境不支持头像上传", icon: "none" });
+      wx.showToast({ title: "Avatar upload is unavailable", icon: "none" });
       return;
     }
     this.setData({ savingProfile: true });
@@ -248,14 +249,14 @@ Page({
         }
         if (response.statusCode !== 200 || body.code !== 0 || !body.data) {
           this.restoreProfileAvatar();
-          wx.showToast({ title: body.message || "头像保存失败，请重试", icon: "none" });
+          wx.showToast({ title: body.message || "Failed to save avatar. Please try again.", icon: "none" });
           return;
         }
-        this.applyUpdatedGuardian(body.data, "头像已更新");
+        this.applyUpdatedGuardian(body.data, "Avatar updated");
       },
       fail: () => {
         this.restoreProfileAvatar();
-        wx.showToast({ title: "头像上传失败，请重试", icon: "none" });
+        wx.showToast({ title: "Failed to upload avatar. Please try again.", icon: "none" });
       },
       complete: () => this.setData({ savingProfile: false })
     });
@@ -278,15 +279,15 @@ Page({
   commitNickname() {
     const nickname = (this.data.guardianProfile.nickname || "").trim();
     if (!nickname) {
-      wx.showToast({ title: "昵称不能为空", icon: "none" });
+      wx.showToast({ title: "Nickname is required", icon: "none" });
       return;
     }
     if (nickname === (((this.data.home && this.data.home.guardian) || {}).nickname || "")) {
       return;
     }
-    this.saveGuardianProfile({ nickname }, "昵称已更新");
+    this.saveGuardianProfile({ nickname }, "Nickname updated");
   },
-  saveGuardianProfile(changes = {}, toastTitle = "资料已更新") {
+  saveGuardianProfile(changes = {}, toastTitle = "Profile updated") {
     if (this.data.savingProfile) {
       return;
     }
@@ -305,7 +306,7 @@ Page({
       .then((guardian) => this.applyUpdatedGuardian(guardian, toastTitle))
       .catch((error) => {
         this.restoreProfileAvatar();
-        wx.showToast({ title: error.message || "保存失败", icon: "none" });
+        wx.showToast({ title: error.message || "Failed to save", icon: "none" });
       })
       .then(() => this.setData({ savingProfile: false }));
   },
@@ -315,16 +316,16 @@ Page({
     }
     const detail = event.detail || {};
     if (isCancel(detail)) {
-      wx.showToast({ title: "已取消手机号授权", icon: "none" });
+      wx.showToast({ title: "Phone authorization cancelled", icon: "none" });
       return;
     }
     if (!detail.code) {
       showPhoneAuthFailed();
       return;
     }
-    this.saveProfileChanges({ phoneCode: detail.code }, "手机号已授权");
+    this.saveProfileChanges({ phoneCode: detail.code }, "Phone authorized");
   },
-  saveProfileChanges(changes = {}, toastTitle = "资料已更新") {
+  saveProfileChanges(changes = {}, toastTitle = "Profile updated") {
     if (this.data.savingProfile) {
       return;
     }
@@ -350,7 +351,7 @@ Page({
     this.setData({ savingProfile: true });
     request("/student/profile", { method: "PUT", data })
       .then((student) => this.applyUpdatedStudent(student, toastTitle))
-      .catch((error) => wx.showToast({ title: error.message || "保存失败", icon: "none" }))
+      .catch((error) => wx.showToast({ title: error.message || "Failed to save", icon: "none" }))
       .then(() => this.setData({ savingProfile: false }));
   },
   onBasicInput(event) {
@@ -359,7 +360,7 @@ Page({
   },
   toggleProfileEdit() {
     const profileEditing = !this.data.profileEditing;
-    this.setData({ profileEditing, profileEditText: profileEditing ? "收起" : "编辑" });
+    this.setData({ profileEditing, profileEditText: profileEditing ? "Close" : "Edit" });
   },
   stopModalTap() {},
   submitBasicProfile() {
@@ -367,11 +368,11 @@ Page({
     const studentName = (form.studentName || "").trim();
     const schoolName = (form.schoolName || "").trim();
     if (!studentName) {
-      wx.showToast({ title: "请输入学生姓名", icon: "none" });
+      wx.showToast({ title: "Enter the student name", icon: "none" });
       return;
     }
     if (!schoolName) {
-      wx.showToast({ title: "请输入学校", icon: "none" });
+      wx.showToast({ title: "Enter the school name", icon: "none" });
       return;
     }
     this.setData({ savingBasicProfile: true });
@@ -383,14 +384,14 @@ Page({
         guardianName: (form.guardianName || "").trim()
       }
     })
-      .then((student) => this.applyUpdatedStudent(student, "资料已保存"))
-      .catch((error) => wx.showToast({ title: error.message || "保存失败", icon: "none" }))
+      .then((student) => this.applyUpdatedStudent(student, "Profile saved"))
+      .catch((error) => wx.showToast({ title: error.message || "Failed to save", icon: "none" }))
       .then(() => this.setData({ savingBasicProfile: false }));
   },
   applyUpdatedStudent(student, toastTitle) {
     const home = this.data.home ? { ...this.data.home, student } : { student };
     const state = buildPageState(home);
-    this.setData({ ...state, profileEditing: false, profileEditText: "编辑" });
+    this.setData({ ...state, profileEditing: false, profileEditText: "Edit" });
     wx.showToast({ title: toastTitle, icon: "success" });
   },
   applyUpdatedGuardian(guardian, toastTitle) {
@@ -409,7 +410,7 @@ Page({
   goLatestFeedback() {
     const feedback = (this.data.home && this.data.home.classroomFeedback || [])[0];
     if (!feedback || !feedback.relatedSubmissionId) {
-      wx.showToast({ title: "老师批改后会显示反馈", icon: "none" });
+      wx.showToast({ title: "Feedback will appear after your teacher reviews your work.", icon: "none" });
       return;
     }
     wx.navigateTo({ url: `/pages/result/index?id=${feedback.relatedSubmissionId}` });
@@ -447,7 +448,7 @@ Page({
 function buildPageState(home = {}) {
   const student = home.student;
   if (!student) {
-    throw new Error("学习账号信息缺失");
+    throw new Error("Learning account information missing");
   }
   const pendingHomework = Array.isArray(home.pendingHomework) ? home.pendingHomework : [];
   const notices = Array.isArray(home.notices) ? home.notices : [];
@@ -488,7 +489,7 @@ function buildRecentLearning(home, continueCourse) {
 function formatRecentDate(value) {
   const text = String(value || "");
   const match = text.match(/^\d{4}-(\d{1,2})-(\d{1,2})/);
-  return match ? `${Number(match[1])}月${Number(match[2])}日` : text;
+  return match ? `${match[1]}-${match[2]}` : text;
 }
 
 function profileFormFromStudent(student) {
@@ -504,26 +505,26 @@ function buildGuardianProfile(guardian = {}) {
   return {
     nickname: guardian.nickname || "",
     avatarUrl: normalizeAvatarUrl(guardian.avatarUrl),
-    displayName: guardian.nickname || "微信用户"
+    displayName: guardian.nickname || "WeChat User"
   };
 }
 
 function buildStudentProfile(student = {}) {
-  const name = student.nickname || student.name || "学员";
-  const grade = student.grade || "年级待补全";
-  const school = student.schoolName || "学校待补全";
+  const name = student.nickname || student.name || "Student";
+  const grade = student.grade || "Grade not provided";
+  const school = student.schoolName || "School not provided";
   const latest = student.lastStudyAt || student.lastSubmittedAt || "";
   const avatarUrl = normalizeAvatarUrl(student.avatarUrl);
   const phoneAuthorized = isAuthorizedPhone(student.phone, student.bindStatus);
   return {
-    name: student.name || "学员",
+    name: student.name || "Student",
     displayName: name,
     avatarUrl,
     avatarText: shortAvatarText(name),
     meta: `${grade} · ${school}`,
-    status: latest ? `最近学习 ${latest}` : "准备开始今天的学习",
+    status: latest ? `Last studied: ${latest}` : "Ready to start learning today",
     phoneAuthorized,
-    phoneHint: phoneAuthorized ? maskPhone(student.phone) : "授权手机号"
+    phoneHint: phoneAuthorized ? maskPhone(student.phone) : "Authorize Phone"
   };
 }
 
@@ -553,19 +554,19 @@ function maskPhone(value) {
   if (text.length === 11 && !text.includes("*")) {
     return `${text.slice(0, 3)}****${text.slice(-4)}`;
   }
-  return text || "授权手机号";
+  return text || "Authorize Phone";
 }
 
 function buildPrimaryTask(home, pendingTask, continueCourse) {
   if (pendingTask && pendingTask.id) {
-    const meta = [pendingTask.course, pendingTask.questionNum ? `${pendingTask.questionNum} 道题` : "", pendingTask.deadline ? `截止 ${pendingTask.deadline}` : ""].filter(Boolean).join(" · ");
+    const meta = [pendingTask.course, pendingTask.questionNum ? `${pendingTask.questionNum} questions` : "", pendingTask.deadline ? `Due ${pendingTask.deadline}` : ""].filter(Boolean).join(" · ");
     return {
       action: "answer",
       tone: "urgent",
-      label: "待完成",
-      title: pendingTask.title || "有练习待完成",
-      desc: meta || "完成后查看得分和反馈。",
-      buttonText: "开始练习"
+      label: "Pending",
+      title: pendingTask.title || "You Have Pending Exercises",
+      desc: meta || "Complete the exercise to view your score and feedback.",
+      buttonText: "Start Exercise"
     };
   }
   if (continueCourse && continueCourse.id) {
@@ -573,10 +574,10 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
     return {
       action: "course",
       tone: "active",
-      label: "继续学习",
-      title: continueCourse.name || "继续上次学习",
-      desc: [continueCourse.grade, subjectLabel(continueCourse.subject), progress > 0 ? `已学 ${progress}%` : ""].filter(Boolean).join(" · ") || "从上次进度继续学习。",
-      buttonText: "继续学习"
+      label: "Continue Learning",
+      title: continueCourse.name || "Resume Learning",
+      desc: [continueCourse.grade, subjectLabel(continueCourse.subject), progress > 0 ? `Completed ${progress}%` : ""].filter(Boolean).join(" · ") || "Continue from where you left off.",
+      buttonText: "Continue Learning"
     };
   }
   const student = home && home.student ? home.student : {};
@@ -584,19 +585,19 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
     return {
       action: "scores",
       tone: "review",
-      label: "学习反馈",
-      title: "查看最近成绩反馈",
-      desc: "查看老师建议，继续练习。",
-      buttonText: "查看反馈"
+      label: "Learning Feedback",
+      title: "View Your Latest Feedback",
+      desc: "Review your teacher's advice and keep practicing.",
+      buttonText: "View Feedback"
     };
   }
   return {
     action: "study",
     tone: "quiet",
-    label: "学习状态",
-      title: "有新内容时会提醒你",
-      desc: "去学习中心查看已开通课程。",
-      buttonText: "去学习"
+    label: "Learning Status",
+      title: "You Will Be Notified of New Content",
+      desc: "View your active courses in the Learning Center.",
+      buttonText: "Start Learning"
   };
 }
 
@@ -607,35 +608,35 @@ function buildOverviewMetrics(student = {}, home = {}, continueCourse = null, pe
   const courseCount = continueCourse && continueCourse.id ? 1 : 0;
   const pendingCount = Array.isArray(pendingHomework) ? pendingHomework.length : 0;
   return [
-    { label: "学习课程", value: `${courseCount}` },
-    { label: "完成课时", value: `${completedLessons}` },
-    { label: "待办", value: `${pendingCount}`, emphasis: pendingCount > 0 }
+    { label: "Courses", value: `${courseCount}` },
+    { label: "Lessons Completed", value: `${completedLessons}` },
+    { label: "Tasks", value: `${pendingCount}`, emphasis: pendingCount > 0 }
   ];
 }
 
 function buildQuickActions() {
   return [
-    { title: "我的课表", action: "schedule", symbol: "▣", tone: "schedule" },
-    { title: "课程讲义", action: "study", symbol: "▰", tone: "materials" },
-    { title: "课堂反馈", action: "feedback", symbol: "▤", tone: "feedback" },
-    { title: "收藏课程", action: "favorites", symbol: "★", tone: "favorites" },
-    { title: "学习提醒", action: "notices", symbol: "🔔", tone: "notice" },
-    { title: "账号设置", action: "profile", symbol: "⚙", tone: "settings" }
+    { title: "My Schedule", action: "schedule", symbol: "▣", tone: "schedule" },
+    { title: "Course Materials", action: "study", symbol: "▰", tone: "materials" },
+    { title: "Class Feedback", action: "feedback", symbol: "▤", tone: "feedback" },
+    { title: "Favorites", action: "favorites", symbol: "★", tone: "favorites" },
+    { title: "Learning Reminders", action: "notices", symbol: "🔔", tone: "notice" },
+    { title: "Account Settings", action: "profile", symbol: "⚙", tone: "settings" }
   ];
 }
 
 function buildProfileCompleteness(student = {}) {
   const missing = [];
-  if (!student.name) missing.push("姓名");
-  if (!student.grade) missing.push("年级");
-  if (!student.schoolName) missing.push("学校");
+  if (!student.name) missing.push("Name");
+  if (!student.grade) missing.push("Grade");
+  if (!student.schoolName) missing.push("School");
   const complete = missing.length === 0;
   return {
     complete,
     statusClass: complete ? "complete" : "pending",
-    status: complete ? "资料完整" : "资料待补全",
-    summary: complete ? `${student.name} · ${student.grade} · ${student.schoolName}` : `待补全：${missing.join("、")}`,
-    detail: complete ? "老师会用这些信息记录成绩和反馈。" : "补全后，成绩和反馈记录会更准确。"
+    status: complete ? "Profile Complete" : "Profile Incomplete",
+    summary: complete ? `${student.name} · ${student.grade} · ${student.schoolName}` : `Missing: ${missing.join(", ")}`,
+    detail: complete ? "Your teacher uses these details to record scores and feedback." : "Complete your profile for more accurate score and feedback records."
   };
 }
 
@@ -643,15 +644,15 @@ function buildSupportNotice(notices = [], pendingHomework = []) {
   const pendingCount = Array.isArray(pendingHomework) ? pendingHomework.length : 0;
   const noticeCount = Array.isArray(notices) ? notices.length : 0;
   if (pendingCount > 0) {
-    return { action: "tasks", title: "还有练习待完成", desc: `${pendingCount} 个练习待完成`, actionText: "开始练习" };
+    return { action: "tasks", title: "Pending Exercises", desc: `${pendingCount} pending exercises`, actionText: "Start Exercise" };
   }
   if (noticeCount > 0) {
-    return { action: "notices", title: "有新的通知", desc: `${noticeCount} 条通知需要查看`, actionText: "查看" };
+    return { action: "notices", title: "New Messages", desc: `${noticeCount} unread messages`, actionText: "View" };
   }
-  return { action: "notices", title: "通知与反馈", desc: "新的课程、反馈和提醒会同步到这里", actionText: "查看" };
+  return { action: "notices", title: "Messages and Feedback", desc: "New courses, feedback, and reminders appear here", actionText: "View" };
 }
 
 function shortAvatarText(name) {
-  const text = String(name || "我").trim();
-  return text ? text.slice(0, 1) : "我";
+  const text = String(name || "Me").trim();
+  return text ? text.slice(0, 1) : "M";
 }

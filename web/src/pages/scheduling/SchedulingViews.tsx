@@ -727,7 +727,7 @@ export function TimelineBlock({
       <span className="schedule-timeline-tags">
         {item.classType && <Tag>{item.classType}</Tag>}
         {item.countText && <Tag>{item.countText}</Tag>}
-        {item.status && <Tag color={item.status === '已取消' ? 'default' : item.status === '待确认' ? 'gold' : 'green'}>{item.status}</Tag>}
+        {item.status && <Tag title={item.status === '已确认' ? '人数已达到开班要求；不代表家长确认' : undefined} color={item.status === '已取消' ? 'default' : item.status === '待确认' ? 'gold' : 'green'}>{item.status}</Tag>}
         {item.kind === 'class' && <RecurrenceMark item={item.record as ScheduleClass} />}
       </span>
       {extra}
@@ -996,11 +996,13 @@ function startTimelineResize(
     }
   };
 
-  const finish = () => {
+  const finish = (finishEvent: PointerEvent) => {
     target.removeEventListener('pointermove', move);
     target.removeEventListener('pointerup', finish);
     target.removeEventListener('pointercancel', finish);
-    if (latestEnd !== originalEnd) onResizeClass(record, formatMinute(latestEnd));
+    const block = target.closest('.schedule-timeline-block') as HTMLElement | null;
+    if (block) block.style.height = `${Math.max(34, ((originalEnd - startMinute) / timelineSlotMinutes) * timelineSlotHeight - 4)}px`;
+    if (finishEvent.type !== 'pointercancel' && latestEnd !== originalEnd) onResizeClass(record, formatMinute(latestEnd));
   };
 
   target.setPointerCapture(event.pointerId);

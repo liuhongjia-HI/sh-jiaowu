@@ -3192,3 +3192,57 @@ button.schedule-block:hover {
 .teacher-library-directory .ant-tree-title { overflow-wrap: anywhere; }
 .teacher-preview-frame { width: 100%; height: 70vh; border: 1px solid #e5e7eb; border-radius: 8px; background: #f5f6f8; }
 .teacher-preview-placeholder { min-height: 60vh; display: flex; align-items: center; justify-content: center; background: #f5f6f8; border-radius: 8px; }
+
+/* People calendar workbench */
+.calendar-page { gap: 12px; }
+.calendar-page .page-heading { margin-bottom: 0; }
+.calendar-page .page-heading h3 { margin: 0; }
+.calendar-workbench { background: #fff; border: 1px solid #e1e7f0; border-radius: 10px; overflow: hidden; }
+.calendar-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px; border-bottom: 1px solid #e1e7f0; }
+.calendar-workbench .schedule-outlook-shell { grid-template-columns: 230px minmax(0, 1fr); gap: 0; }
+.calendar-workbench .schedule-outlook-sidebar { border: 0; border-right: 1px solid #e1e7f0; border-radius: 0; padding: 12px; }
+.calendar-workbench .schedule-outlook-main { padding: 10px; gap: 8px; align-content: start; }
+.calendar-shell-collapsed { display: block; }
+.calendar-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 12px; color: #64748b; }
+.calendar-person-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.calendar-person-picker > strong, .calendar-person-picker > .ant-select { width: 100%; }
+.calendar-filters summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.calendar-filters .schedule-sidebar-filters { margin-top: 8px; }
+.calendar-legend-teacher::before, .calendar-legend-student::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 2px; background: #d1fae5; }
+.calendar-legend-student::before { background: #dbeafe; }
+.calendar-scroll { max-height: calc(100vh - 245px); min-height: 400px; }
+.calendar-scroll .schedule-timeline-grid { grid-template-rows: 68px var(--timeline-height); }
+.calendar-column { user-select: none; touch-action: pan-x; }
+.calendar-column .schedule-time-line, .calendar-availability, .calendar-selection { pointer-events: none; }
+.calendar-availability { position: absolute; left: 0; right: 0; background: #ecfdf5; border-left: 3px solid #86efac; }
+.calendar-availability.is-student { background: #eff6ff; border-left-color: #93c5fd; }
+.calendar-column .schedule-time-line { z-index: 1; }
+.calendar-column .schedule-timeline-block { z-index: 3; }
+.calendar-selection { position: absolute; left: 0; right: 0; z-index: 5; background: #dbeafecc; border: 1px solid #3b82f6; padding: 4px; color: #1d4ed8; }
+.calendar-preflight { margin-top: 16px; }
+.preview-issues { max-height: 240px; overflow: auto; font-size: 12px; }
+.preview-issues > div { margin-top: 8px; }
+.preview-error { color: #b91c1c; }
+.preview-warning { color: #92400e; }
+.schedule-assistant { margin-top: 12px; display: grid; gap: 10px; }
+.assistant-scroll { overflow: auto; max-height: 300px; border: 1px solid #e1e7f0; border-radius: 6px; }
+.assistant-grid { display: grid; gap: 1px; font-size: 11px; background: #e1e7f0; width: max-content; }
+.assistant-grid > strong, .assistant-grid > span, .assistant-row > strong { padding: 8px 4px; background: #fff; }
+.assistant-row { display: contents; }
+.assistant-row > strong { position: sticky; left: 0; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assistant-cell { min-height: 36px; border: 0; background: #f1f5f9; color: #64748b; cursor: pointer; }
+.assistant-cell.is-free { background: #dcfce7; color: #166534; }
+.assistant-cell.is-busy { background: #fee2e2; color: #991b1b; cursor: not-allowed; }
+.assistant-cell.is-unknown { background: #fef3c7; color: #92400e; }
+@media (max-width: 1000px) { .calendar-workbench .schedule-outlook-shell { grid-template-columns: 190px minmax(0, 1fr); } }
+@media (max-width: 700px) { .calendar-workbench .schedule-outlook-shell { grid-template-columns: 1fr; } .calendar-scroll { max-height: 65vh; } }
+.calendar-availability.is-unavailable { background: repeating-linear-gradient(135deg, #fff1f2, #fff1f2 6px, #ffe4e6 6px, #ffe4e6 12px); border-left-color: #fda4af; }
+.assistant-cell.is-unavailable { background: #ffe4e6; color: #9f1239; }
+.availability-date-fields { grid-column: 1 / -1; }
+.availability-date-fields .ant-form-item { margin-bottom: 4px; }
+.calendar-workbench .schedule-outlook-sidebar { min-width: 0; }
+.calendar-workbench .schedule-sidebar-section { min-width: 0; padding: 8px; }
+.calendar-workbench .schedule-sidebar-head { gap: 4px; }
+.calendar-workbench .schedule-mini-calendar { min-width: 0; }
+.calendar-workbench .schedule-mini-calendar { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.calendar-workbench .schedule-mini-day { min-width: 0; padding: 0; }

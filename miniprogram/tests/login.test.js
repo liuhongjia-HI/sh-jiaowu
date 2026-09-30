@@ -88,6 +88,7 @@ test("login page preselects the grade passed from parent onboarding", () => {
     login() {}
   });
   page.onLoad({ grade: "五年级" });
+  assert.equal(page.data.gradeLabels[4], "Grade 5");
   assert.equal(page.data.form.grade, "五年级");
   assert.equal(page.data.gradeIndex, 4);
 });
@@ -131,7 +132,7 @@ test("login page keeps native navigation and an explicit return-home action", ()
 
   assert.notEqual(config.navigationStyle, "custom");
   assert.match(template, /bindtap="leaveLogin"/);
-  assert.match(template, /返回首页/);
+  assert.match(template, /Home/);
 });
 
 test("login page returns to the protected material that triggered binding", async () => {
@@ -266,10 +267,10 @@ test("login page lets users return home after cancelling phone authorization", (
 
   assert.deepEqual(calls.find((item) => item[0] === "showModal"), [
     "showModal",
-    "已取消手机号授权",
-    "可继续填写资料，也可以返回首页后再绑定。",
-    "返回首页",
-    "继续填写"
+    "Phone authorization cancelled",
+    "Continue filling in your details, or return home and link your account later.",
+    "Home",
+    "Edit"
   ]);
   assert.deepEqual(calls.find((item) => item[0] === "removeStorageSync"), ["removeStorageSync", "starline_after_login"]);
   assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/home/index"]);
@@ -293,7 +294,7 @@ test("login page keeps the form when users cancel authorization and choose to co
 
   page.bindPhone({ detail: { errMsg: "getPhoneNumber:fail user deny" } });
 
-  assert.deepEqual(calls, [["showModal", "已取消手机号授权"]]);
+  assert.deepEqual(calls, [["showModal", "Phone authorization cancelled"]]);
 });
 
 test("login page falls back to relaunching home when switchTab fails", () => {
@@ -365,13 +366,14 @@ test("login page uses selected grade option when binding phone", async () => {
   page.bindPhone({ detail: { errMsg: "getPhoneNumber:ok", code: "phone-code" } });
   await flushPromises();
 
+  assert.equal(page.data.gradeLabels[4], "Grade 5");
   assert.equal(page.data.form.grade, "五年级");
   assert.equal(calls.find((item) => item[0] === "request")[2].data.grade, "五年级");
 });
 
 test("login page keeps the network error instead of overwriting it with generic login failure", async () => {
   const calls = [];
-  const networkError = new Error("网络连接失败，请检查网络后重试");
+  const networkError = new Error("Connection failed. Check your network and try again.");
   networkError.userNotified = true;
   const page = loadLoginPage(() => Promise.reject(networkError), {
     login(args) {
@@ -390,7 +392,7 @@ test("login page keeps the network error instead of overwriting it with generic 
   page.bindPhone({ detail: { errMsg: "getPhoneNumber:ok", code: "phone-code" } });
   await flushPromises();
 
-  assert.equal(calls.some((item) => item[1] === "登录失败"), false);
+  assert.equal(calls.some((item) => item[1] === "Login failed"), false);
 });
 
 test("login page offers a picker and resubmits with selectedStudentId when the phone matches multiple children", async () => {
@@ -469,7 +471,7 @@ test("login page does not submit binding when wx.login returns no code", async (
   await flushPromises();
 
   assert.equal(calls.some((item) => item[0] === "request"), false);
-  assert.equal(calls.some((item) => item[1] === "登录失败，请重试"), true);
+  assert.equal(calls.some((item) => item[1] === "Login failed. Please try again."), true);
 });
 
 for (const method of ["silentLogin", "doLogin"]) {

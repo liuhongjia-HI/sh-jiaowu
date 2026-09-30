@@ -3,7 +3,7 @@ const { request } = require("../../utils/request");
 Page({
   data: {
     loading: true,
-    emptyMessage: "收藏讲义或练习后，可以在这里找到。",
+    emptyMessage: "Find your saved materials and exercises here.",
     favorites: []
   },
   onLoad() {
@@ -11,7 +11,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "我的 Starline 学习收藏",
+      title: "My Starline Favorites",
       path: "/pages/favorites/index"
     };
   },
@@ -25,7 +25,7 @@ Page({
     request("/student/favorites")
       .then((favorites) => this.setData({ favorites: favorites || [], loading: false }))
       .catch((error) => this.setData({
-        emptyMessage: error.message || "加载失败",
+        emptyMessage: error.message || "Failed to load",
         loading: false
       }));
   },
@@ -43,7 +43,7 @@ Page({
     const id = event.currentTarget.dataset.id;
     request(`/student/favorites/${id}`, { method: "DELETE" })
       .then(() => {
-        wx.showToast({ title: "已取消收藏", icon: "none" });
+        wx.showToast({ title: "Removed from favorites", icon: "none" });
         this.setData({ favorites: this.data.favorites.filter((item) => item.id !== id) });
       })
       .catch(() => {});

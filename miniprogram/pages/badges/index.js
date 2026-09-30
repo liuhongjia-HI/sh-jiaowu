@@ -3,7 +3,7 @@ const { request } = require("../../utils/request");
 Page({
   data: {
     loading: true,
-    emptyMessage: "继续学习，点亮成长徽章。",
+    emptyMessage: "Keep learning to earn badges.",
     badges: [],
     obtainedCount: 0
   },
@@ -12,7 +12,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "我在 Starline 点亮了成长徽章",
+      title: "My Starline Badges",
       path: "/pages/badges/index"
     };
   },
@@ -33,7 +33,7 @@ Page({
         });
       })
       .catch((error) => this.setData({
-        emptyMessage: error.message || "加载失败",
+        emptyMessage: error.message || "Failed to load",
         loading: false
       }));
   }

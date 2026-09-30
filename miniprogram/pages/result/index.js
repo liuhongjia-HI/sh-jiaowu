@@ -2,10 +2,10 @@ const { request } = require("../../utils/request");
 
 Page({
   data: {
-    taskTitle: "批改结果",
-    resultTitle: "完成啦 🎉",
-    teacherComment: "老师正在批改，稍后就能看到反馈。",
-    teacherCommentNodes: "老师正在批改，稍后就能看到反馈。",
+    taskTitle: "Results",
+    resultTitle: "Well done! 🎉",
+    teacherComment: "Your teacher is reviewing your work. Feedback will be available soon.",
+    teacherCommentNodes: "Your teacher is reviewing your work. Feedback will be available soon.",
     rewardText: "",
     pendingReview: false,
     objectiveText: ""
@@ -20,20 +20,20 @@ Page({
       .then((data) => {
         const pending = data.status === "待批改";
         this.setData({
-          taskTitle: data.taskTitle || "批改结果",
-          resultTitle: pending ? "已提交，等待老师批改" : `${data.score} 分，${scoreTag(data.score)}`,
+          taskTitle: data.taskTitle || "Results",
+          resultTitle: pending ? "Submitted. Awaiting teacher review." : `${data.score} pts, ${scoreTag(data.score)}`,
           teacherComment: data.teacherComment || "",
-          teacherCommentNodes: data.teacherComment || "老师正在批改，稍后就能看到反馈。",
+          teacherCommentNodes: data.teacherComment || "Your teacher is reviewing your work. Feedback will be available soon.",
           rewardText: data.reward || "",
           pendingReview: pending,
-          objectiveText: pending ? `客观题得分 ${data.objectiveScore || data.score || 0} 分` : ""
+          objectiveText: pending ? `Objective score: ${data.objectiveScore || data.score || 0} pts` : ""
         });
       })
       .catch(() => {});
   },
   onShareAppMessage() {
     return {
-      title: this.data.taskTitle ? `我完成了 Starline 练习：${this.data.taskTitle}` : "我完成了 Starline 练习",
+      title: this.data.taskTitle ? `I completed a Starline exercise: ${this.data.taskTitle}` : "I completed a Starline exercise",
       path: "/pages/home/index"
     };
   },
@@ -52,10 +52,10 @@ Page({
 
 function scoreTag(score) {
   if (score >= 90) {
-    return "表现很棒 🎉";
+    return "Great work! 🎉";
   }
   if (score >= 60) {
-    return "继续加油 💪";
+    return "Keep going! 💪";
   }
-  return "下次会更好 🌱";
+  return "Keep practicing! 🌱";
 }

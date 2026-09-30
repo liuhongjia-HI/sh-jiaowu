@@ -4,7 +4,7 @@ const { subjectLabel } = require("../../utils/subject");
 Page({
   data: {
     loading: true,
-    emptyMessage: "完成练习或测评后，这里会显示成绩。",
+    emptyMessage: "Your scores will appear here after exercises or assessments.",
     examScores: [],
     practiceRecords: [],
     latestSummary: null
@@ -14,7 +14,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "Starline 学习效果",
+      title: "Starline Progress",
       path: "/pages/scores/index"
     };
   },
@@ -45,7 +45,7 @@ Page({
         });
       })
       .catch((error) => this.setData({
-        emptyMessage: error.message || "成绩加载失败",
+        emptyMessage: error.message || "Failed to load scores",
         loading: false
       }));
   }
@@ -56,19 +56,19 @@ function normalizeExamScores(scores) {
     const latest = summary.latestRecord || {};
     const first = summary.firstRecord || {};
     const trend = latest.id && first.id && latest.id !== first.id
-      ? `${summary.improvement >= 0 ? "+" : ""}${summary.improvement} 分`
-      : "暂无对比";
+      ? `${summary.improvement >= 0 ? "+" : ""}${summary.improvement} pts`
+      : "No comparison yet";
     return {
       ...summary,
       displayName: subjectLabel(summary.subject),
       latest,
       first,
       trend,
-      examTypeText: latest.examType || "阶段测评",
+      examTypeText: latest.examType || "Progress Assessment",
       latestScoreText: latest.fullScore ? `${latest.score}/${latest.fullScore}` : `${latest.score || 0}`,
-      problemPoint: summary.problemPoint || summary.description || "老师暂未填写问题点。",
-      nextStep: summary.nextStep || latest.teacherComment || "老师暂未填写下一步建议。",
-      teacherComment: latest.teacherComment || summary.description || "老师暂未填写建议。"
+      problemPoint: summary.problemPoint || summary.description || "Your teacher has not added areas to improve yet.",
+      nextStep: summary.nextStep || latest.teacherComment || "Your teacher has not added next steps yet.",
+      teacherComment: latest.teacherComment || summary.description || "Your teacher has not added advice yet."
     };
   });
 }
@@ -77,15 +77,15 @@ function latestSummary(examScores, practiceRecords) {
   if (examScores.length > 0) {
     const latest = examScores[0].latest || {};
     return {
-      title: `${examScores[0].displayName || examScores[0].subject || "考试"} ${examScores[0].latestScoreText}`,
-      subtitle: examScores[0].description || latest.examName || "最近一次考试成绩"
+      title: `${examScores[0].displayName || examScores[0].subject || "Exam"} ${examScores[0].latestScoreText}`,
+      subtitle: examScores[0].description || latest.examName || "Latest exam score"
     };
   }
   if (practiceRecords.length > 0) {
     const latest = practiceRecords[0];
     return {
-      title: `${latest.title} ${latest.scoreText} 分`,
-      subtitle: latest.description || "最近一次平时练习"
+      title: `${latest.title} ${latest.scoreText} pts`,
+      subtitle: latest.description || "Latest practice"
     };
   }
   return null;

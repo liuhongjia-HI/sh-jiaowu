@@ -59,12 +59,12 @@ test("request turns wx network failures into one actionable user-facing error", 
 
   await assert.rejects(
     () => request("/auth/wechat-login", { method: "POST" }),
-    (error) => error.message === "网络连接失败，请检查网络后重试" && error.userNotified === true
+    (error) => error.message === "Connection failed. Check your network and try again." && error.userNotified === true
   );
 
   assert.deepEqual(calls, [[
     "showToast",
-    { title: "网络连接失败，请检查网络后重试", icon: "none" }
+    { title: "Connection failed. Check your network and try again.", icon: "none" }
   ]]);
 });
 
@@ -98,14 +98,14 @@ test("request redirects to login before student API when token is missing", asyn
   };
   const request = loadRequestWithWx(wxMock, [], appMock);
 
-  await assert.rejects(() => request("/student/home"), /请先完成登录绑定/);
+  await assert.rejects(() => request("/student/home"), /Please log in and link your account first./);
   global.setTimeout = originalSetTimeout;
 
   assert.equal(calls.some((item) => item[0] === "ensureLogin"), false);
   assert.equal(calls.some((item) => item[0] === "request"), false);
   assert.deepEqual(calls.find((item) => item[0] === "showToast"), [
     "showToast",
-    { title: "请先完成登录绑定", icon: "none" }
+    { title: "Please log in and link your account first.", icon: "none" }
   ]);
   assert.deepEqual(calls.find((item) => item[0] === "navigateTo"), ["navigateTo", "/pages/login/index"]);
 });
@@ -135,7 +135,7 @@ test("request remembers the protected page before redirecting an unbound visitor
     options: { id: "material-001" }
   }]);
 
-  await assert.rejects(() => request("/student/materials/material-001"), /请先完成登录绑定/);
+  await assert.rejects(() => request("/student/materials/material-001"), /Please log in and link your account first./);
   global.setTimeout = originalSetTimeout;
 
   assert.deepEqual(calls.find((item) => item[0] === "setStorageSync"), [

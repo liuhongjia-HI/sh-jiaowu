@@ -113,6 +113,8 @@ type GrantRepository interface {
 }
 
 type SchedulingRepository interface {
+	PreviewScheduleClass(learning.Principal, learning.SchedulePreviewRequest) (learning.SchedulePreview, error)
+	CancelScheduleClassScope(string, learning.Principal, string, string) (learning.ScheduleClass, error)
 	Availability(learning.Principal, string, string) ([]learning.AvailabilitySlot, error)
 	SaveAvailability(string, learning.Principal, learning.AvailabilityUpsertRequest) ([]learning.AvailabilitySlot, error)
 	ScheduleCandidates(learning.Principal, learning.ScheduleCandidateRequest) ([]learning.ScheduleCandidate, error)

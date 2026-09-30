@@ -1,9 +1,9 @@
 function showPhoneAuthFailed(message) {
   wx.showModal({
-    title: "暂时无法完成授权",
-    content: message || "没有获取到手机号授权结果。请稍后重试，或联系老师确认课程和账号信息。",
+    title: "Authorization unavailable",
+    content: message || "Phone authorization failed. Try again later or contact your teacher.",
     showCancel: false,
-    confirmText: "知道了"
+    confirmText: "OK"
   });
 }
 

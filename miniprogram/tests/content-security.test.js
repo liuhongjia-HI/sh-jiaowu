@@ -127,7 +127,7 @@ test("iPad screenshot navigates back while iPhone keeps the page open", () => {
   stop();
 
   assert.equal(calls.includes("navigateBack"), true);
-  assert.equal(calls.includes("检测到截图，页面即将返回"), true);
+  assert.equal(calls.includes("Screenshot detected. Leaving this page."), true);
 
   let iphoneCapture = null;
   const iphoneCalls = [];

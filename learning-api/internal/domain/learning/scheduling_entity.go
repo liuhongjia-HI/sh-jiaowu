@@ -1,16 +1,17 @@
 package learning
 
 type AvailabilitySlot struct {
-	ID        string `json:"id"`
-	OwnerType string `json:"ownerType"`
-	OwnerID   string `json:"ownerId"`
-	OwnerName string `json:"ownerName"`
-	DayOfWeek int    `json:"dayOfWeek"`
-	StartTime string `json:"startTime"`
-	EndTime   string `json:"endTime"`
-	StartDate string `json:"startDate,omitempty"`
-	EndDate   string `json:"endDate,omitempty"`
-	Remark    string `json:"remark,omitempty"`
+	Unavailable bool   `json:"unavailable,omitempty"`
+	ID          string `json:"id"`
+	OwnerType   string `json:"ownerType"`
+	OwnerID     string `json:"ownerId"`
+	OwnerName   string `json:"ownerName"`
+	DayOfWeek   int    `json:"dayOfWeek"`
+	StartTime   string `json:"startTime"`
+	EndTime     string `json:"endTime"`
+	StartDate   string `json:"startDate,omitempty"`
+	EndDate     string `json:"endDate,omitempty"`
+	Remark      string `json:"remark,omitempty"`
 }
 
 type AvailabilityUpsertRequest struct {
@@ -198,3 +199,18 @@ const (
 	EditScopeThisAndFuture = "thisAndFuture"
 	EditScopeAll           = "all"
 )
+
+// 排课预检不写课次、日志或通知；保存时仍执行相同校验。
+type SchedulePreviewRequest struct {
+	ScheduleClassCreateRequest
+	ID string `json:"id,omitempty"`
+}
+type SchedulePreviewLesson struct {
+	Date     string   `json:"date"`
+	Errors   []string `json:"errors"`
+	Warnings []string `json:"warnings"`
+}
+type SchedulePreview struct {
+	Lessons []SchedulePreviewLesson `json:"lessons"`
+	CanSave bool                    `json:"canSave"`
+}

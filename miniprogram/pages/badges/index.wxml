@@ -1,13 +1,13 @@
 <view class="hero">
-  <view class="eyebrow">成长徽章</view>
-  <view class="hero-title">已点亮 {{obtainedCount}} 枚徽章 🏅</view>
+  <view class="eyebrow">Achievement Badges</view>
+  <view class="hero-title">{{obtainedCount}} Badges Earned 🏅</view>
 </view>
-<view wx:if="{{loading}}" class="empty">正在加载徽章...</view>
+<view wx:if="{{loading}}" class="empty">Loading badges...</view>
 <view wx:else class="section grid2">
   <view wx:for="{{badges}}" wx:key="id" class="card badge-card {{item.obtained ? '' : 'badge-locked'}}">
     <view class="badge-icon">{{item.obtained ? item.icon : '🔒'}}</view>
     <view class="title small-title">{{item.name}}</view>
     <view class="sub">{{item.desc}}</view>
-    <view class="muted">{{item.obtained ? '已获得' : '待获得'}}</view>
+    <view class="muted">{{item.obtained ? 'Earned' : 'Not yet earned'}}</view>
   </view>
 </view>

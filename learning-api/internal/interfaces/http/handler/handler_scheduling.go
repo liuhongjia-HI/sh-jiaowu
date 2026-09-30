@@ -119,7 +119,16 @@ func (h *LearningHandler) UpdateScheduleClass(c *gin.Context) {
 func (h *LearningHandler) CancelScheduleClass(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)
-	item, err := h.service.CancelScheduleClass(operator.(string), principal, c.Param("id"))
+	var req struct {
+		EditScope string `json:"editScope"`
+	}
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			BadRequest(c, "invalid request")
+			return
+		}
+	}
+	item, err := h.service.CancelScheduleClassScope(operator.(string), principal, c.Param("id"), req.EditScope)
 	if err != nil {
 		BadRequest(c, err.Error())
 		return
@@ -199,4 +208,19 @@ func (h *LearningHandler) reviewScheduleClass(c *gin.Context, approve bool) {
 		return
 	}
 	OK(c, item)
+}
+
+func (h *LearningHandler) PreviewScheduleClass(c *gin.Context) {
+	var req learning.SchedulePreviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	result, err := h.service.PreviewScheduleClass(principal, req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
 }

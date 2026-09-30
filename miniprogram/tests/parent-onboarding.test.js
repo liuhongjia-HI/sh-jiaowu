@@ -29,16 +29,16 @@ function loadPage(wxMock = {}) {
 
 test("parent onboarding explains the service and keeps the add-student path simple", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/parent-onboarding/index.wxml"), "utf8");
-  assert.match(template, /准备好后，添加一位学生/);
-  assert.match(template, /添加学生/);
-  assert.match(template, /已有学生信息，直接绑定/);
+  assert.match(template, /Add a student when you are ready/);
+  assert.match(template, /Add Student/);
+  assert.match(template, /Link Existing Student/);
   assert.match(template, /wx:for="\{\{benefits\}\}"/);
   assert.doesNotMatch(template, /孩子所在年级|gradeOptions|onGradeChange/);
 });
 
 test("parent onboarding presents the service explanation before the binding form", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/parent-onboarding/index.wxml"), "utf8");
-  assert(template.indexOf("添加后可以查看") < template.indexOf("准备好后，添加一位学生"));
+  assert(template.indexOf("What You Can Access") < template.indexOf("Add a student when you are ready"));
 });
 
 test("parent onboarding opens the binding form without collecting duplicate grade information", () => {
@@ -58,7 +58,7 @@ test("parent onboarding keeps direct binding as a separate simple entry", () => 
 test("parent onboarding lets visitors skip binding and return home", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/parent-onboarding/index.wxml"), "utf8");
   assert.match(template, /bindtap="skipForNow"/);
-  assert.match(template, /暂不添加，先去看看/);
+  assert.match(template, /Explore First/);
 
   const calls = [];
   const storage = {};

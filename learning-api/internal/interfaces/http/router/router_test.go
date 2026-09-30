@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"starline/learning-api/internal/application/learningapp"
 	"starline/learning-api/internal/domain/learning"
@@ -1814,5 +1815,44 @@ func TestTeacherSchedulingPermissionsThroughAPI(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("审核通过后学生应该能看到这节课")
+	}
+}
+
+func TestCalendarPreviewAndCancellationScopesThroughAPI(t *testing.T) {
+	app := newTestApp(t)
+	defer app.close()
+	token := app.loginAdmin(t, "13800000003")
+	date := time.Now().AddDate(0, 0, 60).Format("2006-01-02")
+	req := learning.ScheduleClassCreateRequest{CourseID: "course-g05-english-s1-q1", TeacherID: "user-teacher", ClassType: "1V1", DurationMinutes: 60, StartTime: "06:00", EndTime: "07:00", StartDate: date, StudentIDs: []string{"stu-001"}, IgnoreWarnings: true, Repeat: &learning.ScheduleRepeat{Freq: "daily", Interval: 1, Count: 3}}
+	var created learning.ScheduleClass
+	app.doJSON(t, http.MethodPost, "/api/schedule-classes", token, req, http.StatusOK, &created)
+	var before []learning.ScheduleClass
+	app.doJSON(t, http.MethodGet, "/api/schedule-classes", token, nil, http.StatusOK, &before)
+	var preview learning.SchedulePreview
+	app.doJSON(t, http.MethodPost, "/api/schedule-classes/preview", token, learning.SchedulePreviewRequest{ScheduleClassCreateRequest: req}, http.StatusOK, &preview)
+	if preview.CanSave || len(preview.Lessons) != 3 {
+		t.Fatalf("expected full conflict preview: %#v", preview)
+	}
+	for _, lesson := range preview.Lessons {
+		if len(lesson.Errors) == 0 {
+			t.Fatalf("missing conflict: %#v", lesson)
+		}
+	}
+	var after []learning.ScheduleClass
+	app.doJSON(t, http.MethodGet, "/api/schedule-classes", token, nil, http.StatusOK, &after)
+	if len(before) != len(after) {
+		t.Fatal("preview inserted lessons")
+	}
+	app.doJSON(t, http.MethodPost, "/api/schedule-classes/"+created.ID+"/cancel", token, map[string]string{}, http.StatusBadRequest, nil)
+	app.doJSON(t, http.MethodPost, "/api/schedule-classes/"+created.ID+"/cancel", token, map[string]string{"editScope": "all"}, http.StatusOK, nil)
+	app.doJSON(t, http.MethodGet, "/api/schedule-classes", token, nil, http.StatusOK, &after)
+	cancelled := 0
+	for _, lesson := range after {
+		if lesson.SeriesID == created.SeriesID && lesson.Status == "已取消" {
+			cancelled++
+		}
+	}
+	if cancelled != 3 {
+		t.Fatalf("expected three cancelled lessons, got %d", cancelled)
 	}
 }

@@ -11,7 +11,7 @@ function request(path, options = {}) {
         throw error;
       }
       if (shouldEnsureAuth(path, options)) {
-        handleUnauthorized(error.message || "登录失败，请重新进入");
+        handleUnauthorized(error.message || "Login failed. Please try again.");
       }
       throw error;
     })
@@ -22,7 +22,7 @@ function doRequest(app, path, options = {}) {
   const baseUrl = app.globalData.apiBaseUrl;
   let loading = !options.silent;
   if (loading) {
-    wx.showLoading({ title: "加载中" });
+    wx.showLoading({ title: "Loading" });
   }
 
   function finishLoading() {
@@ -52,19 +52,19 @@ function doRequest(app, path, options = {}) {
         finishLoading();
         if (res.statusCode === 401 || body.code === 401) {
           if (!shouldEnsureAuth(path, options)) {
-            reject(new Error(body.message || "请求失败"));
+            reject(new Error(body.message || "Request failed"));
             return;
           }
-          handleUnauthorized(body.message || "登录已过期，请重新登录");
-          reject(new Error(body.message || "登录已过期，请重新登录"));
+          handleUnauthorized(body.message || "Session expired. Please log in again.");
+          reject(new Error(body.message || "Session expired. Please log in again."));
           return;
         }
-        wx.showToast({ title: body.message || "请求失败", icon: "none" });
-        reject(new Error(body.message || "请求失败"));
+        wx.showToast({ title: body.message || "Request failed", icon: "none" });
+        reject(new Error(body.message || "Request failed"));
       },
       fail(err) {
         finishLoading();
-        const error = new Error("网络连接失败，请检查网络后重试");
+        const error = new Error("Connection failed. Check your network and try again.");
         error.cause = err;
         error.userNotified = true;
         wx.showToast({ title: error.message, icon: "none" });
@@ -84,7 +84,7 @@ function ensureRequestAuth(app, path, options = {}) {
   if (wx.getStorageSync("starline_token")) {
     return Promise.resolve();
   }
-  return Promise.reject(new Error("请先完成登录绑定"));
+  return Promise.reject(new Error("Please log in and link your account first."));
 }
 
 function shouldEnsureAuth(path, options = {}) {

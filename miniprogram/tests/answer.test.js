@@ -121,7 +121,7 @@ test("answer page blocks submission when any question is unanswered", () => {
   assert.equal(calls.some((item) => item[0] === "request"), false);
   assert.deepEqual(calls.find((item) => item[0] === "showToast"), [
     "showToast",
-    { title: "还有题目未完成", icon: "none" }
+    { title: "Please answer all questions", icon: "none" }
   ]);
 });
 
@@ -174,7 +174,7 @@ test("answer page applies dynamic watermark and reports capture event", async ()
   assert.equal(page.data.watermarkText, "小明 · 尾号9069 · 2026-07-11 10:00 · IDstu001");
   assert.equal(page.data.securityNotice, "请勿截屏录屏或外传。");
   assert.equal(calls.some((item) => item[0] === "request" && item[1] === "/student/security/events"), true);
-  assert.equal(calls.some((item) => item[0] === "showToast" && item[1] === "学习内容已加专属水印，请勿外传"), true);
+  assert.equal(calls.some((item) => item[0] === "showToast" && item[1] === "This content is watermarked. Please do not share it."), true);
   assert.equal(calls.some((item) => item[0] === "setVisualEffectOnCapture" && item[1] === "hidden"), true);
   assert.equal(calls.some((item) => item[0] === "setVisualEffectOnCapture" && item[1] === "none"), true);
 });
@@ -209,5 +209,28 @@ test("answer page downloads the secured homework file when the API exposes permi
     "Bearer token-abc"
   ]);
   assert.deepEqual(calls.find((item) => item[0] === "saveFile"), ["saveFile", "/tmp/homework.pdf"]);
-  assert.equal(calls.some((item) => item[0] === "showToast" && item[1] === "已保存习题"), true);
+  assert.equal(calls.some((item) => item[0] === "showToast" && item[1] === "Exercise saved"), true);
+});
+
+test("judge options display English while preserving the submitted answer value", async () => {
+  let payload;
+  const page = loadAnswerPage((url, options = {}) => {
+    if (url === "/student/homework/hw-judge") {
+      return Promise.resolve({ questions: [{ id: "q-judge", type: "judge", options: [] }] });
+    }
+    if (url === "/student/favorites") return Promise.resolve([]);
+    if (url === "/student/submissions") {
+      payload = options.data;
+      return Promise.resolve({ submissionId: "sub-judge" });
+    }
+    return Promise.resolve({});
+  }, { getStorageSync() { return ""; }, removeStorageSync() {}, showToast() {}, navigateTo() {} });
+  page.onLoad({ id: "hw-judge" });
+  await flushPromises();
+  assert.deepEqual(page.data.questions[0].options.map(option => option.label), ["A. True", "B. False"]);
+  page.chooseOption({ currentTarget: { dataset: { qindex: 0, value: "正确" } } });
+  page.submit();
+  await flushPromises();
+  assert.equal(payload.answers[0].choice, "正确");
+  page.onUnload();
 });

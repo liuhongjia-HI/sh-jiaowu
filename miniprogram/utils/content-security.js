@@ -14,10 +14,10 @@ function activateContentSecurity(options = {}) {
   const onRecordingChange = typeof options.onRecordingChange === "function" ? options.onRecordingChange : null;
   enableCaptureProtection(context);
   const captureHandler = () => {
-    safeToast("学习内容已加专属水印，请勿外传");
+    safeToast("This content is watermarked. Please do not share it.");
     reportSecurityEvent({ ...context, eventType: "screenshot", detail: "用户触发截屏事件" });
     if (isIPadIOS()) {
-      safeToast("检测到截图，页面即将返回");
+      safeToast("Screenshot detected. Leaving this page.");
       navigateBackFromSecurePage();
     }
   };
@@ -80,7 +80,7 @@ function buildRecordingHandler(context, onRecordingChange) {
       detail: isRecording ? "检测到系统录屏已开始" : "系统录屏已结束"
     });
     if (isRecording) {
-      safeToast("检测到录屏，内容已隐藏");
+      safeToast("Screen recording detected. Content hidden.");
     }
   };
 }

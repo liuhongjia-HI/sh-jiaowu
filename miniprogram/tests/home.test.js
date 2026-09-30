@@ -70,8 +70,8 @@ test("home empty course card provides a teacher-contact activation path without 
 
   assert.equal(page.data.courseSlides.length, 1);
   assert.equal(page.data.courseSlides[0].hasCourse, false);
-  assert.equal(page.data.courseSlides[0].actionText, "开通学习星球");
-  assert.match(page.data.courseSlides[0].meta, /联系老师或教务/);
+  assert.equal(page.data.courseSlides[0].actionText, "Activate Courses");
+  assert.match(page.data.courseSlides[0].meta, /teacher or school office/);
 });
 
 test("home empty course card opens activation guidance instead of navigating to study", () => {
@@ -85,8 +85,8 @@ test("home empty course card opens activation guidance instead of navigating to 
   page.goStudyDetail({ currentTarget: { dataset: {} } });
 
   assert.equal(calls[0][0], "showModal");
-  assert.equal(calls[0][1].title, "开通学习星球");
-  assert.match(calls[0][1].content, /联系老师或教务/);
+  assert.equal(calls[0][1].title, "Activate Courses");
+  assert.match(calls[0][1].content, /teacher or school office/);
   assert.equal(calls.some((item) => item[0] === "switchTab"), false);
 });
 
@@ -113,13 +113,13 @@ test("home page greeting follows the current local hour", () => {
   const page = loadHomePage(() => Promise.resolve({}));
 
   page.refreshGreeting(new Date(2026, 7, 23, 8, 52));
-  assert.equal(page.data.greeting, "早上好");
+  assert.equal(page.data.greeting, "Good morning");
   page.refreshGreeting(new Date(2026, 7, 23, 12, 0));
-  assert.equal(page.data.greeting, "中午好");
+  assert.equal(page.data.greeting, "Hello");
   page.refreshGreeting(new Date(2026, 7, 23, 15, 0));
-  assert.equal(page.data.greeting, "下午好");
+  assert.equal(page.data.greeting, "Good afternoon");
   page.refreshGreeting(new Date(2026, 7, 23, 20, 0));
-  assert.equal(page.data.greeting, "晚上好");
+  assert.equal(page.data.greeting, "Good evening");
 });
 
 test("home page opens directly for a visitor and still loads promo banners", async () => {
@@ -238,7 +238,7 @@ test("home page greeting uses the student's nickname, name, then a friendly fall
 
   page.loadHome();
   await flushPromises();
-  assert.equal(page.data.greetingName, "同学");
+  assert.equal(page.data.greetingName, "Student");
 });
 
 test("home page renders today todos and classroom feedback from student home", async () => {
@@ -278,7 +278,7 @@ test("home page renders today todos and classroom feedback from student home", a
 
   assert.equal(page.data.loading, false);
   assert.equal(page.data.todoItems.length, 1);
-  assert.equal(page.data.todoItems[0].icon, "练");
+  assert.equal(page.data.todoItems[0].icon, "✍️");
   assert.equal(page.data.showSubscribePrompt, true);
   assert.equal(page.data.feedbackItems.length, 1);
   assert.equal(page.data.feedbackItems[0].score, 95);
@@ -347,8 +347,8 @@ test("home page shortcut labels use commercial learning actions", () => {
   });
   const labels = page.data.shortcuts.map((item) => item.label);
 
-  assert(labels.includes("课表"));
-  assert(labels.includes("课堂反馈"));
+  assert(labels.includes("Schedule"));
+  assert(labels.includes("Class Feedback"));
   assert.equal(labels.includes("1V1/课表"), false);
   assert.equal(labels.includes("快捷开通"), false);
 });
@@ -361,14 +361,14 @@ test("home page shortcuts follow the product priority order", () => {
   });
 
   assert.deepEqual(page.data.shortcuts.map((item) => item.label), [
-    "题库练习",
-    "学习资料",
+    "Exercises",
+    "Materials",
     "上次练习",
-    "通知消息",
-    "学习中心",
+    "Messages",
+    "Learning Center",
     "成绩报告",
-    "课表",
-    "课堂反馈"
+    "Schedule",
+    "Class Feedback"
   ]);
 });
 
@@ -500,7 +500,7 @@ test("home page guides student to contact teacher for recommendation", () => {
 
   page.contactTeacher({ currentTarget: { dataset: { name: "英语阅读提升" } } });
 
-  assert.equal(calls[0].title, "联系老师");
+  assert.equal(calls[0].title, "Contact Teacher");
   assert.match(calls[0].content, /英语阅读提升/);
 });
 
@@ -614,7 +614,7 @@ test("home page opens notice tab when mini program subscribe templates are not c
 
   page.handleTodo({ currentTarget: { dataset: { type: "subscribe" } } });
 
-  assert.deepEqual(calls.find((item) => item[0] === "showToast"), ["showToast", "提醒服务开通中，可先查看通知消息"]);
+  assert.deepEqual(calls.find((item) => item[0] === "showToast"), ["showToast", "Reminders are being set up. Check Messages for now."]);
   assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/notices/index"]);
 });
 
@@ -681,7 +681,7 @@ test("home page promo banner tap copies an external link instead of failing sile
 
   assert.deepEqual(calls, [
     ["setClipboardData", "https://example.com/promo"],
-    ["showToast", "链接已复制，请在浏览器打开"]
+    ["showToast", "Link copied. Open it in your browser."]
   ]);
 });
 

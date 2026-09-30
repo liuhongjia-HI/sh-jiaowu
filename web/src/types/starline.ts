@@ -1026,6 +1026,7 @@ export type ContentPermissionSummary = {
 };
 
 export type AvailabilitySlot = {
+  unavailable?: boolean;
   id: string;
   ownerType: 'teacher' | 'student';
   ownerId: string;

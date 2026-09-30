@@ -3,9 +3,9 @@ const ONBOARDING_SEEN_KEY = "starline_onboarding_seen";
 Page({
   data: {
     benefits: [
-      { icon: "学", tone: "orange", title: "课程学习", summary: "查看课程和学习进度" },
-      { icon: "练", tone: "blue", title: "课后练习", summary: "完成练习并查看结果" },
-      { icon: "评", tone: "green", title: "老师反馈", summary: "了解表现和改进建议" }
+      { icon: "📚", tone: "orange", title: "Courses", summary: "View courses and learning progress" },
+      { icon: "✍️", tone: "blue", title: "Exercises", summary: "Complete exercises and view results" },
+      { icon: "💬", tone: "green", title: "Teacher Feedback", summary: "Review performance and advice" }
     ]
   },
   onShow() {

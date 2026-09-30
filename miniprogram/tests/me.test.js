@@ -119,7 +119,7 @@ test("me page submits student profile information from the mini program form", a
   assert.equal(page.data.me.guardianName, "星星家长");
   assert.deepEqual(calls.find((item) => item[0] === "showToast"), [
     "showToast",
-    { title: "资料已保存", icon: "success" }
+    { title: "Profile saved", icon: "success" }
   ]);
 });
 
@@ -149,7 +149,7 @@ test("me page blocks profile submission when required fields are missing", () =>
   assert.equal(calls.some((item) => item[0] === "request"), false);
   assert.deepEqual(calls.find((item) => item[0] === "showToast"), [
     "showToast",
-    { title: "请输入学生姓名", icon: "none" }
+    { title: "Enter the student name", icon: "none" }
   ]);
 });
 

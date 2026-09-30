@@ -113,10 +113,13 @@ func (s *MemoryStore) ownerAvailability(ownerType, ownerID string) []learning.Av
 }
 
 func (s *MemoryStore) studentAvailable(studentID string, dayOfWeek, startMin, endMin int, startDate, endDate string) bool {
+	if s.ownerUnavailable("student", studentID, dayOfWeek, startMin, endMin, startDate, endDate) {
+		return false
+	}
 	for _, slot := range s.ownerAvailability("student", studentID) {
 		slotStart, _ := parseClock(slot.StartTime)
 		slotEnd, _ := parseClock(slot.EndTime)
-		if slot.DayOfWeek == dayOfWeek && slotStart <= startMin && slotEnd >= endMin && dateRangeContains(slot.StartDate, slot.EndDate, startDate, endDate) {
+		if !slot.Unavailable && slot.DayOfWeek == dayOfWeek && slotStart <= startMin && slotEnd >= endMin && dateRangeContains(slot.StartDate, slot.EndDate, startDate, endDate) {
 			return true
 		}
 	}
@@ -124,10 +127,13 @@ func (s *MemoryStore) studentAvailable(studentID string, dayOfWeek, startMin, en
 }
 
 func (s *MemoryStore) teacherAvailable(teacherID string, dayOfWeek, startMin, endMin int, startDate, endDate string) bool {
+	if s.ownerUnavailable("teacher", teacherID, dayOfWeek, startMin, endMin, startDate, endDate) {
+		return false
+	}
 	for _, slot := range s.ownerAvailability("teacher", teacherID) {
 		slotStart, _ := parseClock(slot.StartTime)
 		slotEnd, _ := parseClock(slot.EndTime)
-		if slot.DayOfWeek == dayOfWeek && slotStart <= startMin && slotEnd >= endMin && dateRangeContains(slot.StartDate, slot.EndDate, startDate, endDate) {
+		if !slot.Unavailable && slot.DayOfWeek == dayOfWeek && slotStart <= startMin && slotEnd >= endMin && dateRangeContains(slot.StartDate, slot.EndDate, startDate, endDate) {
 			return true
 		}
 	}
@@ -229,6 +235,7 @@ func (s *MemoryStore) ensureSchedulingTables() error {
 			start_date DATE NULL,
 			end_date DATE NULL,
 			remark VARCHAR(255) NOT NULL DEFAULT '',
+            unavailable BOOLEAN NOT NULL DEFAULT FALSE,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			KEY idx_availability_owner (owner_type, owner_id),
 			KEY idx_availability_day (day_of_week, start_time, end_time)
@@ -282,6 +289,9 @@ func (s *MemoryStore) ensureSchedulingTables() error {
 			return err
 		}
 	}
+	if err := s.ensureColumn("availability_slots", "unavailable", "BOOLEAN NOT NULL DEFAULT FALSE"); err != nil {
+		return err
+	}
 	if err := s.ensureColumn("schedule_classes", "expected_student_count", "INT NOT NULL DEFAULT 1"); err != nil {
 		return err
 	}
@@ -325,15 +335,15 @@ func (s *MemoryStore) insertAvailabilitySlot(slot learning.AvailabilitySlot) err
 		return nil
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO availability_slots (id, owner_type, owner_id, owner_name, day_of_week, start_time, end_time, start_date, end_date, remark)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		slot.ID, slot.OwnerType, slot.OwnerID, slot.OwnerName, slot.DayOfWeek, slot.StartTime, slot.EndTime, nullableDate(slot.StartDate), nullableDate(slot.EndDate), slot.Remark,
+		`INSERT INTO availability_slots (id, owner_type, owner_id, owner_name, day_of_week, start_time, end_time, start_date, end_date, remark, unavailable)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		slot.ID, slot.OwnerType, slot.OwnerID, slot.OwnerName, slot.DayOfWeek, slot.StartTime, slot.EndTime, nullableDate(slot.StartDate), nullableDate(slot.EndDate), slot.Remark, slot.Unavailable,
 	)
 	return err
 }
 
 func (s *MemoryStore) loadAvailabilitySlots() ([]learning.AvailabilitySlot, error) {
-	rows, err := s.db.Query(`SELECT id, owner_type, owner_id, owner_name, day_of_week, start_time, end_time, start_date, end_date, remark FROM availability_slots ORDER BY owner_type, owner_id, day_of_week, start_time`)
+	rows, err := s.db.Query(`SELECT id, owner_type, owner_id, owner_name, day_of_week, start_time, end_time, start_date, end_date, remark, unavailable FROM availability_slots ORDER BY owner_type, owner_id, day_of_week, start_time`)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +352,7 @@ func (s *MemoryStore) loadAvailabilitySlots() ([]learning.AvailabilitySlot, erro
 	for rows.Next() {
 		var slot learning.AvailabilitySlot
 		var startDate, endDate sql.NullTime
-		if err := rows.Scan(&slot.ID, &slot.OwnerType, &slot.OwnerID, &slot.OwnerName, &slot.DayOfWeek, &slot.StartTime, &slot.EndTime, &startDate, &endDate, &slot.Remark); err != nil {
+		if err := rows.Scan(&slot.ID, &slot.OwnerType, &slot.OwnerID, &slot.OwnerName, &slot.DayOfWeek, &slot.StartTime, &slot.EndTime, &startDate, &endDate, &slot.Remark, &slot.Unavailable); err != nil {
 			return nil, err
 		}
 		slot.StartDate = dateString(startDate)
@@ -648,6 +658,17 @@ func hasRole(roles []learning.Role, role learning.Role) bool {
 func containsString(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *MemoryStore) ownerUnavailable(typ, id string, day, start, end int, startDate, endDate string) bool {
+	for _, slot := range s.ownerAvailability(typ, id) {
+		slotStart, _ := parseClock(slot.StartTime)
+		slotEnd, _ := parseClock(slot.EndTime)
+		if slot.Unavailable && slot.DayOfWeek == day && slotStart < end && slotEnd > start && dateRangesOverlap(slot.StartDate, slot.EndDate, startDate, endDate) {
 			return true
 		}
 	}

@@ -1,28 +1,28 @@
 <view class="hero">
-  <view class="eyebrow">欢迎来到学习小站</view>
-  <view class="hero-title">绑定手机号，查看专属学习内容</view>
+  <view class="eyebrow">Welcome to Starline</view>
+  <view class="hero-title">Link your phone to access your learning content</view>
 </view>
 <view class="section">
   <view class="card login-card">
     <view class="mascot">🐣</view>
-    <view class="title">开启今天的学习</view>
-    <view class="sub">手机号仅用于匹配老师已开通的学生账号，绑定后即可查看专属学习内容。</view>
+    <view class="title">Start learning today</view>
+    <view class="sub">Your phone number matches your teacher-activated student account to give you access to learning content.</view>
     <view class="form-line">
-      <input value="{{form.studentName}}" data-field="studentName" bindinput="onInput" placeholder="学生姓名" />
+      <input value="{{form.studentName}}" data-field="studentName" bindinput="onInput" placeholder="Student name" />
     </view>
     <view class="form-line">
-      <input value="{{form.schoolName}}" data-field="schoolName" bindinput="onInput" placeholder="学校（选填）" />
+      <input value="{{form.schoolName}}" data-field="schoolName" bindinput="onInput" placeholder="School (optional)" />
     </view>
-    <picker mode="selector" range="{{gradeOptions}}" value="{{gradeIndex}}" bindchange="onGradeChange">
+    <picker mode="selector" range="{{gradeLabels}}" value="{{gradeIndex}}" bindchange="onGradeChange">
       <view class="form-line picker-line">
-        <view class="picker-value {{form.grade ? '' : 'placeholder'}}">{{form.grade || '请选择年级'}}</view>
+        <view class="picker-value {{form.grade ? '' : 'placeholder'}}">{{gradeLabels[gradeIndex] || 'Select grade'}}</view>
       </view>
     </picker>
-    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">绑定手机号</button>
-    <button class="button light secondary-button" bindtap="leaveLogin">返回首页</button>
-    <view class="login-tip">暂不绑定也可以先浏览公开内容；专属学习内容由老师开通后自动显示。</view>
+    <button class="button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone" loading="{{binding}}" disabled="{{binding}}">Link Phone</button>
+    <button class="button light secondary-button" bindtap="leaveLogin">Home</button>
+    <view class="login-tip">Browse public content now. Your learning content will appear once your teacher activates access.</view>
   </view>
 </view>
 <view class="section">
-  <view class="bubble">账号未开通或已停用，请联系老师。</view>
+  <view class="bubble">Your account is inactive. Contact your teacher.</view>
 </view>

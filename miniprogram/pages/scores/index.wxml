@@ -1,12 +1,12 @@
 <view class="hero">
-  <view class="eyebrow">我的成绩</view>
-  <view class="hero-title">看清进步和下一步</view>
+  <view class="eyebrow">My Scores</view>
+  <view class="hero-title">Track progress and next steps</view>
 </view>
 
-<view wx:if="{{loading}}" class="empty">正在加载成绩...</view>
+<view wx:if="{{loading}}" class="empty">Loading scores...</view>
 <view wx:elif="{{examScores.length === 0 && practiceRecords.length === 0}}" class="section">
   <view class="empty-card">
-    <view class="title">还没有成绩记录</view>
+    <view class="title">No scores yet</view>
     <view class="sub">{{emptyMessage}}</view>
   </view>
 </view>
@@ -19,41 +19,41 @@
   </view>
 
   <view class="section">
-    <view class="section-title">考试成绩</view>
+    <view class="section-title">Exam Scores</view>
     <view wx:if="{{examScores.length === 0}}" class="empty-card">
-      <view class="sub">暂无考试成绩。</view>
+      <view class="sub">No exam scores yet.</view>
     </view>
     <view wx:for="{{examScores}}" wx:key="subject" class="card">
       <view class="row">
         <view>
-          <view class="title small-title">{{item.displayName || item.subject}} · {{item.latestScoreText}} 分</view>
-          <view class="sub">{{item.examTypeText}} · {{item.latest.examName || "最近测评"}} · {{item.latest.examDate}}</view>
+          <view class="title small-title">{{item.displayName || item.subject}} · {{item.latestScoreText}} pts</view>
+          <view class="sub">{{item.examTypeText}} · {{item.latest.examName || "Latest assessment"}} · {{item.latest.examDate}}</view>
         </view>
         <view class="badge">{{item.trend}}</view>
       </view>
       <view class="score-meta">
-        <view>首次：{{item.first.examType || "阶段测评"}} · {{item.first.examName || "-"}} {{item.first.score || "-"}} 分</view>
-        <view>平均：{{item.latest.averageScore || "-"}} 分</view>
+        <view>First: {{item.first.examType || "Progress Assessment"}} · {{item.first.examName || "-"}} {{item.first.score || "-"}} pts</view>
+        <view>Average: {{item.latest.averageScore || "-"}} pts</view>
       </view>
-      <view class="advice-title">问题点</view>
+      <view class="advice-title">Areas to Improve</view>
       <rich-text class="sub rich-text" nodes="{{item.problemPoint}}"></rich-text>
-      <view class="advice-title">下一步</view>
+      <view class="advice-title">Next Steps</view>
       <rich-text class="sub rich-text" nodes="{{item.nextStep}}"></rich-text>
     </view>
   </view>
 
   <view class="section">
-    <view class="section-title">平时练习</view>
+    <view class="section-title">Practice</view>
     <view wx:if="{{practiceRecords.length === 0}}" class="empty-card">
-      <view class="sub">暂无练习记录。</view>
+      <view class="sub">No practice records yet.</view>
     </view>
     <view wx:for="{{practiceRecords}}" wx:key="id" class="card blue">
       <view class="row">
         <view class="title small-title">{{item.title}}</view>
-        <view class="badge">{{item.scoreText}} 分</view>
+        <view class="badge">{{item.scoreText}} pts</view>
       </view>
       <view class="muted">{{item.occurredAt}}</view>
-      <rich-text class="sub rich-text" nodes="{{item.description || '老师还没有填写建议。'}}"></rich-text>
+      <rich-text class="sub rich-text" nodes="{{item.description || 'Your teacher has not added advice yet.'}}"></rich-text>
     </view>
   </view>
 </view>

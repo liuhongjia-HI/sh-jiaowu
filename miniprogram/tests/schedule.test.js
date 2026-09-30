@@ -70,14 +70,14 @@ test("schedule page loads confirmed classes from student schedule API", async ()
 
   assert.deepEqual(calls, ["/student/availability", "/student/schedule"]);
   assert.equal(page.data.loading, false);
-  assert.equal(page.data.availability[0].weekLabel, "周六");
+  assert.equal(page.data.availability[0].weekLabel, "Sat");
   assert.equal(page.data.nextClass.id, "schedule-closed-loop");
-  assert.equal(page.data.nextClass.timeText, "周三 19:00-20:30");
-  assert.equal(page.data.nextClass.periodText, "2026-06-01 至 2026-08-31");
-  assert.equal(page.data.nextClass.statusText, "已确认");
+  assert.equal(page.data.nextClass.timeText, "Wed 19:00-20:30");
+  assert.equal(page.data.nextClass.periodText, "2026-06-01 to 2026-08-31");
+  assert.equal(page.data.nextClass.statusText, "Confirmed");
   assert.equal(page.data.classes.length, 1);
   assert.equal(page.data.classes[0].name, "英语 1V3 小班");
-  assert.equal(page.data.classes[0].weekLabel, "周三");
+  assert.equal(page.data.classes[0].weekLabel, "Wed");
   assert.equal(page.data.classes[0].startTime, "19:00");
   assert.equal(page.data.classes[0].endTime, "20:30");
   assert.equal(page.data.classes[0].teacherName, "英语老师");

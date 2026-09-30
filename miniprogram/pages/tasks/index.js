@@ -4,13 +4,13 @@ Page({
   data: {
     loading: true,
     error: "",
-    emptyMessage: "新练习发布后，会显示在这里。",
+    emptyMessage: "New exercises will appear here when published.",
     activeFilter: "全部",
     filters: [
-      { label: "全部", className: "active" },
-      { label: "待完成", className: "" },
-      { label: "批改中", className: "" },
-      { label: "已完成", className: "" }
+      { label: "全部", displayLabel: "All", className: "active" },
+      { label: "待完成", displayLabel: "Pending", className: "" },
+      { label: "批改中", displayLabel: "In Review", className: "" },
+      { label: "已完成", displayLabel: "Completed", className: "" }
     ],
     tasks: [],
     visibleTasks: []
@@ -20,7 +20,7 @@ Page({
   },
   onShareAppMessage() {
     return {
-      title: "Starline 课后练习",
+      title: "Starline Exercises",
       path: "/pages/tasks/index"
     };
   },
@@ -36,8 +36,8 @@ Page({
         this.setData({ tasks: decorateTasks(tasks || []), loading: false }, () => this.applyFilters());
       })
       .catch((error) => this.setData({
-        error: error.message || "加载失败",
-        emptyMessage: error.message || "新练习发布后，会显示在这里。",
+        error: error.message || "Failed to load",
+        emptyMessage: error.message || "New exercises will appear here when published.",
         loading: false
       }));
   },
@@ -72,8 +72,9 @@ function decorateTasks(tasks) {
     return {
       ...task,
       studentStatus,
-      rewardText: done ? (task.score >= 90 ? "高分" : "已完成") : "有奖励",
-      estimateText: done ? `得分 ${task.score || 0}` : `${task.questionNum || 0} 道题 · 预计 8 分钟`,
+      statusLabel: ({ "待完成": "Pending", "批改中": "In Review", "已完成": "Completed" })[studentStatus] || studentStatus,
+      rewardText: done ? (task.score >= 90 ? "High Score" : "Completed") : "Rewards Available",
+      estimateText: done ? `Score: ${task.score || 0}` : `${task.questionNum || 0} questions · About 8 min`,
       cardClass: done ? "" : "reward"
     };
   });

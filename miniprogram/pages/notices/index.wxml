@@ -1,39 +1,39 @@
 <view class="notice-page">
   <view class="notice-heading">
-    <view class="notice-heading-title">通知消息</view>
+    <view class="notice-heading-title">Messages</view>
     <view class="notice-heading-search">⌕</view>
   </view>
 
   <view wx:if="{{linkedStudentText}}" class="notice-student-context" bindtap="goMe">
     <view class="notice-student-context-main">
-      <view class="notice-student-label">当前查看学生</view>
+      <view class="notice-student-label">Current Student</view>
       <view class="notice-student-name">{{linkedStudentText}}</view>
     </view>
-    <view class="notice-student-action">{{studentCount > 1 ? "去切换学生" : "个人中心"}} ›</view>
+    <view class="notice-student-action">{{studentCount > 1 ? "Switch Student" : "Profile"}} ›</view>
   </view>
 
   <view class="notice-tabs">
-    <view wx:for="{{filters}}" wx:key="label" class="notice-tab {{item.className}}" data-filter="{{item.label}}" bindtap="changeFilter">{{item.label}}</view>
+    <view wx:for="{{filters}}" wx:key="label" class="notice-tab {{item.className}}" data-filter="{{item.label}}" bindtap="changeFilter">{{item.displayLabel}}</view>
   </view>
 
   <view class="notice-read-toolbar">
     <view class="notice-read-filters">
-      <view wx:for="{{readFilters}}" wx:key="*this" class="notice-read-filter {{readFilter === item ? 'selected' : ''}}" data-filter="{{item}}" bindtap="changeReadFilter">{{item}}</view>
+      <view wx:for="{{readFilters}}" wx:key="*this" class="notice-read-filter {{readFilter === item ? 'selected' : ''}}" data-filter="{{item}}" bindtap="changeReadFilter">{{readFilterLabels[index]}}</view>
     </view>
-    <button class="notice-read-all" bindtap="markAllRead" loading="{{markingAll}}" disabled="{{loading || error || markingAll || unreadCount === 0}}">全部已读</button>
+    <button class="notice-read-all" bindtap="markAllRead" loading="{{markingAll}}" disabled="{{loading || error || markingAll || unreadCount === 0}}">Mark All Read</button>
   </view>
-  <view class="notice-unread-count">当前学生未读 {{unreadCount}} 条</view>
+  <view class="notice-unread-count">Unread messages: {{unreadCount}}</view>
 
-  <view wx:if="{{loading}}" class="notice-state">正在加载通知...</view>
-  <view wx:elif="{{error}}" class="notice-state" bindtap="loadNotices">{{error}}，点击重试</view>
+  <view wx:if="{{loading}}" class="notice-state">Loading messages...</view>
+  <view wx:elif="{{error}}" class="notice-state" bindtap="loadNotices">{{error}}. Tap to retry</view>
   <view wx:elif="{{visibleNotices.length === 0}}" class="notice-empty">
     <view class="notice-empty-art">
       <view class="notice-empty-bell">♧</view>
       <view class="notice-empty-star">✦</view>
     </view>
-    <view class="notice-empty-title">{{notices.length === 0 ? "暂无新消息" : "当前筛选下暂无消息"}}</view>
-      <view class="notice-empty-sub">{{notices.length === 0 ? "课程上传新内容后，会提醒你查看" : "切换分类或阅读状态查看"}}</view>
-      <button class="notice-empty-button" bindtap="goStudy">去学习</button>
+    <view class="notice-empty-title">{{notices.length === 0 ? "No new messages" : "No matching messages"}}</view>
+      <view class="notice-empty-sub">{{notices.length === 0 ? "You will be notified when new content is published." : "Try another category or read status."}}</view>
+      <button class="notice-empty-button" bindtap="goStudy">Start Learning</button>
   </view>
   <view wx:else class="notice-list">
     <view wx:for="{{visibleNotices}}" wx:key="id" class="notice-item" data-id="{{item.id}}" bindtap="goNotice">
@@ -41,7 +41,7 @@
       <view class="notice-body">
         <view class="notice-title-row">
           <view class="notice-title">{{item.title}}</view>
-          <view class="notice-status {{item.isRead ? 'notice-status-read' : 'notice-status-unread'}}">{{item.isRead ? '已读' : '未读'}}</view>
+          <view class="notice-status {{item.isRead ? 'notice-status-read' : 'notice-status-unread'}}">{{item.isRead ? 'Read' : 'Unread'}}</view>
         </view>
         <view class="notice-summary">{{item.summary}}</view>
         <view class="notice-target">{{item.studentDisplay || item.scopeText}}</view>
