@@ -297,7 +297,7 @@ func TestOfficialAccountNoticeUsesStudentLinkedOpenID(t *testing.T) {
 	}
 }
 
-func TestCompleteReviewAutoNoticeUsesOfficialAccountDelivery(t *testing.T) {
+func TestCompleteReviewUsesStationEventWithoutMatchingTemplate(t *testing.T) {
 	store := NewMemoryStore()
 	for index := range store.students {
 		if store.students[index].ID == "stu-001" {
@@ -323,18 +323,20 @@ func TestCompleteReviewAutoNoticeUsesOfficialAccountDelivery(t *testing.T) {
 		t.Fatalf("expected review completion to succeed: %v", err)
 	}
 	notice := store.notices[0]
-	if notice.Channel != "公众号模板消息" || notice.Status != "已发送" || notice.RecipientOpenID != "oa-review-openid" {
-		t.Fatalf("expected auto review notice to use official account delivery, got %#v", notice)
+	if notice.Channel != "站内通知" || notice.Status != "已发送" || notice.RecipientStudentID != "stu-001" || notice.Type != "评" {
+		t.Fatalf("wrong station notice: %#v", notice)
 	}
-	if notice.RelatedType != "review" || notice.RelatedID != submission.ID {
-		t.Fatalf("expected review notice to link to the student submission, got %#v", notice)
+	event, ok := store.businessEvent(notice.RelatedID)
+	if !ok || event.Kind != learning.NoticeReviewCompleted || event.RelatedID != submission.ID {
+		t.Fatalf("wrong completion event: %#v", event)
 	}
-	if sent.ID != notice.ID || sent.RecipientOpenID != "oa-review-openid" {
-		t.Fatalf("expected sender to receive review notice, sent=%#v notice=%#v", sent, notice)
+	if sent.ID != "" || len(store.businessNoticeTasks) != 0 {
+		t.Fatal("unmatched template caused external delivery")
 	}
+
 }
 
-func TestCompleteReviewAutoNoticeTracksMissingOfficialAccountConfiguration(t *testing.T) {
+func TestCompleteReviewMissingTemplateDoesNotCreateLegacyTask(t *testing.T) {
 	store := NewMemoryStore()
 	for index := range store.students {
 		if store.students[index].ID == "stu-001" {
@@ -354,9 +356,10 @@ func TestCompleteReviewAutoNoticeTracksMissingOfficialAccountConfiguration(t *te
 		t.Fatalf("expected review completion to succeed: %v", err)
 	}
 	notice := store.notices[0]
-	if notice.Channel != "公众号模板消息" || notice.Status != "待配置" || !strings.Contains(notice.FailureReason, "WECHAT_OFFICIAL_ACCOUNT") {
-		t.Fatalf("expected missing official account config to be tracked, got %#v", notice)
+	if notice.Channel != "站内通知" || notice.Status != "已发送" || len(store.businessNoticeTasks) != 0 {
+		t.Fatalf("expected station-only result: %#v", notice)
 	}
+
 }
 
 func TestRemindStudentCreatesRetryableOfficialAccountNotice(t *testing.T) {
@@ -402,7 +405,7 @@ func TestRemindStudentCreatesRetryableOfficialAccountNotice(t *testing.T) {
 	}
 }
 
-func TestCreateHomeworkPublishesOfficialAccountNotices(t *testing.T) {
+func TestCreateHomeworkPublishesStationNoticesForActualAccess(t *testing.T) {
 	store := NewMemoryStore()
 	for index := range store.students {
 		if store.students[index].ID == "stu-001" || store.students[index].ID == "stu-002" || store.students[index].ID == "stu-003" {
@@ -435,21 +438,28 @@ func TestCreateHomeworkPublishesOfficialAccountNotices(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected homework creation to succeed: %v", err)
 	}
-	if sent != 3 {
-		t.Fatalf("expected notices for three English students, sent=%d notices=%#v", sent, store.notices[:3])
+	expected := 0
+	for _, student := range store.students {
+		if student.AccountStatus != "正常" {
+			continue
+		}
+		if _, err := store.StudentHomework(learning.Principal{StudentID: student.ID}, homework.ID); err == nil {
+			expected++
+		}
 	}
-	for _, notice := range store.notices[:3] {
-		if notice.RelatedType != "homework" || notice.RelatedID != homework.ID || notice.Status != "已发送" {
-			t.Fatalf("expected published homework notice, got %#v", notice)
+	if sent != 0 || len(store.businessNoticeEvents) != expected || expected == 0 || len(store.businessNoticeTasks) != 0 {
+		t.Fatalf("wrong publication scope: events=%d expected=%d sent=%d", len(store.businessNoticeEvents), expected, sent)
+	}
+	for _, notice := range store.notices {
+		event, ok := store.businessEvent(notice.RelatedID)
+		if !ok || event.Kind != learning.NoticeHomeworkPublished || event.RelatedID != homework.ID || notice.Channel != "站内通知" || notice.Status != "已发送" {
+			t.Fatalf("wrong publication station record: %#v", notice)
 		}
 		if len(notice.ID) > mysqlIndexedExternalIDLength {
-			t.Fatalf("official homework notice ID is too long for notices.external_id: length=%d id=%q", len(notice.ID), notice.ID)
-		}
-		stationID := stationNoticeID(notice.ID)
-		if len(stationID) > mysqlIndexedExternalIDLength {
-			t.Fatalf("station homework notice ID is too long for notices.external_id: length=%d id=%q", len(stationID), stationID)
+			t.Fatal("business notice ID too long for database")
 		}
 	}
+
 }
 
 func TestUpdateSettingValidatesAndLogs(t *testing.T) {

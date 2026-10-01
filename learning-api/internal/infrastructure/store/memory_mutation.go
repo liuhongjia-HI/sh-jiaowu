@@ -1,23 +1,26 @@
 package store
 
-import "starline/learning-api/internal/domain/learning"
+import (
+	"starline/learning-api/internal/domain/learning"
+	"time"
+)
 
 // persistentMutation runs a state-changing operation against an isolated
 // working copy. The live in-memory state is published only after the database
 // transaction (including its operation log row) commits successfully.
 func persistentMutation[T any](s *MemoryStore, change func(*MemoryStore) (T, error)) (T, error) {
-	if s.db == nil {
-		return change(s)
-	}
 	work := s.cloneForMutation()
 	result, err := change(work)
 	if err != nil {
 		var zero T
 		return zero, err
 	}
-	if err := s.persistMutation(work); err != nil {
-		var zero T
-		return zero, err
+	work.collectScheduleBusinessEvents(s, time.Now())
+	if s.db != nil {
+		if err := s.persistMutation(work); err != nil {
+			var zero T
+			return zero, err
+		}
 	}
 	s.publishMutation(work)
 	return result, nil
@@ -56,6 +59,12 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 		wechatCallbackURL:      s.wechatCallbackURL,
 		seedDemoData:           s.seedDemoData,
 	}
+	work.businessNoticeEvents = cloneBusinessNoticeValue(s.businessNoticeEvents)
+	work.businessNoticeTasks = cloneBusinessNoticeValue(s.businessNoticeTasks)
+	work.businessNoticeReceipts = cloneBusinessNoticeValue(s.businessNoticeReceipts)
+	work.businessScheduleSnapshots = cloneBusinessNoticeValue(s.businessScheduleSnapshots)
+	work.officialMessageSender = s.officialMessageSender
+	work.officialFollowerInfo = s.officialFollowerInfo
 	work.users = cloneUsers(s.users)
 	work.packages = clonePackages(s.packages)
 	work.students = cloneStudents(s.students)
@@ -172,6 +181,12 @@ func cloneStudents(values []learning.Student) []learning.Student {
 }
 
 func (s *MemoryStore) publishMutation(work *MemoryStore) {
+	s.businessNoticeEvents = work.businessNoticeEvents
+	s.businessNoticeTasks = work.businessNoticeTasks
+	s.businessNoticeReceipts = work.businessNoticeReceipts
+	s.businessScheduleSnapshots = work.businessScheduleSnapshots
+	s.officialMessageSender = work.officialMessageSender
+	s.officialFollowerInfo = work.officialFollowerInfo
 	s.users = work.users
 	s.packages = work.packages
 	s.students = work.students

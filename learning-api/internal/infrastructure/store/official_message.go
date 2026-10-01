@@ -236,9 +236,11 @@ func fieldMaxLength(key string) int {
 	case strings.HasPrefix(key, "phrase"):
 		return 5
 	case strings.HasPrefix(key, "thing"):
-		return 50
-	case strings.HasPrefix(key, "time"), strings.HasPrefix(key, "date"):
 		return 20
+	case strings.HasPrefix(key, "const"):
+		return 20
+	case strings.HasPrefix(key, "time"), strings.HasPrefix(key, "date"):
+		return 0
 	default:
 		return 32
 	}
@@ -666,6 +668,7 @@ func (s *MemoryStore) deliverOfficialCampaign(id string, failedOnly bool) {
 		}
 	}
 	sender := s.officialTemplateSender
+	messageSender := s.officialMessageSender
 	recipients := append([]learning.OfficialCampaignRecipient(nil), s.officialCampaignRecipients...)
 	s.mu.Unlock()
 	if !found {
@@ -678,13 +681,39 @@ func (s *MemoryStore) deliverOfficialCampaign(id string, failedOnly bool) {
 		}
 		updated := recipient
 		updated.RetryCount++
-		if sender == nil {
+
+		if messageSender != nil {
+			s.mu.Lock()
+			_, targets, audienceErr := s.officialAudienceUnlocked(campaign.Grades)
+			reachable := false
+			for _, target := range targets {
+				if target.OpenID == recipient.OpenID && target.GuardianID == recipient.GuardianID {
+					reachable = true
+				}
+			}
+			s.mu.Unlock()
+			if audienceErr != nil || !reachable {
+				updated.Status, updated.FailureReason = "发送失败", "家长已取消关注、解绑或账号不可用"
+			} else {
+				messageID, err := sendBusinessTemplateSafely(messageSender, learning.OfficialMessageRequest{TemplateID: campaign.TemplateID, OpenID: recipient.OpenID, Values: campaign.Values, PagePath: campaign.PagePath, ClientMessageID: businessNoticeHash(recipient.ID, fmt.Sprint(updated.RetryCount))})
+				if err != nil {
+					updated.Status, updated.FailureReason = "发送失败", err.Error()
+					var typed *officialSendError
+					if errors.As(err, &typed) && typed.uncertain {
+						updated.Status = "结果待确认"
+					}
+				} else {
+					updated.Status, updated.FailureReason, updated.MessageID, updated.AcceptedAt, updated.SentAt = "微信已受理", "", messageID, businessTime(time.Now()), time.Now().Format("2006-01-02 15:04:05")
+				}
+			}
+		} else if sender == nil {
 			updated.Status, updated.FailureReason = "发送失败", "公众号发送配置不可用"
 		} else if err := sender(campaign.TemplateID, recipient.OpenID, campaign.Values, campaign.PagePath); err != nil {
 			updated.Status, updated.FailureReason = "发送失败", err.Error()
 		} else {
 			updated.Status, updated.FailureReason, updated.SentAt = "发送成功", "", time.Now().Format("2006-01-02 15:04:05")
 		}
+
 		results[recipient.ID] = updated
 	}
 	s.mu.Lock()
@@ -692,33 +721,69 @@ func (s *MemoryStore) deliverOfficialCampaign(id string, failedOnly bool) {
 	_, _ = persistentMutation(s, func(work *MemoryStore) (struct{}, error) {
 		for i := range work.officialCampaignRecipients {
 			if updated, ok := results[work.officialCampaignRecipients[i].ID]; ok {
+				for _, receipt := range work.businessNoticeReceipts {
+					if receipt.MessageID == updated.MessageID && receipt.OpenID == updated.OpenID {
+						applyCampaignReceipt(&updated, receipt)
+					}
+				}
 				work.officialCampaignRecipients[i] = updated
 			}
 		}
-		for i := range work.officialCampaigns {
-			if work.officialCampaigns[i].ID != id {
-				continue
-			}
-			work.officialCampaigns[i].SuccessCount = 0
-			work.officialCampaigns[i].FailureCount = 0
-			for _, recipient := range work.officialCampaignRecipients {
-				if recipient.CampaignID != id {
-					continue
-				}
-				if recipient.Status == "发送成功" {
-					work.officialCampaigns[i].SuccessCount++
-				}
-				if recipient.Status == "发送失败" {
-					work.officialCampaigns[i].FailureCount++
-				}
-			}
-			if work.officialCampaigns[i].FailureCount > 0 {
-				work.officialCampaigns[i].Status = "部分失败"
-			} else {
-				work.officialCampaigns[i].Status = "发送完成"
-			}
-			work.officialCampaigns[i].SentAt = time.Now().Format("2006-01-02 15:04:05")
-		}
+		work.updateOfficialCampaignDelivery(id)
+
 		return struct{}{}, nil
 	})
+}
+
+func applyCampaignReceipt(recipient *learning.OfficialCampaignRecipient, receipt learning.OfficialDeliveryReceipt) {
+	if recipient.Status == "已送达" {
+		return
+	}
+	if receipt.Status == "success" {
+		recipient.Status = "已送达"
+		recipient.DeliveredAt = receipt.ReceivedAt
+		recipient.FailureReason = ""
+	} else {
+		recipient.Status = "发送失败"
+		recipient.FailureReason = "微信发送回执：" + receipt.Status
+	}
+}
+func (s *MemoryStore) updateOfficialCampaignDelivery(id string) {
+	for i := range s.officialCampaigns {
+		campaign := &s.officialCampaigns[i]
+		if campaign.ID != id {
+			continue
+		}
+		campaign.SuccessCount, campaign.FailureCount = 0, 0
+		pending, uncertain := false, false
+		for _, recipient := range s.officialCampaignRecipients {
+			if recipient.CampaignID != id {
+				continue
+			}
+			switch recipient.Status {
+			case "发送成功", "已送达":
+				campaign.SuccessCount++
+			case "微信已受理":
+				campaign.SuccessCount++
+				pending = true
+			case "发送失败":
+				campaign.FailureCount++
+			case "结果待确认":
+				uncertain = true
+			default:
+				pending = true
+			}
+		}
+		switch {
+		case uncertain:
+			campaign.Status = "结果待确认"
+		case campaign.FailureCount > 0:
+			campaign.Status = "部分失败"
+		case pending:
+			campaign.Status = "微信已受理"
+		default:
+			campaign.Status = "发送完成"
+		}
+		campaign.SentAt = time.Now().Format("2006-01-02 15:04:05")
+	}
 }

@@ -16,6 +16,8 @@ type officialAccountEventXML struct {
 	FromUserName string `xml:"FromUserName"`
 	Event        string `xml:"Event"`
 	CreateTime   int64  `xml:"CreateTime"`
+	MessageID    string `xml:"MsgID"`
+	Status       string `xml:"Status"`
 }
 
 type officialAccountEncryptedXML struct {
@@ -23,6 +25,15 @@ type officialAccountEncryptedXML struct {
 }
 
 func (h *LearningHandler) VerifyOfficialAccountCallback(c *gin.Context) {
+	if c.Query("msg_signature") != "" {
+		plain, err := h.service.DecryptOfficialCallback(c.Query("msg_signature"), c.Query("timestamp"), c.Query("nonce"), c.Query("echostr"))
+		if err != nil {
+			c.String(http.StatusForbidden, "invalid signature")
+			return
+		}
+		c.String(http.StatusOK, string(plain))
+		return
+	}
 	if !h.service.VerifyOfficialCallback(c.Query("signature"), c.Query("timestamp"), c.Query("nonce")) {
 		c.String(http.StatusForbidden, "invalid signature")
 		return
@@ -56,9 +67,20 @@ func (h *LearningHandler) OfficialAccountCallback(c *gin.Context) {
 		c.String(http.StatusBadRequest, "invalid xml")
 		return
 	}
+	if strings.EqualFold(event.Event, "TEMPLATESENDJOBFINISH") {
+		if err := h.service.HandleOfficialDeliveryReceipt(event.FromUserName, event.MessageID, event.Status); err != nil {
+			c.String(http.StatusInternalServerError, "failed")
+			return
+		}
+		c.String(http.StatusOK, "success")
+		return
+	}
 	if err := h.service.HandleOfficialCallback(event.FromUserName, event.Event, event.CreateTime); err != nil {
 		c.String(http.StatusInternalServerError, "failed")
 		return
+	}
+	if strings.EqualFold(event.Event, "subscribe") {
+		go func() { _ = h.service.RefreshOfficialFollower(event.FromUserName) }()
 	}
 	c.String(http.StatusOK, "success")
 }

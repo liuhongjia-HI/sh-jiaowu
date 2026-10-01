@@ -10,6 +10,7 @@
     "pages/answer/index",
     "pages/result/index",
     "pages/notices/index",
+    "pages/notice-detail/index",
     "pages/schedule/index",
     "pages/me/index",
     "pages/scores/index",

@@ -100,6 +100,9 @@ type OfficialCampaign struct {
 }
 
 type OfficialCampaignRecipient struct {
+	MessageID     string `json:"messageId,omitempty"`
+	AcceptedAt    string `json:"acceptedAt,omitempty"`
+	DeliveredAt   string `json:"deliveredAt,omitempty"`
 	ID            string `json:"id"`
 	CampaignID    string `json:"campaignId"`
 	GuardianID    string `json:"guardianId"`

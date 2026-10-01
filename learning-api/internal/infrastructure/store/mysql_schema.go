@@ -19,6 +19,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 	if s.db == nil {
 		return errors.New("mysql connection is required")
 	}
+	if err := s.ensureBusinessNoticeSchema(); err != nil {
+		return err
+	}
 	if err := s.ensureSchedulingTables(); err != nil {
 		return err
 	}

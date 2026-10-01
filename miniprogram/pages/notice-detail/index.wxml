@@ -1,0 +1,24 @@
+<view class="notice-detail-page">
+  <view wx:if="{{loading}}" class="detail-state">Loading…</view>
+  <view wx:elif="{{error}}" class="card detail-state">
+    <text>{{error}}</text>
+    <button class="btn ghost" bindtap="loadDetail">Try again</button>
+  </view>
+  <block wx:else>
+    <view class="detail-heading">
+      <text class="detail-student">{{studentName}}</text>
+      <text class="detail-title">{{title}}</text>
+      <text class="detail-time">{{createdAt}}</text>
+    </view>
+    <view wx:if="{{!lessons.length}}" class="card"><text>{{summary}}</text></view>
+    <view wx:for="{{lessons}}" wx:key="id" class="card lesson-card">
+      <view class="row"><text class="lesson-title">{{item.course}}</text><text class="lesson-status {{item.status === 'Cancelled' ? 'cancelled' : ''}}">{{item.status}}</text></view>
+      <view wx:if="{{item.before}}" class="lesson-field"><text>Previously</text><text>{{item.before}}</text></view>
+      <view class="lesson-field"><text>Notified time</text><text>{{item.notified}}</text></view>
+      <view wx:if="{{item.changed}}" class="lesson-field latest"><text>Current time</text><text>{{item.current}}</text></view>
+      <view wx:if="{{item.teacher}}" class="lesson-field"><text>Teacher</text><text>{{item.teacher}}</text></view>
+      <view wx:if="{{item.room}}" class="lesson-field"><text>Room</text><text>{{item.room}}</text></view>
+    </view>
+    <button class="btn" bindtap="openRelated">View details</button>
+  </block>
+</view>

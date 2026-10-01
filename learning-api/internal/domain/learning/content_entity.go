@@ -405,6 +405,7 @@ type StudentCourseDetail struct {
 
 // Submission 是学生提交的一次小挑战及其批改结果。
 type Submission struct {
+	RequestID      string             `json:"requestId,omitempty"`
 	ID             string             `json:"id"`
 	HomeworkID     string             `json:"homeworkId"`
 	StudentID      string             `json:"studentId"`
@@ -444,6 +445,7 @@ type SubmissionAnswer struct {
 }
 
 type SubmissionRequest struct {
+	RequestID  string             `json:"requestId,omitempty"`
 	HomeworkID string             `json:"homeworkId"`
 	Answers    []SubmissionAnswer `json:"answers"`
 }

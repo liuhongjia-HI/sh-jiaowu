@@ -749,26 +749,7 @@ func (s *MemoryStore) homeworkSubmissionsUnlocked(principal learning.Principal, 
 }
 
 func (s *MemoryStore) notifyHomeworkPublished(homework learning.Homework) {
-	students := s.expectedStudentsForHomework(homework)
-	for _, student := range students {
-		summary := homework.Title + "已发布，请按时完成。"
-		if homework.Deadline != "" {
-			summary = homework.Title + "已发布，截止时间 " + homework.Deadline + "。"
-		}
-		notice := learning.Notice{
-			ID:              "notice-homework-" + homework.ID + "-" + student.ID,
-			Type:            "练",
-			Title:           homework.Subject + "练习已发布",
-			Target:          student.Name,
-			Summary:         summary,
-			Channel:         "公众号模板消息",
-			RecipientOpenID: student.OfficialAccountOpenID,
-			RelatedType:     "homework",
-			RelatedID:       homework.ID,
-		}
-		notice = s.deliverNotice(notice)
-		s.prependNoticeRecord(notice)
-	}
+	s.addHomeworkPublishedBusinessEvents(homework, time.Now())
 }
 
 func (s *MemoryStore) expectedStudentsForHomework(homework learning.Homework) []learning.Student {
@@ -1400,19 +1381,13 @@ func (s *MemoryStore) completeReviewUnlocked(operator string, principal learning
 	} else {
 		s.reviews = append(s.reviews[:reviewIndex], s.reviews[reviewIndex+1:]...)
 	}
-	notice := learning.Notice{
-		ID:              "notice-review-" + time.Now().Format("20060102150405.000000000"),
-		Type:            "评",
-		Title:           reviewNoticeTitle(req.FinalStatus),
-		Target:          review.StudentName,
-		Summary:         reviewNoticeSummary(homework.Title, req.FinalStatus),
-		Channel:         "公众号模板消息",
-		RecipientOpenID: s.officialAccountOpenIDForTarget(review.StudentName),
-		RelatedType:     "review",
-		RelatedID:       submission.ID,
+	if req.FinalStatus == "已批改" {
+		s.addReviewCompletedBusinessEvent(submission, homework, time.Now())
+	} else {
+		// Pending recheck is a station status update, never a final completion push.
+		s.prependNoticeRecord(learning.Notice{ID: "notice-review-" + time.Now().Format("20060102150405.000000000"), Type: "评", Title: reviewNoticeTitle(req.FinalStatus), Target: review.StudentName, Summary: reviewNoticeSummary(homework.Title, req.FinalStatus), Channel: "站内通知", Status: "已发送", RecipientStudentID: review.StudentID, RelatedType: "review", RelatedID: submission.ID})
 	}
-	notice = s.deliverNotice(notice)
-	s.prependNoticeRecord(notice)
+
 	s.prependLog(operator, reviewLogAction(req.FinalStatus), review.StudentName+" · "+homework.Title)
 	return cloneSubmission(submission), nil
 }

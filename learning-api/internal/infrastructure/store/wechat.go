@@ -150,37 +150,32 @@ func (s *MemoryStore) useOfficialAccountMessagingUnlocked(appID, secret, miniPro
 		}
 		return out, nil
 	}
+	s.officialMessageSender = newOfficialMessageSender(client, appID, secret, miniProgramAppID)
 	s.officialTemplateSender = func(templateID, openID string, values map[string]string, pagePath string) error {
+		_, err := s.officialMessageSender(learning.OfficialMessageRequest{TemplateID: templateID, OpenID: openID, Values: values, PagePath: pagePath})
+		return err
+	}
+	s.officialFollowerInfo = func(openID string) (learning.OfficialFollower, error) {
 		token, err := wechatAccessToken(client, appID, secret)
 		if err != nil {
-			return err
+			return learning.OfficialFollower{}, err
 		}
-		data := map[string]any{}
-		for key, value := range values {
-			data[key] = map[string]string{"value": value}
-		}
-		body := map[string]any{"touser": openID, "template_id": templateID, "data": data}
-		if miniProgramAppID != "" && strings.TrimSpace(pagePath) != "" {
-			body["miniprogram"] = map[string]string{"appid": miniProgramAppID, "pagepath": strings.TrimSpace(pagePath)}
-		}
-		encoded, _ := json.Marshal(body)
-		endpoint := "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=" + url.QueryEscape(token)
-		resp, err := client.Post(endpoint, "application/json", strings.NewReader(string(encoded)))
+		endpoint := "https://api.weixin.qq.com/cgi-bin/user/info?" + url.Values{"access_token": {token}, "openid": {openID}, "lang": {"zh_CN"}}.Encode()
+		response, err := client.Get(endpoint)
 		if err != nil {
-			return errors.New("公众号模板消息服务暂不可用")
+			return learning.OfficialFollower{}, errors.New("公众号用户资料获取失败")
 		}
-		defer resp.Body.Close()
+		defer response.Body.Close()
 		var payload struct {
-			ErrCode int    `json:"errcode"`
-			ErrMsg  string `json:"errmsg"`
+			OpenID    string `json:"openid"`
+			UnionID   string `json:"unionid"`
+			Subscribe int    `json:"subscribe"`
+			ErrCode   int    `json:"errcode"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return errors.New("公众号模板消息返回异常")
+		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil || payload.ErrCode != 0 {
+			return learning.OfficialFollower{}, errors.New("公众号用户资料返回异常")
 		}
-		if payload.ErrCode != 0 {
-			return fmt.Errorf("公众号模板消息发送失败（%d %s）", payload.ErrCode, payload.ErrMsg)
-		}
-		return nil
+		return learning.OfficialFollower{OpenID: openID, UnionID: payload.UnionID, Subscribed: payload.Subscribe == 1, SyncedAt: time.Now().Format("2006-01-02 15:04:05")}, nil
 	}
 	s.officialFollowerSyncer = func() ([]learning.OfficialFollower, error) {
 		token, err := wechatAccessToken(client, appID, secret)
@@ -298,7 +293,7 @@ func wechatPhoneNumber(client *http.Client, appID, secret, phoneCode string) (st
 	return payload.PhoneInfo.PhoneNumber, nil
 }
 
-func wechatAccessToken(client *http.Client, appID, secret string) (string, error) {
+func fetchWechatAccessToken(client *http.Client, appID, secret string) (string, time.Duration, error) {
 	endpoint := "https://api.weixin.qq.com/cgi-bin/token?" + url.Values{
 		"grant_type": {"client_credential"},
 		"appid":      {appID},
@@ -306,21 +301,29 @@ func wechatAccessToken(client *http.Client, appID, secret string) (string, error
 	}.Encode()
 	resp, err := client.Get(endpoint)
 	if err != nil {
-		return "", errors.New("微信授权服务暂不可用，请稍后再试")
+		return "", 0, errors.New("微信授权服务暂不可用，请稍后再试")
 	}
 	defer resp.Body.Close()
 	var payload struct {
 		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
 		ErrCode     int    `json:"errcode"`
 		ErrMsg      string `json:"errmsg"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", errors.New("微信授权返回异常，请稍后再试")
+		return "", 0, errors.New("微信授权返回异常，请稍后再试")
 	}
 	if payload.ErrCode != 0 || payload.AccessToken == "" {
-		return "", fmt.Errorf("微信授权失败，请稍后再试（%d %s）", payload.ErrCode, payload.ErrMsg)
+		return "", 0, fmt.Errorf("微信授权失败，请稍后再试（%d %s）", payload.ErrCode, payload.ErrMsg)
 	}
-	return payload.AccessToken, nil
+	if payload.ExpiresIn <= 0 {
+		payload.ExpiresIn = 7200
+	}
+	lifetime := time.Duration(payload.ExpiresIn) * time.Second
+	if lifetime > 5*time.Minute {
+		lifetime -= 5 * time.Minute
+	}
+	return payload.AccessToken, lifetime, nil
 }
 
 func wechatOfficialTemplateMessage(client *http.Client, appID, secret, templateID string, notice learning.Notice) error {

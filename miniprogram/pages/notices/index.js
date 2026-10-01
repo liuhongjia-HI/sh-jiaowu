@@ -155,6 +155,7 @@ function decorateNotices(notices, student) {
 function noticeDestination(notice) {
   const type = String(notice.relatedType || "").toLowerCase();
   const id = String(notice.relatedId || "").trim();
+  if (type === "business" && id) return `/pages/notice-detail/index?id=${encodeURIComponent(id)}`;
   if (type === "schedule") return "/pages/schedule/index";
   if (!id) return "";
   if (type === "homework") return `/pages/answer/index?id=${encodeURIComponent(id)}`;

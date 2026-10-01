@@ -1,0 +1,13 @@
+.notice-detail-page { padding: 32rpx; padding-bottom: calc(36rpx + env(safe-area-inset-bottom)); }
+.detail-heading { display: flex; flex-direction: column; gap: 14rpx; margin-bottom: 28rpx; }
+.detail-student { font-size: 28rpx; color: #b74b20; font-weight: 600; }
+.detail-title { font-size: 36rpx; font-weight: 700; }
+.detail-time { font-size: 24rpx; color: #81746c; }
+.detail-state { display: flex; flex-direction: column; gap: 28rpx; padding: 48rpx 24rpx; text-align: center; }
+.lesson-title { flex: 1; font-size: 30rpx; font-weight: 600; word-break: break-word; }
+.lesson-status { flex-shrink: 0; font-size: 23rpx; color: #337448; }
+.lesson-status.cancelled { color: #b33b32; }
+.lesson-field { display: flex; gap: 24rpx; justify-content: space-between; margin-top: 22rpx; font-size: 27rpx; line-height: 1.5; }
+.lesson-field text:first-child { color: #81746c; flex-shrink: 0; }
+.lesson-field text:last-child { text-align: right; word-break: break-word; }
+.latest text { color: #b74b20 !important; font-weight: 600; }

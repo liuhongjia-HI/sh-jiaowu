@@ -79,6 +79,9 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 			return err
 		}
 	}
+	if err := persistBusinessNoticeBootstrap(tx, s); err != nil {
+		return err
+	}
 	if err := s.persistStaticRowsTx(tx); err != nil {
 		return err
 	}
@@ -98,7 +101,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		}
 	}
 	for _, item := range s.officialCampaignRecipients {
-		if _, err := tx.Exec(`INSERT INTO official_message_recipients (id, campaign_id, guardian_id, guardian_name, official_open_id, student_names, status, failure_reason, retry_count, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.CampaignID, item.GuardianID, item.GuardianName, item.OpenID, item.StudentNames, item.Status, item.FailureReason, item.RetryCount, nullableDateTime(item.SentAt)); err != nil {
+		if _, err := tx.Exec(`INSERT INTO official_message_recipients (id, campaign_id, guardian_id, guardian_name, official_open_id, student_names, status, failure_reason, retry_count, sent_at, delivery_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.CampaignID, item.GuardianID, item.GuardianName, item.OpenID, item.StudentNames, item.Status, item.FailureReason, item.RetryCount, nullableDateTime(item.SentAt), mustJSON(item)); err != nil {
 			return err
 		}
 	}
@@ -416,10 +419,10 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, submission := range s.submissions {
 		if _, err := tx.Exec(
-			`INSERT INTO student_submission_results (id, homework_id, student_id, task_title, score, objective_score, final_score, teacher_comment, reward, status, answers_json, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO student_submission_results (id, homework_id, student_id, task_title, score, objective_score, final_score, teacher_comment, reward, status, answers_json, created_at, request_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			submission.ID, submission.HomeworkID, submission.StudentID, submission.TaskTitle, submission.Score, submission.ObjectiveScore, submission.FinalScore,
-			submission.TeacherComment, submission.Reward, submission.Status, mustJSON(submission.Answers), nullableDateTime(submission.CreatedAt),
+			submission.TeacherComment, submission.Reward, submission.Status, mustJSON(submission.Answers), nullableDateTime(submission.CreatedAt), nullableString(submission.RequestID),
 		); err != nil {
 			return err
 		}

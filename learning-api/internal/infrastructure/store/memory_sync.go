@@ -1067,8 +1067,15 @@ func (s *MemoryStore) RecordStudentSecurityEvent(operator string, principal lear
 func (s *MemoryStore) CreateSubmission(operator string, principal learning.Principal, req learning.SubmissionRequest) (learning.Submission, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result1, err := s.createSubmissionUnlocked(operator, principal, req)
-	return result1, err
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	release, err := s.lockSubmissionRequest(principal.StudentID, req.RequestID)
+	if err != nil {
+		return learning.Submission{}, err
+	}
+	defer release()
+	return persistentMutation(s, func(work *MemoryStore) (learning.Submission, error) {
+		return work.createSubmissionUnlocked(operator, principal, req)
+	})
 }
 
 func (s *MemoryStore) StudentSubmission(principal learning.Principal, id string) (learning.Submission, error) {

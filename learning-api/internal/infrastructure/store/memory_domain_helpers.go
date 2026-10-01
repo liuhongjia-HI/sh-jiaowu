@@ -513,7 +513,7 @@ func studentNoticeVisible(notice learning.Notice) bool {
 	if status != "已发送" && status != "自动发送" {
 		return false
 	}
-	return studentCourseContentNotice(notice)
+	return (notice.RelatedType == "business" && notice.RecipientStudentID != "" && notice.RelatedID != "") || studentCourseContentNotice(notice)
 }
 
 func studentCourseContentNotice(notice learning.Notice) bool {

@@ -27,6 +27,14 @@ var (
 )
 
 type MemoryStore struct {
+	businessNoticeEvents      []learning.BusinessNoticeEvent
+	businessNoticeTasks       []learning.BusinessNoticeTask
+	businessNoticeReceipts    []learning.OfficialDeliveryReceipt
+	businessScheduleSnapshots map[string]learning.ScheduleClass
+	officialMessageSender     func(learning.OfficialMessageRequest) (string, error)
+	officialFollowerInfo      func(string) (learning.OfficialFollower, error)
+	businessWorkerMu          sync.Mutex
+
 	mu                              sync.Mutex
 	users                           []learning.User
 	packages                        []learning.Package

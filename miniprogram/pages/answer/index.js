@@ -179,21 +179,23 @@ Page({
           wx.showToast({ title: "Please answer all questions", icon: "none" });
       return;
     }
+    const answers = this.data.questions.map((question) => ({
+      questionId: question.id, choice: question.choice, choices: question.choices || [], text: question.text
+    }));
+    const pendingKey = submissionRequestKey(this.data.homeworkId);
+    const signature = JSON.stringify(answers);
+    const savedRequest = (wx.getStorageSync && wx.getStorageSync(pendingKey)) || this._submissionRequest;
+    const pending = savedRequest && savedRequest.signature === signature ? savedRequest : { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`, signature };
+    this._submissionRequest = pending;
+    if (wx.setStorageSync) wx.setStorageSync(pendingKey, pending);
     this.setData({ saving: true });
     request("/student/submissions", {
-      method: "POST",
-      data: {
-        homeworkId: this.data.homeworkId,
-        answers: this.data.questions.map((question) => ({
-          questionId: question.id,
-          choice: question.choice,
-          choices: question.choices || [],
-          text: question.text
-        }))
-      }
+      method: "POST", data: { homeworkId: this.data.homeworkId, requestId: pending.id, answers }
     })
       .then((res) => {
         wx.removeStorageSync(draftKey(this.data.homeworkId));
+        wx.removeStorageSync(pendingKey);
+        this._submissionRequest = null;
         wx.showToast({ title: "Submitted", icon: "success" });
         wx.navigateTo({ url: `/pages/result/index?id=${res.submissionId}` });
       })
@@ -283,4 +285,9 @@ function showFileError(title, error) {
 
 function stripApiPrefix(path) {
   return String(path || "").replace(/^\/api/, "");
+}
+
+function submissionRequestKey(homeworkId) {
+  const studentId = wx.getStorageSync ? wx.getStorageSync("starline_student_id") || "" : "";
+  return `starline_submission_request_${studentId}_${homeworkId}`;
 }

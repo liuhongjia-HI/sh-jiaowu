@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, postData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../../components/ListViews';
+import AutomaticNotices from './AutomaticNotices';
 import { NoticeDialog } from './ResourceDialogs';
 import { gradeOptions } from '../../utils/curriculum';
 import type { CurrentUser, NoticeCreateRequest, OfficialAudiencePreview, OfficialCampaign, OfficialTemplate } from '../../types/starline';
@@ -15,7 +16,7 @@ const DRAFT_KEY = 'starline:official-message-draft';
 function statusColor(status: string) {
   if (status === '发送完成' || status === '发送成功') return 'success';
   if (status === '部分失败' || status === '发送失败') return 'error';
-  if (status === '发送中') return 'processing';
+  if (status === '发送中' || status === '微信已受理') return 'processing';
   return 'default';
 }
 
@@ -83,7 +84,7 @@ function CampaignRecords() {
   const retry = useMutation({ mutationFn: (id: string) => postData<OfficialCampaign>(`/official-account/campaigns/${id}/retry`, {}), onSuccess: () => { message.success('已重新提交失败消息。'); queryClient.invalidateQueries({ queryKey: ['official-campaigns'] }); }, onError: (error: Error) => message.error(error.message || '重试失败。') });
   if (campaigns.isLoading) return <Skeleton active />;
   if (campaigns.error) return <Alert type="error" message="发送记录加载失败。" />;
-  return <Card><Table rowKey="id" dataSource={campaigns.data ?? []} pagination={{ pageSize: 10 }} columns={[{ title: '发送时间', dataIndex: 'createdAt', width: 170 }, { title: '模板', dataIndex: 'templateTitle' }, { title: '接收年级', dataIndex: 'grades', render: (items: string[]) => items?.join('、') || '-' }, { title: '目标人数', dataIndex: 'targetCount', width: 90 }, { title: '成功', dataIndex: 'successCount', width: 80 }, { title: '失败', dataIndex: 'failureCount', width: 80 }, { title: '状态', dataIndex: 'status', width: 110, render: (status: string) => <Tag color={statusColor(status)}>{status}</Tag> }, { title: '操作', width: 90, render: (_, row) => row.failureCount > 0 ? <Button type="link" loading={retry.isPending} onClick={() => retry.mutate(row.id)}>重试失败</Button> : '-' }]} /></Card>;
+  return <Card><Table rowKey="id" dataSource={campaigns.data ?? []} pagination={{ pageSize: 10 }} columns={[{ title: '发送时间', dataIndex: 'createdAt', width: 170 }, { title: '模板', dataIndex: 'templateTitle' }, { title: '接收年级', dataIndex: 'grades', render: (items: string[]) => items?.join('、') || '-' }, { title: '目标人数', dataIndex: 'targetCount', width: 90 }, { title: '已受理/送达', dataIndex: 'successCount', width: 80 }, { title: '失败', dataIndex: 'failureCount', width: 80 }, { title: '状态', dataIndex: 'status', width: 110, render: (status: string) => <Tag color={statusColor(status)}>{status}</Tag> }, { title: '操作', width: 90, render: (_, row) => row.failureCount > 0 ? <Button type="link" loading={retry.isPending} onClick={() => retry.mutate(row.id)}>重试失败</Button> : '-' }]} /></Card>;
 }
 
 function LegacyNotices({ onOpen }: { onOpen: () => void }) {
@@ -100,5 +101,5 @@ export default function NoticesPage({ user }: { user: CurrentUser }) {
   const [form] = Form.useForm<NoticeCreateRequest>(); const [open, setOpen] = useState(false); const queryClient = useQueryClient(); const canUseOfficialMessaging = user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
   const send = useMutation({ mutationFn: (values: NoticeCreateRequest) => postData('/notices', values), onSuccess: () => { message.success('通知已发送。'); setOpen(false); form.resetFields(); queryClient.invalidateQueries({ queryKey: ['notices'] }); }, onError: (error: Error) => message.error(error.message || '发送通知失败。') });
   const openLegacy = () => { form.setFieldsValue({ type: '通知', title: '', target: '', summary: '', channel: '站内通知', recipientOpenId: '', relatedType: '', relatedId: '' }); setOpen(true); };
-  return <div className="page-stack official-message-page"><div className="page-heading"><div><Typography.Title level={3}>通知提醒</Typography.Title><Typography.Text type="secondary">按年级向已关注公众号的家长发送模板消息。</Typography.Text></div>{canUseOfficialMessaging && <Button onClick={openLegacy}>发送站内通知</Button>}</div>{canUseOfficialMessaging ? <Tabs defaultActiveKey="compose" items={[{ key: 'compose', label: '消息推送', children: <OfficialComposer /> }, { key: 'records', label: '发送记录', children: <CampaignRecords /> }, { key: 'station', label: '站内通知', children: <LegacyNotices onOpen={openLegacy} /> }]} /> : <LegacyNotices onOpen={openLegacy} />}<NoticeDialog form={form} open={open} loading={send.isPending} onCancel={() => setOpen(false)} onSubmit={(formValues) => send.mutate(formValues)} /></div>;
+  return <div className="page-stack official-message-page"><div className="page-heading"><div><Typography.Title level={3}>通知提醒</Typography.Title><Typography.Text type="secondary">管理课程自动通知与公众号消息。</Typography.Text></div>{canUseOfficialMessaging && <Button onClick={openLegacy}>发送站内通知</Button>}</div>{canUseOfficialMessaging ? <Tabs defaultActiveKey="automatic" items={[{ key: 'automatic', label: '自动通知', children: <AutomaticNotices /> },{ key: 'compose', label: '消息推送', children: <OfficialComposer /> }, { key: 'records', label: '发送记录', children: <CampaignRecords /> }, { key: 'station', label: '站内通知', children: <LegacyNotices onOpen={openLegacy} /> }]} /> : <LegacyNotices onOpen={openLegacy} />}<NoticeDialog form={form} open={open} loading={send.isPending} onCancel={() => setOpen(false)} onSubmit={(formValues) => send.mutate(formValues)} /></div>;
 }

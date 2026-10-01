@@ -299,25 +299,14 @@ func TestScheduleClassConflictHonorsDateRanges(t *testing.T) {
 	}
 }
 
-func TestScheduleClassAutoOfficialAccountNotices(t *testing.T) {
+func TestScheduleClassBusinessNotificationsDefaultOff(t *testing.T) {
 	store := NewMemoryStore()
-	for index := range store.students {
-		if store.students[index].ID == "stu-001" {
-			store.students[index].OfficialAccountOpenID = "oa-schedule-openid"
-		}
-	}
 	ops, err := store.PrincipalByUserID("user-ops")
 	if err != nil {
-		t.Fatalf("expected ops principal: %v", err)
+		t.Fatal(err)
 	}
-	sent := make([]learning.Notice, 0)
-	store.officialNoticeSender = func(notice learning.Notice) error {
-		sent = append(sent, notice)
-		if notice.Channel != "公众号模板消息" || notice.RecipientOpenID != "oa-schedule-openid" {
-			t.Fatalf("expected official account schedule notice, got %#v", notice)
-		}
-		return nil
-	}
+	sent := 0
+	store.officialNoticeSender = func(learning.Notice) error { sent++; return nil }
 	req := learning.ScheduleClassCreateRequest{
 		CourseID:        "course-g05-english-s1-q1",
 		TeacherID:       "user-teacher",
@@ -330,52 +319,51 @@ func TestScheduleClassAutoOfficialAccountNotices(t *testing.T) {
 		StartDate:       "2026-06-03",
 		StudentIDs:      []string{"stu-001"},
 	}
+
 	created, err := store.CreateScheduleClass("运营教务", ops, req)
 	if err != nil {
-		t.Fatalf("expected schedule creation to succeed: %v", err)
+		t.Fatal(err)
 	}
-	assertScheduleNotice(t, findScheduleOfficialNotice(t, store.notices, created.ID, "课程已安排"), created.ID, "课程已安排", "周三")
-
 	req.StartDate = "2026-06-06"
 	req.StartTime = "09:00"
 	req.EndTime = "10:30"
-	updated, err := store.UpdateScheduleClass("运营教务", ops, created.ID, req)
-	if err != nil {
-		t.Fatalf("expected schedule update to succeed: %v", err)
+	if _, err = store.UpdateScheduleClass("运营教务", ops, created.ID, req); err != nil {
+		t.Fatal(err)
 	}
-	assertScheduleNotice(t, findScheduleOfficialNotice(t, store.notices, updated.ID, "课程调整提醒"), updated.ID, "课程调整提醒", "周六")
-
-	cancelled, err := store.CancelScheduleClass("运营教务", ops, created.ID)
-	if err != nil {
-		t.Fatalf("expected schedule cancellation to succeed: %v", err)
+	if _, err = store.CancelScheduleClass("运营教务", ops, created.ID); err != nil {
+		t.Fatal(err)
 	}
-	assertScheduleNotice(t, findScheduleOfficialNotice(t, store.notices, cancelled.ID, "课程取消提醒"), cancelled.ID, "课程取消提醒", "周六")
-	if len(sent) != 3 {
-		t.Fatalf("expected create/update/cancel to send three notices, sent=%d", len(sent))
+	kinds := []string{learning.NoticeScheduleConfirmed, learning.NoticeScheduleChanged, learning.NoticeScheduleCancelled}
+	if len(store.businessNoticeEvents) != len(kinds) {
+		t.Fatalf("expected three business events: %#v", store.businessNoticeEvents)
+	}
+	for i, event := range store.businessNoticeEvents {
+		if event.Kind != kinds[i] || event.StudentID != "stu-001" {
+			t.Fatalf("incorrect event %#v", event)
+		}
+		found := false
+		for _, notice := range store.notices {
+			if notice.RelatedType == "business" && notice.RelatedID == event.ID && notice.RecipientStudentID == "stu-001" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("missing student-visible station notification")
+		}
+	}
+	if sent != 0 || len(store.businessNoticeTasks) != 0 {
+		t.Fatal("default-off business notifications called legacy transmitter")
 	}
 }
 
-func TestScheduleNoticeIsIdempotentPerStudentAndEvent(t *testing.T) {
-	store := NewMemoryStore()
-	store.notifyScheduleClass(learning.ScheduleClass{
-		ID: "schedule-idempotent", CourseName: "英语课程", DayOfWeek: 3,
-		StartTime: "19:00", EndTime: "20:00", TeacherName: "李老师",
-		Students: []learning.CandidateStudent{{ID: "stu-001", Name: "小明"}},
-	}, "课程调整提醒", "已调整")
-	store.notifyScheduleClass(learning.ScheduleClass{
-		ID: "schedule-idempotent", CourseName: "英语课程", DayOfWeek: 3,
-		StartTime: "19:00", EndTime: "20:00", TeacherName: "李老师",
-		Students: []learning.CandidateStudent{{ID: "stu-001", Name: "小明"}},
-	}, "课程调整提醒", "已调整")
-
-	count := 0
-	for _, notice := range store.notices {
-		if notice.RelatedType == "schedule" && notice.RelatedID == "schedule-idempotent" && notice.Title == "课程调整提醒" {
-			count++
-		}
-	}
-	if count != 2 {
-		t.Fatalf("expected one official record and one station record, got %d: %#v", count, store.notices)
+func TestScheduleBusinessNotificationRepeatedSaveIsIdempotent(t *testing.T) {
+	store := businessFixture(t)
+	item := futureBusinessClass("schedule-idempotent", "")
+	mutateBusiness(t, store, func(work *MemoryStore) { work.scheduleClasses = []learning.ScheduleClass{item} })
+	count := len(store.businessNoticeEvents)
+	mutateBusiness(t, store, func(work *MemoryStore) { work.scheduleClasses[0] = item })
+	if len(store.businessNoticeEvents) != count {
+		t.Fatal("unchanged save generated duplicate events")
 	}
 }
 

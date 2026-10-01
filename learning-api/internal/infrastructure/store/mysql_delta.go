@@ -23,6 +23,7 @@ func persistStateDeltaTx(tx *sql.Tx, before, after *MemoryStore) error {
 		schedulingRows,
 		commercialRows,
 		engagementRows,
+		businessNoticeRows,
 		trialRows,
 	}
 	for _, build := range builders {

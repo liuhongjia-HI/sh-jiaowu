@@ -18,7 +18,7 @@ type noticeDeliveryOutcome struct {
 // any public Store method.
 func noticeMutation[T any](s *MemoryStore, change func(*MemoryStore) (T, error), refresh func(*MemoryStore, T) T) (T, error) {
 	s.mu.Lock()
-	result, err := change(s)
+	result, err := persistentMutation(s, change)
 	if err != nil {
 		s.mu.Unlock()
 		var zero T

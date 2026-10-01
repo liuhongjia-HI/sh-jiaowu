@@ -14,6 +14,7 @@ import (
 func (s *MemoryStore) loadAllFromDatabase() error {
 	loaders := []func() error{
 		s.loadOfficialMessagingFromDB,
+		s.loadBusinessNoticesFromDB,
 		s.loadSubjectsFromDB,
 		s.loadLearningSpacesFromDB,
 		s.loadStudentsFromDB,
@@ -147,7 +148,7 @@ func (s *MemoryStore) loadOfficialMessagingFromDB() error {
 	if err := campaignRows.Close(); err != nil {
 		return err
 	}
-	recipientRows, err := s.db.Query(`SELECT id, campaign_id, guardian_id, guardian_name, official_open_id, student_names, status, failure_reason, retry_count, sent_at FROM official_message_recipients ORDER BY id`)
+	recipientRows, err := s.db.Query(`SELECT id, campaign_id, guardian_id, guardian_name, official_open_id, student_names, status, failure_reason, retry_count, sent_at, delivery_json FROM official_message_recipients ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -155,11 +156,20 @@ func (s *MemoryStore) loadOfficialMessagingFromDB() error {
 	for recipientRows.Next() {
 		var item learning.OfficialCampaignRecipient
 		var sentAt sql.NullTime
-		if err := recipientRows.Scan(&item.ID, &item.CampaignID, &item.GuardianID, &item.GuardianName, &item.OpenID, &item.StudentNames, &item.Status, &item.FailureReason, &item.RetryCount, &sentAt); err != nil {
+		var delivery sql.NullString
+		if err := recipientRows.Scan(&item.ID, &item.CampaignID, &item.GuardianID, &item.GuardianName, &item.OpenID, &item.StudentNames, &item.Status, &item.FailureReason, &item.RetryCount, &sentAt, &delivery); err != nil {
 			recipientRows.Close()
 			return err
 		}
 		item.SentAt = dateTimeString(sentAt)
+		if delivery.Valid && delivery.String != "" {
+			var stored learning.OfficialCampaignRecipient
+			if err := json.Unmarshal([]byte(delivery.String), &stored); err != nil {
+				recipientRows.Close()
+				return err
+			}
+			item.MessageID, item.AcceptedAt, item.DeliveredAt = stored.MessageID, stored.AcceptedAt, stored.DeliveredAt
+		}
 		recipients = append(recipients, item)
 	}
 	if err := recipientRows.Close(); err != nil {
@@ -902,7 +912,7 @@ func (s *MemoryStore) loadSettingsFromDB() error {
 }
 
 func (s *MemoryStore) loadSubmissionsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, homework_id, student_id, task_title, score, objective_score, final_score, teacher_comment, reward, status, answers_json, created_at FROM student_submission_results ORDER BY created_at`)
+	rows, err := s.db.Query(`SELECT id, homework_id, student_id, task_title, score, objective_score, final_score, teacher_comment, reward, status, answers_json, created_at, request_id FROM student_submission_results ORDER BY created_at`)
 	if err != nil {
 		return err
 	}
@@ -911,10 +921,12 @@ func (s *MemoryStore) loadSubmissionsFromDB() error {
 	for rows.Next() {
 		var item learning.Submission
 		var answersJSON string
+		var requestID sql.NullString
 		var createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.HomeworkID, &item.StudentID, &item.TaskTitle, &item.Score, &item.ObjectiveScore, &item.FinalScore, &item.TeacherComment, &item.Reward, &item.Status, &answersJSON, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.HomeworkID, &item.StudentID, &item.TaskTitle, &item.Score, &item.ObjectiveScore, &item.FinalScore, &item.TeacherComment, &item.Reward, &item.Status, &answersJSON, &createdAt, &requestID); err != nil {
 			return err
 		}
+		item.RequestID = requestID.String
 		item.Answers = parseSubmissionAnswersJSON(answersJSON)
 		item.CreatedAt = dateTimeString(createdAt)
 		out[item.ID] = item

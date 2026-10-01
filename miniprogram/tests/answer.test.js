@@ -83,7 +83,9 @@ test("answer page builds submission payload from selected option and text answer
 
   const requestCall = calls.find((item) => item[0] === "request");
   assert.equal(requestCall[1], "/student/submissions");
+  assert.match(requestCall[2].data.requestId, /^[A-Za-z0-9_-]{1,64}$/);
   assert.deepEqual(requestCall[2].data, {
+    requestId: requestCall[2].data.requestId,
     homeworkId: "hw-answer-001",
     answers: [
       { questionId: "q-single", choice: "A", choices: [], text: "" },
@@ -233,4 +235,19 @@ test("judge options display English while preserving the submitted answer value"
   await flushPromises();
   assert.equal(payload.answers[0].choice, "正确");
   page.onUnload();
+});
+
+test("uncertain submission keeps its request ID across page reload; success clears it", async () => {
+  const storage = { starline_student_id: 'child-b' };
+  const wxMock = { getStorageSync: key => storage[key], setStorageSync: (key,value) => storage[key]=value, removeStorageSync: key => delete storage[key], showToast() {}, navigateTo() {} };
+  const requests=[];
+  const data={homeworkId:'hw-retry',questions:[{id:'q',type:'single',choice:'A',choices:[],text:''}]};
+  const first=loadAnswerPage((url,opts)=>{requests.push(opts.data);return Promise.reject(new Error('timeout'));},wxMock);
+  first.setData(data);first.submit();await flushPromises();
+  assert.equal(first.data.saving,false);
+  assert.equal(storage['starline_submission_request_child-b_hw-retry'].id, requests[0].requestId);
+  const second=loadAnswerPage((url,opts)=>{requests.push(opts.data);return Promise.resolve({submissionId:'saved'});},wxMock);
+  second.setData(data);second.submit();await flushPromises();
+  assert.equal(requests[0].requestId,requests[1].requestId);
+  assert.equal(storage['starline_submission_request_child-b_hw-retry'],undefined);
 });

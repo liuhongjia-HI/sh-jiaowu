@@ -2,6 +2,8 @@ package store
 
 import (
 	"errors"
+	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -522,6 +524,21 @@ func (s *MemoryStore) createSubmissionUnlocked(operator string, principal learni
 			return work.createSubmissionUnlocked(operator, principal, req)
 		})
 	}
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	if req.RequestID != "" && !regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`).MatchString(req.RequestID) {
+		return learning.Submission{}, errors.New("提交请求编号格式不正确")
+	}
+	for _, previous := range s.submissions {
+		if req.RequestID != "" && previous.StudentID == principal.StudentID && previous.RequestID == req.RequestID {
+			if previous.HomeworkID != req.HomeworkID || !reflect.DeepEqual(previous.Answers, req.Answers) {
+				return learning.Submission{}, errors.New("提交请求编号已使用，请重新提交")
+			}
+			if _, err := s.studentSubmissionUnlocked(principal, previous.ID); err != nil {
+				return learning.Submission{}, err
+			}
+			return cloneSubmission(previous), nil
+		}
+	}
 	homework, err := s.studentHomeworkUnlocked(principal, req.HomeworkID)
 	if err != nil {
 		return learning.Submission{}, err
@@ -546,6 +563,7 @@ func (s *MemoryStore) createSubmissionUnlocked(operator string, principal learni
 	}
 	submission := learning.Submission{
 		ID:             "sub-" + time.Now().Format("20060102150405.000000000"),
+		RequestID:      req.RequestID,
 		HomeworkID:     homework.ID,
 		StudentID:      principal.StudentID,
 		TaskTitle:      homework.Title,
@@ -557,6 +575,9 @@ func (s *MemoryStore) createSubmissionUnlocked(operator string, principal learni
 		Status:         status,
 		CreatedAt:      time.Now().Format("2006-01-02 15:04:05"),
 		Answers:        cloneSubmissionAnswers(req.Answers),
+	}
+	if req.RequestID != "" {
+		submission.ID = "sub-" + businessNoticeHash(principal.StudentID, req.RequestID)[:40]
 	}
 	s.submissions[submission.ID] = cloneSubmission(submission)
 	if hasText {
@@ -574,6 +595,7 @@ func (s *MemoryStore) createSubmissionUnlocked(operator string, principal learni
 		}
 		s.reviews = append([]learning.Review{review}, s.reviews...)
 	}
+	s.addSubmissionBusinessEvent(submission, homework, time.Now())
 	s.prependLog(operator, "提交小挑战", homework.Title)
 	return cloneSubmission(submission), nil
 }

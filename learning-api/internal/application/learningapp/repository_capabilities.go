@@ -145,6 +145,14 @@ type CommercialRepository interface {
 }
 
 type NoticeRepository interface {
+	BusinessNoticeBindings() []learning.BusinessNoticeBinding
+	UpdateBusinessNoticeBinding(string, learning.BusinessNoticeBinding) ([]learning.BusinessNoticeBinding, error)
+	BusinessNoticeTasks() []learning.BusinessNoticeTask
+	RetryBusinessNotice(string, string) (learning.BusinessNoticeTask, error)
+	BusinessNoticeDetail(learning.Principal, string) (learning.BusinessNoticeDetail, error)
+	HandleOfficialDeliveryReceipt(string, string, string) error
+	RefreshOfficialFollower(string) error
+
 	MarkAllStudentNoticesRead(learning.Principal) ([]learning.Notice, error)
 	Notices(learning.Principal) []learning.Notice
 	MarkStudentNoticeRead(learning.Principal, string) (learning.Notice, error)

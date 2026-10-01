@@ -723,32 +723,9 @@ func (s *MemoryStore) cancelScheduleClassUnlocked(operator string, principal lea
 	return learning.ScheduleClass{}, errors.New("课程不存在")
 }
 
-func (s *MemoryStore) notifyScheduleClass(item learning.ScheduleClass, title, action string) {
-	for _, candidate := range item.Students {
-		target := candidate.Name
-		openID := ""
-		if student, ok := s.findStudent(candidate.ID); ok {
-			target = student.Name
-			openID = student.OfficialAccountOpenID
-		}
-		if s.hasScheduleNoticeForStudent(item.ID, title, target) {
-			continue
-		}
-		notice := learning.Notice{
-			ID:              "notice-schedule-" + action + "-" + item.ID + "-" + candidate.ID + "-" + time.Now().Format("20060102150405.000000000"),
-			Type:            "课",
-			Title:           title,
-			Target:          target,
-			Summary:         scheduleNoticeSummary(item, action),
-			Channel:         "公众号模板消息",
-			RecipientOpenID: openID,
-			RelatedType:     "schedule",
-			RelatedID:       item.ID,
-		}
-		notice = s.deliverNotice(notice)
-		s.prependNoticeRecord(notice)
-	}
-}
+// Business events are collected from committed changes by persistentMutation.
+// Keep this call site while existing scheduling mutations use the common collector.
+func (s *MemoryStore) notifyScheduleClass(item learning.ScheduleClass, title, action string) {}
 
 func (s *MemoryStore) hasScheduleNoticeForStudent(scheduleID, title, target string) bool {
 	for _, notice := range s.notices {

@@ -154,27 +154,31 @@ func TestCompletedReviewNoticeLinksToStudentSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatalf("complete review: %v", err)
 	}
-	found := false
+	var stationID string
 	for _, notice := range store.notices {
-		if notice.RelatedType == "review" {
-			if notice.RelatedID != submission.ID {
-				t.Fatalf("review notice should link to submission %q, got %#v", submission.ID, notice)
+		event, ok := store.businessEvent(notice.RelatedID)
+		if notice.RelatedType == "business" && ok && event.Kind == learning.NoticeReviewCompleted {
+			if event.RelatedID != submission.ID {
+				t.Fatalf("wrong completion target: %#v", event)
 			}
-			found = true
+			stationID = notice.ID
+			detail, err := store.BusinessNoticeDetail(student, event.ID)
+			if err != nil || detail.Event.RelatedID != submission.ID {
+				t.Fatalf("completion detail unavailable: %v", err)
+			}
 		}
 	}
-	if !found {
-		t.Fatal("expected a review notice after completing the review")
+	if stationID == "" {
+		t.Fatal("expected completion station notice")
 	}
 	home, err := store.StudentHome(student)
 	if err != nil {
-		t.Fatalf("load student home: %v", err)
+		t.Fatal(err)
 	}
-	for _, notice := range home.Notices {
-		if notice.RelatedType == "review" {
-			t.Fatalf("student inbox should not include review notices, got %#v", home.Notices)
-		}
+	if !noticeListContains(home.Notices, stationID) {
+		t.Fatal("completion notice missing from actual student inbox")
 	}
+
 }
 
 // TestUpdateStudentRebasesEnrollmentWhenAdminCorrectsGrade 确认管理端修改年级

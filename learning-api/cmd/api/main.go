@@ -80,6 +80,7 @@ func main() {
 		return
 	}
 	go previewWorker.Run(ctx)
+	go repo.RunBusinessNoticeWorker(ctx, func(err error) { log.Errorf("business notifications: %v", err) })
 
 	r := router.New(router.Dependencies{
 		Config:  cfg,
