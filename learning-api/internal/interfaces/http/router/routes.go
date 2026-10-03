@@ -226,6 +226,8 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g := protected(api, service, tokens, learning.RoleCampusAdmin, learning.RoleSuperAdmin)
 	g.POST("/teachers", h.CreateTeacher)
 	g.PUT("/teachers/:id", h.UpdateTeacher)
+	g.PUT("/teachers/:id/status", h.SetTeacherStatus)
+	g.DELETE("/teachers/:id", h.DeleteTeacher)
 	g.POST("/teachers/:id/reset-password", h.ResetTeacherPassword)
 	g.GET("/logs", h.Logs)
 	g.GET("/system/readiness", h.SystemReadiness)

@@ -2,7 +2,7 @@ import { EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Form, Input, Modal, Select, Skeleton, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getData, postData, putData, resetTeacherPassword } from '../services/http';
+import { deleteData, getData, postData, putData, resetTeacherPassword } from '../services/http';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
 import type { LearningSpace, PasswordResetResult, Teacher, TeacherUpsertRequest, TeacherLibraryPolicy } from '../types/starline';
@@ -72,6 +72,56 @@ export default function Teachers() {
     onError: (error: any) => message.error(error.response?.data?.message || '重置密码失败，请稍后重试。')
   });
 
+  const changeStatus = useMutation({
+    mutationFn: (teacher: Teacher) => putData<Teacher>(`/teachers/${teacher.id}/status`, { accountStatus: teacher.accountStatus === '正常' ? '停用' : '正常' }),
+    onSuccess: (teacher) => {
+      message.success(teacher.accountStatus === '正常' ? '教师账号已启用' : '教师账号已停用');
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+    },
+    onError: (error: Error) => message.error(error.message || '更新账号状态失败')
+  });
+  const deleteTeacher = useMutation({
+    mutationFn: (teacher: Teacher) => deleteData(`/teachers/${teacher.id}`),
+    onSuccess: () => {
+      message.success('教师账号已删除');
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+    }
+  });
+
+  function confirmStatus(teacher: Teacher) {
+    const disable = teacher.accountStatus === '正常';
+    Modal.confirm({
+      title: `${disable ? '停用' : '启用'}教师账号`,
+      content: disable
+        ? `确定停用「${teacher.name}」吗？停用后无法登录，已有教学记录保留。${teacher.activeClassCount > 0 ? `名下还有 ${teacher.activeClassCount} 节未结束的课程，请在排课管理中完成交接。` : ''}`
+        : `确定恢复「${teacher.name}」的登录和原有教学权限吗？`,
+      okText: disable ? '确认停用' : '确认启用',
+      okButtonProps: { danger: disable }, cancelText: '取消',
+      onOk: () => changeStatus.mutateAsync(teacher)
+    });
+  }
+
+  function confirmDelete(teacher: Teacher) {
+    Modal.confirm({
+      title: '删除教师账号',
+      content: `确定删除「${teacher.name}」（${teacher.phone}）吗？删除后无法恢复。仅可删除无关联教学记录的测试或误建账号；离职教师请使用停用。`,
+      okText: '确认删除', okButtonProps: { danger: true }, cancelText: '取消',
+      onOk: async () => {
+        try { await deleteTeacher.mutateAsync(teacher); }
+        catch (error) { message.error((error as Error).message || '删除失败'); throw error; }
+      }
+    });
+  }
+
+  function teacherActions(teacher: Teacher) {
+    return <Space size={4}>
+      <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(teacher)} />
+      <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(teacher)} />
+      <Button size="small" type="text" danger={teacher.accountStatus === '正常'} loading={changeStatus.isPending && changeStatus.variables?.id === teacher.id} onClick={() => confirmStatus(teacher)}>{teacher.accountStatus === '正常' ? '停用' : '启用'}</Button>
+      <Button size="small" type="text" danger loading={deleteTeacher.isPending && deleteTeacher.variables?.id === teacher.id} onClick={() => confirmDelete(teacher)}>删除</Button>
+    </Space>;
+  }
+
   function openCreate() {
     setEditing(null);
     form.setFieldsValue({
@@ -134,7 +184,7 @@ export default function Teachers() {
       <div className="page-heading">
         <div>
           <Typography.Title level={3}>老师管理</Typography.Title>
-          <Typography.Text type="secondary">维护教师账号、资料查阅范围和教学操作权限。</Typography.Text>
+          <Typography.Text type="secondary">维护教师账号和教学权限；离职教师请停用，无关联教学记录的测试账号可删除。</Typography.Text>
         </div>
         <div className="page-heading-actions">
           <ListViewToggle storageKey="starline:list-view:teachers" value={viewMode} onChange={setViewMode} />
@@ -161,12 +211,7 @@ export default function Teachers() {
                   { label: '备注', value: record.remark || '-' }
                 ]}
                 tags={teachingRangeTags(record, learningSpaces.data ?? [])}
-                actions={(
-                  <>
-                    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
-                    <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(record)} />
-                  </>
-                )}
+                actions={teacherActions(record)}
               />
             )}
           />
@@ -177,7 +222,7 @@ export default function Teachers() {
             rowKey="id"
             dataSource={rows}
             pagination={false}
-            scroll={{ x: 1516 }}
+            scroll={{ x: 1640 }}
             tableLayout="fixed"
             columns={[
           { title: '资料查阅范围', key: 'library', width: 240, render: (_: unknown, record: Teacher) => libraryScopeTags(record, learningSpaces.data ?? []) },
@@ -191,13 +236,9 @@ export default function Teachers() {
               { title: '备注', dataIndex: 'remark', width: 200, ellipsis: true },
               {
                 title: '操作',
-                width: 96,
-                render: (_, record) => (
-                  <Space size={4}>
-                    <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(record)} />
-                    <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(record)} />
-                  </Space>
-                )
+                width: 220,
+                fixed: 'right',
+                render: (_, record) => teacherActions(record)
               }
             ]}
           />

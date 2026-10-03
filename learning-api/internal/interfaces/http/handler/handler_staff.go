@@ -123,3 +123,30 @@ func bindAdminStaff(c *gin.Context) (learning.AdminStaffUpsertRequest, bool) {
 	req.Remark = strings.TrimSpace(req.Remark)
 	return req, true
 }
+
+func (h *LearningHandler) SetTeacherStatus(c *gin.Context) {
+	var req struct {
+		AccountStatus string `json:"accountStatus"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "invalid request")
+		return
+	}
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.SetTeacherStatus(operator.(string), principal, c.Param("id"), req.AccountStatus)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+func (h *LearningHandler) DeleteTeacher(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	if err := h.service.DeleteTeacher(operator.(string), principal, c.Param("id")); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, nil)
+}

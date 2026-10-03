@@ -25,6 +25,8 @@ type StaffRepository interface {
 	Teachers(principal learning.Principal) []learning.Teacher
 	CreateTeacher(operator string, principal learning.Principal, req learning.TeacherUpsertRequest) (learning.Teacher, error)
 	UpdateTeacher(operator string, principal learning.Principal, id string, req learning.TeacherUpsertRequest) (learning.Teacher, error)
+	SetTeacherStatus(string, learning.Principal, string, string) (learning.Teacher, error)
+	DeleteTeacher(string, learning.Principal, string) error
 }
 
 func (s *Service) LoginWithWechatCode(req learning.WechatLoginRequest) (learning.Principal, error) {
@@ -75,4 +77,11 @@ func (s *Service) CreateTeacher(operator string, principal learning.Principal, r
 }
 func (s *Service) UpdateTeacher(operator string, principal learning.Principal, id string, req learning.TeacherUpsertRequest) (learning.Teacher, error) {
 	return s.staff.UpdateTeacher(operator, principal, id, req)
+}
+
+func (s *Service) SetTeacherStatus(operator string, principal learning.Principal, id, status string) (learning.Teacher, error) {
+	return s.staff.SetTeacherStatus(operator, principal, id, status)
+}
+func (s *Service) DeleteTeacher(operator string, principal learning.Principal, id string) error {
+	return s.staff.DeleteTeacher(operator, principal, id)
 }
