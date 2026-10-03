@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"sort"
 	"strings"
@@ -42,7 +43,7 @@ func businessLessonEffective(item learning.ScheduleClass) bool {
 }
 
 func defaultBusinessNoticeBindings() []learning.BusinessNoticeBinding {
-	return []learning.BusinessNoticeBinding{
+	bindings := []learning.BusinessNoticeBinding{
 		{Kind: learning.NoticeScheduleConfirmed, Title: "排课确认", RequiredFields: map[string]string{"thing1": "课程名称", "thing2": "上课学生", "time4": "上课时间"}},
 		{Kind: learning.NoticeScheduleChanged, Title: "调课成功", RequiredFields: map[string]string{"thing12": "课程名称", "time2": "调前时间", "time4": "调后时间", "thing7": "学员姓名"}},
 		{Kind: learning.NoticeScheduleReminder, Title: "课前提醒", RequiredFields: map[string]string{"thing1": "课程名称", "time2": "上课时间", "thing14": "参与人员"}},
@@ -51,6 +52,51 @@ func defaultBusinessNoticeBindings() []learning.BusinessNoticeBinding {
 		{Kind: learning.NoticeReviewException, Title: "作业批改异常", RequiredFields: map[string]string{"thing7": "作业名称", "thing5": "班级", "const2": "异常原因"}},
 		{Kind: learning.NoticeHomeworkPublished, Title: "作业发布", RequiredFields: map[string]string{}},
 		{Kind: learning.NoticeReviewCompleted, Title: "批改完成", RequiredFields: map[string]string{}},
+		{Kind: learning.NoticeMaterialsPublished, Title: "资料批量发布", RequiredFields: map[string]string{}, AvailableFields: materialNoticeFields()},
+		{Kind: learning.NoticeTeachingPlansUploaded, Title: "教师教案上传", RequiredFields: map[string]string{}, AvailableFields: map[string]string{"resource_title": "教案名称", "resource_count": "教案数量", "published_at": "上传时间", "teacher_name": "教师姓名", "teaching_scope": "年级学科"}},
+	}
+	for i := range bindings {
+		bindings[i].TriggerReady = true
+	}
+	return bindings
+}
+
+func materialNoticeFields() map[string]string {
+	return map[string]string{"course_name": "课程名称", "resource_title": "资料名称", "resource_count": "资料数量", "published_at": "发布时间", "student_name": "学生姓名"}
+}
+
+func materialNoticeMappingAllowed(key, value string) bool {
+	if strings.HasPrefix(key, "thing") {
+		return value == "course_name" || value == "resource_title" || value == "student_name"
+	}
+	if strings.HasPrefix(key, "time") || strings.HasPrefix(key, "date") {
+		return value == "published_at"
+	}
+	return strings.HasPrefix(key, "number") && value == "resource_count"
+}
+
+func resourceNoticeMappingAllowed(kind, key, value string) bool {
+	if kind != learning.NoticeTeachingPlansUploaded {
+		return materialNoticeMappingAllowed(key, value)
+	}
+	if strings.HasPrefix(key, "thing") {
+		return value == "resource_title" || value == "teacher_name" || value == "teaching_scope"
+	}
+	if strings.HasPrefix(key, "time") || strings.HasPrefix(key, "date") {
+		return value == "published_at"
+	}
+	return strings.HasPrefix(key, "number") && value == "resource_count"
+}
+
+func validTeacherNoticeOrigin(origin string) bool {
+	target, err := url.Parse(origin)
+	return err == nil && target.Scheme == "https" && target.Hostname() != "" && target.User == nil && (target.Path == "" || target.Path == "/") && target.RawQuery == "" && !target.ForceQuery && target.Fragment == "" && !strings.ContainsAny(origin, "\r\n#")
+}
+
+func deriveMaterialNoticeFields(binding *learning.BusinessNoticeBinding) {
+	binding.RequiredFields = map[string]string{}
+	for key, value := range binding.FieldMappings {
+		binding.RequiredFields[key] = binding.AvailableFields[value]
 	}
 }
 
@@ -66,6 +112,12 @@ func (s *MemoryStore) businessNoticeBindingsUnlocked() []learning.BusinessNotice
 				bindings[i].EnabledAt = item.EnabledAt
 				bindings[i].ApprovedReasons = item.ApprovedReasons
 				bindings[i].StudentIDs = item.StudentIDs
+				bindings[i].TeacherIDs = item.TeacherIDs
+				bindings[i].WebOrigin = item.WebOrigin
+				if bindings[i].AvailableFields != nil {
+					bindings[i].FieldMappings = cloneMap(item.FieldMappings)
+					deriveMaterialNoticeFields(&bindings[i])
+				}
 			}
 		}
 		bindings[i].Reason = s.validateBusinessNoticeBinding(bindings[i])
@@ -109,6 +161,21 @@ func (s *MemoryStore) validateBusinessNoticeBinding(binding learning.BusinessNot
 			return "模板包含尚未映射的字段 " + key
 		}
 	}
+	if binding.AvailableFields != nil {
+		for key, value := range binding.FieldMappings {
+			if !resourceNoticeMappingAllowed(binding.Kind, key, value) {
+				return "资料通知字段映射无效：" + key
+			}
+		}
+	}
+	if binding.Kind == learning.NoticeTeachingPlansUploaded {
+		if !validTeacherNoticeOrigin(binding.WebOrigin) {
+			return "请填写教师网页的 HTTPS 域名"
+		}
+		if !binding.TriggerReady {
+			return "教案提醒暂不可开启，可先保存配置"
+		}
+	}
 	if binding.Kind == learning.NoticeReviewException && len(binding.ApprovedReasons) == 0 {
 		return "请先配置已通过微信审核的异常原因"
 	}
@@ -134,7 +201,41 @@ func (s *MemoryStore) UpdateBusinessNoticeBinding(operator string, req learning.
 			binding := bindings[i]
 			binding.TemplateID = strings.TrimSpace(req.TemplateID)
 			binding.Enabled = req.Enabled
+			if binding.AvailableFields != nil {
+				binding.FieldMappings = cloneMap(req.FieldMappings)
+				if len(binding.FieldMappings) > 20 {
+					return nil, errors.New("资料通知模板最多映射 20 个字段")
+				}
+				for key, value := range binding.FieldMappings {
+					if !resourceNoticeMappingAllowed(binding.Kind, key, value) {
+						return nil, errors.New("资料通知字段映射无效：" + key)
+					}
+				}
+				deriveMaterialNoticeFields(&binding)
+			}
 			binding.StudentIDs = compactStrings(req.StudentIDs)
+			if binding.Kind == learning.NoticeTeachingPlansUploaded {
+				if len(req.StudentIDs) != 0 {
+					return nil, errors.New("教师教案通知不能选择学生接收范围")
+				}
+				if len(req.TeacherIDs) > 500 {
+					return nil, errors.New("试运行教师最多 500 名")
+				}
+				binding.TeacherIDs = []string{}
+				for _, id := range compactStrings(req.TeacherIDs) {
+					binding.TeacherIDs = appendUnique(binding.TeacherIDs, id)
+				}
+				binding.WebOrigin = strings.TrimSpace(req.WebOrigin)
+				if binding.WebOrigin != "" && !validTeacherNoticeOrigin(binding.WebOrigin) {
+					return nil, errors.New("教师网页地址必须为不含路径、参数或凭据的 HTTPS 域名")
+				}
+				for _, id := range binding.TeacherIDs {
+					teacher, err := work.principalByUserIDUnlocked(id)
+					if err != nil || !hasRole(teacher.Roles, learning.RoleTeacher) {
+						return nil, errors.New("试运行教师不存在或已停用")
+					}
+				}
+			}
 			binding.ApprovedReasons = compactStrings(req.ApprovedReasons)
 			for _, reason := range binding.ApprovedReasons {
 				if len([]rune(reason)) > 20 {
@@ -240,7 +341,7 @@ func (s *MemoryStore) collectScheduleBusinessEvents(before *MemoryStore, now tim
 		if item.Status == "已取消" && hasSettled && old.Status != "已取消" {
 			kind = learning.NoticeScheduleCancelled
 		} else if businessLessonEffective(item) {
-			if !hasSettled {
+			if !hasSettled || old.Status == "已取消" {
 				kind = learning.NoticeScheduleConfirmed
 			} else if businessLessonVersion(settled) != businessLessonVersion(item) {
 				kind = learning.NoticeScheduleChanged
@@ -437,6 +538,20 @@ func (s *MemoryStore) BusinessNoticeDetail(principal learning.Principal, id stri
 		student, ok := s.findStudent(event.StudentID)
 		if !allowed || !ok || student.AccountStatus != "正常" {
 			break
+		}
+		if event.Kind == learning.NoticeMaterialsPublished {
+			items := s.materialBatchAccessibleResources(event.StudentID, event.ResourceIDs)
+			if len(items) == 0 {
+				break
+			}
+			event = cloneBusinessNoticeValue(event)
+			event.Values = nil
+			event.ResourceIDs = nil
+			for _, item := range items {
+				event.ResourceIDs = append(event.ResourceIDs, item.ID)
+			}
+			event.Summary = fmt.Sprintf("%s / 共%d份资料", items[0].Course, len(items))
+			return learning.BusinessNoticeDetail{Event: event, CurrentMaterials: items, NoticeID: event.StationNoticeID, CanSwitch: principal.StudentID != event.StudentID}, nil
 		}
 		detail := learning.BusinessNoticeDetail{Event: cloneBusinessNoticeValue(event), CurrentLessons: []learning.ScheduleClass{}, CanSwitch: principal.StudentID != event.StudentID}
 		for _, change := range event.Lessons {

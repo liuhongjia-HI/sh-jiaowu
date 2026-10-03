@@ -80,6 +80,12 @@ func main() {
 		return
 	}
 	go previewWorker.Run(ctx)
+	downloadWorker := handler.NewMaterialDownloadWorker(service, cfg.FileStorage.Root)
+	if err := downloadWorker.Recover(); err != nil {
+		log.Errorf("material download jobs recovery failed: %v", err)
+		return
+	}
+	go downloadWorker.Run(ctx)
 	go repo.RunBusinessNoticeWorker(ctx, func(err error) { log.Errorf("business notifications: %v", err) })
 
 	r := router.New(router.Dependencies{

@@ -203,3 +203,50 @@ func TestMaterialSyncRollsBackWholeBatchWhenTargetChanges(t *testing.T) {
 		t.Fatalf("first target must remain unchanged after batch failure: %#v", matches)
 	}
 }
+
+func TestMaterialSyncRequiresFreshPreviewAfterTargetDirectoryRename(t *testing.T) {
+	s, p, source, first, second, material := materialSyncFixture(t)
+	req := learning.MaterialSyncRequest{SourceCourseID: source.ID, SourceLessonID: source.Curriculum[2].ID, MaterialIDs: []string{material.ID}, Targets: []learning.MaterialSyncTarget{{CourseID: first.ID, LessonID: "splus-lesson"}, {CourseID: second.ID, LessonID: "h-lesson"}}}
+	preview, err := s.PreviewMaterialSync(p, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Snapshot = preview.Snapshot
+	for i := range s.courses {
+		if s.courses[i].ID == second.ID {
+			s.courses[i].Curriculum[2].Name = "重新定位的课节"
+		}
+	}
+	if _, err := s.SyncMaterials("管理员", p, req); err == nil {
+		t.Fatal("renamed destination accepted stale confirmation")
+	}
+	if len(s.materialSlotMatches(first.ID, "splus-lesson", "HD")) != 0 {
+		t.Fatal("stale multi-target sync partially committed")
+	}
+	fresh, err := s.PreviewMaterialSync(p, req)
+	if err != nil || fresh.Snapshot == preview.Snapshot {
+		t.Fatalf("fresh preview did not reflect renamed directory: %#v %v", fresh, err)
+	}
+	req.Snapshot = fresh.Snapshot
+	if result, err := s.SyncMaterials("管理员", p, req); err != nil || len(result.Targets) != 2 {
+		t.Fatalf("freshly confirmed sync failed: %#v %v", result, err)
+	}
+}
+
+func TestMaterialSyncDraftCopyDoesNotCountAsCompleted(t *testing.T) {
+	s, p, source, target, _, material := materialSyncFixture(t)
+	draft := material
+	draft.ID, draft.CourseID, draft.LessonID = "matching-draft", target.ID, "splus-lesson"
+	draft.PublishStatus = "未发布"
+	s.materials = append(s.materials, draft)
+	req := learning.MaterialSyncRequest{SourceCourseID: source.ID, SourceLessonID: source.Curriculum[2].ID, MaterialIDs: []string{material.ID}, Targets: []learning.MaterialSyncTarget{{CourseID: target.ID, LessonID: "splus-lesson"}}}
+	preview, err := s.PreviewMaterialSync(p, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Snapshot = preview.Snapshot
+	result, err := s.SyncMaterials("管理员", p, req)
+	if err != nil || result.AlreadySynced || result.Targets[0].Created != 1 {
+		t.Fatalf("unpublished copy treated as successful sync: %#v %v", result, err)
+	}
+}

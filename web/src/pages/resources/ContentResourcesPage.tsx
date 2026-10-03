@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Checkbox, Form, Input, Modal, Popconfirm, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, HolderOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, http, postData, postForm, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
@@ -15,7 +15,7 @@ type ResourceKind = 'materials' | 'homework';
 type UploadValues = { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
 type ContentValues = Omit<UploadValues, 'fileList'> & { status: string };
 type MaterialUploadFailure = { fileName: string; reason: string; file: File; title: string; tagCode: string; allowDownload: boolean };
-type MaterialUploadResult = { sourceCourseId: string; sourceLessonId: string; uploaded: Material[]; added: number; failures: MaterialUploadFailure[]; manual?: boolean };
+type MaterialUploadResult = { sourceCourseId: string; sourceLessonId: string; uploaded: Material[]; added: number; failures: MaterialUploadFailure[]; manual?: boolean; batchId?: string; noticePending?: boolean };
 
 function materialTitleFromFile(fileName: string) {
   return fileName.replace(/\.[^.]+$/, '').trim() || fileName;
@@ -108,8 +108,12 @@ function moveMaterial(items: Material[], sourceID: string, targetID: string) {
   return next;
 }
 
-export function ContentResourcesPage({ kind, user, courseId, packageId, onClearFilter }: { kind: ResourceKind; user?: CurrentUser; courseId?: string; packageId?: string; onClearFilter?: () => void }) {
+export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packageId, onClearFilter }: { kind: ResourceKind; user?: CurrentUser; courseId?: string; syncLessonId?: string; packageId?: string; onClearFilter?: () => void }) {
   const [open, setOpen] = useState(false);
+  const uploadBatchId = useRef('');
+  useEffect(() => {
+    if (open) uploadBatchId.current = crypto.randomUUID();
+  }, [open]);
   const [editing, setEditing] = useState<Material | Homework | null>(null);
   const [submissionHomework, setSubmissionHomework] = useState<Homework | null>(null);
   const [contentForm] = Form.useForm<ContentValues>();
@@ -148,6 +152,18 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     queryFn: () => getData<HomeworkSubmissionSummary>(`/homework/${submissionHomework?.id}/submissions`)
   });
   const canManage = canUpload(kind, user);
+  const pendingNoticeBatches = useQuery({ queryKey: ['pending-material-notice-batches'], enabled: kind === 'materials' && canManage, queryFn: () => getData<{ batchId: string; courseId: string; resourceCount: number }[]>('/materials/notification-batches') });
+  const resumeNoticeBatches = useMutation({
+    mutationFn: async () => {
+      let failures = 0;
+      for (const batch of pendingNoticeBatches.data || []) {
+        try { await postData(`/materials/notification-batches/${encodeURIComponent(batch.batchId)}/complete`, { courseId: batch.courseId }); }
+        catch { failures++; }
+      }
+      return failures;
+    },
+    onSuccess: failures => { client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] }); if (failures) message.warning(`${failures} 次提醒汇总失败，可再次重试`); else { setSyncBatch(current => current ? { ...current, noticePending: false } : current); message.success('提醒已汇总'); } }
+  });
   const canManageCourse = Boolean(user?.roles.some((role) => (['ops_staff', 'campus_admin', 'super_admin'].includes(role) || role === 'teacher' && user?.teacherLibrary?.canManageCourses !== false)));
   const unrestrictedCourseScope = Boolean(user?.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role)));
   const create = useMutation({
@@ -159,11 +175,13 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       if (files.length === 0) throw new Error('请选择文件');
       const lessonLabel = formatResourceCurriculumLabel({ lessonId: values.lessonId }, course);
       const uploaded: Material[] = [];
+      const batchId = uploadBatchId.current || crypto.randomUUID();
       const failures: MaterialUploadFailure[] = [];
       let added = 0;
       for (const file of files) {
         const tagCode = values.tagCode || suggestMaterialTagCode(file.name);
         const data = new FormData();
+        data.append('batchId', batchId);
         const uploadTitle = values.title?.trim() || lessonLabel || materialTitleFromFile(file.name);
         data.append('title', uploadTitle);
         data.append('courseId', course.id);
@@ -180,7 +198,10 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
         }
       }
       if (!uploaded.length) throw new Error(failures[0]?.reason || '上传失败，请稍后重试。');
-      return { sourceCourseId: course.id, sourceLessonId: values.lessonId, uploaded, added, failures };
+      let noticePending = false;
+      try { await postData(`/materials/notification-batches/${encodeURIComponent(batchId)}/complete`, { courseId: course.id }); }
+      catch { noticePending = true; }
+      return { sourceCourseId: course.id, sourceLessonId: values.lessonId, uploaded, added, failures, batchId, noticePending };
     },
     onSuccess: (result) => {
       if (kind === 'materials' && result && typeof result === 'object' && 'added' in result) {
@@ -197,6 +218,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       setUploadTarget(null);
       client.invalidateQueries({ queryKey: [kind] });
       client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
       if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials', 'all-for-reorder'] });
     },
     onError: (error: Error) => message.error(error.message || '保存失败，请稍后重试。')
@@ -238,6 +260,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       const failures: MaterialUploadFailure[] = [];
       for (const item of syncBatch.failures) {
         const data = new FormData();
+        if (syncBatch.batchId) data.append('batchId', syncBatch.batchId);
         data.append('title', item.title);
         data.append('courseId', syncBatch.sourceCourseId);
         data.append('learningSpaceId', sourceSyncCourse?.learningSpaceId || '');
@@ -251,20 +274,34 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
           failures.push({ ...item, reason: error instanceof Error ? error.message : '上传失败' });
         }
       }
-      return { succeeded, failures };
+      let noticePending = Boolean(syncBatch.noticePending);
+      if (syncBatch.batchId) {
+        try { await postData(`/materials/notification-batches/${encodeURIComponent(syncBatch.batchId)}/complete`, { courseId: syncBatch.sourceCourseId }); noticePending = false; }
+        catch { noticePending = true; }
+      }
+      return { succeeded, failures, noticePending };
     },
-    onSuccess: ({ succeeded, failures }) => {
+    onSuccess: ({ succeeded, failures, noticePending }) => {
       setSyncBatch((current) => {
         if (!current) return current;
-        return { ...current, uploaded: [...current.uploaded, ...succeeded], added: current.added + succeeded.length, failures };
+        return { ...current, uploaded: [...current.uploaded, ...succeeded], added: current.added + succeeded.length, failures, noticePending };
       });
       setSyncPreview(null);
       if (failures.length) message.warning(`${succeeded.length} 个文件重试成功，仍有 ${failures.length} 个失败。`);
       else message.success('失败文件已全部重新上传，可继续同步。');
       client.invalidateQueries({ queryKey: ['materials'] });
       client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
     },
     onError: (error: Error) => message.error(error.message || '重新上传失败，请稍后重试。')
+  });
+  const retryNoticeBatch = useMutation({
+    mutationFn: async () => {
+      if (!syncBatch?.batchId) throw new Error('上传批次不存在');
+      return postData(`/materials/notification-batches/${encodeURIComponent(syncBatch.batchId)}/complete`, { courseId: syncBatch.sourceCourseId });
+    },
+    onSuccess: () => { setSyncBatch(current => current ? { ...current, noticePending: false } : current); message.success('提醒已汇总'); client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] }); },
+    onError: (error: Error) => message.error(error.message || '提醒汇总失败，请重试')
   });
   const executeSync = useMutation({
     mutationFn: () => postData<MaterialSyncResult>('/materials/sync', { ...materialSyncRequest(), snapshot: syncPreview?.snapshot || '' }),
@@ -275,6 +312,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       setSyncPreview(null);
       client.invalidateQueries({ queryKey: ['materials'] });
       client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
       client.invalidateQueries({ queryKey: ['courses'] });
       client.invalidateQueries({ queryKey: ['content'] });
     },
@@ -318,6 +356,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       client.invalidateQueries({ queryKey: [kind] });
       client.invalidateQueries({ queryKey: ['permissions'] });
       if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
     },
     onError: (error: Error) => message.error(error.message || '保存失败，请检查课程范围和发布状态。')
   });
@@ -340,6 +379,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       client.invalidateQueries({ queryKey: ['courses'] });
       client.invalidateQueries({ queryKey: ['content'] });
       client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
     },
     onError: (error: Error) => message.error(error.message || '保存课程目录失败，请检查层级关系。')
   });
@@ -350,6 +390,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       client.invalidateQueries({ queryKey: [kind] });
 		if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials', 'all-for-reorder'] });
       if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
     },
     onError: (error: Error) => message.error(error.message || '删除失败，请稍后重试。')
   });
@@ -367,6 +408,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       message.success('讲义展示顺序已保存，小程序会同步更新。');
       client.invalidateQueries({ queryKey: ['materials'] });
       client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
     },
     onError: (error: Error) => message.error(error.message || '排序保存失败，请刷新后重试。')
   });
@@ -377,7 +419,8 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   });
   const removeSelected = useMutation({
     mutationFn: async (ids: string[]) => { for (const id of ids) await deleteData(`${path}/${id}`); },
-    onSuccess: (_data, ids) => { message.success(`已删除 ${ids.length} 项内容。`); setSelectedRowKeys([]); client.invalidateQueries({ queryKey: [kind] }); if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials-overview'] }); },
+    onSuccess: (_data, ids) => { message.success(`已删除 ${ids.length} 项内容。`); setSelectedRowKeys([]); client.invalidateQueries({ queryKey: [kind] }); if (kind === 'materials') client.invalidateQueries({ queryKey: ['materials-overview'] });
+      client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] }); },
     onError: (error: Error) => message.error(error.message || '批量删除失败，请稍后重试。')
   });
   const openFile = async (url: unknown, download = false, name?: unknown) => {
@@ -445,6 +488,15 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   const loadError = resources.error || courses.error || (Boolean(packageId) && packages.error);
 
   const materialPacks = kind === 'materials' ? groupMaterialsByLesson(tableRows as Material[], courses.data ?? []) : [];
+  const autoSyncOpened = useRef('');
+  useEffect(() => {
+    const key = `${courseId}:${syncLessonId}`;
+    if (!syncLessonId || !courseId || !canManage || loading || loadError || autoSyncOpened.current === key) return;
+    autoSyncOpened.current = key;
+    const row = materialPacks.find(pack => pack.courseId === courseId && pack.lessonId === syncLessonId);
+    if (row) startManualSync(row);
+    else message.warning('当前课节没有可同步的已发布讲义');
+  }, [courseId, syncLessonId, canManage, loading, loadError, materialPacks]);
   const selectedPacks = materialPacks.filter((pack) => selectedRowKeys.includes(pack.key));
   const selectedDeleteIds = kind === 'materials' ? selectedPacks.flatMap((pack) => pack.materials.map((item) => item.id)) : selectedRowKeys.map(String);
 
@@ -488,11 +540,12 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
   return <div className="page-stack">
     <div className="page-heading">
       <div>
-        <Typography.Title level={3}>{title}</Typography.Title>
+        <Typography.Title level={3}>{kind === 'materials' ? selectedCourse?.name || selectedPackage?.name || title : title}</Typography.Title>
         <Typography.Text type="secondary">{kind === 'materials' ? filterDescription : '从题库选题并发布到学习空间。'}</Typography.Text>
       </div>
       {canManage && <Button type="primary" icon={kind === 'materials' ? <UploadOutlined /> : <PlusOutlined />} onClick={() => { setUploadTarget(null); setOpen(true); }}>{kind === 'materials' ? '上传讲义' : '新建课后练习'}</Button>}
     </div>
+    {kind === 'materials' && Boolean(pendingNoticeBatches.data?.length) && <Alert type="warning" showIcon message={`${pendingNoticeBatches.data?.length} 次上传的提醒待汇总`} action={<Button loading={resumeNoticeBatches.isPending} onClick={() => resumeNoticeBatches.mutate()}>汇总提醒</Button>} />}
     {kind === 'materials' && !courseId && !packageId && <MaterialUploadOverview courses={courses.data ?? []} canManage={canManage} onUpload={(targetCourseId, lessonId) => { setUploadTarget({ courseId: targetCourseId, lessonId }); setOpen(true); }} onOpenFile={(item, download) => openFile(download ? item.downloadUrl : item.previewUrl, download, item.fileName)} />}
     {kind === 'materials' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索课节或文件名" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear placeholder="学科" value={subject} onChange={setSubject} options={subjectOptions} style={{ width: 130 }} /><Select allowClear showSearch placeholder="上传人" value={uploaderId} onChange={setUploaderId} options={uploaderOptions} style={{ width: 150 }} /><Input type="date" value={uploadedFrom} onChange={(event) => setUploadedFrom(event.target.value)} /><Input type="date" value={uploadedTo} onChange={(event) => setUploadedTo(event.target.value)} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setSubject(undefined); setTagCode(undefined); setUploaderId(undefined); setUploadedFrom(''); setUploadedTo(''); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
     {kind === 'homework' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
@@ -588,7 +641,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
     <HomeworkSubmissionDialog homework={submissionHomework} summary={submissionSummary.data} loading={submissionSummary.isLoading} error={Boolean(submissionSummary.error)} onCancel={() => setSubmissionHomework(null)} />
     {open && <UploadDialog kind={kind} open loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} materials={(kind === 'materials' ? (resources.data ?? []) : []) as Material[]} initialCourse={uploadCourse} initialLessonId={uploadTarget?.lessonId} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => { setOpen(false); setUploadTarget(null); }} onSubmit={(values) => create.mutate(values)} />}
     <ContentEditDialog kind={kind} form={contentForm} item={editing} loading={save.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setEditing(null)} onSubmit={(values) => save.mutate(values)} />
-    <CourseDialog form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
+    <CourseDialog referenceCourseId={courseEditor?.id} form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
     <Modal
       title={syncBatch?.manual ? '跨班型同步课节讲义' : '同步本次课程讲义'}
       open={Boolean(syncBatch)}
@@ -603,6 +656,7 @@ export function ContentResourcesPage({ kind, user, courseId, packageId, onClearF
       ]}
     >
       <Alert type="info" showIcon message={`${syncBatch?.manual ? '当前课节已选取' : '源课程已上传'} ${syncBatch?.uploaded.length || 0} 份已发布资料，可选择同步到同年级、学科、学期和阶段的课程。`} description="同步后各课程资料独立维护；即使目标课节已有同标签资料，本次文件也会独立新增。" style={{ marginBottom: 16 }} />
+      {syncBatch?.noticePending && <Alert type="warning" showIcon message="资料已上传，提醒汇总未完成" action={<Button loading={retryNoticeBatch.isPending} onClick={() => retryNoticeBatch.mutate()}>重试提醒汇总</Button>} style={{ marginBottom: 16 }} />}
       {syncBatch?.failures.length ? <Alert type="warning" showIcon message={`${syncBatch.failures.length} 个文件上传失败，不会参与同步`} description={<div><div>{syncBatch.failures.map((item) => `${item.fileName}：${item.reason}`).join('；')}</div><Button size="small" style={{ marginTop: 8 }} loading={retryFailedUploads.isPending} onClick={() => retryFailedUploads.mutate()}>只重新上传失败文件</Button></div>} style={{ marginBottom: 16 }} /> : null}
       <Typography.Text strong>{syncBatch?.manual ? '源课节资料' : '本次资料'}</Typography.Text>
       <div style={{ margin: '8px 0 16px' }}>{syncBatch?.uploaded.map((item) => <Tag key={item.id}>{item.tagCode || '未标签'} · {item.fileName}</Tag>)}</div>

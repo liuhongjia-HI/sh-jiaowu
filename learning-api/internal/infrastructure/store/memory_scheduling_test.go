@@ -31,8 +31,8 @@ func TestScheduleClassCanReserveTimeWithoutRegisteredStudents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected pending reservation to succeed: %v", err)
 	}
-	if created.Status != "待确认" || len(created.Students) != 0 {
-		t.Fatalf("expected pending class without students, got %#v", created)
+	if created.Status != "已确认" || len(created.Students) != 0 {
+		t.Fatalf("expected confirmed reservation without students, got %#v", created)
 	}
 	if created.ExpectedStudentCount != 2 || created.ReservationNote != req.ReservationNote {
 		t.Fatalf("expected reservation metadata to be kept, got %#v", created)

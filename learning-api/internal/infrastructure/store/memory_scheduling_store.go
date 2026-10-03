@@ -586,21 +586,11 @@ func classCapacity(classType string) int {
 	return value
 }
 
-func minClassStudents(capacity int) int {
-	if capacity <= 1 {
-		return 1
-	}
-	return 2
-}
-
 func candidateReason(studentCount, capacity int) string {
 	if studentCount >= capacity {
-		return "人数已满足满班，可直接确认"
+		return "人数达到容量，可排课"
 	}
-	if studentCount >= minClassStudents(capacity) {
-		return "人数已达到成班线，可继续补充学生"
-	}
-	return "人数不足成班线，需协调更多学生时间"
+	return "可排课，未满容量可继续补充学生"
 }
 
 func scheduleNoticeSummary(item learning.ScheduleClass, action string) string {

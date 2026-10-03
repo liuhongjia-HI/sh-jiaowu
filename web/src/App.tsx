@@ -26,6 +26,8 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react
 import { useQuery } from '@tanstack/react-query';
 import { loadSubjectColors } from './utils/subject-colors';
 import { changePassword, clearToken, getData, getToken, logout } from './services/http';
+import { materialPickupQuery } from './utils/materialPickup';
+import { teachingPlanEntryQuery } from './utils/teachingPlanEntry';
 import type { CurrentUser, Role, SubjectMetadata } from './types/starline';
 
 const { Header, Sider, Content } = Layout;
@@ -127,6 +129,19 @@ function hasAnyRole(user: CurrentUser, roles: Role[]) {
 
 function isNavGroup(item: NavNode): item is NavGroup {
   return 'children' in item;
+}
+
+function LoginRedirect() {
+  const location = useLocation();
+  const query = materialPickupQuery(location.pathname, location.search) || teachingPlanEntryQuery(location.pathname, location.search);
+  return <Navigate to={`/login${query}`} replace />;
+}
+
+function AuthenticatedLoginRedirect({ user }: { user: CurrentUser }) {
+  const location = useLocation();
+  const planQuery = teachingPlanEntryQuery(location.pathname, location.search);
+  const pickupQuery = materialPickupQuery(location.pathname, location.search);
+  return <Navigate to={planQuery ? `/teaching-plans${planQuery}` : pickupQuery ? `/teacher-library${pickupQuery}` : teacherLanding(user)} replace />;
 }
 
 function teacherLanding(user: CurrentUser) { return user.roles.includes('teacher') && !user.roles.some(r => ['ops_staff', 'campus_admin', 'super_admin'].includes(r)) ? '/teacher-library' : '/dashboard'; }
@@ -231,7 +246,7 @@ function MustChangePasswordPage({ user }: { user: CurrentUser }) {
       await changePassword(values.oldPassword, values.newPassword);
       message.success('密码已修改，请用新密码重新登录。');
       clearToken();
-      window.location.href = '/login';
+      window.location.href = `/login${materialPickupQuery(window.location.pathname, window.location.search) || teachingPlanEntryQuery(window.location.pathname, window.location.search)}`;
     } catch (error: any) {
       message.error(error.response?.data?.message || error.message || '修改失败，请检查原密码。');
     } finally {
@@ -465,7 +480,7 @@ export default function App() {
   const loginRoutes = (
     <BrowserRouter>
       <Suspense fallback={<PageLoading />}>
-        <Routes><Route path="/login" element={<Login />} /><Route path="*" element={<Navigate to="/login" />} /></Routes>
+        <Routes><Route path="/login" element={<Login />} /><Route path="*" element={<LoginRedirect />} /></Routes>
       </Suspense>
     </BrowserRouter>
   );
@@ -501,5 +516,5 @@ export default function App() {
   if (me.data.mustChangePassword && me.data.authMethod === 'password') {
     return <BrowserRouter><Routes><Route path="*" element={<MustChangePasswordPage user={me.data} />} /></Routes></BrowserRouter>;
   }
-  return <BrowserRouter><Routes><Route path="/login" element={<Navigate to={teacherLanding(me.data)} />} /><Route path="*" element={<Shell user={me.data} />} /></Routes></BrowserRouter>;
+  return <BrowserRouter><Routes><Route path="/login" element={<AuthenticatedLoginRedirect user={me.data} />} /><Route path="*" element={<Shell user={me.data} />} /></Routes></BrowserRouter>;
 }

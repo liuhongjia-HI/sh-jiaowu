@@ -2,7 +2,7 @@ const { request } = require("../../utils/request");
 const { refreshNoticeBadge } = require("../../utils/notice-badge");
 
 Page({
-  data: { loading: true, error: "", detail: null, lessons: [], studentName: "", title: "", summary: "", createdAt: "" },
+  data: { loading: true, error: "", detail: null, lessons: [], materials: [], studentName: "", title: "", summary: "", createdAt: "" },
   onLoad(options = {}) {
     this.noticeId = String(options.id || "");
     this.loadDetail();
@@ -10,7 +10,7 @@ Page({
   onUnload() { this.generation = (this.generation || 0) + 1; },
   loadDetail() {
     const generation = this.generation = (this.generation || 0) + 1;
-    this.setData({ loading: true, error: "", detail: null, lessons: [], studentName: "", title: "", summary: "" });
+    this.setData({ loading: true, error: "", detail: null, lessons: [], materials: [], studentName: "", title: "", summary: "" });
     if (!/^[a-f0-9]{64}$/.test(this.noticeId)) {
       this.setData({ loading: false, error: "This message is unavailable." });
       return Promise.resolve();
@@ -36,13 +36,18 @@ Page({
           const latest = current.get(change.after.id);
           return { id: change.after.id, course: change.after.courseName || change.after.name, before: change.before ? lessonTime(change.before) : "", notified: lessonTime(change.after), current: latest ? lessonTime(latest) : "", changed: !!latest && lessonTime(latest) !== lessonTime(change.after), status: !latest ? "Unavailable" : latest.status === "已取消" ? "Cancelled" : latest.auditStatus !== "已通过" || latest.status !== "已确认" ? "Awaiting confirmation" : "Confirmed", teacher: latest ? latest.teacherName : "", room: latest ? latest.roomName : "", campus: latest ? latest.campusId : "" };
         });
-        this.setData({ loading: false, detail, lessons, studentName: detail.event.studentName, title: detail.event.title, summary: detail.event.summary, createdAt: detail.event.createdAt ? detail.event.createdAt.replace("T", " ").slice(0, 16) : "" });
-        request(`/student/notices/business-${this.noticeId}/read`, { method: "POST", data: {}, silent: true }).then(() => refreshNoticeBadge()).catch(() => {});
+        this.setData({ loading: false, detail, lessons, materials: detail.currentMaterials || [], studentName: detail.event.studentName, title: detail.event.title, summary: detail.event.summary, createdAt: detail.event.createdAt ? detail.event.createdAt.replace("T", " ").slice(0, 16) : "" });
+        request(`/student/notices/${encodeURIComponent(detail.noticeId || `business-${this.noticeId}`)}/read`, { method: "POST", data: {}, silent: true }).then(() => refreshNoticeBadge()).catch(() => {});
       })
       .catch((error) => {
         if (generation !== this.generation) return;
-        this.setData({ loading: false, error: error.message || "Unable to load this message.", detail: null, lessons: [], studentName: "" });
+        this.setData({ loading: false, error: error.message || "Unable to load this message.", detail: null, lessons: [], materials: [], studentName: "" });
       });
+  },
+  openMaterial(event) {
+    const id = String(event.currentTarget.dataset.id || "");
+    if (!(this.data.materials || []).some(item => item.id === id)) return;
+    wx.navigateTo({ url: `/pages/material-preview/index?id=${encodeURIComponent(id)}` });
   },
   openRelated() {
     const event = this.data.detail && this.data.detail.event;

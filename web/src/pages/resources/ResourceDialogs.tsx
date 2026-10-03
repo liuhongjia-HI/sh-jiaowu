@@ -31,6 +31,7 @@ type ContentFormValues = {
   allowDownload?: boolean;
 };
 type QuestionFormValues = QuestionBankUpsertRequest;
+type CurriculumReference = { id: string; kind: string; title: string; courseName: string; blocking?: boolean };
 
 const CONTENT_TYPE_NAME: Record<string, string> = {
   course: '课程',
@@ -271,6 +272,8 @@ export function CourseDialog({
   allowedLearningSpaceIds,
   unrestricted,
   onCancel,
+  onSync,
+  referenceCourseId,
   onSubmit
 }: {
   form: ReturnType<typeof Form.useForm<CourseFormValues>>[0];
@@ -287,10 +290,16 @@ export function CourseDialog({
   unrestricted: boolean;
   onCancel: () => void;
   onSubmit: (values: CourseFormValues) => void;
+  onSync?: (curriculum: CourseFormValues['curriculum']) => void;
+  referenceCourseId?: string;
 }) {
   const lastAutoName = useRef('');
   const [curriculumNodes, setCurriculumNodes] = useState<CourseFormValues['curriculum']>([]);
   const [curriculumError, setCurriculumError] = useState('');
+  const [checkingReferences, setCheckingReferences] = useState(false);
+  const [originalSpaceId, setOriginalSpaceId] = useState('');
+  const currentCurriculum = useRef(curriculumNodes);
+  currentCurriculum.current = curriculumNodes;
   const [collapsedUnits, setCollapsedUnits] = useState<Set<string>>(new Set());
   const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(new Set());
   const [unitCount, setUnitCount] = useState(1);
@@ -304,6 +313,15 @@ export function CourseDialog({
   const grade = Form.useWatch('grade', form);
   const subject = Form.useWatch('subject', form);
   const selectedSpaceId = Form.useWatch('learningSpaceId', form);
+  const scopeChanged = Boolean(open && referenceCourseId && originalSpaceId && selectedSpaceId && selectedSpaceId !== originalSpaceId && !scopeLocked);
+  const scopeImpact = useQuery({
+    queryKey: ['curriculum-scope-impact', referenceCourseId, selectedSpaceId],
+    queryFn: () => postData<CurriculumReference[]>(`/courses/${referenceCourseId}/curriculum-references`, { targetLearningSpaceId: selectedSpaceId }),
+    enabled: scopeChanged,
+    retry: false,
+    staleTime: 0
+  });
+  const blockedScope = scopeChanged && Boolean(scopeImpact.data?.some(ref => ref.blocking));
   const gradeSelectOptions = gradeOptions().filter((option) => availableSpaces.some((space) => space.grade === option.value));
   const subjectSelectOptions = subjectOptions(grade, subjectCatalog).filter((option) => (
     availableSpaces.some((space) => space.grade === grade && space.subject === option.value)
@@ -343,6 +361,7 @@ export function CourseDialog({
   useEffect(() => {
     if (!open) return;
     setCurriculumNodes(form.getFieldValue('curriculum') ?? []);
+    setOriginalSpaceId(form.getFieldValue('learningSpaceId') || '');
     setCurriculumError('');
     setCollapsedUnits(new Set());
     setCollapsedChapters(new Set());
@@ -383,7 +402,9 @@ export function CourseDialog({
     if (type === 'chapter' && parentId) setCollapsedUnits((current) => new Set([...current].filter((item) => item !== parentId)));
     if (type === 'lesson' && parentId) setCollapsedChapters((current) => new Set([...current].filter((item) => item !== parentId)));
   };
-  const removeCurriculumBranch = (nodeId: string) => {
+  const removeCurriculumBranch = async (nodeId: string) => {
+    if (checkingReferences) return;
+    const snapshot = JSON.stringify(curriculumNodes);
     const ids = new Set([nodeId]);
     let foundChild = true;
     while (foundChild) {
@@ -395,7 +416,28 @@ export function CourseDialog({
         }
       });
     }
-    updateCurriculum(curriculumNodes.filter((node) => !ids.has(node.id)));
+    if (referenceCourseId) {
+      setCheckingReferences(true);
+      try {
+        const refs = await postData<{ id: string; kind: string; title: string; courseName: string }[]>(`/courses/${referenceCourseId}/curriculum-references`, { nodeIds: [...ids] });
+        if (JSON.stringify(currentCurriculum.current) !== snapshot) { message.warning('目录已变化，请重新检查删除范围'); return; }
+        if (refs.length) {
+          Modal.info({ title: '目录引用影响', zIndex: 1600, width: 640, content: <>
+            <Alert type="warning" message={`涉及 ${ids.size} 个目录节点、${refs.length} 份资料，请先重新关联后删除`} />
+            <div style={{ maxHeight: 320, overflow: 'auto', marginTop: 12 }}>{refs.map(ref => <div key={`${ref.kind}-${ref.id}`} style={{ marginBottom: 8 }}><Tag>{ref.kind}</Tag><Typography.Text strong>{ref.title}</Typography.Text><div><Typography.Text type="secondary">{ref.courseName}</Typography.Text></div></div>)}</div>
+            {refs.some(ref => ref.kind === '教案') && <a href="/teaching-plans" target="_blank" rel="noreferrer">打开教案管理并重新关联章节</a>}
+          </> });
+          return;
+        }
+      } catch (error) {
+        message.error(error instanceof Error ? error.message : '引用检查失败，请重试');
+        return;
+      } finally { setCheckingReferences(false); }
+    }
+    Modal.confirm({ title: '删除目录', zIndex: 1600, content: `将移除 ${ids.size} 个节点，保存课程后生效。`, okText: '删除', okButtonProps: { danger: true }, cancelText: '保留', onOk: () => {
+      if (JSON.stringify(currentCurriculum.current) !== snapshot) { message.warning('目录已变化，请重新检查删除范围'); return; }
+      updateCurriculum(currentCurriculum.current.filter((node) => !ids.has(node.id)));
+    } });
   };
   const updateCurriculumName = (nodeId: string, name: string) => {
     updateCurriculum(curriculumNodes.map((node) => node.id === nodeId ? { ...node, name } : node));
@@ -415,9 +457,10 @@ export function CourseDialog({
       onCancel={onCancel}
       onSubmit={() => form.submit()}
       width="min(760px, 100vw)"
-      submitDisabled={!hasSpaceOptions}
+      submitDisabled={!hasSpaceOptions || scopeChanged && (scopeImpact.isFetching || !!scopeImpact.error || blockedScope)}
       submitting={loading}
     >
+      {onSync && <Button style={{ marginBottom: 16 }} disabled={loading} onClick={() => onSync(curriculumNodes)}>跨班型同步</Button>}
       {!availableSpaces.length && (
         <Alert
           type="info"
@@ -437,6 +480,7 @@ export function CourseDialog({
         />
       )}
       <Form form={form} layout="vertical" preserve={false} initialValues={{ ...form.getFieldsValue(true), ...(scopeSpaceId ? { learningSpaceId: scopeSpaceId } : {}) }} onFinish={(values) => {
+        if (scopeChanged && (scopeImpact.isFetching || scopeImpact.error || blockedScope)) return;
         const missing = missingCurriculumTypes();
         if (missing.length) {
           setCurriculumError(`请至少添加 1 个 ${missing.map((type) => ({ unit: 'Unit' })[type]).join('、')}`);
@@ -488,6 +532,13 @@ export function CourseDialog({
             options={spaceOptions}
           />
         </Form.Item>
+        {scopeChanged && <Card size="small" title="教学范围变更影响" style={{ marginBottom: 16 }} extra={<Button loading={scopeImpact.isFetching} onClick={() => scopeImpact.refetch()}>重新检查</Button>}>
+          {scopeImpact.isFetching ? <Skeleton active paragraph={{ rows: 2 }} /> : scopeImpact.error ? <Alert type="error" message="引用检查失败，暂不能保存范围变更" /> : <>
+            <Alert type={blockedScope ? 'warning' : 'info'} message={blockedScope ? '教案与目标年级、学科、学期或阶段不匹配，请先重新关联' : scopeImpact.data?.length ? '以下资料将随课程进入新的教学范围' : '没有关联资料'} />
+            {!!scopeImpact.data?.length && <div style={{ maxHeight: 240, overflow: 'auto', marginTop: 12 }}>{scopeImpact.data.map(ref => <div key={`${ref.kind}-${ref.id}`} style={{ marginBottom: 8 }}><Tag>{ref.kind}</Tag><Typography.Text strong>{ref.title}</Typography.Text><Tag color={ref.blocking ? 'orange' : 'green'} style={{ marginLeft: 8 }}>{ref.blocking ? '需重新关联' : '随课程保留'}</Tag></div>)}</div>}
+            {blockedScope && <a href="/teaching-plans" target="_blank" rel="noreferrer">打开教案管理并重新关联章节</a>}
+          </>}
+        </Card>}
         <Form.Item label="课程目录" extra="支持一至三级目录；没有下级节点的叶子节点必须填写名称，上级节点名称可选。">
           <div className="curriculum-toolbar">
             <Typography.Text type="secondary">共 {curriculumNodes.filter((node) => node.type === 'unit').length} 个 Unit · {curriculumNodes.filter((node) => node.type === 'chapter').length} 个 Chapter · {curriculumNodes.filter((node) => node.type === 'lesson').length} 个 Lesson</Typography.Text>
@@ -511,7 +562,7 @@ export function CourseDialog({
               <InputNumber min={1} max={200} aria-label="Unit序号" value={unit.sortOrder} onChange={(value) => updateCurriculumSortOrder(unit.id, value || 1)} />
               <Input aria-label={`Unit名称${curriculumNodeIsLeaf(unit.id) ? '（必填）' : '（选填）'}`} value={unit.name} onChange={(event) => updateCurriculumName(unit.id, event.target.value)} placeholder={`Unit 名称${curriculumNodeIsLeaf(unit.id) ? '（必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(unit.id) && !unit.name.trim() ? 'error' : undefined} />
               <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('chapter', unit.id).length} 个 Chapter</Typography.Text>
-              <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
+              <Button danger type="text" size="small" htmlType="button" disabled={checkingReferences} onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
             </div>
             <div className="curriculum-node-actions">
               <span>批量创建 Chapter</span>
@@ -526,7 +577,7 @@ export function CourseDialog({
                 <InputNumber min={1} max={200} aria-label="Chapter序号" value={chapter.sortOrder} onChange={(value) => updateCurriculumSortOrder(chapter.id, value || 1)} />
                 <Input aria-label={`Chapter名称${curriculumNodeIsLeaf(chapter.id) ? '（必填）' : '（选填）'}`} value={chapter.name} onChange={(event) => updateCurriculumName(chapter.id, event.target.value)} placeholder={`Chapter 名称${curriculumNodeIsLeaf(chapter.id) ? '（必填）' : '（选填）'}`} status={curriculumNodeIsLeaf(chapter.id) && !chapter.name.trim() ? 'error' : undefined} />
                 <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('lesson', chapter.id).length} 个 Lesson</Typography.Text>
-                <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
+                <Button danger type="text" size="small" htmlType="button" disabled={checkingReferences} onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
               </div>
               <div className="curriculum-node-actions">
                 <span>批量创建 Lesson</span>
@@ -538,7 +589,7 @@ export function CourseDialog({
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Lesson序号" value={lesson.sortOrder} onChange={(value) => updateCurriculumSortOrder(lesson.id, value || 1)} />
                 <Input aria-label="Lesson名称（必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
-                <Button danger type="text" size="small" htmlType="button" onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
+                <Button danger type="text" size="small" htmlType="button" disabled={checkingReferences} onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
               </div>)}</div>}
             </div>)}
           </div>)}

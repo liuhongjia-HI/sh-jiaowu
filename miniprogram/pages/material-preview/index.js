@@ -52,6 +52,7 @@ Page({
     this.courseId = options.courseId || "";
     this.lessonId = options.lessonId || "";
     this.pageLoadToken = 0;
+    this.unloaded = false;
     this.previewRetryCount = 0;
     this.listFirst = !!(this.courseId && this.lessonId);
     if (!id && !this.listFirst) {
@@ -67,9 +68,15 @@ Page({
   },
   loadMaterial(id, loadLessonContents) {
     this.materialId = id;
+    const token = this.pageLoadToken = (this.pageLoadToken || 0) + 1;
+    if (this.previewRetryTimer) { clearTimeout(this.previewRetryTimer); this.previewRetryTimer = null; }
+    this.previewRetryCount = 0;
     this.resetContentSecurity(id, "material");
     this.setData({
       contentMode: "material",
+      material: {},
+      materialCode: "",
+      pageCount: 0,
       activeHomework: {},
       previewMode: "unknown",
       previewMessage: "",
@@ -79,6 +86,7 @@ Page({
       favoriteId: ""
     });
     request(`/student/materials/${id}`).then((material) => {
+      if (this.unloaded || token !== this.pageLoadToken || this.data.contentMode !== "material") return;
       this.courseId = this.courseId || material.courseId || "";
       this.lessonId = this.lessonId || material.lessonId || "";
       const lessonTitle = (material.curriculum && material.curriculum.lesson) || this.data.lessonTitle || material.title;
@@ -98,6 +106,7 @@ Page({
       this.loadPagedPreview(id);
       if (loadLessonContents) this.loadLessonContents();
     }).catch(() => {
+      if (this.unloaded || token !== this.pageLoadToken || this.data.contentMode !== "material") return;
       this.setData({
         pageTitle: "Failed to load",
         displayTitle: "Failed to load",
@@ -118,8 +127,10 @@ Page({
     });
   },
   loadLessonContents() {
-    if (!this.courseId || !this.lessonId) return;
-    request(`/student/study/${this.courseId}`).then((detail) => {
+    if (this.unloaded || !this.courseId || !this.lessonId) return;
+    const courseId = this.courseId, lessonId = this.lessonId;
+    request(`/student/study/${courseId}`).then((detail) => {
+      if (this.unloaded || this.courseId !== courseId || this.lessonId !== lessonId) return;
       const courseMaterials = detail.materials || [];
       const courseHomework = detail.homework || [];
       const curriculum = (detail.course && detail.course.curriculum) || [];
@@ -236,6 +247,7 @@ Page({
     };
   },
   onUnload() {
+    this.unloaded = true;
     this.pageLoadToken += 1;
     if (this.previewRetryTimer) {
       clearTimeout(this.previewRetryTimer);
@@ -266,7 +278,10 @@ Page({
   // 分页图片在上传后由服务端预生成；详情页只下载第一页作为预览，完整内容交给文档查看器。
   // 缩略图不可用时保留整份 PDF 入口，避免模拟内容冒充真实预览。
   loadPagedPreview(id) {
+    if (this.unloaded || this.materialId !== id || this.data.contentMode !== "material") return;
+    const token = this.pageLoadToken = (this.pageLoadToken || 0) + 1;
     request(`/student/materials/${id}/preview/pages`).then((info) => {
+      if (this.unloaded || token !== this.pageLoadToken) return;
       const previewStatus = info && info.previewStatus;
       if (previewStatus === "processing") {
         this.setData({
@@ -294,7 +309,6 @@ Page({
         });
         return;
       }
-      const token = ++this.pageLoadToken;
       this.setData({
         previewMode: "image",
         previewMessage: "",
@@ -304,6 +318,7 @@ Page({
       });
       this.loadPreviewCover(id, token);
     }).catch((error) => {
+      if (this.unloaded || token !== this.pageLoadToken) return;
       const message = error.message || "Unable to open";
       this.setData({ previewMode: "unavailable", previewMessage: message, pagesLoading: false });
       if (message.includes("正在生成") && this.previewRetryCount < 3) {
@@ -347,6 +362,7 @@ Page({
   },
   refreshFavorite(materialId) {
     request("/student/favorites").then((favorites) => {
+      if (this.unloaded || this.materialId !== materialId || this.data.contentMode !== "material") return;
       const matched = (favorites || []).find(
         (item) => item.targetType === "material" && item.targetId === materialId
       );

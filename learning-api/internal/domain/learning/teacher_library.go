@@ -19,6 +19,7 @@ type TeacherLibrary struct {
 	Materials         []Material            `json:"materials"`
 	Spaces            []LearningSpace       `json:"spaces"`
 	RecentMaterialIDs []string              `json:"recentMaterialIds"`
+	UnreadMaterialIDs []string              `json:"unreadMaterialIds"`
 	CanDownload       bool                  `json:"canDownload"`
 }
 

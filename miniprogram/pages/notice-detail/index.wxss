@@ -11,3 +11,5 @@
 .lesson-field text:first-child { color: #81746c; flex-shrink: 0; }
 .lesson-field text:last-child { text-align: right; word-break: break-word; }
 .latest text { color: #b74b20 !important; font-weight: 600; }
+
+.material-card .btn { flex-shrink: 0; margin-left: 16rpx; }

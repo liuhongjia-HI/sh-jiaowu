@@ -34,6 +34,11 @@ var allowedUploadTypes = map[string]struct {
 }
 
 func (h *LearningHandler) CreateMaterial(c *gin.Context) {
+	batchID := strings.TrimSpace(c.PostForm("batchId"))
+	if len(batchID) > 64 {
+		BadRequest(c, "上传批次标识不能超过 64 字节")
+		return
+	}
 	asset, ok := h.saveUploadedLearningFile(c)
 	if !ok {
 		return
@@ -41,6 +46,7 @@ func (h *LearningHandler) CreateMaterial(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	operator, _ := c.Get(middleware.OperatorNameKey)
 	created, err := h.service.CreateMaterial(operator.(string), principal, learning.MaterialUploadRequest{
+		BatchID:         batchID,
 		Title:           strings.TrimSpace(c.PostForm("title")),
 		LearningSpaceID: strings.TrimSpace(c.PostForm("learningSpaceId")),
 		CourseID:        strings.TrimSpace(c.PostForm("courseId")),
@@ -54,6 +60,27 @@ func (h *LearningHandler) CreateMaterial(c *gin.Context) {
 		return
 	}
 	OK(c, created)
+}
+
+func (h *LearningHandler) CompleteMaterialNoticeBatch(c *gin.Context) {
+	var req learning.MaterialNoticeBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	p, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	result, err := h.service.CompleteMaterialNoticeBatch(operator.(string), p, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
+
+func (h *LearningHandler) PendingMaterialNoticeBatches(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	OK(c, h.service.PendingMaterialNoticeBatches(p))
 }
 
 func (h *LearningHandler) PreviewMaterialSync(c *gin.Context) {

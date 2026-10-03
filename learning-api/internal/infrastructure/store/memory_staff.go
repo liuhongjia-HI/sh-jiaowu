@@ -119,6 +119,9 @@ func (s *MemoryStore) createTeacherUnlocked(operator string, principal learning.
 	if err != nil {
 		return learning.Teacher{}, err
 	}
+	if err := s.validateTeacherRangeChanges(req, learning.User{}); err != nil {
+		return learning.Teacher{}, err
+	}
 	for _, user := range s.users {
 		if user.Phone == req.Phone {
 			return learning.Teacher{}, errors.New("手机号已存在")
@@ -171,6 +174,9 @@ func (s *MemoryStore) updateTeacherUnlocked(operator string, principal learning.
 		if !canManageTeacher(principal, s.users[i]) {
 			return learning.Teacher{}, errors.New("不能管理其他校区教师")
 		}
+		if err := s.validateTeacherRangeChanges(req, s.users[i]); err != nil {
+			return learning.Teacher{}, err
+		}
 		for _, user := range s.users {
 			if user.ID != id && user.Phone == req.Phone {
 				return learning.Teacher{}, errors.New("手机号已存在")
@@ -196,6 +202,10 @@ func (s *MemoryStore) updateTeacherUnlocked(operator string, principal learning.
 		s.users[i].CanUploadHandout = req.CanUploadHandout
 		s.users[i].CanUploadQuestion = req.CanUploadQuestion
 		s.users[i].CanReview = req.CanReview
+		if s.users[i].AccountStatus == "正常" && req.AccountStatus == "停用" {
+			// Revoked sessions stay invalid after the account is enabled again.
+			s.users[i].TokenVersion++
+		}
 		s.users[i].AccountStatus = req.AccountStatus
 		s.users[i].Remark = req.Remark
 		after := s.teacherFromUser(s.users[i])

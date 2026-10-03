@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"starline/learning-api/internal/domain/learning"
@@ -42,6 +43,9 @@ func (s *MemoryStore) businessTaskValidity(task learning.BusinessNoticeTask, now
 	if binding.TemplateID != task.TemplateID {
 		return "通知模板已变更"
 	}
+	if task.Kind == learning.NoticeTeachingPlansUploaded {
+		return s.teacherNoticeTaskValidity(task, binding)
+	}
 	reachable := false
 	for _, target := range s.businessRecipients(task.StudentID) {
 		if target.OpenID == task.OpenID && target.GuardianID == task.GuardianID {
@@ -54,6 +58,14 @@ func (s *MemoryStore) businessTaskValidity(task learning.BusinessNoticeTask, now
 	event, ok := s.businessEvent(task.EventID)
 	if !ok {
 		return "业务事件不存在"
+	}
+	if task.Kind == learning.NoticeMaterialsPublished {
+		if len(event.ResourceIDs) == 0 || len(s.materialBatchAccessibleResources(task.StudentID, event.ResourceIDs)) != len(event.ResourceIDs) {
+			return "资料已撤回或访问权限已失效"
+		}
+		if !reflect.DeepEqual(task.Values, materialBatchValues(binding, event, s.materialBatchAccessibleResources(task.StudentID, event.ResourceIDs))) {
+			return "资料模板字段映射已变更"
+		}
 	}
 	if task.Kind == learning.NoticeHomeworkSubmitted {
 		submission, found := s.submissions[event.RelatedID]
@@ -324,7 +336,7 @@ func (s *MemoryStore) ProcessBusinessNotices(now time.Time) error {
 		if !claimed {
 			continue
 		}
-		messageID, sendErr := sendBusinessTemplateSafely(sender, learning.OfficialMessageRequest{TemplateID: task.TemplateID, OpenID: task.OpenID, Values: task.Values, PagePath: task.PagePath, ClientMessageID: task.ClientMessageID})
+		messageID, sendErr := sendBusinessTemplateSafely(sender, learning.OfficialMessageRequest{TemplateID: task.TemplateID, OpenID: task.OpenID, Values: task.Values, PagePath: task.PagePath, URL: task.URL, ClientMessageID: task.ClientMessageID})
 		s.mu.Lock()
 		err = persistentMutationError(s, func(work *MemoryStore) error {
 			for i, current := range work.businessNoticeTasks {

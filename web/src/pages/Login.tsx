@@ -9,6 +9,8 @@ import { Button, Form, Input, Space, Typography, message } from 'antd';
 import { useState } from 'react';
 import { getCaptcha, loginWithAdminPassword } from '../services/http';
 import type { CaptchaChallenge } from '../types/starline';
+import { materialPickupQuery } from '../utils/materialPickup';
+import { teachingPlanEntryQuery } from '../utils/teachingPlanEntry';
 
 type LoginFormValues = {
   phone: string;
@@ -34,6 +36,13 @@ export default function Login() {
     try {
       const result = await loginWithAdminPassword(values.phone, values.password, captcha ? { captchaId: captcha.captchaId, captchaAnswer: values.captchaAnswer } : undefined);
       message.success('登录成功');
+      const pickupQuery = materialPickupQuery(window.location.pathname, window.location.search);
+      if (pickupQuery) {
+        window.location.href = `/teacher-library${pickupQuery}`;
+        return;
+      }
+      const planQuery = teachingPlanEntryQuery(window.location.pathname, window.location.search);
+      if (planQuery) { window.location.href = `/teaching-plans${planQuery}`; return; }
       window.location.href = result.user.roles.includes('teacher') && !result.user.roles.some(r => ['ops_staff', 'campus_admin', 'super_admin'].includes(r)) ? '/teacher-library' : '/dashboard';
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || '登录失败，请检查手机号和密码。';

@@ -28,12 +28,14 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 		s.loadCourseCurriculumFromDB,
 		s.loadQuestionBankFromDB,
 		s.loadMaterialsFromDB,
+		s.loadTeacherMaterialReadsFromDB,
 		s.loadTeachingPlansFromDB,
 		s.loadHomeworkFromDB,
 		s.loadGrantsFromDB,
 		s.loadTrialsFromDB,
 		s.loadFileAssetsFromDB,
 		s.loadPreviewJobsFromDB,
+		s.loadMaterialDownloadsFromDB,
 		s.loadReviewsFromDB,
 		s.loadNoticesFromDB,
 		s.loadLogsFromDB,
@@ -68,7 +70,7 @@ func (s *MemoryStore) loadAllFromDatabase() error {
 }
 
 func (s *MemoryStore) loadTeachingPlansFromDB() error {
-	rows, err := s.db.Query(`SELECT id, title, grade, subject, file_id, file_name, file_size, file_type, uploader_id, uploader_name, created_at FROM teaching_plans ORDER BY created_at DESC, id DESC`)
+	rows, err := s.db.Query(`SELECT id, title, grade, subject, file_id, file_name, file_size, file_type, uploader_id, uploader_name, created_at, course_id, lesson_id, chapter_name, semester, phase FROM teaching_plans ORDER BY created_at DESC, id DESC`)
 	if err != nil {
 		return err
 	}
@@ -77,7 +79,7 @@ func (s *MemoryStore) loadTeachingPlansFromDB() error {
 	for rows.Next() {
 		var item learning.TeachingPlan
 		var createdAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.Title, &item.Grade, &item.Subject, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.UploaderID, &item.UploaderName, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Grade, &item.Subject, &item.FileID, &item.FileName, &item.FileSize, &item.FileType, &item.UploaderID, &item.UploaderName, &createdAt, &item.CourseID, &item.LessonID, &item.Chapter, &item.Semester, &item.Phase); err != nil {
 			return err
 		}
 		item.CreatedAt = dateTimeString(createdAt)
@@ -512,7 +514,7 @@ func (s *MemoryStore) loadPackageContentTypes() ([]packageContentType, error) {
 }
 
 func (s *MemoryStore) loadCoursesFromDB() error {
-	rows, err := s.db.Query(`SELECT id, family_id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json FROM courses ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, family_id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json, directory_sync_json FROM courses ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -520,11 +522,16 @@ func (s *MemoryStore) loadCoursesFromDB() error {
 	out := []learning.Course{}
 	for rows.Next() {
 		var item learning.Course
-		var chaptersJSON sql.NullString
-		if err := rows.Scan(&item.ID, &item.FamilyID, &item.LearningSpaceID, &item.Name, &item.Subject, &item.Grade, &item.Status, &item.ChapterCount, &chaptersJSON); err != nil {
+		var chaptersJSON, directorySyncJSON sql.NullString
+		if err := rows.Scan(&item.ID, &item.FamilyID, &item.LearningSpaceID, &item.Name, &item.Subject, &item.Grade, &item.Status, &item.ChapterCount, &chaptersJSON, &directorySyncJSON); err != nil {
 			return err
 		}
 		item.Chapters = parseStringSliceJSON(chaptersJSON.String)
+		if directorySyncJSON.Valid && directorySyncJSON.String != "" {
+			if err := json.Unmarshal([]byte(directorySyncJSON.String), &item.DirectorySyncMap); err != nil {
+				return err
+			}
+		}
 		out = append(out, item)
 	}
 	s.courses = out

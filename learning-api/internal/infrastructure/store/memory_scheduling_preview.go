@@ -45,9 +45,12 @@ func (s *MemoryStore) PreviewScheduleClass(p learning.Principal, request learnin
 	defer s.mu.Unlock()
 	work := s.cloneForMutation()
 	req := request.ScheduleClassCreateRequest
+	var repeat learning.ScheduleRepeat
+	previous := map[string]learning.ScheduleClass{}
 	dates := []string{}
 	if request.ID == "" {
-		repeat, err := normalizeRepeat(req.Repeat)
+		var err error
+		repeat, err = normalizeRepeat(req.Repeat)
 		if err != nil {
 			return learning.SchedulePreview{}, err
 		}
@@ -93,6 +96,7 @@ func (s *MemoryStore) PreviewScheduleClass(p learning.Principal, request learnin
 				return learning.SchedulePreview{}, err
 			}
 			dates = append(dates, shifted)
+			previous[shifted] = target
 			ids[target.ID] = true
 		}
 		remaining := []learning.ScheduleClass{}
@@ -106,8 +110,9 @@ func (s *MemoryStore) PreviewScheduleClass(p learning.Principal, request learnin
 	result := learning.SchedulePreview{CanSave: true, Lessons: []learning.SchedulePreviewLesson{}}
 	req.IgnoreWarnings = true
 	for _, date := range dates {
-		lesson := learning.SchedulePreviewLesson{Date: date, Errors: []string{}, Warnings: []string{}}
-		item, err := work.buildScheduleClass(p, "", date, req)
+		req := scheduleRequestForDate(req, repeat, date)
+		lesson := learning.SchedulePreviewLesson{Date: date, StartTime: req.StartTime, EndTime: req.EndTime, Errors: []string{}, Warnings: []string{}}
+		item, err := work.buildScheduleClass(p, "", date, req, previous[date])
 		if err != nil {
 			details := []string{}
 			if strings.Contains(err.Error(), "该时间已有课程") {

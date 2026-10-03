@@ -140,6 +140,12 @@ func TestCourseFamilyImportRetainsCoursesAndMapsExistingContent(t *testing.T) {
 	}
 	s.materials = append(s.materials, learning.Material{ID: "import-material", CourseID: second.ID, LessonID: "two-lesson", Title: "S+ 讲义"})
 	s.homework = append(s.homework, learning.Homework{ID: "import-homework", CourseID: second.ID, LessonID: "two-lesson", Title: "S+ 练习"})
+	s.courses[findCourseIndex(s.courses, second.ID)].DirectorySyncMap = map[string]string{"upstream:node": "two-lesson"}
+	s.courses[findCourseIndex(s.courses, first.ID)].DirectorySyncMap = map[string]string{second.ID + ":two-lesson": "one-lesson"}
+	plan, err := s.CreateTeachingPlan("超级管理员", admin, learning.TeachingPlanUploadRequest{Grade: second.Grade, Subject: second.Subject, CourseID: second.ID, LessonID: "two-lesson", File: learning.FileAsset{ID: "import-plan-file", FileName: "教案.pdf", OriginalPath: "/tmp/import-plan.pdf"}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	family, err := s.ImportCourseFamily("超级管理员", admin, learning.CourseFamilyImportRequest{Name: "导入测试系列", CourseIDs: []string{first.ID, second.ID}})
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +155,18 @@ func TestCourseFamilyImportRetainsCoursesAndMapsExistingContent(t *testing.T) {
 	}
 	if s.materials[len(s.materials)-1].CourseID != second.ID {
 		t.Fatal("material course ownership changed")
+	}
+	mapped, err := s.TeachingPlan(admin, plan.ID)
+	if err != nil || mapped.CourseID != second.ID || mapped.LessonID != "one-lesson" {
+		t.Fatalf("plan ownership/chapter not mapped: %#v %v", mapped, err)
+	}
+	firstMapped, _ := s.findCourse(first.ID)
+	secondMapped, _ := s.findCourse(second.ID)
+	if firstMapped.DirectorySyncMap[second.ID+":one-lesson"] != "one-lesson" || secondMapped.DirectorySyncMap["upstream:node"] != "one-lesson" {
+		t.Fatal("directory sync links lost on shared-directory import")
+	}
+	if _, err := s.UpdateCourseFamily("超级管理员", admin, family.ID, learning.CourseFamilyUpdateRequest{Name: family.Name, Curriculum: []learning.CurriculumNode{{ID: "unused-unit", Type: learning.CurriculumUnit, Name: "新课节", SortOrder: 1}}}); err == nil {
+		t.Fatal("shared curriculum dropped referenced plan")
 	}
 
 	third, err := s.CreateCourse("超级管理员", admin, learning.CourseUpsertRequest{Name: "导入测试 H", LearningSpaceID: "space-g05-english-s1-q1-h", Curriculum: []learning.CurriculumNode{{ID: "other-unit", Type: learning.CurriculumUnit, Name: "Other Unit", SortOrder: 1}}})

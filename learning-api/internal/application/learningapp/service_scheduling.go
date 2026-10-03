@@ -48,3 +48,14 @@ func (s *Service) PreviewScheduleClass(p learning.Principal, r learning.Schedule
 func (s *Service) CancelScheduleClassScope(o string, p learning.Principal, id, scope string) (learning.ScheduleClass, error) {
 	return s.scheduling.CancelScheduleClassScope(o, p, id, scope)
 }
+
+func (s *Service) PreviewRestoreScheduleClass(p learning.Principal, id string) (learning.SchedulePreview, error) {
+	return s.scheduling.PreviewRestoreScheduleClass(p, id)
+}
+func (s *Service) RestoreScheduleClass(o string, p learning.Principal, id string, ignoreWarnings bool) (learning.ScheduleClass, error) {
+	return s.scheduling.RestoreScheduleClass(o, p, id, ignoreWarnings)
+}
+
+func (s *Service) MarkScheduleClassCompleted(o string, p learning.Principal, id string) (learning.ScheduleClass, error) {
+	return s.scheduling.MarkScheduleClassCompleted(o, p, id)
+}

@@ -27,16 +27,46 @@ func normalizeRepeat(repeat *learning.ScheduleRepeat) (learning.ScheduleRepeat, 
 	}
 	out := *repeat
 	switch out.Freq {
-	case "", "daily", "weekly":
+	case "", "daily", "weekly", "custom":
 	case "monthly":
-		// 客户明确按月与特殊日期后续迭代。字段结构已经能装下，
-		// 这里显式拒绝，避免前端先放出来、后端静默当成不重复。
+		// 按月未开放，避免静默按单次处理。
 		return learning.ScheduleRepeat{}, errors.New("按月重复暂未开放")
 	default:
 		return learning.ScheduleRepeat{}, errors.New("不支持的重复方式")
 	}
 	if out.Freq == "" {
 		return learning.ScheduleRepeat{}, nil
+	}
+	if out.Freq == "custom" {
+		if len(out.Dates) == 0 || len(out.Dates) >= maxGeneratedLessons {
+			return learning.ScheduleRepeat{}, errors.New("请添加其他上课日期，单次最多生成 200 节课")
+		}
+		if out.Count != 0 || out.Until != "" {
+			return learning.ScheduleRepeat{}, errors.New("自定义日期不能同时设置重复结束条件")
+		}
+		out.Dates = append([]learning.ScheduleCustomDate(nil), out.Dates...)
+		seen := map[string]bool{}
+		for i, day := range out.Dates {
+			day.Date = strings.TrimSpace(day.Date)
+			day.StartTime = strings.TrimSpace(day.StartTime)
+			day.EndTime = strings.TrimSpace(day.EndTime)
+			if _, has, ok := parseDateBound(day.Date); !ok || !has {
+				return learning.ScheduleRepeat{}, errors.New("自定义日期格式应为 YYYY-MM-DD")
+			}
+			if seen[day.Date] {
+				return learning.ScheduleRepeat{}, errors.New("自定义日期不能重复")
+			}
+			seen[day.Date] = true
+			for _, clock := range []string{day.StartTime, day.EndTime} {
+				if clock != "" {
+					if _, ok := parseClock(clock); !ok {
+						return learning.ScheduleRepeat{}, errors.New("自定义时间格式应为 HH:MM")
+					}
+				}
+			}
+			out.Dates[i] = day
+		}
+		return out, nil
 	}
 	if out.Interval <= 0 {
 		out.Interval = 1
@@ -84,6 +114,17 @@ func expandRepeatDates(repeat learning.ScheduleRepeat, startDate string) ([]stri
 	}
 	if repeat.Freq == "" {
 		return []string{start.Format("2006-01-02")}, nil
+	}
+	if repeat.Freq == "custom" {
+		dates := []string{startDate}
+		for _, day := range repeat.Dates {
+			if day.Date <= startDate {
+				return nil, errors.New("其他上课日期须晚于首节，且不能重复")
+			}
+			dates = append(dates, day.Date)
+		}
+		sort.Strings(dates)
+		return dates, nil
 	}
 	var until time.Time
 	hasUntil := false
@@ -161,6 +202,30 @@ func expandRepeatDates(repeat learning.ScheduleRepeat, startDate string) ([]stri
 		}
 	}
 	return unique, nil
+}
+
+func scheduleRequestForDate(req learning.ScheduleClassCreateRequest, repeat learning.ScheduleRepeat, date string) learning.ScheduleClassCreateRequest {
+	if repeat.Freq != "custom" {
+		return req
+	}
+	for _, day := range repeat.Dates {
+		if day.Date != date {
+			continue
+		}
+		if day.StartTime != "" {
+			req.StartTime = day.StartTime
+		}
+		if day.EndTime != "" {
+			req.EndTime = day.EndTime
+		}
+		start, okStart := parseClock(req.StartTime)
+		end, okEnd := parseClock(req.EndTime)
+		if okStart && okEnd {
+			req.DurationMinutes = end - start
+		}
+		break
+	}
+	return req
 }
 
 // resolveEditScope 决定这次修改落在哪些课次上。

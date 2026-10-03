@@ -53,3 +53,23 @@ test('homework publication and final review open the specific learning record', 
  page.data.detail = {event:{kind:'review_completed',relatedId:'sub B'}}; page.openRelated();
  assert.deepEqual(targets, ['/pages/answer/index?id=hw%20B','/pages/result/index?id=sub%20B']);
 });
+
+test('material message opens only current authorized files and reads its own station notice', async () => {
+ const payload = { canSwitch: false, noticeId: 'notice-upload-owned', event: { studentId: 'a', studentName: '孩子A', title: '资料已更新', summary: '共1份资料', kind: 'materials_published' }, currentMaterials: [{ id: 'material one', title: '当前资料' }] };
+ const { page, requests } = load(url => Promise.resolve(url.includes('/read') ? undefined : payload));
+ const targets = []; wx.navigateTo = ({url}) => targets.push(url);
+ await page.loadDetail();
+ assert.deepEqual(page.data.materials, payload.currentMaterials);
+ assert.ok(requests.includes('/student/notices/notice-upload-owned/read'));
+ page.openMaterial({currentTarget:{dataset:{id:'material one'}}});
+ page.openMaterial({currentTarget:{dataset:{id:'withdrawn'}}});
+ assert.deepEqual(targets, ['/pages/material-preview/index?id=material%20one']);
+});
+
+test('failed material detail reload clears previously authorized files', async () => {
+ const { page } = load(() => Promise.reject(new Error('资料权限已失效')));
+ page.data.materials = [{id:'stale'}];
+ await page.loadDetail();
+ assert.deepEqual(page.data.materials, []);
+ assert.equal(page.data.error, '资料权限已失效');
+});

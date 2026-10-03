@@ -6,7 +6,7 @@ export type TeacherLibraryPolicy = {
  canViewDrafts: boolean;
  recentMaterialIds?: string[];
 };
-export type TeacherLibraryData = { policy?: TeacherLibraryPolicy; courses: Course[]; materials: Material[]; spaces: LearningSpace[]; recentMaterialIds: string[]; canDownload: boolean };
+export type TeacherLibraryData = { policy?: TeacherLibraryPolicy; courses: Course[]; materials: Material[]; spaces: LearningSpace[]; recentMaterialIds: string[]; unreadMaterialIds?: string[]; canDownload: boolean };
 export type ApiResponse<T> = {
   code: number;
   message: string;

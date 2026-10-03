@@ -117,6 +117,11 @@ func (s *MemoryStore) importCourseFamilyUnlocked(operator string, principal lear
 			return learning.CourseFamily{}, fmt.Errorf("课程“%s”的目录与第一门课程不一致，请先调整后再合并", course.Name)
 		}
 		idMaps[index] = mapping
+		for _, plan := range s.teachingPlans {
+			if plan.CourseID == course.ID && mapping[plan.LessonID] == "" {
+				return learning.CourseFamily{}, fmt.Errorf("课程“%s”存在无法对应的教案章节", course.Name)
+			}
+		}
 		for _, material := range s.materials {
 			if material.CourseID == course.ID && material.LessonID != "" && mapping[material.LessonID] == "" {
 				return learning.CourseFamily{}, fmt.Errorf("课程“%s”存在无法对应的讲义课节", course.Name)
@@ -130,6 +135,16 @@ func (s *MemoryStore) importCourseFamilyUnlocked(operator string, principal lear
 	}
 	family := learning.CourseFamily{ID: "course-family-" + time.Now().Format("20060102150405.000000000"), Name: name, Grade: spaces[0].Grade, Subject: spaces[0].Subject, Semester: spaces[0].Semester, Phase: spaces[0].Phase, Curriculum: append([]learning.CurriculumNode(nil), canonical.Curriculum...), Courses: make([]learning.Course, 0, len(courses))}
 	for index, course := range courses {
+		s.remapDirectorySyncLinks(course.ID, idMaps[index])
+		course.DirectorySyncMap = cloneMap(s.courses[findCourseIndex(s.courses, course.ID)].DirectorySyncMap)
+		for i := range s.teachingPlans {
+			if s.teachingPlans[i].CourseID == course.ID {
+				s.teachingPlans[i].LessonID = idMaps[index][s.teachingPlans[i].LessonID]
+				if path, err := curriculumPathForLesson(canonical, s.teachingPlans[i].LessonID); err == nil {
+					s.teachingPlans[i].Chapter = planChapterLabel(path)
+				}
+			}
+		}
 		for i := range s.materials {
 			if s.materials[i].CourseID == course.ID && s.materials[i].LessonID != "" {
 				s.materials[i].LessonID = idMaps[index][s.materials[i].LessonID]

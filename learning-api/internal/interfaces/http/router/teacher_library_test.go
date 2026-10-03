@@ -51,4 +51,12 @@ func TestTeacherLibraryReadOnlyAndLiveRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	app.doJSON(t, http.MethodGet, "/api/teacher/library", token, nil, http.StatusUnauthorized, nil)
+	app.doJSON(t, http.MethodPost, "/api/auth/admin-password-login", "", map[string]string{"phone": "13800000004", "password": "123456"}, http.StatusUnauthorized, nil)
+	req.AccountStatus = "正常"
+	if _, err := app.store.UpdateTeacher("admin", admin, teacher.UserID, req); err != nil {
+		t.Fatal(err)
+	}
+	app.doJSON(t, http.MethodGet, "/api/teacher/library", token, nil, http.StatusUnauthorized, nil)
+	newToken := app.loginAdmin(t, "13800000004")
+	app.doJSON(t, http.MethodGet, "/api/teacher/library", newToken, nil, http.StatusOK, nil)
 }

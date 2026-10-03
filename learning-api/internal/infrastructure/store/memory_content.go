@@ -233,6 +233,15 @@ func (s *MemoryStore) validateCourseContentBindings(course learning.Course) erro
 	for _, node := range course.Curriculum {
 		availableNodeIDs[node.ID] = true
 	}
+	for _, plan := range s.teachingPlans {
+		if plan.CourseID != course.ID {
+			continue
+		}
+		space, ok := s.findLearningSpace(course.LearningSpaceID)
+		if !availableNodeIDs[plan.LessonID] || !curriculumLeaf(course.Curriculum, plan.LessonID) || !ok || course.Grade != plan.Grade || !subjectsMatch(course.Subject, plan.Subject) || space.Semester != plan.Semester || space.Phase != plan.Phase {
+			return errors.New("目录仍有关联教案，请先重新关联教案再删除章节或切换教学范围")
+		}
+	}
 	for _, item := range s.materials {
 		if item.CourseID == course.ID && strings.TrimSpace(item.LessonID) != "" {
 			boundNodeIDs[item.LessonID] = true
@@ -244,6 +253,9 @@ func (s *MemoryStore) validateCourseContentBindings(course learning.Course) erro
 		}
 	}
 	for nodeID := range boundNodeIDs {
+		if !availableNodeIDs[nodeID] {
+			return errors.New("目录仍有关联讲义或练习，请先迁移内容再删除章节")
+		}
 		if availableNodeIDs[nodeID] && !curriculumLeaf(course.Curriculum, nodeID) {
 			return errors.New("已有讲义或练习绑定到新增下级的目录，请先迁移内容再修改课程目录")
 		}
@@ -268,6 +280,11 @@ func (s *MemoryStore) deleteCourseUnlocked(operator string, principal learning.P
 		}
 		if !canSeeCourse(principal, course) {
 			return errors.New("不能删除未负责的课程")
+		}
+		for _, plan := range s.teachingPlans {
+			if plan.CourseID == course.ID {
+				return errors.New("课程仍有关联教案，请先重新关联教案再删除课程")
+			}
 		}
 		name := course.Name
 		familyID := course.FamilyID
@@ -430,6 +447,10 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 			return work.createMaterialUnlocked(operator, principal, req)
 		})
 	}
+	req.BatchID = strings.TrimSpace(req.BatchID)
+	if len(req.BatchID) > 64 {
+		return learning.Material{}, errors.New("上传批次标识不能超过 64 字节")
+	}
 	req.Title = strings.TrimSpace(req.Title)
 	req.LearningSpaceID = strings.TrimSpace(req.LearningSpaceID)
 	req.CourseID = strings.TrimSpace(req.CourseID)
@@ -488,7 +509,8 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	}
 	s.materials = append([]learning.Material{item}, s.materials...)
 	s.prependLog(operator, "上传学习资料", item.Title)
-	s.notifyCourseContentUploaded(course)
+	s.notifyCourseContentUploadedBatch(course, principal.UserID, req.BatchID)
+	s.registerMaterialNoticeBatch(principal, req.BatchID, item)
 	return s.decorateMaterial(item), nil
 }
 
@@ -774,14 +796,36 @@ func (s *MemoryStore) expectedStudentsForHomework(homework learning.Homework) []
 }
 
 func (s *MemoryStore) notifyCourseContentUploaded(course learning.Course) {
+	s.notifyCourseContentUploadedBatch(course, "", "")
+}
+
+func (s *MemoryStore) notifyCourseContentUploadedBatch(course learning.Course, uploaderID, batchID string) {
 	if course.Status != learning.StatusEnabled {
 		return
 	}
 	title := s.courseContentNoticeTitle(course)
 	stamp := time.Now().Format("20060102150405.000000000")
 	for _, student := range s.expectedStudentsForCourseHandout(course) {
+		id := "notice-course-" + course.ID + "-" + student.ID + "-" + stamp
+		if batchID != "" {
+			id = "notice-upload-" + businessNoticeHash(uploaderID, batchID, course.ID, student.ID)
+			merged := false
+			for i := range s.notices {
+				if s.notices[i].ID == id {
+					// A later successful file in the same operation is still new
+					// content if the recipient opened the notice during upload.
+					s.notices[i].IsRead = false
+					s.notices[i].Title = title
+					merged = true
+					break
+				}
+			}
+			if merged {
+				continue
+			}
+		}
 		notice := learning.Notice{
-			ID:                 "notice-course-" + course.ID + "-" + student.ID + "-" + stamp,
+			ID:                 id,
 			Type:               "课",
 			Title:              title,
 			Target:             student.Name,

@@ -14,7 +14,7 @@ func businessNoticeRows(s *MemoryStore) []persistenceRow {
 		rows = append(rows, simpleRow("business_notice_events", "id", event.ID, `INSERT INTO business_notice_events (id, student_id, kind, payload) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE payload=VALUES(payload)`, event.ID, event.StudentID, event.Kind, mustJSON(event)))
 	}
 	for _, task := range s.businessNoticeTasks {
-		rows = append(rows, simpleRow("business_notice_tasks", "id", task.ID, `INSERT INTO business_notice_tasks (id, event_id, student_id, recipient_key, status, due_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status=VALUES(status), due_at=VALUES(due_at), payload=VALUES(payload)`, task.ID, task.EventID, task.StudentID, businessNoticeHash(task.OpenID, task.GuardianID), task.Status, businessSQLTime(task.DueAt), mustJSON(task)))
+		rows = append(rows, simpleRow("business_notice_tasks", "id", task.ID, `INSERT INTO business_notice_tasks (id, event_id, student_id, recipient_key, status, due_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE recipient_key=VALUES(recipient_key), status=VALUES(status), due_at=VALUES(due_at), payload=VALUES(payload)`, task.ID, task.EventID, task.StudentID, businessNoticeHash(task.OpenID, task.GuardianID), task.Status, businessSQLTime(task.DueAt), mustJSON(task)))
 	}
 	for id, snapshot := range s.businessScheduleSnapshots {
 		rows = append(rows, simpleRow("business_schedule_snapshots", "id", id, `INSERT INTO business_schedule_snapshots (id, payload) VALUES (?, ?) ON DUPLICATE KEY UPDATE payload=VALUES(payload)`, id, mustJSON(snapshot)))

@@ -56,7 +56,7 @@ func (s *MemoryStore) teacherLibraryMaterialsUnlocked(p learning.Principal) []le
 		if !ok || c.LearningSpaceID != m.LearningSpaceID || !s.canReadTeacherCourse(p, c) {
 			continue
 		}
-		if p.IsTeacherOnly() && p.TeacherLibrary != nil && !p.TeacherLibrary.CanViewDrafts && !materialPublished(m.Status) {
+		if p.IsTeacherOnly() && p.TeacherLibrary != nil && !p.TeacherLibrary.CanViewDrafts && !materialVisibleToStudents(m) {
 			continue
 		}
 		m = s.decorateMaterial(m)
@@ -70,7 +70,7 @@ func (s *MemoryStore) teacherLibraryMaterialsUnlocked(p learning.Principal) []le
 func (s *MemoryStore) TeacherLibrary(p learning.Principal) (learning.TeacherLibrary, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := learning.TeacherLibrary{Policy: cloneTeacherLibrary(p.TeacherLibrary), Courses: []learning.Course{}, Materials: s.teacherLibraryMaterialsUnlocked(p), Spaces: []learning.LearningSpace{}, RecentMaterialIDs: []string{}, CanDownload: p.CanDownloadTeacherMaterial()}
+	out := learning.TeacherLibrary{Policy: cloneTeacherLibrary(p.TeacherLibrary), Courses: []learning.Course{}, Materials: s.teacherLibraryMaterialsUnlocked(p), Spaces: []learning.LearningSpace{}, RecentMaterialIDs: []string{}, UnreadMaterialIDs: []string{}, CanDownload: p.CanDownloadTeacherMaterial()}
 	for _, c := range s.courses {
 		if s.canReadTeacherCourse(p, c) {
 			decorated := s.decorateCourse(c)
@@ -100,6 +100,21 @@ func (s *MemoryStore) TeacherLibrary(p learning.Principal) (learning.TeacherLibr
 			}
 		}
 	}
+	reads := map[string]string{}
+	for _, read := range s.teacherMaterialReads {
+		if read.UserID == p.UserID {
+			reads[read.MaterialID] = read.Version
+		}
+	}
+	for _, material := range out.Materials {
+		if !materialVisibleToStudents(material) {
+			continue
+		}
+		version := reads[material.ID]
+		if version != teacherMaterialVersion(material) {
+			out.UnreadMaterialIDs = append(out.UnreadMaterialIDs, material.ID)
+		}
+	}
 	return out, nil
 }
 func (s *MemoryStore) RecordTeacherMaterialView(p learning.Principal, id string) error {
@@ -112,9 +127,11 @@ func (s *MemoryStore) recordTeacherMaterialViewUnlocked(p learning.Principal, id
 		return persistentMutationError(s, func(work *MemoryStore) error { return work.recordTeacherMaterialViewUnlocked(p, id) })
 	}
 	found := false
+	var viewed learning.Material
 	for _, m := range s.teacherLibraryMaterialsUnlocked(p) {
 		if m.ID == id {
 			found = true
+			viewed = m
 			break
 		}
 	}
@@ -137,6 +154,7 @@ func (s *MemoryStore) recordTeacherMaterialViewUnlocked(p learning.Principal, id
 		}
 		policy.RecentMaterialIDs = ids
 		s.users[i].TeacherLibrary = policy
+		s.recordTeacherMaterialRead(p.UserID, viewed)
 		return nil
 	}
 	return errors.New("账号不存在")

@@ -19,13 +19,12 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 	if s.db == nil {
 		return errors.New("mysql connection is required")
 	}
-	if err := s.ensureBusinessNoticeSchema(); err != nil {
-		return err
-	}
 	if err := s.ensureSchedulingTables(); err != nil {
 		return err
 	}
 	statements := []string{
+		`CREATE TABLE IF NOT EXISTS teacher_material_reads (id VARCHAR(64) PRIMARY KEY, user_id VARCHAR(64) NOT NULL, material_id VARCHAR(64) NOT NULL, material_version VARCHAR(64) NOT NULL, UNIQUE KEY idx_teacher_material_read (user_id,material_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS material_download_jobs (id VARCHAR(64) PRIMARY KEY, owner_id VARCHAR(64) NOT NULL, status VARCHAR(32) NOT NULL, payload LONGTEXT NOT NULL, KEY idx_material_download_owner (owner_id,status)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS course_families (
 			id VARCHAR(64) PRIMARY KEY,
 			name VARCHAR(128) NOT NULL,
@@ -420,6 +419,11 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			return err
 		}
 	}
+	// Notice migrations add fields to tables created above. Running them first
+	// fails on a new database initialized from deploy/mysql/init.sql.
+	if err := s.ensureBusinessNoticeSchema(); err != nil {
+		return err
+	}
 	columns := []struct {
 		table string
 		name  string
@@ -501,6 +505,12 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		// 审核维度，与 status 的成班维度分开存。存量数据统一按「已通过」补，
 		// 见 backfillScheduleAuditStatus——升级前排的课本来就是生效状态，
 		// 不能因为加了审核字段就在学生端集体消失。
+		{"courses", "directory_sync_json", "LONGTEXT NULL"},
+		{"teaching_plans", "course_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"teaching_plans", "lesson_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"teaching_plans", "chapter_name", "VARCHAR(512) NOT NULL DEFAULT ''"},
+		{"teaching_plans", "semester", "VARCHAR(32) NOT NULL DEFAULT ''"},
+		{"teaching_plans", "phase", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "audit_status", "VARCHAR(16) NOT NULL DEFAULT ''"},
 		{"schedule_classes", "audit_reason", "TEXT NULL"},
 		{"schedule_classes", "audited_by", "VARCHAR(64) NOT NULL DEFAULT ''"},

@@ -8,6 +8,7 @@ import (
 	"starline/learning-api/internal/domain/learning"
 	"strings"
 	"testing"
+	"time"
 )
 
 type noticeTransport func(*http.Request) (*http.Response, error)
@@ -92,5 +93,81 @@ func TestBusinessManualCampaignEarlyReceiptIsPersistentDeliveryState(t *testing.
 	}
 	if s.officialCampaignRecipients[0].Status != "已送达" {
 		t.Fatal("late failure overwrote delivery success")
+	}
+}
+
+func TestBusinessWechatSenderWebTargetAndInvalidTargets(t *testing.T) {
+	for _, tc := range []struct {
+		target, path string
+		valid        bool
+	}{
+		{"https://school.example/teaching-plans?plan=plan-20261003120000.123456000", "", true},
+		{"http://school.example/teaching-plans", "", false},
+		{"javascript:alert(1)", "", false},
+		{"//school.example/teaching-plans", "", false},
+		{"https://user:secret@school.example/teaching-plans", "", false},
+		{"https://school.example/teaching-plans#secret", "", false},
+		{"https://school.example/teaching-plans\r\n", "", false},
+		{"https://school.example/teaching-plans", "pages/notice-detail/index?id=fixture", false},
+	} {
+		t.Run(tc.target+tc.path, func(t *testing.T) {
+			app := "web-target-" + businessNoticeHash(t.Name())
+			invalidateWechatToken(app, "fixture")
+			calls := 0
+			client := &http.Client{Transport: noticeTransport(func(req *http.Request) (*http.Response, error) {
+				calls++
+				if strings.HasSuffix(req.URL.Path, "/token") {
+					return noticeResponse(`{"access_token":"fixture","expires_in":7200}`), nil
+				}
+				var body map[string]any
+				if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body["url"] != tc.target || body["miniprogram"] != nil || body["client_msg_id"] != "web-target-id" {
+					t.Fatalf("wrong webpage payload: %+v", body)
+				}
+				return noticeResponse(`{"errcode":0,"msgid":987}`), nil
+			})}
+			id, err := newOfficialMessageSender(client, app, "fixture", "")(learning.OfficialMessageRequest{URL: tc.target, PagePath: tc.path, OpenID: "fixture-open", TemplateID: "fixture-template", Values: map[string]string{"thing1": "内部教案"}, ClientMessageID: "web-target-id"})
+			if tc.valid {
+				if err != nil || id != "987" || calls != 2 {
+					t.Fatalf("valid URL rejected: %s %v %d", id, err, calls)
+				}
+			} else {
+				var typed *officialSendError
+				if !errors.As(err, &typed) || !typed.configuration || calls != 0 {
+					t.Fatalf("invalid target reached transport: %v calls=%d", err, calls)
+				}
+			}
+		})
+	}
+}
+
+func TestBusinessWorkerPreservesWebTargetAndDedupIdentity(t *testing.T) {
+	s := businessFixture(t)
+	mutateBusiness(t, s, func(work *MemoryStore) {
+		work.scheduleClasses = []learning.ScheduleClass{futureBusinessClass("web-worker-lesson", "web-worker-series")}
+	})
+	target := "https://school.example/teaching-plans?plan=plan-fixture"
+	for i := range s.businessNoticeTasks {
+		s.businessNoticeTasks[i].URL = target
+		s.businessNoticeTasks[i].PagePath = ""
+	}
+	sent := map[string]bool{}
+	s.officialMessageSender = func(req learning.OfficialMessageRequest) (string, error) {
+		if req.URL != target || req.PagePath != "" || req.ClientMessageID == "" || sent[req.ClientMessageID] {
+			t.Fatalf("worker changed target or replayed: %+v", req)
+		}
+		sent[req.ClientMessageID] = true
+		return req.ClientMessageID, nil
+	}
+	if err := s.ProcessBusinessNotices(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ProcessBusinessNotices(time.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if len(sent) != 3 {
+		t.Fatalf("wrong unique recipient tasks: %d", len(sent))
 	}
 }

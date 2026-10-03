@@ -78,7 +78,7 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 	if len(materials) == 0 {
 		if lessonID, ok := s.previewLessonForCourse(course); ok {
 			for _, material := range s.materials {
-				if (material.CourseID == courseID || material.LearningSpaceID == course.LearningSpaceID) && material.LessonID == lessonID && materialPublished(material.Status) {
+				if (material.CourseID == courseID || material.LearningSpaceID == course.LearningSpaceID) && material.LessonID == lessonID && materialVisibleToStudents(material) {
 					materials = append(materials, material)
 				}
 			}
@@ -106,7 +106,7 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 func (s *MemoryStore) publishedMaterialsForCourse(course learning.Course) []learning.Material {
 	out := make([]learning.Material, 0)
 	for _, material := range s.materials {
-		if !materialPublished(material.Status) || !s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) {
+		if !materialVisibleToStudents(material) || !s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) {
 			continue
 		}
 		if strings.TrimSpace(material.CourseID) == "" {
@@ -398,7 +398,7 @@ func (s *MemoryStore) studentMaterialUnlocked(principal learning.Principal, mate
 			continue
 		}
 		for _, material := range s.materials {
-			if material.ID == materialID && material.LessonID == previewLessonID && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && materialPublished(material.Status) {
+			if material.ID == materialID && material.LessonID == previewLessonID && s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && materialVisibleToStudents(material) {
 				return s.decorateStudentMaterial(principal, material), nil
 			}
 		}

@@ -167,13 +167,20 @@ func TestTeacherLibraryMySQLRestartAndFailure(t *testing.T) {
 	if len(library.RecentMaterialIDs) == 0 || library.RecentMaterialIDs[0] != id {
 		t.Fatal("history did not survive reconnect")
 	}
+	if containsString(library.UnreadMaterialIDs, id) || len(restored.teacherMaterialReads) != 1 {
+		t.Fatal("read version did not survive reconnect")
+	}
 	if !p.TeacherLibrary.CanDownload || !p.TeacherLibrary.CanManageCourses || !p.TeacherLibrary.CanViewDrafts {
 		t.Fatal("legacy rights changed")
 	}
 	before := teacherLibraryJSON(p.TeacherLibrary)
+	readBefore := append([]teacherMaterialRead(nil), restored.teacherMaterialReads...)
 	restored.db.Close()
 	if err := restored.RecordTeacherMaterialView(p, id); err == nil {
 		t.Fatal("write succeeded with closed database")
+	}
+	if len(restored.teacherMaterialReads) != len(readBefore) || restored.teacherMaterialReads[0] != readBefore[0] {
+		t.Fatal("failed DB write changed read state")
 	}
 	for _, u := range restored.users {
 		if u.ID == p.UserID && teacherLibraryJSON(u.TeacherLibrary) != before {

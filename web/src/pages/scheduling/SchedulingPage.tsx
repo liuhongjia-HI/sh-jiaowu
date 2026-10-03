@@ -4,11 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
+import { TeacherScopeFields } from '../../components/TeacherScopeFields';
+import { serializeTeacherScopes, teacherScopeFormValues } from '../../utils/teacherScopes';
+import { coursesForTeacher, filterTeachingCourses, schedulingStudentOptions } from '../../utils/schedulingScopes';
 import { gradeOptions, subjectLabel, subjectOptions, useSubjectCatalog } from '../../utils/curriculum';
-import type { AvailabilitySlot, Course, CurrentUser, ScheduleClass, Student, Teacher } from '../../types/starline';
+import type { AvailabilitySlot, Course, CurrentUser, LearningSpace, ScheduleClass, Student, Teacher, TeacherUpsertRequest } from '../../types/starline';
 import { addDays, addMonths, weekdayOfDateText, classCapacity, formatWeekRange, isClockText, localDateText, scheduleClassOccursOn, startOfMonth, startOfWeek, weekOptions } from './scheduling-utils';
 import { CalendarTimeline, SchedulingAssistant, type CalendarMode, type CalendarPerson, type CalendarSelection } from './CalendarWorkbench';
-import { MiniMonthCalendar, MonthScheduleBoard, buildMiniMonthDays, classColumns, filterClasses, parseOwnerKey, RepeatFields, buildRepeatPayload, type RepeatFormValues, type ScheduleRepeatValues, pendingReviewColumns, scheduleClassPayload, type ScheduleMoveTarget, scheduleClassSubject, studentDisplayName, studentOptionLabel, teacherOptionLabel, uniqueScheduleCampuses } from './SchedulingViews';
+import { MiniMonthCalendar, MonthScheduleBoard, buildMiniMonthDays, ScheduleLessonList, filterClasses, parseOwnerKey, RepeatFields, buildRepeatPayload, type RepeatFormValues, type ScheduleRepeatValues, pendingReviewColumns, scheduleClassPayload, type ScheduleMoveTarget, scheduleClassSubject, studentDisplayName, teacherOptionLabel, uniqueScheduleCampuses } from './SchedulingViews';
 
 type AvailabilityFormValues = {
   ownerKey: string;
@@ -49,6 +52,10 @@ const classTypeOptions = ['1V1', '1V2', '1V3', '1V4'].map((value) => ({ label: v
 export default function Scheduling({ user }: { user: CurrentUser }) {
   const [availabilityForm] = Form.useForm<AvailabilityFormValues>();
   const [editForm] = Form.useForm<ScheduleClassFormValues>();
+  const [teacherScopeForm] = Form.useForm();
+  const [scopeTeacher, setScopeTeacher] = useState<Teacher | null>(null);
+  const [formCourseGrade, setFormCourseGrade] = useState<string>();
+  const [formCourseSubject, setFormCourseSubject] = useState<string>();
   // 人员日历是高频入口，默认展开。
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [calendarPeople, setCalendarPeople] = useState<string[]>([]);
@@ -68,7 +75,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   // 默认停在资源泳道日视图：这是排课场景真正读得清的密度，周视图退居总览。
   const [viewMode, setViewMode] = useState<CalendarMode>(() => {
-    try { const saved = localStorage.getItem(`starline-calendar-view:${user.userId}`); return ['day','workweek','week','month','list'].includes(saved ?? '') ? saved as CalendarMode : 'day'; } catch { return 'day'; }
+    try { const saved = localStorage.getItem(`starline-calendar-view:${user.userId}`); if (saved === 'workweek') return 'week'; return ['day','week','month','list'].includes(saved ?? '') ? saved as CalendarMode : 'day'; } catch { return 'day'; }
   });
   useEffect(() => { try { localStorage.setItem(`starline-calendar-view:${user.userId}`, viewMode); } catch { /* storage unavailable */ } }, [viewMode, user.userId]);
   const [classGradeFilter, setClassGradeFilter] = useState<string>();
@@ -94,6 +101,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const teachers = useQuery({ queryKey: ['teachers'], queryFn: () => getData<Teacher[]>('/teachers') });
   const students = useQuery({ queryKey: ['students'], queryFn: () => getData<Student[]>('/students') });
   const courses = useQuery({ queryKey: ['courses'], queryFn: () => getData<Course[]>('/courses') });
+  const teachingSpaces = useQuery({ queryKey: ['learning-spaces'], queryFn: () => getData<LearningSpace[]>('/learning-spaces'), enabled: Boolean(scopeTeacher) });
   const classes = useQuery({ queryKey: ['schedule-classes'], queryFn: () => getData<ScheduleClass[]>('/schedule-classes') });
   const availabilityOverview = useQuery({ queryKey: ['availability-overview'], queryFn: () => getData<AvailabilitySlot[]>('/availability/overview') });
   // 待审核队列只有管理员看得到，老师侧不发这个请求。
@@ -107,6 +115,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const editingClassType = Form.useWatch('classType', editForm);
   const editingStudentIDs = Form.useWatch('studentIds', editForm) ?? [];
   const editingTeacherId = Form.useWatch('teacherId', editForm);
+  const editingCourseId = Form.useWatch('courseId', editForm);
   const editingStartTime = Form.useWatch('startTime', editForm);
   const editingEndTime = Form.useWatch('endTime', editForm);
   const editingStartDate = Form.useWatch('startDate', editForm);
@@ -142,6 +151,12 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       queryClient.invalidateQueries({ queryKey: ['availability-overview'] });
     },
     onError: (error) => message.error(error instanceof Error ? error.message : '保存失败，请检查星期和时间段。')
+  });
+
+  const completeClass = useMutation({
+    mutationFn: (id: string) => postData<ScheduleClass>(`/schedule-classes/${id}/completed`, {}),
+    onSuccess: (record) => { message.success('已标记已上课'); setEditingClass(record); queryClient.invalidateQueries({ queryKey: ['schedule-classes'] }); },
+    onError: (e: Error) => message.error(e.message)
   });
 
   const cancelClass = useMutation({
@@ -218,8 +233,27 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   }, [teachers.data, students.data, user]);
 
   const courseOptions = (courses.data ?? []).map((item) => ({ label: `${item.name} · ${item.grade}/${subjectLabel(item.subject)}`, value: item.id }));
-  const teacherOptions = (teachers.data ?? []).map((item) => ({ label: teacherOptionLabel(item), value: item.id }));
-  const studentOptions = (students.data ?? []).map((item) => ({ label: studentOptionLabel(item), value: item.id }));
+  const teacherOptions = (teachers.data ?? []).filter(item => item.accountStatus !== '停用' || item.id === editingClass?.teacherId).map((item) => ({ label: teacherOptionLabel(item), value: item.id, disabled: item.accountStatus === '停用' }));
+  const studentOptions = schedulingStudentOptions(students.data ?? []);
+  const formTeacher = (teachers.data ?? []).find(item => item.id === editingTeacherId);
+  const teachingCourses = coursesForTeacher(courses.data ?? [], formTeacher);
+  const candidateCourses = filterTeachingCourses(teachingCourses, formCourseGrade, formCourseSubject);
+  const formCourseOptions = candidateCourses.map(item => ({ value: item.id, label: `${item.name} · ${item.grade}/${subjectLabel(item.subject)}` }));
+  const selectedFormCourse = (courses.data ?? []).find(item => item.id === editingCourseId);
+  if (selectedFormCourse && !candidateCourses.some(item => item.id === selectedFormCourse.id)) formCourseOptions.push({ value: selectedFormCourse.id, label: `${selectedFormCourse.name} · ${teachingCourses.some(item => item.id === selectedFormCourse.id) ? '当前筛选之外' : '不在授课范围'}` });
+  const validTeacherCourse = !editingCourseId || teachingCourses.some(item => item.id === editingCourseId) || !creatingClass && editingClass?.teacherId === editingTeacherId && editingClass?.courseId === editingCourseId;
+  const saveTeacherScope = useMutation({
+    mutationFn: (values: any) => {
+      if (!scopeTeacher) throw new Error('请选择老师');
+      const base = teacherScopeFormValues(scopeTeacher, teachingSpaces.data ?? []);
+      const body: TeacherUpsertRequest = { name: scopeTeacher.name, phone: scopeTeacher.phone, campusId: scopeTeacher.campusId, accountStatus: scopeTeacher.accountStatus, remark: scopeTeacher.remark, canUploadHandout: scopeTeacher.canUploadHandout, canUploadQuestion: scopeTeacher.canUploadQuestion, canReview: scopeTeacher.canReview,
+        ...serializeTeacherScopes({ ...values, teacherLibrary: { ...base.teacherLibrary, ...values.teacherLibrary } }, teachingSpaces.data ?? []) };
+      return putData<Teacher>(`/teachers/${scopeTeacher.id}`, body);
+    },
+    onSuccess: () => { message.success('授课范围已更新'); setScopeTeacher(null); queryClient.invalidateQueries({ queryKey: ['teachers'] }); setFormCourseGrade(undefined); setFormCourseSubject(undefined); },
+    onError: (error: Error) => message.error(error.message || '授课范围保存失败')
+  });
+  useEffect(() => { if (scopeTeacher && teachingSpaces.data) teacherScopeForm.setFieldsValue(teacherScopeFormValues(scopeTeacher, teachingSpaces.data)); }, [scopeTeacher, teachingSpaces.data, teacherScopeForm]);
   const campusOptions = uniqueScheduleCampuses(classes.data ?? []).map((value) => ({ label: value, value }));
   const subjectCatalog = useSubjectCatalog();
   const classSubjectOptions = subjectOptions(classGradeFilter, subjectCatalog);
@@ -230,6 +264,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     { label: '全部状态', value: '全部' },
     { label: '待确认', value: '待确认' },
     { label: '已确认', value: '已确认' },
+    { label: '已上课', value: '已上课' },
     { label: '已取消', value: '已取消' }
   ];
   const classFilters = useMemo<ScheduleFilters>(() => ({
@@ -286,6 +321,20 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     const record = (classes.data ?? []).find(item => item.id === id);
     if (record) { setCancelScope('this'); setCancelRecord(record); }
   }
+  const restoreClass = useMutation({
+    mutationFn: ({ id, ignoreWarnings }: { id: string; ignoreWarnings: boolean }) => postData<ScheduleClass>(`/schedule-classes/${id}/restore`, { ignoreWarnings }),
+    onSuccess: () => { message.success('课次已恢复'); queryClient.invalidateQueries({ queryKey: ['schedule-classes'] }); queryClient.invalidateQueries({ queryKey: ['schedule-classes-pending'] }); },
+    onError: (e: Error) => message.error(e.message || '恢复失败，请重新检查')
+  });
+  async function requestRestore(record: ScheduleClass) {
+    try {
+      const result = await postData<SchedulePreview>(`/schedule-classes/${record.id}/restore-preview`, {});
+      if (!result.canSave) { Modal.error({ title: '无法恢复课程', width: 640, content: <PreviewResult result={result} /> }); return; }
+      const warnings = result.lessons.some(lesson => lesson.warnings.length > 0);
+      Modal.confirm({ title: '恢复这节课程', width: 640, content: <PreviewResult result={result} />, okText: warnings ? '已协调，恢复课程' : '恢复课程', cancelText: '保留取消', onOk: () => restoreClass.mutateAsync({ id: record.id, ignoreWarnings: warnings }) });
+    } catch (e) { message.error(e instanceof Error ? e.message : '恢复预检失败，请重试'); }
+  }
+
   async function preflight(payload: ScheduleClassFormValues, id: string | undefined, submit: () => void) {
     setPreflightBusy(true);
     try {
@@ -329,6 +378,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   function openCopy(record: ScheduleClass) {
     if (!canCreateClass) return;
     setEditingClass(null);
+    setFormCourseGrade(undefined);
+    setFormCourseSubject(undefined);
     setCreatingClass(true);
     setCopyingClass(true);
     setRepeatEnabled(false);
@@ -372,6 +423,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   function openCreateClassForDay(lessonDate: string, selection: CalendarSelection = {}) {
     if (!canCreateClass) return;
     setEditingClass(null);
+    setFormCourseGrade(undefined);
+    setFormCourseSubject(undefined);
     setCreatingClass(true);
     setCopyingClass(false);
     setRepeatEnabled(false);
@@ -442,7 +495,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 
         </div>
         <Space wrap>
-          <Button icon={<SaveOutlined />} onClick={() => setAvailabilityOpen(true)}>维护可上课时间</Button>
+          <Button icon={<SaveOutlined />} onClick={() => setAvailabilityOpen(true)}>教师可上课时间</Button>
           <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()} />
         </Space>
       </div>
@@ -487,7 +540,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             {canCreateClass && <Button aria-label="新建课程" type="primary" icon={<PlusOutlined />} onClick={() => openCreateClassForDay(localDateText(selectedDate))}>新建课程</Button>}
           </Space>
           <Segmented value={viewMode} onChange={value => setViewMode(value as CalendarMode)} options={[
-            { label: '日', value: 'day' }, { label: '工作周', value: 'workweek' }, { label: '周', value: 'week' }, { label: '月', value: 'month' }, { label: '列表', value: 'list' }
+            { label: '日', value: 'day' }, { label: '周', value: 'week' }, { label: '月', value: 'month' }, { label: '列表', value: 'list' }
           ]} />
         </div>
         <div className={sidebarOpen ? 'schedule-outlook-shell' : 'calendar-shell-collapsed'}>
@@ -521,18 +574,21 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Space wrap size={6}>{selectedPeople.length ? selectedPeople.map(person => <Tag key={person.key}>{person.name}</Tag>) : <span>全部教师</span>}{hasClassFilters && <Tag color="blue">已筛选</Tag>}</Space>
               <Space wrap size={10}><span className="calendar-legend-teacher">教师可上课</span><span className="calendar-legend-student">学生可上课</span><span title="空白仅表示无课程，不表示已登记可上课时间">双击新建 · 拖选时段</span></Space>
             </div>
-            {viewMode === 'day' || viewMode === 'week' || viewMode === 'workweek' ? <CalendarTimeline
+            {viewMode === 'day' || viewMode === 'week' ? <CalendarTimeline
               mode={viewMode} date={selectedDate} people={viewMode === 'day' ? dayPeople : selectedPeople} lessons={subjectVisibleClasses}
               slots={availabilityOverview.data ?? []} courseById={courseById} teacherById={teacherById} studentById={studentById} canManage={canCreateClass}
               onCreate={openCreateClassForDay} onEdit={openEdit} onCopy={openCopy} onMove={confirmMoveClass} onResize={confirmResizeClass}
             /> : viewMode === 'month' ? <MonthScheduleBoard month={calendarMonth} classes={subjectVisibleClasses} courseById={courseById} teacherById={teacherById} canManage={canCreateClass} onEditClass={openEdit} onCopyClass={openCopy} onMoveClass={confirmMoveClass} />
-              : <Table rowKey="id" scroll={{ x: 1450 }} dataSource={subjectVisibleClasses} pagination={{ pageSize: 20 }} columns={classColumns(courseById, teacherById, canCreateClass, openEdit, requestCancel, cancelClass.isPending)} />}
+              : <ScheduleLessonList classes={subjectVisibleClasses} courseById={courseById} teacherById={teacherById} canManage={canCreateClass} onEditClass={openEdit} onCancel={record => requestCancel(record.id)} onRestore={requestRestore} cancelling={cancelClass.isPending} />}
           </main>
         </div>
       </div>
 
+      <Drawer title="编辑老师授课范围" width="min(560px, 100vw)" open={!!scopeTeacher} onClose={() => setScopeTeacher(null)} destroyOnHidden extra={<Button type="primary" loading={saveTeacherScope.isPending} disabled={!teachingSpaces.data} onClick={() => teacherScopeForm.submit()}>保存范围</Button>}>
+        {teachingSpaces.isLoading ? <Skeleton active /> : teachingSpaces.error ? <Alert type="error" message="授课范围加载失败" action={<Button onClick={() => teachingSpaces.refetch()}>重试</Button>} /> : <Form form={teacherScopeForm} layout="vertical" onFinish={values => saveTeacherScope.mutate(values)}><Typography.Paragraph strong>{scopeTeacher?.name}</Typography.Paragraph><TeacherScopeFields form={teacherScopeForm} spaces={teachingSpaces.data ?? []} /></Form>}
+      </Drawer>
       <Drawer
-        title="维护可上课时间"
+        title="教师可上课时间"
         open={availabilityOpen}
         width={560}
         onClose={() => setAvailabilityOpen(false)}
@@ -591,10 +647,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         }}
         extra={(editingClass || creatingClass) && (
           <Space>
+            {editingClass && editingClass.status !== '已上课' && editingClass.status !== '已取消' && editingClass.auditStatus === '已通过' && new Date(`${editingClass.lessonDate}T${editingClass.endTime}`).getTime() <= Date.now() && (
+              <Button loading={completeClass.isPending} onClick={() => completeClass.mutate(editingClass.id)}>标记已上课</Button>
+            )}
             {editingClass && (
               <Button danger loading={cancelClass.isPending} onClick={() => requestCancel(editingClass.id)}>取消课程</Button>
             )}
-            <Button type="primary" loading={preflightBusy || updateClass.isPending || createManualClass.isPending} onClick={() => editForm.submit()}>
+            <Button type="primary" disabled={editingClass?.status === '已上课' && !copyingClass} loading={preflightBusy || updateClass.isPending || createManualClass.isPending} onClick={() => editForm.submit()}>
               {copyingClass ? '创建复制课程' : creatingClass ? '创建课程' : '保存调课'}
             </Button>
           </Space>
@@ -616,11 +675,16 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             else updateClass.mutate({ ...payload, ignoreWarnings: true });
           });
         }}>
-          <Form.Item name="courseId" label="课程" rules={[{ required: true, message: '请选择课程' }]}>
-            <Select showSearch optionFilterProp="label" options={courseOptions} />
-          </Form.Item>
           <Form.Item name="teacherId" label="老师" rules={[{ required: true, message: '请选择老师' }]}>
-            <Select showSearch optionFilterProp="label" options={teacherOptions} />
+            <Select showSearch optionFilterProp="label" options={teacherOptions} onChange={() => { setFormCourseGrade(undefined); setFormCourseSubject(undefined); }} />
+          </Form.Item>
+          {canReviewClass && formTeacher && <Button type="link" style={{ padding: 0, marginBottom: 12 }} onClick={() => setScopeTeacher(formTeacher)}>编辑老师授课范围</Button>}
+          {teachingCourses.length > 8 && <Space.Compact block style={{ marginBottom: 12 }}>
+            <Select aria-label="排课课程年级" allowClear placeholder="年级" value={formCourseGrade} options={[...new Set(teachingCourses.map(item => item.grade))].map(value => ({ value, label: value }))} onChange={value => { setFormCourseGrade(value); setFormCourseSubject(undefined); }} style={{ width: '50%' }} />
+            <Select aria-label="排课课程学科" allowClear placeholder="学科" value={formCourseSubject} options={[...new Set(teachingCourses.filter(item => !formCourseGrade || item.grade === formCourseGrade).map(item => item.subject))].map(value => ({ value, label: subjectLabel(value) }))} onChange={setFormCourseSubject} style={{ width: '50%' }} />
+          </Space.Compact>}
+          <Form.Item name="courseId" label="课程" dependencies={['teacherId']} rules={[{ required: true, message: '请选择课程' }, { validator: async () => { if (!validTeacherCourse) throw new Error('课程不在老师授课范围，请调整课程或授课范围'); } }]}>
+            <Select showSearch optionFilterProp="label" disabled={!editingTeacherId} options={formCourseOptions} notFoundContent={editingTeacherId ? '老师尚无可排课程，请调整授课范围' : '请先选择老师'} />
           </Form.Item>
           <Form.Item name="campusId" hidden><Input /></Form.Item>
           {editingClass?.seriesId && !editingClass.detached && <Form.Item label="本次修改范围"><Select value={editScope} onChange={setEditScope} options={scopeOptions} /></Form.Item>}
@@ -632,6 +696,26 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <InputNumber min={30} max={1440} step={30} addonAfter="分钟" style={{ width: '100%' }} onChange={value => { if (value && isClockText(editingStartTime)) editForm.setFieldValue('endTime', timeText(Math.min(1440, clockMinutes(editingStartTime) + value))); }} />
             </Form.Item>
           </Space.Compact>
+          <Form.Item
+            name="studentIds"
+            label={`学生（已选 ${editingStudentIDs.length}/${classCapacity(editingClassType)}）`}
+            dependencies={['classType']}
+            rules={[{ validator: async (_, ids?: string[]) => {
+              const capacity = classCapacity(editForm.getFieldValue('classType'));
+              if (capacity && (ids?.length ?? 0) > capacity) throw new Error(`当前班型最多 ${capacity} 名学生，请调整班型或学生`);
+            } }]}
+          >
+            <Select
+              mode="multiple"
+              showSearch
+              optionFilterProp="label"
+              maxCount={classCapacity(editingClassType)}
+              options={studentOptions}
+            />
+          </Form.Item>
+          <Form.Item name="startDate" label={creatingClass && repeatEnabled ? '首节上课日期' : '上课日期'} rules={[{ required: true, message: '请选择上课日期' }]}>
+            <Input type="date" />
+          </Form.Item>
           <Space.Compact block>
             <Form.Item name="startTime" rules={[{ required: true, message: '请输入开始时间' }]} style={{ width: '50%' }}>
               <Input type="time" onChange={event => { if (isClockText(event.target.value)) editForm.setFieldValue('endTime', timeText(Math.min(1440, clockMinutes(event.target.value) + (editForm.getFieldValue('durationMinutes') || 90)))); }} />
@@ -640,9 +724,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Input type="time" onChange={event => { if (isClockText(event.target.value) && isClockText(editingStartTime)) editForm.setFieldValue('durationMinutes', clockMinutes(event.target.value) - clockMinutes(editingStartTime)); }} />
             </Form.Item>
           </Space.Compact>
-          <Form.Item name="startDate" label={creatingClass && repeatEnabled ? '首节上课日期' : '上课日期'} rules={[{ required: true, message: '请选择上课日期' }]}>
-            <Input type="date" />
-          </Form.Item>
+
 
           {/* 重复规则只在新建时出现：一节已经排好的课谈不上「重复几次」，
               要改重复方式就是删了重排。 */}
@@ -654,20 +736,12 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               form={editForm}
             />
           )}
-          <Form.Item
-            name="studentIds"
-            label={`学生（已选 ${editingStudentIDs.length}/${classCapacity(editingClassType)}）`}
-          >
-            <Select
-              mode="multiple"
-              showSearch
-              optionFilterProp="label"
-              maxCount={classCapacity(editingClassType)}
-              options={studentOptions}
-            />
-          </Form.Item>
           <Space.Compact block>
-            <Form.Item name="expectedStudentCount" label="预计人数" rules={[{ required: true, message: '请输入预计人数' }]} style={{ width: '35%' }}>
+            <Form.Item name="expectedStudentCount" label="计划招收人数" dependencies={['classType']} style={{ width: '35%' }} rules={[{ validator: async (_, value?: number | null) => {
+              if (value === undefined || value === null) return;
+              const capacity = classCapacity(editForm.getFieldValue('classType'));
+              if (!Number.isInteger(value) || value < 1 || value > capacity) throw new Error(`计划招收人数应为 1 至 ${capacity} 的整数`);
+            } }]}>
               <InputNumber min={1} max={classCapacity(editingClassType)} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="reservationNote" label="预留说明" style={{ width: '65%' }}>
@@ -735,12 +809,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
 }
 
 const scopeOptions = [ { label: '仅此课次', value: 'this' }, { label: '此课次及后续', value: 'thisAndFuture' }, { label: '整个系列（未来课次）', value: 'all' } ];
-type SchedulePreview = { canSave: boolean; lessons: { date: string; errors: string[]; warnings: string[] }[] };
+type SchedulePreview = { canSave: boolean; lessons: { date: string; startTime?: string; endTime?: string; errors: string[]; warnings: string[] }[] };
 const clockMinutes = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
 const timeText = (value: number) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 function PreviewResult({ result }: { result: SchedulePreview }) {
   const issues = result.lessons.filter(lesson => lesson.errors.length || lesson.warnings.length);
   return <div className="preview-result"><Tag color={result.canSave ? 'green' : 'red'}>{result.lessons.length} 节课 · {result.canSave ? '无撞课' : '存在阻塞'}</Tag>
+    {result.lessons.length > 1 && <details><summary>查看全部课次</summary>{result.lessons.map(lesson => <div key={lesson.date}>{lesson.date} · {lesson.startTime}–{lesson.endTime}</div>)}</details>}
     <div className="preview-issues">{issues.map(lesson => <div key={lesson.date}><strong>{lesson.date}</strong>{lesson.errors.map((text, i) => <div className="preview-error" key={`e${i}`}>{text}</div>)}{lesson.warnings.map((text, i) => <div className="preview-warning" key={`w${i}`}>{text}</div>)}</div>)}</div>
   </div>;
 }

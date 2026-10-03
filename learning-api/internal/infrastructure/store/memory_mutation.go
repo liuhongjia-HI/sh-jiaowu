@@ -85,6 +85,7 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	for index, item := range s.questionBank {
 		work.questionBank[index] = cloneQuestionBankItem(item)
 	}
+	work.teacherMaterialReads = append([]teacherMaterialRead(nil), s.teacherMaterialReads...)
 	work.materials = append([]learning.Material(nil), s.materials...)
 	work.teachingPlans = append([]learning.TeachingPlan(nil), s.teachingPlans...)
 	work.homework = make([]learning.Homework, len(s.homework))
@@ -93,6 +94,10 @@ func (s *MemoryStore) cloneForMutation() *MemoryStore {
 	}
 	work.fileAssets = cloneMap(s.fileAssets)
 	work.previewJobs = append([]learning.PreviewJob(nil), s.previewJobs...)
+	work.materialDownloads = make([]learning.MaterialDownloadJob, len(s.materialDownloads))
+	for i, job := range s.materialDownloads {
+		work.materialDownloads[i] = cloneDownloadJob(job)
+	}
 	work.reviews = append([]learning.Review(nil), s.reviews...)
 	work.notices = append([]learning.Notice(nil), s.notices...)
 	work.logs = append([]learning.OperationLog(nil), s.logs...)
@@ -199,11 +204,13 @@ func (s *MemoryStore) publishMutation(work *MemoryStore) {
 	s.courses = work.courses
 	s.courseFamilies = work.courseFamilies
 	s.questionBank = work.questionBank
+	s.teacherMaterialReads = work.teacherMaterialReads
 	s.materials = work.materials
 	s.teachingPlans = work.teachingPlans
 	s.homework = work.homework
 	s.fileAssets = work.fileAssets
 	s.previewJobs = work.previewJobs
+	s.materialDownloads = work.materialDownloads
 	s.reviews = work.reviews
 	s.notices = work.notices
 	s.logs = work.logs

@@ -56,24 +56,14 @@ export function classCapacity(classType?: string) {
   return match ? Number(match[1]) : 4;
 }
 
-export function minimumStudentCount(classType: string) {
-  if (classType === '1V1') return 1;
-  if (classType === '1V2') return 2;
-  if (classType === '1V3') return 2;
-  if (classType === '1V4') return 3;
-  return 1;
-}
-
 export function candidateLevel(candidate: ScheduleCandidate): CandidateLevel {
   if (candidate.studentCount >= candidate.capacity) return 'full';
-  if (candidate.studentCount >= minimumStudentCount(candidate.classType)) return 'ready';
-  return 'short';
+  return 'ready';
 }
 
 export function candidateLevelMeta(level: CandidateLevel) {
-  if (level === 'full') return { label: '满班推荐', color: 'green' };
-  if (level === 'ready') return { label: '可开班', color: 'blue' };
-  return { label: '人数不足', color: 'default' };
+  if (level === 'full') return { label: '满额推荐', color: 'green' };
+  return { label: '可排课', color: 'blue' };
 }
 
 // 一条记录就是一节课，落在哪天由 lessonDate 说了算。

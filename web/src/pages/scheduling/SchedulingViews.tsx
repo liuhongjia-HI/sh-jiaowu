@@ -1,5 +1,5 @@
 import { CalendarOutlined, CloseCircleOutlined, CopyOutlined, DeleteOutlined, DisconnectOutlined, EditOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RetweetOutlined, RightOutlined, SaveOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Dropdown, Modal, Popconfirm, Popover, Select, Skeleton, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Dropdown, Modal, Pagination, Popconfirm, Popover, Select, Skeleton, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import type { FormInstance, TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -14,7 +14,6 @@ import {
   classCapacity,
   formatWeekRange,
   localDateText,
-  minimumStudentCount,
   scheduleClassOccursOn,
   startOfMonth,
   startOfWeek,
@@ -30,11 +29,12 @@ type AvailabilityFormValues = {
 };
 
 export type ScheduleRepeatValues = {
-  freq: 'daily' | 'weekly';
+  freq: 'daily' | 'weekly' | 'custom';
   interval: number;
   byDay?: number[];
   until?: string;
   count?: number;
+  dates?: { date: string; startTime?: string; endTime?: string }[];
 };
 
 type ScheduleClassFormValues = {
@@ -131,8 +131,7 @@ const maxTimelineColumns = 4;
 // 第三格变成 "+N"，点开能看到被折叠的全部课程——这样「最多三个」是字面意义上的
 // 三个可视块，不会因为再挤一个加号变成四个。
 const weekCellMaxLessons = 3;
-// 月视图一格最多列 4 条，与客户 Outlook 月视图的密度一致（图上是 4 条 + "+2"）。
-// 超过时列前 3 条 + "+N"，保证「+N」本身也算在 4 个格位里。
+// 月视图最多占四个格位；较忙日期显示前三节及当天完整列表入口。
 const monthCellMaxLessons = 4;
 // 已取消课程的幽灵条：只画出「这个时段原本有课、现在空出来了」，不需要能读字。
 const canceledGhostWidth = 10;
@@ -879,14 +878,18 @@ export function MonthScheduleBoard({
 }) {
   // 之前这里写死 new Date() 且依赖数组为空，月视图翻页翻不动，永远停在当前月。
   const days = useMemo(() => buildMonthDays(month), [month]);
+  const [expandedDate, setExpandedDate] = useState<string>();
+  const expandedClasses = sortByStartTime(classes.filter(item => expandedDate && scheduleClassOccursOn(item, new Date(`${expandedDate}T12:00:00`))));
   if (classes.length === 0) return <Empty description="还没有可展示的课程。" />;
   return (
+    <>
     <div className="month-board">
       {days.map((day) => {
         const dayClasses = classes.filter((item) => scheduleClassOccursOn(item, day.date));
         return (
           <div
             className="month-day"
+            data-date={day.key}
             key={day.key}
             onDragOver={(event) => canManage ? event.preventDefault() : undefined}
             onDrop={(event) => {
@@ -901,13 +904,14 @@ export function MonthScheduleBoard({
             <div className="month-day-head">
               <strong>{day.day}</strong>
               <span>{day.weekLabel}</span>
+              {dayClasses.length > 0 && <button type="button" className="month-day-count" aria-label={`${day.key} 查看全部 ${dayClasses.length} 节课`} onClick={() => setExpandedDate(day.key)}>{dayClasses.length} 节</button>}
             </div>
             <div className="month-day-body">
               {dayClasses.length === 0 ? (
                 <span className="month-day-empty">暂无课程</span>
               ) : (() => {
                 const sorted = sortByStartTime(dayClasses);
-                // 一格里最多列 4 条，其余折叠成 "+N"，与客户 Outlook 月视图一致。
+                // 一格最多四个格位，超出时通过明确入口打开当天完整列表。
                 // 不折叠的话，最忙的那天会把整个月的行高一起撑高。
                 const visible = sorted.length > monthCellMaxLessons
                   ? sorted.slice(0, monthCellMaxLessons - 1)
@@ -926,30 +930,8 @@ export function MonthScheduleBoard({
                         onCopyClass={onCopyClass}
                       />
                     ))}
-                    {hidden.length > 0 && (
-                      <Popover
-                        trigger="click"
-                        placement="right"
-                        title={`${day.label} 还有 ${hidden.length} 节课`}
-                        content={(
-                          <div className="month-overflow-list">
-                            {hidden.map((item) => (
-                              <MonthClassEntry
-                                key={item.id}
-                                item={item}
-                                course={courseById[item.courseId]}
-                                teacher={teacherById[item.teacherId]}
-                                canManage={canManage}
-                                onEditClass={onEditClass}
-                                onCopyClass={onCopyClass}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      >
-                        <button type="button" className="month-overflow-toggle">+{hidden.length}</button>
-                      </Popover>
-                    )}
+                    {hidden.length > 0 && <button type="button" className="month-overflow-toggle" onClick={() => setExpandedDate(day.key)}>另 {hidden.length} 节 · 查看全部</button>}
+
                   </>
                 );
               })()}
@@ -958,7 +940,33 @@ export function MonthScheduleBoard({
         );
       })}
     </div>
+    <Drawer title={`${expandedDate || ''} · 全部 ${expandedClasses.length} 节课`} open={Boolean(expandedDate)} onClose={() => setExpandedDate(undefined)} width="min(560px, 100vw)">
+      <div className="month-full-day-list">
+        {expandedClasses.map(item => <MonthClassEntry key={item.id} item={item} course={courseById[item.courseId]} teacher={teacherById[item.teacherId]} canManage={canManage} expanded onEditClass={record => { setExpandedDate(undefined); onEditClass(record); }} onCopyClass={record => { setExpandedDate(undefined); onCopyClass(record); }} />)}
+      </div>
+    </Drawer>
+    </>
   );
+}
+
+export function ScheduleLessonList({ classes, courseById, teacherById, canManage, onEditClass, onCancel, onRestore, cancelling }: {
+ classes: ScheduleClass[]; courseById: CourseLookup; teacherById: Record<string, Teacher>; canManage: boolean;
+ onEditClass: (record: ScheduleClass) => void; onCancel: (record: ScheduleClass) => void; onRestore: (record: ScheduleClass) => void; cancelling: boolean;
+}) {
+ const [page, setPage] = useState(1);
+ useEffect(() => { setPage(previous => Math.min(previous, Math.max(1, Math.ceil(classes.length / 20)))); }, [classes.length]);
+ const sorted = [...classes].sort((a, b) => a.lessonDate.localeCompare(b.lessonDate) || a.startTime.localeCompare(b.startTime));
+ const current = Math.min(page, Math.max(1, Math.ceil(sorted.length / 20)));
+ if (!sorted.length) return <Empty description="当前条件下没有课次" />;
+ return <div className="schedule-lesson-list">
+  {sorted.slice((current - 1) * 20, current * 20).map(item => <article key={item.id} className="schedule-lesson-list-row" data-lesson-id={item.id}>
+   <div className="schedule-lesson-list-date">{item.lessonDate}</div>
+   <MonthClassEntry item={item} course={courseById[item.courseId]} teacher={teacherById[item.teacherId]} canManage={canManage} expanded copyable={false} onEditClass={onEditClass} onCopyClass={onEditClass} />
+   {canManage && item.status === '已取消' && <Button aria-label={`恢复课次 ${item.id}`} onClick={() => onRestore(item)}>恢复课次</Button>}
+   {canManage && item.status !== '已取消' && <Button danger aria-label={`取消课次 ${item.id}`} loading={cancelling} icon={<CloseCircleOutlined />} onClick={() => onCancel(item)}>取消课次</Button>}
+  </article>)}
+  <Pagination current={current} pageSize={20} total={sorted.length} showTotal={total => `共 ${total} 节课`} showSizeChanger={false} onChange={setPage} />
+ </div>;
 }
 
 // 拖动课程块下沿改结束时间。
@@ -1070,8 +1078,12 @@ function MonthClassEntry({
   teacher,
   canManage,
   onEditClass,
-  onCopyClass
+  onCopyClass,
+  expanded = false,
+  copyable = true
 }: {
+  expanded?: boolean;
+  copyable?: boolean;
   item: ScheduleClass;
   course?: Course;
   teacher?: Teacher;
@@ -1085,24 +1097,26 @@ function MonthClassEntry({
   const label = scheduleLessonTitle(item, course, teacher);
   const subject = scheduleClassSubject(item, course ? { [course.id]: course } : {});
   const palette = subjectColor(subject || item.courseName);
-  const full = `${item.startTime} · ${label}`;
+  const full = `${item.startTime}-${item.endTime} · ${label} · ${item.classType} · ${item.status}`;
 
   const entry = (
     <button
       type="button"
-      className={`month-class ${item.status === '已取消' ? 'is-canceled' : ''}`}
+      data-lesson-id={item.id}
+      className={`month-class ${expanded ? 'is-expanded' : ''} ${item.status === '已取消' ? 'is-canceled' : ''}`}
       title={full}
-      draggable={editable}
+      draggable={editable && copyable}
       style={{ '--subject-color': palette.accent, '--subject-bg': palette.bg } as CSSProperties}
       onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
       onClick={() => editable ? onEditClass(item) : undefined}
     >
-      <span className="month-class-time">{item.startTime}</span>
+      <span className="month-class-time">{item.startTime}{expanded && `-${item.endTime}`}</span>
       <span className="month-class-text">{label}</span>
-      <RecurrenceMark item={item} />
+      <span className="month-class-icons"><span role="img" aria-label={item.status} title={item.status}>{item.status === '已取消' ? '×' : item.status === '已确认' ? '✓' : '○'}</span><RecurrenceMark item={item} /></span>
+      {expanded && <span className="month-class-meta">{item.classType} · {item.status}{item.auditStatus && item.auditStatus !== '已通过' ? ` · ${item.auditStatus}` : ''}</span>}
     </button>
   );
-  if (!editable) return entry;
+  if (!editable || !copyable) return entry;
   // 右键复制在月视图同样可用：月视图是「看全貌顺手补一节」的场景，
   // 复制现有课比从空表单重填一遍快得多。
   return (
@@ -1137,7 +1151,7 @@ export function classColumns(courseById: CourseLookup, teacherById: Record<strin
     { title: '时间', width: 180, render: (_, record) => `${record.lessonDate} ${record.startTime}-${record.endTime}` },
     { title: '班型', dataIndex: 'classType', width: 90 },
     { title: '学生', render: (_, record) => tagList(record.students.map(studentDisplayName), 'blue') },
-    // 成班状态：人数够不够、有没有被取消。
+    // 排课状态与人数无关，线下成班由老师决定。
     { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '已取消' ? 'default' : value === '待确认' ? 'gold' : 'green'}>{value}</Tag> },
     // 审核状态：管理员认不认。与上一列是两个维度，不能合并显示。
     { title: '审核', width: 150, render: (_, record) => auditStatusTag(record) }
@@ -1960,106 +1974,50 @@ function RejectButton({
 // 结束方式必须二选一：只按次数、或只按日期。两个都留着的话，
 // 「每周一次、共 10 次、到 6 月 30 日止」这种输入没人说得清以谁为准，
 // 后端也会直接拒绝。
-export function RepeatFields({
-  enabled,
-  onToggle,
-  startDate,
-  form
-}: {
-  enabled: boolean;
-  onToggle: (next: boolean) => void;
-  startDate?: string;
-  form: FormInstance;
-}) {
+export function RepeatFields({ enabled, onToggle, startDate, form }: { enabled: boolean; onToggle: (next: boolean) => void; startDate?: string; form: FormInstance }) {
   const freq = Form.useWatch(['repeat', 'freq'], form) ?? 'weekly';
   const endMode = Form.useWatch(['repeat', 'endMode'], form) ?? 'count';
   const interval = Form.useWatch(['repeat', 'interval'], form) ?? 1;
   const byDay = Form.useWatch(['repeat', 'byDay'], form) as number[] | undefined;
   const startWeekday = weekdayOfDateText(startDate);
-
-  return (
-    <>
-      <Form.Item label="重复">
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          <Switch
-            checked={enabled}
-            onChange={onToggle}
-            checkedChildren="重复排课"
-            unCheckedChildren="只排一节"
-          />
-          {enabled && (
-            <>
-              <Typography.Text type="secondary">
-                支持按日或按周自定义重复周期；固定周次例如隔周上课，设置为“每 2 周”。
-              </Typography.Text>
+  return <Form.Item label="重复"><Space direction="vertical" size={8} style={{ width: '100%' }}>
+    <Switch checked={enabled} onChange={onToggle} checkedChildren="多节排课" unCheckedChildren="只排一节" />
+    {enabled && <>
+      <Form.Item name={['repeat', 'freq']} noStyle initialValue="weekly"><Select aria-label="排课重复方式" style={{ width: '100%' }} options={[{ label: '按周', value: 'weekly' }, { label: '按日', value: 'daily' }, { label: '自定义日期', value: 'custom' }]} /></Form.Item>
+      {freq === 'custom' ? <>
+        <Typography.Text type="secondary">首节按上方日期和时间；其他日期可单独调整时间，留空沿用首节时间。</Typography.Text>
+        <Form.List name={['repeat', 'dates']} rules={[{ validator: async (_, rows) => {
+          if (!rows?.length) throw new Error('请添加其他上课日期');
+          if (rows.length > 199) throw new Error('单次最多 200 节');
+          const dates = rows.map((row: { date?: string }) => row.date).filter(Boolean);
+          if (new Set(dates).size !== dates.length || dates.some((date: string) => startDate && date <= startDate)) throw new Error('其他日期须晚于首节，且不能重复');
+        } }]}>
+          {(fields, { add, remove }, { errors }) => <Space direction="vertical" style={{ width: '100%' }}>
+            {fields.map(({ key, name, ...rest }) => <Card key={key} size="small">
               <Space.Compact block>
-                <Form.Item name={['repeat', 'freq']} noStyle initialValue="weekly">
-                  <Select
-                    style={{ width: '34%' }}
-                    options={[
-                      { label: '按周', value: 'weekly' },
-                      { label: '按日', value: 'daily' }
-                    ]}
-                  />
-                </Form.Item>
-                <Form.Item name={['repeat', 'interval']} noStyle initialValue={1}>
-                  <InputNumber
-                    min={1}
-                    max={52}
-                    style={{ width: '33%' }}
-                    addonBefore="每"
-                    addonAfter={freq === 'daily' ? '天' : '周'}
-                  />
-                </Form.Item>
-                <Form.Item name={['repeat', 'endMode']} noStyle initialValue="count">
-                  <Select
-                    style={{ width: '33%' }}
-                    options={[
-                      { label: '按次数结束', value: 'count' },
-                      { label: '按日期结束', value: 'until' }
-                    ]}
-                  />
-                </Form.Item>
+                <Form.Item {...rest} name={[name, 'date']} rules={[{ required: true, message: '请选择日期' }]} style={{ width: '80%', marginBottom: 8 }}><Input aria-label={`其他上课日期 ${name + 1}`} type="date" min={startDate} /></Form.Item>
+                <Button aria-label={`移除日期 ${name + 1}`} danger onClick={() => remove(name)} style={{ width: '20%' }}>移除</Button>
               </Space.Compact>
-
-              {freq === 'weekly' && (
-                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                  <Typography.Text strong>每周上课日</Typography.Text>
-                  <Form.Item name={['repeat', 'byDay']} noStyle>
-                    <Select
-                      mode="multiple"
-                      allowClear
-                      style={{ width: '100%' }}
-                      placeholder={startWeekday ? `默认跟随首节：${weekLabel(startWeekday)}` : '默认跟随首节上课日期'}
-                      options={weekOptions}
-                    />
-                  </Form.Item>
-                </Space>
-              )}
-
-              {endMode === 'count' ? (
-                <Form.Item name={['repeat', 'count']} noStyle initialValue={4}>
-                  <InputNumber min={1} max={200} style={{ width: '100%' }} addonBefore="共" addonAfter="节" />
-                </Form.Item>
-              ) : (
-                <Form.Item name={['repeat', 'until']} noStyle>
-                  <Input placeholder="重复到（含）2026-06-30" />
-                </Form.Item>
-              )}
-
-              <Typography.Text type="secondary">
-                {repeatSummaryText(freq, interval, byDay, startWeekday, endMode)}
-                。不会自动跳过节假日和寒暑假，需要跳过的课次请排完后单独取消。单次最多生成 200 节。
-              </Typography.Text>
-              <Typography.Text type="secondary">
-                按月和特殊日期重复将在后续开放。
-              </Typography.Text>
-            </>
-          )}
-        </Space>
-      </Form.Item>
-    </>
-  );
+              <Space.Compact block>
+                <Form.Item {...rest} name={[name, 'startTime']} style={{ width: '50%', marginBottom: 0 }}><Input aria-label={`其他开始时间 ${name + 1}`} type="time" /></Form.Item>
+                <Form.Item {...rest} name={[name, 'endTime']} style={{ width: '50%', marginBottom: 0 }}><Input aria-label={`其他结束时间 ${name + 1}`} type="time" /></Form.Item>
+              </Space.Compact>
+            </Card>)}
+            <Button icon={<PlusOutlined />} disabled={fields.length >= 199} onClick={() => add({ date: '', startTime: '', endTime: '' })}>添加上课日期</Button>
+            <Form.ErrorList errors={errors} />
+          </Space>}
+        </Form.List>
+      </> : <>
+        <Space.Compact block>
+          <Form.Item name={['repeat', 'interval']} noStyle initialValue={1}><InputNumber min={1} max={52} style={{ width: '50%' }} addonBefore="每" addonAfter={freq === 'daily' ? '天' : '周'} /></Form.Item>
+          <Form.Item name={['repeat', 'endMode']} noStyle initialValue="count"><Select style={{ width: '50%' }} options={[{ label: '按次数结束', value: 'count' }, { label: '按日期结束', value: 'until' }]} /></Form.Item>
+        </Space.Compact>
+        {freq === 'weekly' && <Form.Item name={['repeat', 'byDay']} label="每周上课日"><Select mode="multiple" allowClear style={{ width: '100%' }} placeholder={startWeekday ? `默认${weekLabel(startWeekday)}` : '默认首节所在星期'} options={weekOptions} /></Form.Item>}
+        {endMode === 'count' ? <Form.Item name={['repeat', 'count']} noStyle initialValue={4}><InputNumber min={1} max={200} style={{ width: '100%' }} addonBefore="共" addonAfter="节" /></Form.Item> : <Form.Item name={['repeat', 'until']} noStyle rules={[{ required: true, message: '请选择结束日期' }]}><Input type="date" min={startDate} /></Form.Item>}
+        <Typography.Text type="secondary">{repeatSummaryText(freq, interval, byDay, startWeekday, endMode)}。单次最多生成 200 节，不自动跳过节假日。</Typography.Text>
+      </>}
+    </>}
+  </Space></Form.Item>;
 }
 
 function repeatSummaryText(
@@ -2086,10 +2044,12 @@ export type RepeatFormValues = {
   endMode?: string;
   count?: number;
   until?: string;
+  dates?: { date: string; startTime?: string; endTime?: string }[];
 };
 
 // 表单里的重复规则转成后端要的形状。
 export function buildRepeatPayload(values: RepeatFormValues): ScheduleRepeatValues {
+  if (values.freq === 'custom') return { freq: 'custom', interval: 1, dates: values.dates ?? [] };
   const freq: ScheduleRepeatValues['freq'] = values.freq === 'daily' ? 'daily' : 'weekly';
   const payload: ScheduleRepeatValues = {
     freq,

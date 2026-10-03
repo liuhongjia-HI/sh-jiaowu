@@ -1,17 +1,24 @@
 package learning
 
 const (
-	NoticeScheduleConfirmed = "schedule_confirmed"
-	NoticeScheduleChanged   = "schedule_changed"
-	NoticeScheduleReminder  = "schedule_reminder"
-	NoticeScheduleCancelled = "schedule_cancelled"
-	NoticeHomeworkSubmitted = "homework_submitted"
-	NoticeHomeworkPublished = "homework_published"
-	NoticeReviewCompleted   = "review_completed"
-	NoticeReviewException   = "review_exception"
+	NoticeScheduleConfirmed     = "schedule_confirmed"
+	NoticeScheduleChanged       = "schedule_changed"
+	NoticeScheduleReminder      = "schedule_reminder"
+	NoticeScheduleCancelled     = "schedule_cancelled"
+	NoticeHomeworkSubmitted     = "homework_submitted"
+	NoticeHomeworkPublished     = "homework_published"
+	NoticeReviewCompleted       = "review_completed"
+	NoticeReviewException       = "review_exception"
+	NoticeMaterialsPublished    = "materials_published"
+	NoticeTeachingPlansUploaded = "teaching_plans_uploaded"
 )
 
 type BusinessNoticeBinding struct {
+	TeacherIDs      []string          `json:"teacherIds,omitempty"`
+	WebOrigin       string            `json:"webOrigin,omitempty"`
+	FieldMappings   map[string]string `json:"fieldMappings,omitempty"`
+	AvailableFields map[string]string `json:"availableFields,omitempty"`
+	TriggerReady    bool              `json:"triggerReady"`
 	Kind            string            `json:"kind"`
 	Title           string            `json:"title"`
 	TemplateID      string            `json:"templateId"`
@@ -30,22 +37,33 @@ type BusinessLessonChange struct {
 }
 
 type BusinessNoticeEvent struct {
-	ID          string                 `json:"id"`
-	BatchID     string                 `json:"batchId"`
-	Kind        string                 `json:"kind"`
-	StudentID   string                 `json:"studentId"`
-	StudentName string                 `json:"studentName"`
-	SeriesID    string                 `json:"seriesId,omitempty"`
-	RelatedID   string                 `json:"relatedId,omitempty"`
-	Title       string                 `json:"title"`
-	Summary     string                 `json:"summary"`
-	Lessons     []BusinessLessonChange `json:"lessons"`
-	CreatedAt   string                 `json:"createdAt"`
-	ExpiresAt   string                 `json:"expiresAt"`
-	Values      map[string]string      `json:"values,omitempty"`
+	RecipientUserID        string                 `json:"recipientUserId,omitempty"`
+	RecipientName          string                 `json:"recipientName,omitempty"`
+	ResourceIDs            []string               `json:"resourceIds,omitempty"`
+	UploaderID             string                 `json:"uploaderId,omitempty"`
+	CourseID               string                 `json:"courseId,omitempty"`
+	BatchCompleted         bool                   `json:"batchCompleted,omitempty"`
+	CompletedResourceCount int                    `json:"completedResourceCount,omitempty"`
+	StationNoticeID        string                 `json:"stationNoticeId,omitempty"`
+	ID                     string                 `json:"id"`
+	BatchID                string                 `json:"batchId"`
+	Kind                   string                 `json:"kind"`
+	StudentID              string                 `json:"studentId"`
+	StudentName            string                 `json:"studentName"`
+	SeriesID               string                 `json:"seriesId,omitempty"`
+	RelatedID              string                 `json:"relatedId,omitempty"`
+	Title                  string                 `json:"title"`
+	Summary                string                 `json:"summary"`
+	Lessons                []BusinessLessonChange `json:"lessons"`
+	CreatedAt              string                 `json:"createdAt"`
+	ExpiresAt              string                 `json:"expiresAt"`
+	Values                 map[string]string      `json:"values,omitempty"`
 }
 
 type BusinessNoticeTask struct {
+	RecipientUserID string            `json:"recipientUserId,omitempty"`
+	RecipientName   string            `json:"recipientName,omitempty"`
+	URL             string            `json:"url,omitempty"`
 	ID              string            `json:"id"`
 	EventID         string            `json:"eventId"`
 	Kind            string            `json:"kind"`
@@ -73,6 +91,7 @@ type BusinessNoticeTask struct {
 }
 
 type OfficialMessageRequest struct {
+	URL             string
 	TemplateID      string
 	OpenID          string
 	Values          map[string]string
@@ -88,7 +107,25 @@ type OfficialDeliveryReceipt struct {
 }
 
 type BusinessNoticeDetail struct {
-	Event          BusinessNoticeEvent `json:"event"`
-	CurrentLessons []ScheduleClass     `json:"currentLessons"`
-	CanSwitch      bool                `json:"canSwitch"`
+	CurrentMaterials []Material          `json:"currentMaterials,omitempty"`
+	NoticeID         string              `json:"noticeId,omitempty"`
+	Event            BusinessNoticeEvent `json:"event"`
+	CurrentLessons   []ScheduleClass     `json:"currentLessons"`
+	CanSwitch        bool                `json:"canSwitch"`
+}
+
+type MaterialNoticeBatchRequest struct {
+	CourseID string `json:"courseId"`
+}
+
+type MaterialNoticeBatchResult struct {
+	ResourceCount    int  `json:"resourceCount"`
+	RecipientCount   int  `json:"recipientCount"`
+	AlreadyCompleted bool `json:"alreadyCompleted"`
+}
+
+type PendingMaterialNoticeBatch struct {
+	BatchID       string `json:"batchId"`
+	CourseID      string `json:"courseId"`
+	ResourceCount int    `json:"resourceCount"`
 }

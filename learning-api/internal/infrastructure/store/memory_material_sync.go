@@ -141,7 +141,9 @@ func materialSyncSnapshot(preview learning.MaterialSyncPreview, sources []learni
 		parts = append(parts, fmt.Sprintf("s:%s:%s:%s:%s:%t:%s:%s", source.ID, source.FileID, source.TagCode, source.Title, source.AllowDownload, source.PreviewStatus, source.FileName))
 	}
 	for _, target := range preview.Targets {
-		parts = append(parts, "t:"+target.CourseID+":"+target.LessonID)
+		// The confirmed destination includes its displayed directory path. A rename
+		// or move between preview and save must require a fresh confirmation.
+		parts = append(parts, "t:"+mustJSON(target))
 		for _, item := range target.Items {
 			parts = append(parts, "i:"+item.SourceMaterialID+":"+item.Action+":"+item.ExistingID+":"+item.ExistingTitle+":"+item.ExistingVersion)
 		}
@@ -209,11 +211,15 @@ func (s *MemoryStore) applyMaterialSyncUnlocked(operator string, principal learn
 			item.UpdatedAt = now
 			item.SortOrder = s.nextMaterialSortOrder(target.ID)
 			s.materials = append([]learning.Material{item}, s.materials...)
+			s.registerMaterialNoticeBatch(principal, req.Snapshot, item)
 			targetResult.Created++
 			targetResult.MaterialIDs = append(targetResult.MaterialIDs, item.ID)
 		}
 		s.prependLogDetail(operator, "同步课程讲义", target.Name, fmt.Sprintf("%s/%s → %s/%s；新增 %d", req.SourceCourseID, req.SourceLessonID, target.ID, preview.LessonID, targetResult.Created))
 		s.notifyCourseContentUploaded(target)
+		if _, err := s.completeMaterialNoticeBatchUnlocked(principal, req.Snapshot, target.ID); err != nil {
+			return learning.MaterialSyncResult{}, err
+		}
 		result.Targets = append(result.Targets, targetResult)
 	}
 	return result, nil
@@ -229,7 +235,7 @@ func (s *MemoryStore) materialSyncAlreadyCompleted(plan materialSyncPlan) (learn
 			matches := s.materialSlotMatches(target.ID, preview.LessonID, source.TagCode)
 			matchedID := ""
 			for _, match := range matches {
-				if !used[match.ID] && match.FileID == source.FileID && match.Title == source.Title && match.AllowDownload == source.AllowDownload {
+				if !used[match.ID] && materialVisibleToStudents(match) && match.FileID == source.FileID && match.Title == source.Title && match.AllowDownload == source.AllowDownload {
 					matchedID = match.ID
 					break
 				}

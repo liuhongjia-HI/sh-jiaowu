@@ -49,10 +49,12 @@ type MemoryStore struct {
 	courseFamilies                  []learning.CourseFamily
 	questionBank                    []learning.QuestionBankItem
 	materials                       []learning.Material
+	teacherMaterialReads            []teacherMaterialRead
 	teachingPlans                   []learning.TeachingPlan
 	homework                        []learning.Homework
 	fileAssets                      map[string]learning.FileAsset
 	previewJobs                     []learning.PreviewJob
+	materialDownloads               []learning.MaterialDownloadJob
 	reviews                         []learning.Review
 	notices                         []learning.Notice
 	logs                            []learning.OperationLog

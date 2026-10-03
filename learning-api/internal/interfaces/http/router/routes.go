@@ -56,6 +56,9 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 		readOnlyPaths := map[string]bool{
 			"GET /api/teaching-plans": true, "GET /api/teaching-plans/:id": true,
 			"GET /api/teaching-plans/:id/preview": true, "GET /api/teaching-plans/:id/download": true,
+			"POST /api/teaching-plans/:id/view":      true,
+			"POST /api/material-downloads/selection": true, "POST /api/material-downloads": true,
+			"GET /api/material-downloads": true, "POST /api/material-downloads/:id/retry": true, "GET /api/material-downloads/:id/archive": true,
 			"GET /api/teacher/library": true, "POST /api/teacher/materials/:id/view": true,
 			"GET /api/files/:id/preview": true, "GET /api/files/:id/download": true,
 			"GET /api/subjects": true, "GET /api/materials": true,
@@ -69,8 +72,18 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/teacher/library", h.TeacherLibrary)
 	g.GET("/teaching-plans", h.TeachingPlans)
 	g.POST("/teaching-plans", h.CreateTeachingPlan)
+	g.POST("/teaching-plans/notification-audience", h.TeachingPlanNotificationAudience)
+	g.GET("/teaching-plans/notification-batches", h.PendingTeachingPlanNoticeBatches)
+	g.POST("/teaching-plans/notification-batches/:id/complete", h.CompleteTeachingPlanNoticeBatch)
+	g.POST("/material-downloads/selection", h.MaterialDownloadSelection)
+	g.POST("/material-downloads", h.CreateMaterialDownload)
+	g.GET("/material-downloads", h.MaterialDownloads)
+	g.POST("/material-downloads/:id/retry", h.RetryMaterialDownload)
+	g.GET("/material-downloads/:id/archive", h.MaterialDownloadArchive)
+	g.PUT("/teaching-plans/:id/chapter", h.UpdateTeachingPlanChapter)
 	g.GET("/teaching-plans/:id", h.TeachingPlan)
 	g.GET("/teaching-plans/:id/preview", h.TeachingPlanPreview)
+	g.POST("/teaching-plans/:id/view", h.RecordTeachingPlanView)
 	g.GET("/teaching-plans/:id/download", h.TeachingPlanDownload)
 	g.POST("/teaching-plans/:id/preview/retry", h.RetryTeachingPlanPreview)
 	g.POST("/teacher/materials/:id/view", h.RecordTeacherMaterialView)
@@ -89,6 +102,8 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/students/:id/scores", h.StudentScores)
 	g.GET("/courses", h.Courses)
 	g.GET("/course-families", h.CourseFamilies)
+	g.POST("/courses/directory-sync-preview", h.PreviewCourseDirectorySync)
+	g.POST("/courses/directory-sync", h.SyncCourseDirectory)
 	g.POST("/course-families", h.CreateCourseFamily)
 	g.POST("/course-families/import", h.ImportCourseFamily)
 	g.PUT("/course-families/:id", h.UpdateCourseFamily)
@@ -96,6 +111,7 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.POST("/courses", h.CreateCourse)
 	g.POST("/courses/:id/copy", h.CopyCourse)
 	g.PUT("/courses/:id", h.UpdateCourse)
+	g.POST("/courses/:id/curriculum-references", h.CurriculumReferences)
 	g.DELETE("/courses/:id", h.DeleteCourse)
 	g.GET("/questions", h.Questions)
 	g.POST("/questions", h.CreateQuestion)
@@ -103,6 +119,8 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.GET("/materials", h.Materials)
 	g.GET("/materials/overview", h.MaterialOverview)
 	g.POST("/materials", h.CreateMaterial)
+	g.GET("/materials/notification-batches", h.PendingMaterialNoticeBatches)
+	g.POST("/materials/notification-batches/:id/complete", h.CompleteMaterialNoticeBatch)
 	g.POST("/materials/sync-preview", h.PreviewMaterialSync)
 	g.POST("/materials/sync", h.SyncMaterials)
 	g.POST("/materials/reorder", h.ReorderMaterials)
@@ -137,6 +155,9 @@ func registerAdminRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 	g.POST("/schedule-classes/preview", h.PreviewScheduleClass)
 	g.PUT("/schedule-classes/:id", h.UpdateScheduleClass)
 	g.POST("/schedule-classes/:id/cancel", h.CancelScheduleClass)
+	g.POST("/schedule-classes/:id/completed", h.MarkScheduleClassCompleted)
+	g.POST("/schedule-classes/:id/restore-preview", h.PreviewRestoreScheduleClass)
+	g.POST("/schedule-classes/:id/restore", h.RestoreScheduleClass)
 	g.GET("/banners", h.Banners)
 }
 

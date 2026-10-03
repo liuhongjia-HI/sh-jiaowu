@@ -95,6 +95,13 @@ func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID stri
 			data[key] = map[string]string{"value": value}
 		}
 		body := map[string]any{"touser": request.OpenID, "template_id": request.TemplateID, "data": data}
+		if request.URL != "" {
+			target, err := url.Parse(request.URL)
+			if err != nil || target.Scheme != "https" || target.Hostname() == "" || target.User != nil || target.Fragment != "" || strings.ContainsAny(request.URL, "\r\n") || request.PagePath != "" {
+				return "", &officialSendError{reason: "网页跳转配置不正确", configuration: true}
+			}
+			body["url"] = target.String()
+		}
 		if request.ClientMessageID != "" {
 			body["client_msg_id"] = request.ClientMessageID
 		}

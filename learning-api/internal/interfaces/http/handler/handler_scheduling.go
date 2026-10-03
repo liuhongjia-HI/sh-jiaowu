@@ -224,3 +224,43 @@ func (h *LearningHandler) PreviewScheduleClass(c *gin.Context) {
 	}
 	OK(c, result)
 }
+
+func (h *LearningHandler) PreviewRestoreScheduleClass(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	preview, err := h.service.PreviewRestoreScheduleClass(p, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, preview)
+}
+func (h *LearningHandler) RestoreScheduleClass(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	o, _ := c.Get(middleware.OperatorNameKey)
+	var req struct {
+		IgnoreWarnings bool `json:"ignoreWarnings"`
+	}
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			BadRequest(c, "恢复参数无效")
+			return
+		}
+	}
+	item, err := h.service.RestoreScheduleClass(o.(string), p, c.Param("id"), req.IgnoreWarnings)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}
+
+func (h *LearningHandler) MarkScheduleClassCompleted(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	item, err := h.service.MarkScheduleClassCompleted(operator.(string), principal, c.Param("id"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, item)
+}

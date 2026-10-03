@@ -24,14 +24,15 @@ type CurriculumPath struct {
 }
 
 type Course struct {
-	ID              string           `json:"id"`
-	FamilyID        string           `json:"familyId,omitempty"`
-	Name            string           `json:"name"`
-	Subject         string           `json:"subject"`
-	Grade           string           `json:"grade"`
-	LearningSpaceID string           `json:"learningSpaceId,omitempty"`
-	LessonCount     int              `json:"lessonCount"`
-	Curriculum      []CurriculumNode `json:"curriculum"`
+	DirectorySyncMap map[string]string `json:"-"`
+	ID               string            `json:"id"`
+	FamilyID         string            `json:"familyId,omitempty"`
+	Name             string            `json:"name"`
+	Subject          string            `json:"subject"`
+	Grade            string            `json:"grade"`
+	LearningSpaceID  string            `json:"learningSpaceId,omitempty"`
+	LessonCount      int               `json:"lessonCount"`
+	Curriculum       []CurriculumNode  `json:"curriculum"`
 	// 临时仅供同一版本内尚未迁移的内部派生逻辑使用，不对 API 暴露。
 	ChapterCount int      `json:"-"`
 	Chapters     []string `json:"-"`
@@ -487,6 +488,7 @@ type PreviewResult struct {
 }
 
 type MaterialUploadRequest struct {
+	BatchID         string
 	Title           string
 	LearningSpaceID string
 	CourseID        string

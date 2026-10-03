@@ -129,7 +129,6 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 	if capacity <= 0 {
 		return nil, errors.New("请选择正确班型")
 	}
-	minStudents := minClassStudents(capacity)
 
 	// 解析目标课程：优先按「学科 + 年级」入口，其次兼容旧的按课程入口。
 	var targetCourses []learning.Course
@@ -226,15 +225,13 @@ func (s *MemoryStore) scheduleCandidatesUnlocked(principal learning.Principal, r
 						missing = append(missing, student)
 					}
 				}
-				// 保留差一两人就能成班的近似方案，交给「协调建议」面板处理。
+				// 有学生可约即保留候选；人数只影响排序，不决定能否排课。
 				if len(available) == 0 {
 					continue
 				}
 				score := len(available) * 20
 				if len(available) >= capacity {
 					score += 40
-				} else if len(available) >= minStudents {
-					score += 10
 				}
 				candidates = append(candidates, learning.ScheduleCandidate{
 					ID:                "candidate-" + teacher.ID + "-" + strconv.Itoa(teacherSlot.DayOfWeek) + "-" + minutesToClock(candidateStart),
@@ -374,7 +371,7 @@ func (s *MemoryStore) createScheduleClassUnlocked(operator string, principal lea
 	// 也没法一键回退。
 	built := make([]learning.ScheduleClass, 0, len(dates))
 	for index, date := range dates {
-		item, err := s.buildScheduleClass(principal, "", date, req)
+		item, err := s.buildScheduleClass(principal, "", date, scheduleRequestForDate(req, repeat, date))
 		if err != nil {
 			return learning.ScheduleClass{}, err
 		}
@@ -439,7 +436,7 @@ func scheduleCreateLogAction(item learning.ScheduleClass) string {
 	if item.Status == "已确认" {
 		return "确认排课"
 	}
-	return "创建待成班排课"
+	return "创建排课"
 }
 
 func scheduleBatchLogTarget(item learning.ScheduleClass, count int) string {
@@ -453,7 +450,7 @@ func scheduleBatchLogTarget(item learning.ScheduleClass, count int) string {
 // buildScheduleClass 构造「一节课」。lessonDate 是这节课的具体日期，
 // StartDate/EndDate 对课次而言恒等于它——这样既有的冲突判定与日期区间
 // helper（hasScheduleConflictExcept / dateRangesOverlap 等）不用改就继续成立。
-func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID, lessonDate string, req learning.ScheduleClassCreateRequest) (learning.ScheduleClass, error) {
+func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID, lessonDate string, req learning.ScheduleClassCreateRequest, previous ...learning.ScheduleClass) (learning.ScheduleClass, error) {
 	lessonDate = strings.TrimSpace(lessonDate)
 	if lessonDate == "" {
 		return learning.ScheduleClass{}, errors.New("请选择上课日期")
@@ -500,6 +497,26 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 	if teacher.AccountStatus != "正常" {
 		return learning.ScheduleClass{}, errors.New("该教师账号已停用，不能排课")
 	}
+	if !containsString(teacher.LearningSpaceIDs, course.LearningSpaceID) {
+		// Preserve an existing assignment when only changing its date/time. New
+		// assignments and changing the teacher/course must use teaching grants,
+		// never the teacher's extra read-only library scopes.
+		retained := false
+		for _, existing := range previous {
+			if existing.TeacherID == teacher.ID && existing.CourseID == course.ID {
+				retained = true
+			}
+		}
+		for _, existing := range s.scheduleClasses {
+			if existing.ID == exceptID && existing.TeacherID == teacher.ID && existing.CourseID == course.ID {
+				retained = true
+				break
+			}
+		}
+		if !retained {
+			return learning.ScheduleClass{}, errors.New("课程不在老师授课范围，请先调整老师授课范围")
+		}
+	}
 	capacity := classCapacity(req.ClassType)
 	if capacity <= 0 {
 		return learning.ScheduleClass{}, errors.New("请选择正确班型")
@@ -543,7 +560,7 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 		return learning.ScheduleClass{}, errors.New("预约备注最多255个字")
 	}
 	if req.ExpectedStudentCount <= 0 {
-		req.ExpectedStudentCount = minClassStudents(capacity)
+		req.ExpectedStudentCount = len(students)
 	}
 	if req.ExpectedStudentCount < len(students) {
 		req.ExpectedStudentCount = len(students)
@@ -585,10 +602,8 @@ func (s *MemoryStore) buildScheduleClass(principal learning.Principal, exceptID,
 	if len(warnings) > 0 && !req.IgnoreWarnings {
 		return learning.ScheduleClass{}, errors.New(strings.Join(warnings, "；") + "。确认要继续排这节课，请再次提交确认。")
 	}
-	status := "待确认"
-	if len(students) >= minClassStudents(capacity) {
-		status = "已确认"
-	}
+	// 排课不承担线下成班决策；空名单可预留，审核另行控制可见性。
+	status := "已确认"
 	// 学年、学期按开课日期落校历判定一次，写入排课记录后不再变化，
 	// 见 resolveScheduleTerm；fallbackSemester 兜底取自课程所属学习空间。
 	fallbackSemester := ""
@@ -646,8 +661,8 @@ func (s *MemoryStore) updateScheduleClassUnlocked(operator string, principal lea
 		if err := scheduleEditPermission(principal, existing); err != nil {
 			return learning.ScheduleClass{}, err
 		}
-		if existing.Status == "已取消" {
-			return learning.ScheduleClass{}, errors.New("已取消课程不能调课")
+		if existing.Status == "已取消" || existing.Status == "已上课" {
+			return learning.ScheduleClass{}, errors.New(existing.Status + "课程不能调课")
 		}
 		scope, err := resolveEditScope(existing, req.EditScope)
 		if err != nil {
@@ -780,7 +795,7 @@ func (s *MemoryStore) updateScheduleSeriesUnlocked(operator string, principal le
 			s.scheduleClasses = original
 			return learning.ScheduleClass{}, err
 		}
-		item, err := s.buildScheduleClass(principal, target.ID, date, req)
+		item, err := s.buildScheduleClass(principal, target.ID, date, req, target)
 		if err != nil {
 			s.scheduleClasses = original
 			return learning.ScheduleClass{}, err

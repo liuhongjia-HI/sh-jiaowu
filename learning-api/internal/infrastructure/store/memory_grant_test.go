@@ -837,16 +837,20 @@ func TestUpdateCourseSyncsContentReferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected admin principal: %v", err)
 	}
+	original, ok := store.findCourse("course-g05-english-s1-q1")
+	if !ok {
+		t.Fatal("seed course missing")
+	}
 	updated, err := store.UpdateCourse("超级管理员", admin, "course-g05-english-s1-q1", learning.CourseUpsertRequest{
 		Name:            "五年级英语期中阅读精讲课",
 		LearningSpaceID: "space-g05-english-s1-q1",
-		Curriculum:      testCurriculum("course-g05-english-s1-q1"),
+		Curriculum:      original.Curriculum,
 		Status:          learning.StatusEnabled,
 	})
 	if err != nil {
 		t.Fatalf("expected course update to succeed: %v", err)
 	}
-	if updated.LessonCount != 1 || updated.MaterialNum == 0 || updated.HomeworkNum == 0 {
+	if updated.LessonCount != original.LessonCount || updated.MaterialNum == 0 || updated.HomeworkNum == 0 {
 		t.Fatalf("unexpected updated course counts: %#v", updated)
 	}
 	for _, material := range store.materials {

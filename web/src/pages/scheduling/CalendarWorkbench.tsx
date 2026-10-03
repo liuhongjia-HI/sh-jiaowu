@@ -6,7 +6,7 @@ import type { AvailabilitySlot, Course, ScheduleClass, Student, Teacher } from '
 import { availabilityCovers, localDateText, startOfWeek, weekdayOfDateText } from './scheduling-utils';
 import { buildTimelineItems, buildWeekDays, layoutOverlappingItems, TimelineBlock, type ScheduleMoveTarget } from './SchedulingViews';
 
-export type CalendarMode = 'day' | 'workweek' | 'week' | 'month' | 'list';
+export type CalendarMode = 'day' | 'week' | 'month' | 'list';
 export type CalendarSelection = { startTime?: string; endTime?: string; ownerKey?: string };
 export type CalendarPerson = { key: string; name: string; kind: 'teacher' | 'student'; id: string };
 export const minuteText = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
@@ -21,7 +21,7 @@ export function slotsOnDate(slots: AvailabilitySlot[], date: string, person?: Ca
 }
 
 export function CalendarTimeline({ mode, date, people, lessons, slots, courseById, teacherById, studentById, canManage, onCreate, onEdit, onCopy, onMove, onResize }: {
-  mode: 'day' | 'workweek' | 'week'; date: Date; people: CalendarPerson[];
+  mode: 'day' | 'week'; date: Date; people: CalendarPerson[];
   lessons: ScheduleClass[]; slots: AvailabilitySlot[]; courseById: Record<string, Course>;
   teacherById: Record<string, Teacher>; studentById: Record<string, Student>; canManage: boolean;
   onCreate: (date: string, selection?: CalendarSelection) => void;
@@ -31,7 +31,7 @@ export function CalendarTimeline({ mode, date, people, lessons, slots, courseByI
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const columns = useMemo(() => {
-    const days = mode === 'day' ? [date] : buildWeekDays(startOfWeek(date)).slice(0, mode === 'workweek' ? 5 : 7).map(day => day.date);
+    const days = mode === 'day' ? [date] : buildWeekDays(startOfWeek(date)).map(day => day.date);
     return days.flatMap(day => {
       const dateText = localDateText(day);
       const owners = mode === 'day' ? (people.length ? people : [undefined]) : [people.length === 1 ? people[0] : undefined];

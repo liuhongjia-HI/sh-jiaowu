@@ -19,6 +19,10 @@
       <view wx:if="{{item.teacher}}" class="lesson-field"><text>Teacher</text><text>{{item.teacher}}</text></view>
       <view wx:if="{{item.room}}" class="lesson-field"><text>Room</text><text>{{item.room}}</text></view>
     </view>
-    <button class="btn" bindtap="openRelated">View details</button>
+    <view wx:for="{{materials}}" wx:key="id" class="card material-card">
+      <view class="row"><text class="lesson-title">{{item.title}}</text><button class="btn ghost" size="mini" data-id="{{item.id}}" bindtap="openMaterial">View</button></view>
+      <text class="detail-time">{{item.fileName}}</text>
+    </view>
+    <button wx:if="{{!materials.length}}" class="btn" bindtap="openRelated">View details</button>
   </block>
 </view>

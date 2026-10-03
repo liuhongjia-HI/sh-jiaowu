@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Empty, Input, Modal, Select, Skeleton, Space, Spin, Table, Tag, Tree, Typography, message } from 'antd';
+import { Alert, Badge, Button, Card, Empty, Input, Modal, Select, Skeleton, Space, Spin, Table, Tag, Tree, Typography, message } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import { BookOutlined, DownloadOutlined, EyeOutlined, HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { getData, http, postData } from '../services/http';
 import type { CurrentUser, Material, TeacherLibraryData } from '../types/starline';
+import { MaterialDownloads } from '../components/MaterialDownloads';
 import { subjectLabel, semesterLabel, phaseLabel } from '../utils/curriculum';
 
 const pathText = (m: Material) => [m.curriculum?.unit, m.curriculum?.chapter, m.curriculum?.lesson].filter(Boolean).join(' / ');
@@ -31,6 +32,8 @@ export default function TeacherLibrary({ user }: { user: CurrentUser }) {
   const materialId = params.get('material') || '';
   const keyword = params.get('q') || '';
   const recent = params.get('recent') === '1';
+  const unread = params.get('unread') === '1';
+  const unreadIDs = new Set(data?.unreadMaterialIds || []);
   const active = data?.materials.find(m => m.id === materialId);
   const patch = (values: Record<string, string>, replace = false) => {
     const next = new URLSearchParams(params);
@@ -43,7 +46,8 @@ export default function TeacherLibrary({ user }: { user: CurrentUser }) {
     return (!params.get('subject') || c.subject === params.get('subject')) && (!params.get('grade') || c.grade === params.get('grade')) && ['semester', 'phase', 'level'].every(k => !params.get(k) || s?.[k as 'semester' | 'phase' | 'level'] === params.get(k));
   });
   const allowedCourses = new Set(courses.map(c => c.id));
-  const rows = (data?.materials ?? []).filter(m => allowedCourses.has(m.courseId || '') && (!courseId || m.courseId === courseId) && (!lessonId || m.lessonId === lessonId) && (!params.get('tag') || m.tagCode === params.get('tag')) && (!recent || data?.recentMaterialIds.includes(m.id)) && (!keyword.trim() || [m.title, m.fileName, m.course, pathText(m)].join(' ').toLocaleLowerCase().includes(keyword.trim().toLocaleLowerCase())));
+  const rows = (data?.materials ?? []).filter(m => allowedCourses.has(m.courseId || '') && (!courseId || m.courseId === courseId) && (!lessonId || m.lessonId === lessonId) && (!params.get('tag') || m.tagCode === params.get('tag')) && (!recent || data?.recentMaterialIds.includes(m.id)) && (!unread || unreadIDs.has(m.id)) && (!keyword.trim() || [m.title, m.fileName, m.course, pathText(m)].join(' ').toLocaleLowerCase().includes(keyword.trim().toLocaleLowerCase())));
+  if (unread) rows.sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
   if (recent) rows.sort((a, b) => (data?.recentMaterialIds.indexOf(a.id) ?? 0) - (data?.recentMaterialIds.indexOf(b.id) ?? 0));
   const tree: DataNode[] = courses.map(c => {
     const nodes = c.curriculum || [];
@@ -56,7 +60,7 @@ export default function TeacherLibrary({ user }: { user: CurrentUser }) {
     const descendants = new Set([lessonId]);
     let changed = true;
     while (changed) { changed = false; for (const n of course?.curriculum ?? []) if (descendants.has(n.parentId || '') && !descendants.has(n.id)) { descendants.add(n.id); changed = true; } }
-    return (data?.materials ?? []).filter(m => m.courseId === courseId && descendants.has(m.lessonId) && allowedCourses.has(m.courseId || '') && (!params.get('tag') || m.tagCode === params.get('tag')) && (!recent || data?.recentMaterialIds.includes(m.id)) && (!keyword.trim() || [m.title, m.fileName, m.course, pathText(m)].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())));
+    return (data?.materials ?? []).filter(m => m.courseId === courseId && descendants.has(m.lessonId) && allowedCourses.has(m.courseId || '') && (!params.get('tag') || m.tagCode === params.get('tag')) && (!recent || data?.recentMaterialIds.includes(m.id)) && (!unread || unreadIDs.has(m.id)) && (!keyword.trim() || [m.title, m.fileName, m.course, pathText(m)].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())));
   })() : rows;
 
   useEffect(() => {
@@ -95,7 +99,7 @@ export default function TeacherLibrary({ user }: { user: CurrentUser }) {
   const pageSize = 12;
   const effectivePage = Math.min(page, Math.max(1, Math.ceil(displayRows.length / pageSize)));
   return <div className="page-stack teacher-library">
-    <div className="page-heading"><div><Typography.Title level={3}>我的讲义</Typography.Title><Typography.Text type="secondary">按课程查找讲义，打开后可在同一课节的文件间切换。</Typography.Text></div><Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => query.refetch()}>刷新资料</Button></div>
+    <div className="page-heading"><div><Typography.Title level={3}>我的讲义</Typography.Title><Typography.Text type="secondary">按课程查找讲义，打开后可在同一课节的文件间切换。</Typography.Text></div><Space wrap><MaterialDownloads userId={user.userId} courses={data?.courses || []} spaces={data?.spaces || []} canDownload={Boolean(data?.canDownload)} defaultSubject={params.get('subject') || currentCourse?.subject} /><Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => query.refetch()}>刷新资料</Button></Space></div>
     {query.isLoading ? <Skeleton active /> : query.error ? <Alert type="error" message="资料加载失败" description="请检查网络后重试。" action={<Button onClick={() => query.refetch()}>重试</Button>} /> : <>
       <Card size="small"><Typography.Text strong>查阅范围：</Typography.Text><Typography.Text>{scopeDescription || '尚未分配资料范围，请联系管理员。'}</Typography.Text></Card>
       <Card size="small"><Space wrap>
@@ -106,12 +110,12 @@ export default function TeacherLibrary({ user }: { user: CurrentUser }) {
       </Space></Card>
       <div className="teacher-library-layout">
         <Card className="teacher-library-directory" title={<Space><BookOutlined />课程目录</Space>} size="small">
-          <Space direction="vertical" style={{ width: '100%' }}><Button block type={!courseId && !recent ? 'primary' : 'default'} onClick={() => patch({ course: '', lesson: '', recent: '', page: '' })}>全部讲义</Button><Button block icon={<HistoryOutlined />} type={recent ? 'primary' : 'default'} onClick={() => patch({ course: '', lesson: '', recent: '1', page: '' })}>最近查看</Button></Space>
-          {tree.length ? <Tree key={[params.get('subject'), params.get('grade'), params.get('semester'), params.get('phase'), params.get('level'), courseId].join('|')} blockNode treeData={tree} defaultExpandParent defaultExpandedKeys={courseId ? [courseId, ...(lessonId ? [`${courseId}:${lessonId}`] : [])] : []} selectedKeys={courseId ? [lessonId ? `${courseId}:${lessonId}` : courseId] : []} onSelect={(keys) => { const key = String(keys[0] || ''); const c = courses.find(item => key === item.id || key.startsWith(`${item.id}:`)); patch({ course: c?.id || '', lesson: c && key !== c.id ? key.slice(c.id.length + 1) : '', recent: '', page: '' }); }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前范围暂无课程" />}
+          <Space direction="vertical" style={{ width: '100%' }}><Button block type={!courseId && !recent && !unread ? 'primary' : 'default'} onClick={() => patch({ course: '', lesson: '', recent: '', unread: '', page: '' })}>全部讲义</Button><Button block icon={<HistoryOutlined />} type={recent ? 'primary' : 'default'} onClick={() => patch({ course: '', lesson: '', recent: '1', unread: '', page: '' })}>最近查看</Button><Button block aria-label="新增与未读资料" type={unread ? 'primary' : 'default'} onClick={() => patch({ course: '', lesson: '', recent: '', unread: '1', page: '' })}>新增与未读 <Badge count={unreadIDs.size} overflowCount={999} /></Button></Space>
+          {tree.length ? <Tree key={[params.get('subject'), params.get('grade'), params.get('semester'), params.get('phase'), params.get('level'), courseId].join('|')} blockNode treeData={tree} defaultExpandParent defaultExpandedKeys={courseId ? [courseId, ...(lessonId ? [`${courseId}:${lessonId}`] : [])] : []} selectedKeys={courseId ? [lessonId ? `${courseId}:${lessonId}` : courseId] : []} onSelect={(keys) => { const key = String(keys[0] || ''); const c = courses.find(item => key === item.id || key.startsWith(`${item.id}:`)); patch({ course: c?.id || '', lesson: c && key !== c.id ? key.slice(c.id.length + 1) : '', recent: '', unread: '', page: '' }); }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前范围暂无课程" />}
         </Card>
-        <Card title={recent ? '最近查看' : currentCourse?.name || '全部讲义'} extra={<Typography.Text type="secondary">{displayRows.length} 份资料</Typography.Text>}>
-          <Table<Material> rowKey="id" dataSource={displayRows} pagination={{ current: effectivePage, pageSize, showSizeChanger: false, onChange: p => patch({ page: String(p) }) }} locale={{ emptyText: <Empty description={keyword || courseId || params.get('tag') ? '当前条件下没有讲义，可调整搜索或筛选条件。' : recent ? '打开讲义后，会在这里留下最近查看记录。' : '负责范围内暂无可查阅的讲义，请联系资料负责人。'} /> }} columns={[
-            { title: '讲义', key: 'name', render: (_, m) => <div><Button type="link" style={{ padding: 0, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => patch({ material: m.id })}>{m.title}</Button><div><Typography.Text type="secondary">{m.fileName}</Typography.Text></div><Tag>{typeNames[m.tagCode || ''] || m.tagCode || m.fileType}</Tag>{m.status !== '启用' && <Tag color="orange">{m.status}</Tag>}</div> },
+        <Card title={unread ? '新增与未读资料' : recent ? '最近查看' : currentCourse?.name || '全部讲义'} extra={<Typography.Text type="secondary">{displayRows.length} 份资料</Typography.Text>}>
+          <Table<Material> rowKey="id" dataSource={displayRows} pagination={{ current: effectivePage, pageSize, showSizeChanger: false, onChange: p => patch({ page: String(p) }) }} locale={{ emptyText: <Empty description={keyword || courseId || params.get('tag') ? '当前条件下没有讲义，可调整搜索或筛选条件。' : unread ? '暂无未读资料' : recent ? '打开讲义后，会在这里留下最近查看记录。' : '负责范围内暂无可查阅的讲义，请联系资料负责人。'} /> }} columns={[
+            { title: '讲义', key: 'name', render: (_, m) => <div><Button type="link" style={{ padding: 0, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => patch({ material: m.id })}>{m.title}</Button>{unreadIDs.has(m.id) && <Tag color="blue" style={{ marginLeft: 8 }}>未读</Tag>}<div><Typography.Text type="secondary">{m.fileName}</Typography.Text></div><Tag>{typeNames[m.tagCode || ''] || m.tagCode || m.fileType}</Tag>{m.status !== '启用' && <Tag color="orange">{m.status}</Tag>}</div> },
             { title: '所属课程 / 章节', render: (_, m) => <div>{m.course}<div><Typography.Text type="secondary">{pathText(m) || '课程资料'}</Typography.Text></div></div> },
             { title: '更新时间', dataIndex: 'updatedAt', width: 160, render: (value: string, m: Material) => value || m.createdAt || '—' },
             { title: '操作', width: 155, render: (_, m) => <Space><Button icon={<EyeOutlined />} onClick={() => patch({ material: m.id })}>查看</Button>{data?.canDownload && m.downloadUrl && <Button aria-label={`下载 ${m.title}`} icon={<DownloadOutlined />} loading={downloading} onClick={() => download(m)} />}</Space> }

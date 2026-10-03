@@ -845,6 +845,9 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 	if !canSeeCourse(principal, course) {
 		return learning.Course{}, errors.New("不能维护未负责的课程范围")
 	}
+	if existing, ok := s.findCourse(id); ok {
+		course.DirectorySyncMap = cloneMap(existing.DirectorySyncMap)
+	}
 	return course, nil
 }
 
@@ -1840,7 +1843,7 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			if firstLesson, limited := s.trialFirstLessonForGrant(grant, material.CourseID); limited && material.LessonID != firstLesson {
 				continue
 			}
-			if materialPublished(material.Status) && materialTagIn(material.TagCode, materialHandoutTags...) && containsString(spaceIDs, material.LearningSpaceID) {
+			if materialVisibleToStudents(material) && materialTagIn(material.TagCode, materialHandoutTags...) && containsString(spaceIDs, material.LearningSpaceID) {
 				out = appendMaterialUnique(out, s.decorateMaterial(material))
 			}
 		}
@@ -1854,7 +1857,7 @@ func (s *MemoryStore) materialsForStudent(studentID string) []learning.Material 
 			continue
 		}
 		for _, material := range s.materials {
-			if s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && material.LessonID == lessonID && materialPublished(material.Status) {
+			if s.courseContentMatches(course.ID, material.CourseID, material.LearningSpaceID) && material.LessonID == lessonID && materialVisibleToStudents(material) {
 				if strings.TrimSpace(material.CourseID) == "" {
 					material.CourseID = course.ID
 					material.Course = course.Name

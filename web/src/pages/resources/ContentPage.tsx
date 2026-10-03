@@ -1,36 +1,69 @@
 import { Alert, Button, Card, Checkbox, Form, Input, Modal, Pagination, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, postData, putData } from '../../services/http';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../../components/ListViews';
 import { CourseDialog, type CourseFormValues } from './ResourceDialogs';
-import { DEFAULT_PHASES, DEFAULT_SEMESTERS, formatLearningSpace, gradeOptions, phaseLabel, prepareCurriculumForSave, semesterLabel, subjectLabel, subjectOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
+import { DEFAULT_PHASES, DEFAULT_SEMESTERS, formatLearningSpace, gradeOptions, phaseLabel, prepareCurriculumForSave, semesterLabel, subjectLabel, subjectOptions, subjectsForGrade, subjectsMatch, useSubjectCatalog } from '../../utils/curriculum';
 import type { Course, CourseCopyResult, CourseFamily, CourseUpsertRequest, CurrentUser, LearningSpace } from '../../types/starline';
 import { useSearchParams } from 'react-router-dom';
+import { MaterialDownloads } from '../../components/MaterialDownloads';
 import MaterialsPage from './MaterialsPage';
 import HomeworkPage from './HomeworkPage';
 import ReviewsPage from './ReviewsPage';
+import { CourseDirectorySync } from './CourseDirectorySync';
 
 export default function ContentPage({ user }: { user?: CurrentUser }) {
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') || 'courses';
+  const downloadCourses = useQuery({ queryKey: ['content'], queryFn: () => getData<Course[]>('/courses') });
+  const downloadSpaces = useQuery({ queryKey: ['learning-spaces-for-content'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
+  const catalogScroll = useRef(0);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const scrollContainer = () => {
+    let parent = pageRef.current?.parentElement;
+    while (parent) {
+      if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY) && parent.scrollHeight > parent.clientHeight) return parent;
+      parent = parent.parentElement;
+    }
+    return document.scrollingElement;
+  };
+  const previousTab = useRef(tab);
+  useEffect(() => {
+    if (tab === 'courses' && previousTab.current !== 'courses') {
+      const frame = requestAnimationFrame(() => scrollContainer()?.scrollTo(0, catalogScroll.current));
+      previousTab.current = tab;
+      return () => cancelAnimationFrame(frame);
+    }
+    previousTab.current = tab;
+  }, [tab]);
+  const navigateTab = (value: string, courseId?: string, syncLessonId?: string) => {
+    if (tab === 'courses') catalogScroll.current = scrollContainer()?.scrollTop ?? 0;
+    setParams(value === 'courses' ? {} : { tab: value, ...(courseId ? { courseId } : {}), ...(syncLessonId ? { syncLessonId } : {}) });
+  };
   const content = tab === 'materials'
-    ? <MaterialsPage user={user} courseId={params.get('courseId') || undefined} packageId={params.get('packageId') || undefined} onClearFilter={() => setParams({ tab: 'materials' })} />
+    ? <MaterialsPage user={user} courseId={params.get('courseId') || undefined} syncLessonId={params.get('syncLessonId') || undefined} packageId={params.get('packageId') || undefined} onClearFilter={() => setParams({ tab: 'materials' })} />
     : tab === 'homework'
       ? <HomeworkPage user={user} />
       : tab === 'review'
         ? <ReviewsPage user={user} />
-        : <CourseCatalog user={user} onViewMaterials={(courseId) => setParams({ tab: 'materials', courseId })} />;
-  return <div className="page-stack"><Card><Tabs activeKey={tab} onChange={(value) => setParams(value === 'courses' ? {} : { tab: value })} items={[{ key: 'courses', label: '课程' }, { key: 'materials', label: '课程讲义' }, { key: 'homework', label: '课后练习' }, { key: 'review', label: '批改反馈' }]} /></Card>{content}</div>;
+        : null;
+  return <div ref={pageRef} className="page-stack"><Card><Tabs tabBarExtraContent={user ? <MaterialDownloads userId={user.userId} courses={downloadCourses.data || []} spaces={downloadSpaces.data || []} canDownload={Boolean(user.roles.some(r => ['ops_staff', 'campus_admin', 'super_admin'].includes(r)) || user.roles.includes('teacher') && user.teacherLibrary?.canDownload !== false)} defaultSubject={downloadCourses.data?.find(c => c.id === params.get('courseId'))?.subject} /> : undefined} activeKey={tab} onChange={(value) => navigateTab(value)} items={[{ key: 'courses', label: '课程' }, { key: 'materials', label: '课程讲义' }, { key: 'homework', label: '课后练习' }, { key: 'review', label: '批改反馈' }]} /></Card><div hidden={tab !== 'courses'}><CourseCatalog user={user} onViewMaterials={(courseId, syncLessonId) => navigateTab('materials', courseId, syncLessonId)} /></div>{content}</div>;
 }
 
-function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMaterials: (courseId: string) => void }) {
+function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMaterials: (courseId: string, syncLessonId?: string) => void }) {
   const [form] = Form.useForm<CourseFormValues>();
   const [familyForm] = Form.useForm<CourseFormValues>();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
+  const [directorySource, setDirectorySource] = useState<Course>();
+  const beginDirectorySync = (source: Course | undefined, curriculum: CourseFormValues['curriculum']) => {
+    if (!source) return;
+    if (JSON.stringify(prepareCurriculumForSave(curriculum || [])) !== JSON.stringify(prepareCurriculumForSave(source.curriculum || []))) { message.warning('请先保存目录修改，再进行同步'); return; }
+    setOpen(false); setFamilyEditing(null); setDirectorySource(source);
+  };
   const [copiedFrom, setCopiedFrom] = useState<string>();
   const [copySummary, setCopySummary] = useState<{ materialCopied: number; homeworkCopied: number; spaceChanged: boolean }>();
   const [copying, setCopying] = useState<Course | null>(null);
@@ -147,7 +180,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
     return (courses.data ?? []).filter((item) => {
       if (item.familyId) return false;
       if (gradeFilter && item.grade !== gradeFilter) return false;
-      if (subjectFilter && item.subject !== subjectFilter) return false;
+      if (subjectFilter && !subjectsMatch(item.subject, subjectFilter)) return false;
       if (termFilter && courseTermKey(item, spaceById) !== termFilter) return false;
       if (statusFilter && (item.status || '启用') !== statusFilter) return false;
       if (!term) return true;
@@ -157,7 +190,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
   }, [courses.data, gradeFilter, keyword, spaceById, statusFilter, subjectFilter, termFilter]);
   const familyRows = (families.data ?? []).filter((family) => {
     if (gradeFilter && family.grade !== gradeFilter) return false;
-    if (subjectFilter && family.subject !== subjectFilter) return false;
+    if (subjectFilter && !subjectsMatch(family.subject, subjectFilter)) return false;
     if (termFilter && termKey(family.semester, family.phase) !== termFilter) return false;
     if (statusFilter && !family.courses.some((course) => (course.status || '启用') === statusFilter)) return false;
     return !keyword.trim() || `${family.name} ${family.grade} ${family.subject} ${family.courses.map((course) => spaceById.get(course.learningSpaceId || '')?.level || '').join(' ')}`.toLowerCase().includes(keyword.trim().toLowerCase());
@@ -263,7 +296,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
               options={gradeOptions()}
               onChange={(value) => {
                 setGradeFilter(value);
-                setSubjectFilter((current) => (value && current && !subjectsForGrade(value, subjectCatalog).includes(current) ? undefined : current));
+                setSubjectFilter((current) => (value && current && !subjectsForGrade(value, subjectCatalog).some(subject => subjectsMatch(subject, current)) ? undefined : current));
                 setPage(1);
               }}
             />
@@ -392,12 +425,13 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
         <Input aria-label="合并后的课程系列名称" placeholder="课程系列名称" value={familyImportName} onChange={(event) => setFamilyImportName(event.target.value)} />
         <div style={{ marginTop: 12 }}>{selectedRowKeys.map((id) => <Tag key={id}>{rows.find((row) => row.id === id)?.name || id}</Tag>)}</div>
       </Modal>
-      <CourseDialog form={familyForm} open={familyCreateOpen || Boolean(familyEditing)} editing dialogTitle={familyEditing ? '编辑课程系列共享目录' : '新增课程系列 · 编辑共享目录'} scopeLocked scopeSpaceId={familyEditing?.courses[0]?.learningSpaceId || familySpaceIDs[0]} loading={familyCreate.isPending || familyUpdate.isPending} learningSpaces={spaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestricted} onCancel={() => { setFamilyCreateOpen(false); setFamilyEditing(null); familyForm.resetFields(); }} onSubmit={(values) => familyEditing ? familyUpdate.mutate(values) : familyCreate.mutate(values)} />
+      <CourseDialog referenceCourseId={familyEditing?.courses[0]?.id} onSync={familyEditing ? curriculum => beginDirectorySync(familyEditing.courses[0], curriculum) : undefined} form={familyForm} open={familyCreateOpen || Boolean(familyEditing)} editing dialogTitle={familyEditing ? '编辑课程系列共享目录' : '新增课程系列 · 编辑共享目录'} scopeLocked scopeSpaceId={familyEditing?.courses[0]?.learningSpaceId || familySpaceIDs[0]} loading={familyCreate.isPending || familyUpdate.isPending} learningSpaces={spaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestricted} onCancel={() => { setFamilyCreateOpen(false); setFamilyEditing(null); familyForm.resetFields(); }} onSubmit={(values) => familyEditing ? familyUpdate.mutate(values) : familyCreate.mutate(values)} />
       <Modal title={`为“${familyAdding?.name || ''}”添加班型`} open={Boolean(familyAdding)} onCancel={() => setFamilyAdding(null)} onOk={() => familyAdd.mutate()} okText="添加班型" okButtonProps={{ disabled: !familyAddSpaceID }} confirmLoading={familyAdd.isPending}>
         <Typography.Paragraph type="secondary">新增班型直接使用系列共享目录；讲义和练习独立，从空内容开始。</Typography.Paragraph>
         <Select showSearch optionFilterProp="label" aria-label="选择新增班型" placeholder="选择班型" style={{ width: '100%' }} value={familyAddSpaceID} options={familyAdding ? availableFamilySpaces(familyAdding).map((space) => ({ value: space.id, label: `${space.level} · ${formatLearningSpace(space)}` })) : []} onChange={setFamilyAddSpaceID} />
       </Modal>
-      <CourseDialog form={form} open={open} editing={Boolean(editing)} copiedFrom={copiedFrom} copySummary={copySummary} loading={save.isPending} learningSpaces={spaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestricted} onCancel={closeEditor} onSubmit={(values) => save.mutate(values)} />
+      {directorySource && <CourseDirectorySync source={directorySource} courses={courses.data ?? []} spaces={spaces.data ?? []} onClose={() => setDirectorySource(undefined)} onMaterials={lessonId => { const source = directorySource; setDirectorySource(undefined); closeEditor(); setFamilyEditing(null); onViewMaterials(source.id, lessonId); }} />}
+      <CourseDialog referenceCourseId={editing?.id} onSync={editing ? curriculum => beginDirectorySync(editing, curriculum) : undefined} form={form} open={open} editing={Boolean(editing)} copiedFrom={copiedFrom} copySummary={copySummary} loading={save.isPending} learningSpaces={spaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestricted} onCancel={closeEditor} onSubmit={(values) => save.mutate(values)} />
       <Modal
         title="复制课程"
         open={Boolean(copying)}

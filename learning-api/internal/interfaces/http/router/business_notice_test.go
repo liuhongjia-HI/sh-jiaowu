@@ -21,9 +21,22 @@ func TestAutomaticNoticeAPIRequiresOperationsAndValidConfiguration(t *testing.T)
 	ops := app.loginAdmin(t, "13800000003")
 	var bindings []learning.BusinessNoticeBinding
 	app.doJSON(t, http.MethodGet, path, ops, nil, http.StatusOK, &bindings)
-	if len(bindings) != 8 {
+	if len(bindings) != 10 {
 		t.Fatalf("unexpected bindings %d", len(bindings))
 	}
+	teacherConfig := learning.BusinessNoticeBinding{Kind: learning.NoticeTeachingPlansUploaded, TeacherIDs: []string{"user-teacher"}, WebOrigin: "https://school.example", FieldMappings: map[string]string{"thing4": "resource_title"}}
+	app.doJSON(t, http.MethodPut, path+"/"+teacherConfig.Kind, ops, teacherConfig, http.StatusOK, &bindings)
+	foundTeacherConfig := false
+	for _, binding := range bindings {
+		if binding.Kind == teacherConfig.Kind {
+			foundTeacherConfig = !binding.Enabled && binding.TriggerReady && binding.WebOrigin == teacherConfig.WebOrigin && len(binding.TeacherIDs) == 1 && binding.TeacherIDs[0] == "user-teacher"
+		}
+	}
+	if !foundTeacherConfig {
+		t.Fatal("teacher draft did not survive configuration API")
+	}
+	teacherConfig.Enabled, teacherConfig.TriggerReady = true, true
+	app.doJSON(t, http.MethodPut, path+"/"+teacherConfig.Kind, ops, teacherConfig, http.StatusBadRequest, nil)
 	for _, binding := range bindings {
 		if binding.Enabled {
 			t.Fatal("default-on automatic notice")

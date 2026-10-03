@@ -50,17 +50,35 @@ type StudentRepository interface {
 }
 
 type ContentRepository interface {
+	MaterialDownloadSelection(learning.Principal, learning.MaterialDownloadScope) (learning.MaterialDownloadSelection, error)
+	CreateMaterialDownload(learning.Principal, learning.MaterialDownloadScope) (learning.MaterialDownloadJob, error)
+	MaterialDownloads(learning.Principal) []learning.MaterialDownloadJob
+	MaterialDownloadArchive(learning.Principal, string) (string, error)
+	InvalidateMaterialDownload(learning.Principal, string) error
+	RetryMaterialDownload(learning.Principal, string) (learning.MaterialDownloadScope, error)
+	RecoverMaterialDownloads() error
+	ClaimMaterialDownload() (learning.MaterialDownloadJob, []learning.MaterialDownloadFile, bool, error)
+	FinishMaterialDownload(string, string, string) error
+	ExpiredMaterialArchives() ([]string, error)
+	AcknowledgeMaterialArchiveRemoval(string) error
 	CourseFamilies(learning.Principal) []learning.CourseFamily
 	CreateCourseFamily(string, learning.Principal, learning.CourseFamilyCreateRequest) (learning.CourseFamily, error)
 	UpdateCourseFamily(string, learning.Principal, string, learning.CourseFamilyUpdateRequest) (learning.CourseFamily, error)
 	AddCourseFamilyCourse(string, learning.Principal, string, learning.CourseFamilyAddCourseRequest) (learning.Course, error)
 	ImportCourseFamily(string, learning.Principal, learning.CourseFamilyImportRequest) (learning.CourseFamily, error)
 	TeachingPlans(learning.Principal) learning.TeachingPlanList
+	TeachingPlanNotificationAudience(learning.Principal, learning.TeachingPlanAudienceRequest) ([]learning.TeachingPlanNoticeRecipient, error)
+	PendingTeachingPlanNoticeBatches(learning.Principal) []learning.PendingTeachingPlanNoticeBatch
+	CompleteTeachingPlanNoticeBatch(string, learning.Principal, string) (learning.MaterialNoticeBatchResult, error)
 	TeachingPlan(learning.Principal, string) (learning.TeachingPlan, error)
 	CreateTeachingPlan(string, learning.Principal, learning.TeachingPlanUploadRequest) (learning.TeachingPlan, error)
 	TeachingPlanFile(learning.Principal, string) (learning.FileAsset, error)
 	RetryTeachingPlanPreview(string, learning.Principal, string) error
+	UpdateTeachingPlanChapter(string, learning.Principal, string, learning.TeachingPlanChapterRequest) (learning.TeachingPlan, error)
 	Courses(learning.Principal) []learning.Course
+	CurriculumReferences(learning.Principal, string, learning.CurriculumReferencesRequest) ([]learning.CurriculumReference, error)
+	PreviewCourseDirectorySync(learning.Principal, learning.CourseDirectorySyncRequest) (learning.CourseDirectorySyncResult, error)
+	SyncCourseDirectory(string, learning.Principal, learning.CourseDirectorySyncRequest) (learning.CourseDirectorySyncResult, error)
 	CreateCourse(string, learning.Principal, learning.CourseUpsertRequest) (learning.Course, error)
 	CopyCourse(string, learning.Principal, string, learning.CourseCopyRequest) (learning.CourseCopyResult, error)
 	UpdateCourse(string, learning.Principal, string, learning.CourseUpsertRequest) (learning.Course, error)
@@ -69,12 +87,15 @@ type ContentRepository interface {
 	Materials(learning.Principal, learning.MaterialQuery) []learning.Material
 	TeacherLibrary(learning.Principal) (learning.TeacherLibrary, error)
 	RecordTeacherMaterialView(learning.Principal, string) error
+	RecordTeachingPlanView(learning.Principal, string, learning.TeachingPlanReadRequest) error
 	Homework(learning.Principal) []learning.Homework
 	Reviews(learning.Principal) []learning.Review
 	AssignReview(string, learning.Principal, string, learning.ReviewAssignRequest) (learning.Review, error)
 	CreateQuestion(string, learning.Principal, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	UpdateQuestion(string, learning.Principal, string, learning.QuestionBankUpsertRequest) (learning.QuestionBankItem, error)
 	CreateMaterial(string, learning.Principal, learning.MaterialUploadRequest) (learning.Material, error)
+	CompleteMaterialNoticeBatch(string, learning.Principal, string, learning.MaterialNoticeBatchRequest) (learning.MaterialNoticeBatchResult, error)
+	PendingMaterialNoticeBatches(learning.Principal) []learning.PendingMaterialNoticeBatch
 	PreviewMaterialSync(learning.Principal, learning.MaterialSyncRequest) (learning.MaterialSyncPreview, error)
 	SyncMaterials(string, learning.Principal, learning.MaterialSyncRequest) (learning.MaterialSyncResult, error)
 	UpdateMaterial(string, learning.Principal, string, learning.MaterialUpdateRequest) (learning.Material, error)
@@ -113,8 +134,11 @@ type GrantRepository interface {
 }
 
 type SchedulingRepository interface {
+	MarkScheduleClassCompleted(string, learning.Principal, string) (learning.ScheduleClass, error)
 	PreviewScheduleClass(learning.Principal, learning.SchedulePreviewRequest) (learning.SchedulePreview, error)
 	CancelScheduleClassScope(string, learning.Principal, string, string) (learning.ScheduleClass, error)
+	PreviewRestoreScheduleClass(learning.Principal, string) (learning.SchedulePreview, error)
+	RestoreScheduleClass(string, learning.Principal, string, bool) (learning.ScheduleClass, error)
 	Availability(learning.Principal, string, string) ([]learning.AvailabilitySlot, error)
 	SaveAvailability(string, learning.Principal, learning.AvailabilityUpsertRequest) ([]learning.AvailabilitySlot, error)
 	ScheduleCandidates(learning.Principal, learning.ScheduleCandidateRequest) ([]learning.ScheduleCandidate, error)

@@ -23,7 +23,17 @@ func (s *Service) RetryTeachingPlanPreview(o string, p learning.Principal, id st
 	return s.content.RetryTeachingPlanPreview(o, p, id)
 }
 
+func (s *Service) UpdateTeachingPlanChapter(o string, p learning.Principal, id string, r learning.TeachingPlanChapterRequest) (learning.TeachingPlan, error) {
+	return s.content.UpdateTeachingPlanChapter(o, p, id, r)
+}
+
 func (s *Service) Courses(p learning.Principal) []learning.Course { return s.content.Courses(p) }
+func (s *Service) RecordTeachingPlanView(p learning.Principal, id string, req learning.TeachingPlanReadRequest) error {
+	return s.content.RecordTeachingPlanView(p, id, req)
+}
+func (s *Service) CurriculumReferences(p learning.Principal, id string, r learning.CurriculumReferencesRequest) ([]learning.CurriculumReference, error) {
+	return s.content.CurriculumReferences(p, id, r)
+}
 func (s *Service) CourseFamilies(p learning.Principal) []learning.CourseFamily {
 	return s.content.CourseFamilies(p)
 }
@@ -210,6 +220,14 @@ func materialOverviewCurriculumPath(nodes []learning.CurriculumNode, leafID stri
 func (s *Service) CreateMaterial(o string, p learning.Principal, r learning.MaterialUploadRequest) (learning.Material, error) {
 	return s.content.CreateMaterial(o, p, r)
 }
+
+func (s *Service) CompleteMaterialNoticeBatch(o string, p learning.Principal, batch string, r learning.MaterialNoticeBatchRequest) (learning.MaterialNoticeBatchResult, error) {
+	return s.content.CompleteMaterialNoticeBatch(o, p, batch, r)
+}
+
+func (s *Service) PendingMaterialNoticeBatches(p learning.Principal) []learning.PendingMaterialNoticeBatch {
+	return s.content.PendingMaterialNoticeBatches(p)
+}
 func (s *Service) PreviewMaterialSync(p learning.Principal, r learning.MaterialSyncRequest) (learning.MaterialSyncPreview, error) {
 	return s.content.PreviewMaterialSync(p, r)
 }
@@ -276,4 +294,15 @@ func (s *Service) TeacherLibrary(p learning.Principal) (learning.TeacherLibrary,
 }
 func (s *Service) RecordTeacherMaterialView(p learning.Principal, id string) error {
 	return s.content.RecordTeacherMaterialView(p, id)
+}
+
+func (s *Service) TeachingPlanNotificationAudience(p learning.Principal, req learning.TeachingPlanAudienceRequest) ([]learning.TeachingPlanNoticeRecipient, error) {
+	return s.content.TeachingPlanNotificationAudience(p, req)
+}
+
+func (s *Service) PendingTeachingPlanNoticeBatches(p learning.Principal) []learning.PendingTeachingPlanNoticeBatch {
+	return s.content.PendingTeachingPlanNoticeBatches(p)
+}
+func (s *Service) CompleteTeachingPlanNoticeBatch(operator string, p learning.Principal, batchID string) (learning.MaterialNoticeBatchResult, error) {
+	return s.content.CompleteTeachingPlanNoticeBatch(operator, p, batchID)
 }

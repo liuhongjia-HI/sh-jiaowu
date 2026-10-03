@@ -118,8 +118,8 @@ type ScheduleClass struct {
 	Students             []CandidateStudent `json:"students"`
 	ExpectedStudentCount int                `json:"expectedStudentCount"`
 	ReservationNote      string             `json:"reservationNote,omitempty"`
-	// 审核维度，与 Status 的「成班维度」是两件事，不要混用：
-	//   Status      = 待确认 / 已确认 / 已取消 —— 人数够不够、有没有被取消
+	// 审核维度，与 Status 的「排课维度」是两件事，不要混用：
+	//   Status      = 已确认 / 已上课 / 已取消（兼容旧待确认）—— 不按人数判断成班
 	//   AuditStatus = 待审核 / 已通过 / 已驳回 —— 管理员认不认这节课
 	// 两者共用「确认」二字会让谁都说不清，所以审核这边换一套词。
 	// 只有 AuditStatus == AuditApproved 的课次才对学生可见、才发通知。
@@ -166,11 +166,18 @@ type LessonFeedbackUpsertRequest struct {
 // 一期只实现 daily / weekly，monthly 与特殊日期按客户要求后续迭代，
 // 但字段先切出来，届时不用改表结构：Interval 不写死成 1 就是为了这个。
 type ScheduleRepeat struct {
-	Freq     string `json:"freq"`            // daily | weekly；空 = 不重复，只排一节
-	Interval int    `json:"interval"`        // 每 N 天 / 每 N 周，默认 1
-	ByDay    []int  `json:"byDay,omitempty"` // weekly 时的星期集合，1=周一 ... 7=周日
-	Until    string `json:"until,omitempty"` // 按日期结束
-	Count    int    `json:"count,omitempty"` // 按次数结束；与 Until 二选一
+	Freq     string               `json:"freq"`            // daily | weekly | custom；空 = 不重复，只排一节
+	Interval int                  `json:"interval"`        // 每 N 天 / 每 N 周，默认 1
+	ByDay    []int                `json:"byDay,omitempty"` // weekly 时的星期集合，1=周一 ... 7=周日
+	Until    string               `json:"until,omitempty"` // 按日期结束
+	Count    int                  `json:"count,omitempty"` // 按次数结束；与 Until 二选一
+	Dates    []ScheduleCustomDate `json:"dates,omitempty"` // custom：首节之外的日期，可覆盖当天时间
+}
+
+type ScheduleCustomDate struct {
+	Date      string `json:"date"`
+	StartTime string `json:"startTime,omitempty"`
+	EndTime   string `json:"endTime,omitempty"`
 }
 
 // 系列身份直接落在课次的 SeriesID 上，没有单独的系列表：
@@ -206,9 +213,11 @@ type SchedulePreviewRequest struct {
 	ID string `json:"id,omitempty"`
 }
 type SchedulePreviewLesson struct {
-	Date     string   `json:"date"`
-	Errors   []string `json:"errors"`
-	Warnings []string `json:"warnings"`
+	Date      string   `json:"date"`
+	StartTime string   `json:"startTime"`
+	EndTime   string   `json:"endTime"`
+	Errors    []string `json:"errors"`
+	Warnings  []string `json:"warnings"`
 }
 type SchedulePreview struct {
 	Lessons []SchedulePreviewLesson `json:"lessons"`

@@ -276,6 +276,10 @@ body {
   gap: 20px;
 }
 
+.teachers-page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .page-heading {
   display: flex;
   align-items: flex-start;
@@ -2044,7 +2048,7 @@ button.schedule-block:hover {
   flex: 0 0 auto;
 }
 
-/* 教师/年级/科目/学生挤在一行，超宽省略；完整内容在 title 里。 */
+/* 月格内使用短行；当天完整列表和课次列表允许姓名换行。 */
 .month-class-text {
   flex: 1 1 auto;
   min-width: 0;
@@ -2911,8 +2915,7 @@ button.schedule-block:hover {
   }
 }
 
-/* 月视图超出四条时的 "+N"。做成和条目同宽的一行，
-   点开是当天完整列表（Popover），和周视图的折叠块行为一致。 */
+/* 月格内展示剩余数量，点击打开当天完整课程列表。 */
 .month-overflow-toggle {
   width: 100%;
   border: 1px dashed #cbd5e1;
@@ -3211,7 +3214,8 @@ button.schedule-block:hover {
 .calendar-legend-teacher::before, .calendar-legend-student::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 2px; background: #d1fae5; }
 .calendar-legend-student::before { background: #dbeafe; }
 .calendar-scroll { max-height: calc(100vh - 245px); min-height: 400px; }
-.calendar-scroll .schedule-timeline-grid { grid-template-rows: 68px var(--timeline-height); }
+.calendar-scroll .schedule-timeline-grid { grid-template-rows: minmax(68px, auto) var(--timeline-height); }
+.calendar-scroll .schedule-lane-head strong { white-space: normal; overflow-wrap: anywhere; overflow: visible; }
 .calendar-column { user-select: none; touch-action: pan-x; }
 .calendar-column .schedule-time-line, .calendar-availability, .calendar-selection { pointer-events: none; }
 .calendar-availability { position: absolute; left: 0; right: 0; background: #ecfdf5; border-left: 3px solid #86efac; }
@@ -3247,3 +3251,34 @@ button.schedule-block:hover {
 .calendar-workbench .schedule-mini-calendar { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .calendar-workbench .schedule-mini-day { min-width: 0; padding: 0; }
 .calendar-workbench .schedule-outlook-main { grid-template-columns: minmax(0, 1fr); }
+
+.material-download-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; margin-top: 16px; }
+.material-download-filters .ant-select { width: 100%; }
+.material-download-summary { margin-bottom: 16px; }
+.material-download-heading { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.material-download-job { margin-bottom: 12px; overflow-wrap: anywhere; }
+.material-download-highlight { border-color: #1677ff; }
+@media (max-width: 600px) {
+ .material-download-filters { grid-template-columns: minmax(0, 1fr); }
+ .material-download-job .ant-space { max-width: 100%; }
+ .teacher-library .page-heading { flex-wrap: wrap; gap: 12px; }
+}
+
+.month-day-count { border: 0; background: #edf4ff; color: #1668dc; border-radius: 4px; padding: 2px 4px; cursor: pointer; font-size: 12px; }
+.month-full-day-list { display: grid; gap: 8px; }
+.month-class.is-expanded { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 10px 12px; font-size: 14px; }
+.month-class.is-expanded .month-class-time { grid-column: 1; font-weight: 600; }
+.month-class.is-expanded .month-class-text { grid-column: 1 / -1; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.month-class.is-expanded .schedule-recurrence-mark { grid-column: 2; grid-row: 1; }
+.month-class-meta { grid-column: 1 / -1; color: #64748b; font-size: 12px; }
+
+.schedule-lesson-list { display: grid; gap: 12px; }
+.schedule-lesson-list-row { display: grid; grid-template-columns: 105px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e6ebf2; border-radius: 8px; background: #fff; }
+.schedule-lesson-list-date { font-weight: 600; font-size: 13px; }
+@media (max-width: 700px) {
+ .schedule-lesson-list-row { grid-template-columns: minmax(0, 1fr); }
+ .schedule-lesson-list-row > .ant-btn { justify-self: end; }
+}
+
+.month-class-icons { display: inline-flex; align-items: center; gap: 4px; color: #64748b; }
+.month-class.is-expanded .month-class-icons { grid-column: 2; grid-row: 1; }

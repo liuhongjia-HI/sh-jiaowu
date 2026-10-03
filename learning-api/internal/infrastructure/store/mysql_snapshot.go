@@ -60,6 +60,8 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		"DELETE FROM package_spaces",
 		"DELETE FROM materials",
 		"DELETE FROM teaching_plans",
+		"DELETE FROM material_download_jobs",
+		"DELETE FROM teacher_material_reads",
 		"DELETE FROM homework_tasks",
 		"DELETE FROM course_curriculum_nodes",
 		"DELETE FROM courses",
@@ -201,8 +203,8 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, course := range s.courses {
 		if _, err := tx.Exec(
-			`INSERT INTO courses (id, family_id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			course.ID, course.FamilyID, course.LearningSpaceID, course.Name, course.Subject, course.Grade, course.Status, course.ChapterCount, mustJSON(course.Chapters),
+			`INSERT INTO courses (id, family_id, learning_space_id, name, subject, grade, status, chapter_count, chapters_json, directory_sync_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			course.ID, course.FamilyID, course.LearningSpaceID, course.Name, course.Subject, course.Grade, course.Status, course.ChapterCount, mustJSON(course.Chapters), mustJSON(course.DirectorySyncMap),
 		); err != nil {
 			return err
 		}
@@ -230,7 +232,17 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		}
 	}
 	for _, plan := range s.teachingPlans {
-		if _, err := tx.Exec(`INSERT INTO teaching_plans (id, title, grade, subject, file_id, file_name, file_size, file_type, uploader_id, uploader_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, plan.ID, plan.Title, plan.Grade, plan.Subject, plan.FileID, plan.FileName, plan.FileSize, plan.FileType, plan.UploaderID, plan.UploaderName, nullableDateTime(plan.CreatedAt)); err != nil {
+		if _, err := tx.Exec(`INSERT INTO teaching_plans (id, title, grade, subject, file_id, file_name, file_size, file_type, uploader_id, uploader_name, created_at, course_id, lesson_id, chapter_name, semester, phase) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, plan.ID, plan.Title, plan.Grade, plan.Subject, plan.FileID, plan.FileName, plan.FileSize, plan.FileType, plan.UploaderID, plan.UploaderName, nullableDateTime(plan.CreatedAt), plan.CourseID, plan.LessonID, plan.Chapter, plan.Semester, plan.Phase); err != nil {
+			return err
+		}
+	}
+	for _, read := range s.teacherMaterialReads {
+		if _, err := tx.Exec(`INSERT INTO teacher_material_reads (id,user_id,material_id,material_version) VALUES (?,?,?,?)`, read.ID, read.UserID, read.MaterialID, read.Version); err != nil {
+			return err
+		}
+	}
+	for _, job := range s.materialDownloads {
+		if _, err := tx.Exec(`INSERT INTO material_download_jobs (id,owner_id,status,payload) VALUES (?,?,?,?)`, job.ID, job.OwnerID, job.Status, mustJSON(storedDownloadJob{job, job.OwnerID, job.ArchivePath, job.Items})); err != nil {
 			return err
 		}
 	}

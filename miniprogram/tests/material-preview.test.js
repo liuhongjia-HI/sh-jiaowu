@@ -10,7 +10,7 @@ test("material preview keeps only the preview card as the full-courseware entry"
   assert.doesNotMatch(template, /class="preview-action"/);
   assert.doesNotMatch(template, /class="watermark-layer"/);
   assert.doesNotMatch(template, /tag-item-filter/);
-  assert.match(template, /wx:if="{{showNextButton}}".*class="button challenge-button" bindtap="goAnswer"/);
+  assert.match(template, /wx:if="{{showNextButton}}".*class="button challenge-button" bindtap="goNext"/);
   assert.match(template, /bindtap="backToList"/);
   assert.match(template, /contentMode === 'list'/);
 });
@@ -35,7 +35,7 @@ test("material preview hides the Next action until it is re-enabled", () => {
   const template = fs.readFileSync(path.join(__dirname, "../pages/material-preview/index.wxml"), "utf8");
   const page = loadMaterialPreviewPage(() => Promise.reject(new Error("unused")), baseWxMock());
   assert.equal(page.data.showNextButton, false);
-  assert.match(template, /preview-actions[\s\S]*wx:if="{{showNextButton}}"[\s\S]*bindtap="goAnswer">Next/);
+  assert.match(template, /preview-actions[\s\S]*wx:if="{{showNextButton}}"[^>]*bindtap="goNext">Next/);
 });
 
 test("material preview defaults to All, uses English tags, and filters content within the current lesson", async () => {
@@ -788,4 +788,109 @@ test("download print handles revoked permission without opening a file", async (
   await page.printMaterial();
   assert.equal(modal.content, "下载权限已失效");
   assert.equal(page.data.downloading, false);
+});
+
+
+test("switching materials ignores an earlier detail response and clears the old file action", async () => {
+  let firstDetail;
+  const requested = [];
+  const page = loadMaterialPreviewPage(url => {
+    requested.push(url);
+    if (url === "/student/materials/first") return new Promise(resolve => firstDetail = resolve);
+    if (url === "/student/materials/second") return Promise.resolve({ id: "second", title: "Current file", previewUrl: "/api/student/materials/second/preview" });
+    if (url.endsWith("/preview/pages")) return Promise.resolve({ imageMode: false, pageCount: 2 });
+    if (url === "/student/favorites") return Promise.resolve([]);
+    return Promise.reject(new Error("unexpected " + url));
+  }, baseWxMock());
+  page.onLoad({ id: "first" });
+  page.setData({ material: { id: "old", downloadUrl: "/old/download" } });
+  page.loadMaterial("second", false);
+  assert.equal(page.data.material.downloadUrl, undefined);
+  await flushPromises();
+  firstDetail({ id: "first", title: "Old response", previewUrl: "/api/student/materials/first/preview" });
+  await flushPromises();
+  assert.equal(page.data.material.id, "second");
+  assert.equal(page.data.displayTitle, "Current file");
+  assert.equal(requested.includes("/student/materials/first/preview/pages"), false);
+});
+
+test("earlier preview metadata cannot replace the current material or update an unloaded page", async () => {
+  let oldMetadata, currentMetadata;
+  const page = loadMaterialPreviewPage(url => {
+    if (url === "/student/favorites") return Promise.resolve([]);
+    if (url === "/student/materials/first/preview/pages") return new Promise(resolve => oldMetadata = resolve);
+    if (url === "/student/materials/second/preview/pages") return new Promise(resolve => currentMetadata = resolve);
+    return Promise.resolve({ id: url.split("/").pop(), title: "File" });
+  }, baseWxMock());
+  page.onLoad({ id: "first" });
+  await flushPromises();
+  page.loadMaterial("second", false);
+  await flushPromises();
+  oldMetadata({ previewStatus: "failed", message: "Old failure" });
+  await flushPromises();
+  assert.equal(page.data.previewMode, "unknown");
+  assert.equal(page.data.previewMessage, "");
+  page.onUnload();
+  currentMetadata({ imageMode: false, pageCount: 5 });
+  await flushPromises();
+  assert.equal(page.data.previewMode, "unknown");
+  assert.equal(page.data.pageCount, 0);
+});
+
+
+test("material Next offers multiple Blank files before moving to the lesson homework", async () => {
+  const navigated = [];
+  const materials = [
+    { id: "hd", tagCode: "HD", lessonId: "lesson-1" },
+    { id: "blank-1", tagCode: "Blank", lessonId: "lesson-1" },
+    { id: "blank-2", tagCode: "Blank", lessonId: "lesson-1" }
+  ];
+  const page = loadMaterialPreviewPage(url => {
+    if (url === "/student/study/course-1") return Promise.resolve({ materials, homework: [{ id: "hw", lessonId: "lesson-1", tagCode: "HW" }] });
+    if (url === "/student/favorites") return Promise.resolve([]);
+    if (url.endsWith("/preview/pages")) return Promise.resolve({ imageMode: false, pageCount: 1 });
+    return Promise.resolve(materials.find(item => item.id === url.split("/").pop()));
+  }, baseWxMock({ navigateTo({ url }) { navigated.push(url); } }));
+  page.onLoad({ courseId: "course-1", lessonId: "lesson-1" });
+  await flushPromises();
+  page.selectTagItem({ currentTarget: { dataset: { id: "hd" } } });
+  await flushPromises();
+  assert.equal(page.data.showNextButton, true);
+  page.goNext();
+  assert.equal(page.data.contentMode, "list");
+  assert.deepEqual(page.data.tagItems.map(item => item.id), ["blank-1", "blank-2"]);
+  assert.deepEqual(navigated, []);
+  page.selectTagItem({ currentTarget: { dataset: { id: "blank-2" } } });
+  await flushPromises();
+  page.goNext();
+  assert.equal(page.data.contentMode, "homework");
+  assert.equal(page.data.activeHomework.id, "hw");
+  assert.equal(page.data.showNextButton, false);
+  page.goAnswer();
+  assert.deepEqual(navigated, ["/pages/answer/index?id=hw"]);
+});
+
+test("returning to the lesson list ignores a delayed material failure", async () => {
+  let fail;
+  const page = loadMaterialPreviewPage(url => url === "/student/favorites" ? Promise.resolve([]) : new Promise((resolve, reject) => fail = reject), baseWxMock());
+  page.onLoad({ id: "slow" });
+  page.lessonContents = [{ id: "slow", lessonId: "lesson-1", tagCode: "HD", contentType: "material" }];
+  page.backToList();
+  fail(new Error("late failure"));
+  await flushPromises();
+  assert.equal(page.data.contentMode, "list");
+  assert.notEqual(page.data.displayTitle, "Failed to load");
+  assert.equal(page.data.previewMode, "unknown");
+});
+
+
+test("an unloaded lesson ignores its delayed content list", async () => {
+  let finish;
+  const page = loadMaterialPreviewPage(() => new Promise(resolve => finish = resolve), baseWxMock());
+  page.onLoad({ courseId: "course-1", lessonId: "lesson-1" });
+  page.onUnload();
+  finish({ materials: [{ id: "late", lessonId: "lesson-1", tagCode: "HD" }], homework: [] });
+  await flushPromises();
+  assert.deepEqual(page.data.tagItems, []);
+  assert.equal(page.data.tagItemCountText, "0 items");
 });

@@ -15,6 +15,20 @@ func (h *LearningHandler) Courses(c *gin.Context) {
 	principal, _ := middleware.CurrentPrincipal(c)
 	OK(c, h.service.Courses(principal))
 }
+func (h *LearningHandler) CurriculumReferences(c *gin.Context) {
+	principal, _ := middleware.CurrentPrincipal(c)
+	var req learning.CurriculumReferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "目录参数无效")
+		return
+	}
+	result, err := h.service.CurriculumReferences(principal, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, result)
+}
 func (h *LearningHandler) CreateCourse(c *gin.Context) {
 	req, ok := bindCourse(c)
 	if !ok {

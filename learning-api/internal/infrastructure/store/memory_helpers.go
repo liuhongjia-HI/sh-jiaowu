@@ -559,16 +559,20 @@ func (s *MemoryStore) teacherFromUser(user learning.User) learning.Teacher {
 }
 
 // activeClassCountForTeacher 统计一个老师名下还没结束、也没取消的排课数量。
-// “没结束”按 EndDate 判断：空值是长期排课，没到 EndDate 那天都算在期内，
-// 只有明确过了 EndDate 的才算已经结束，不用再关心这个老师还带着它。
+// 独立课次按实际日期和结束时间判断；没有课次日期的旧记录才按 EndDate 判断。
 func (s *MemoryStore) activeClassCountForTeacher(teacherID string) int {
-	today := time.Now().Format("2006-01-02")
+	now := time.Now()
+	today := now.Format("2006-01-02")
 	count := 0
 	for _, item := range s.scheduleClasses {
 		if item.TeacherID != teacherID || item.Status == "已取消" {
 			continue
 		}
-		if item.EndDate != "" && item.EndDate < today {
+		if item.LessonDate != "" {
+			if item.LessonDate < today || item.LessonDate == today && item.EndTime != "" && item.EndTime <= now.Format("15:04") {
+				continue
+			}
+		} else if item.EndDate != "" && item.EndDate < today {
 			continue
 		}
 		count++
