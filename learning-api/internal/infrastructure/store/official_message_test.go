@@ -68,3 +68,32 @@ func TestOfficialCallbackSignature(t *testing.T) {
 		t.Fatal("expected invalid callback signature")
 	}
 }
+
+func TestRevealWechatSecret(t *testing.T) {
+	s := NewMemoryStoreWithOptions(Options{SkipBaseData: true, EncryptionKey: "test-key"})
+	fields := map[string]string{"miniProgramAppSecret": wechatMiniSecretKey, "officialAccountAppSecret": wechatOfficialSecretKey, "callbackToken": wechatCallbackTokenKey, "encodingAesKey": wechatEncodingAESKey}
+	for field, key := range fields {
+		if _, err := s.RevealWechatSecret(field); err == nil {
+			t.Fatal("missing secret must fail")
+		}
+		encrypted, err := s.encryptWechatValue("fixture-" + field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.settings[key] = encrypted
+		value, err := s.RevealWechatSecret(field)
+		if err != nil || value != "fixture-"+field {
+			t.Fatal("secret reveal failed")
+		}
+		if s.settings[key] != encrypted {
+			t.Fatal("reveal must not modify settings")
+		}
+	}
+	if _, err := s.RevealWechatSecret(wechatMiniSecretKey); err == nil {
+		t.Fatal("raw storage keys must be rejected")
+	}
+	s.settings[wechatMiniSecretKey] = "enc:v1:broken"
+	if _, err := s.RevealWechatSecret("miniProgramAppSecret"); err == nil {
+		t.Fatal("invalid encrypted value must fail")
+	}
+}

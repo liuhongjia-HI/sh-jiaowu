@@ -219,5 +219,6 @@ type SystemRepository interface {
 	UpdateGradeSubjects(string, learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error)
 	UpsertGradeSubject(string, string, learning.GradeSubjectMetadata) (learning.GradeSubjectMetadata, error)
 	WechatSettings() learning.WechatSettings
+	RevealWechatSecret(string) (string, error)
 	UpdateWechatSettings(string, learning.WechatSettingsUpdateRequest) (learning.WechatSettings, error)
 }

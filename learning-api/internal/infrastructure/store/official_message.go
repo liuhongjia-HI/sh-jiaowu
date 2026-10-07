@@ -119,6 +119,27 @@ func (s *MemoryStore) WechatSettings() learning.WechatSettings {
 	return s.wechatSettingsUnlocked()
 }
 
+// RevealWechatSecret returns only the requested secret; regular settings stay masked.
+func (s *MemoryStore) RevealWechatSecret(field string) (string, error) {
+	keys := map[string]string{
+		"miniProgramAppSecret":     wechatMiniSecretKey,
+		"officialAccountAppSecret": wechatOfficialSecretKey,
+		"callbackToken":            wechatCallbackTokenKey,
+		"encodingAesKey":           wechatEncodingAESKey,
+	}
+	key, ok := keys[field]
+	if !ok {
+		return "", errors.New("不支持查看该配置项")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	value := s.decryptWechatValue(s.settings[key])
+	if value == "" {
+		return "", errors.New("该密钥尚未保存或无法读取")
+	}
+	return value, nil
+}
+
 func requireWechatAppID(label, value string) error {
 	value = strings.TrimSpace(value)
 	if value == "" {

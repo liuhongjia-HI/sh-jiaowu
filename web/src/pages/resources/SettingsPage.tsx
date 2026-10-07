@@ -1,8 +1,8 @@
 import { Alert, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
-import { CopyOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
-import { useState } from 'react';
+import { EyeOutlined, EyeInvisibleOutlined, LoadingOutlined, CopyOutlined, DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteData, getData, putData, resolveApiUrl } from '../../services/http';
+import { deleteData, getData, postData, putData, resolveApiUrl } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton } from '../../components/ListViews';
 import type { SettingUpdateRequest, SubjectMetadata, SubjectMetadataUpdateRequest, WechatSettings, WechatSettingsUpdateRequest } from '../../types/starline';
@@ -378,14 +378,55 @@ export function SubjectMetadataCard() {
   );
 }
 
+type SecretField = 'miniProgramAppSecret' | 'officialAccountAppSecret' | 'callbackToken' | 'encodingAesKey';
+
+function WechatSecretInput({ field, configured, placeholder, value = '', onChange, id }: {
+  field: SecretField; configured: boolean; placeholder: string; value?: string;
+  onChange?: (value: string) => void; id?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [stored, setStored] = useState('');
+  const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
+  useEffect(() => () => { requestVersion.current += 1; }, []);
+  const toggle = async () => {
+    if (loading) return;
+    if (visible) { setVisible(false); setStored(''); return; }
+    if (value || !configured) { setVisible(true); return; }
+    const version = ++requestVersion.current;
+    setLoading(true);
+    try {
+      const result = await postData<{ value: string }>('/wechat/settings/reveal', { field });
+      if (version === requestVersion.current) { setStored(result.value); setVisible(true); }
+    } catch (error) {
+      if (version === requestVersion.current) message.error(error instanceof Error ? error.message : '密钥读取失败，请重试。');
+    } finally {
+      if (version === requestVersion.current) setLoading(false);
+    }
+  };
+  return <Input
+    id={id}
+    type={visible ? 'text' : 'password'}
+    value={value || (visible ? stored : '')}
+    placeholder={placeholder}
+    autoComplete="new-password"
+    onChange={(event) => { requestVersion.current += 1; setLoading(false); setStored(''); onChange?.(event.target.value); }}
+    suffix={<Button type="text" size="small" aria-label={visible ? '隐藏密钥' : '显示密钥'}
+      title={visible ? '隐藏密钥' : '显示密钥'} disabled={loading} onClick={toggle}
+      icon={loading ? <LoadingOutlined /> : visible ? <EyeInvisibleOutlined /> : <EyeOutlined />} />}
+  />;
+}
+
 function WechatSettingsCard() {
   const [form] = Form.useForm<WechatSettingsUpdateRequest>();
+  const [secretVersion, setSecretVersion] = useState(0);
   const queryClient = useQueryClient();
   const config = useQuery({ queryKey: ['wechat-settings'], queryFn: () => getData<WechatSettings>('/wechat/settings') });
   const save = useMutation({
     mutationFn: (values: WechatSettingsUpdateRequest) => putData<WechatSettings>('/wechat/settings', values),
     onSuccess: () => {
       message.success('微信配置已保存。');
+      setSecretVersion((version) => version + 1);
       form.setFieldsValue({ miniProgramAppSecret: '', officialAccountAppSecret: '', callbackToken: '', encodingAesKey: '' });
       queryClient.invalidateQueries({ queryKey: ['wechat-settings'] });
     },
@@ -420,9 +461,8 @@ function WechatSettingsCard() {
             <Input placeholder="wx..." autoComplete="off" />
           </Form.Item>
           <Form.Item name="miniProgramAppSecret" label="AppSecret">
-            <Input.Password
+            <WechatSecretInput key={`mini-${secretVersion}`} field="miniProgramAppSecret" configured={current.miniProgramSecretConfigured}
               placeholder={current.miniProgramSecretConfigured ? '已保存，留空不修改' : '请输入小程序 AppSecret'}
-              autoComplete="new-password"
             />
           </Form.Item>
         </Card>
@@ -440,14 +480,14 @@ function WechatSettingsCard() {
             </Form.Item>
           </div>
           <Form.Item name="officialAccountAppSecret" label="AppSecret">
-            <Input.Password placeholder={current.officialAccountSecretConfigured ? '已保存，留空不修改' : '请输入公众号 AppSecret'} autoComplete="new-password" />
+            <WechatSecretInput key={`officialAccountAppSecret-${secretVersion}`} field="officialAccountAppSecret" configured={current.officialAccountSecretConfigured} placeholder={current.officialAccountSecretConfigured ? '已保存，留空不修改' : '请输入公众号 AppSecret'} />
           </Form.Item>
           <div className="wechat-form-row">
             <Form.Item name="callbackToken" label="回调 Token">
-              <Input.Password placeholder={current.callbackTokenConfigured ? '已保存，留空不修改' : '请输入回调 Token'} autoComplete="new-password" />
+              <WechatSecretInput key={`callbackToken-${secretVersion}`} field="callbackToken" configured={current.callbackTokenConfigured} placeholder={current.callbackTokenConfigured ? '已保存，留空不修改' : '请输入回调 Token'} />
             </Form.Item>
             <Form.Item name="encodingAesKey" label="EncodingAESKey">
-              <Input.Password placeholder={current.encodingAesKeyConfigured ? '已保存，留空不修改' : '请输入 EncodingAESKey'} autoComplete="new-password" />
+              <WechatSecretInput key={`encodingAesKey-${secretVersion}`} field="encodingAesKey" configured={current.encodingAesKeyConfigured} placeholder={current.encodingAesKeyConfigured ? '已保存，留空不修改' : '请输入 EncodingAESKey'} />
             </Form.Item>
           </div>
           <Form.Item label="微信服务器回调地址">
@@ -465,7 +505,7 @@ function WechatSettingsCard() {
         </Card>
       </div>
       <div className="wechat-settings-actions">
-        <Button onClick={() => form.resetFields()}>取消</Button>
+        <Button onClick={() => { form.resetFields(); setSecretVersion((version) => version + 1); }}>取消</Button>
         <Button type="primary" htmlType="submit" loading={save.isPending}>保存配置</Button>
       </div>
     </Form>

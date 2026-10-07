@@ -82,3 +82,7 @@ func (s *Service) DecryptOfficialCallback(signature, timestamp, nonce, encrypted
 func (s *Service) HandleOfficialCallback(openID, event string, createTime int64) error {
 	return s.notice.HandleOfficialCallback(openID, event, createTime)
 }
+
+func (s *Service) RevealWechatSecret(field string) (string, error) {
+	return s.system.RevealWechatSecret(field)
+}

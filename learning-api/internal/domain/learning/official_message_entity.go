@@ -1,6 +1,6 @@
 package learning
 
-// WechatSettings 是管理后台可见的单例微信配置。敏感值永远不回传，
+// WechatSettings 是管理后台可见的单例微信配置。常规查询不回传敏感值，
 // 只通过 *Configured 告知前端是否已经保存。
 type WechatSettings struct {
 	MiniProgramName                 string `json:"miniProgramName"`

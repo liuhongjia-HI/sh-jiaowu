@@ -236,6 +236,7 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g.GET("/system/readiness", h.SystemReadiness)
 	g.PUT("/settings", h.UpdateSetting)
 	g.GET("/wechat/settings", h.WechatSettings)
+	g.POST("/wechat/settings/reveal", h.RevealWechatSecret)
 	g.PUT("/wechat/settings", h.UpdateWechatSettings)
 	g.PUT("/subjects/:id", h.UpdateSubjectMetadata)
 	g.DELETE("/subjects/:id", h.DeleteSubjectMetadata)

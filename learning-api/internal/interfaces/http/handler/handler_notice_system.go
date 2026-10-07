@@ -321,3 +321,21 @@ func (h *LearningHandler) MarkAllStudentNoticesRead(c *gin.Context) {
 	}
 	OK(c, notices)
 }
+
+func (h *LearningHandler) RevealWechatSecret(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	var req struct {
+		Field string `json:"field"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	value, err := h.service.RevealWechatSecret(req.Field)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, gin.H{"value": value})
+}
