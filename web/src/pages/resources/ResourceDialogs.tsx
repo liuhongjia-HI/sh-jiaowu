@@ -272,7 +272,8 @@ export function CourseDialog({
   allowedLearningSpaceIds,
   unrestricted,
   onCancel,
-  onSync,
+  syncTargets,
+  onSaveAndSync,
   referenceCourseId,
   onSubmit
 }: {
@@ -290,9 +291,12 @@ export function CourseDialog({
   unrestricted: boolean;
   onCancel: () => void;
   onSubmit: (values: CourseFormValues) => void;
-  onSync?: (curriculum: CourseFormValues['curriculum']) => void;
+  syncTargets?: { value: string; label: string }[];
+  onSaveAndSync?: (values: CourseFormValues, targetCourseIds: string[], unitIds: string[]) => void;
   referenceCourseId?: string;
 }) {
+  const [syncUnitIds, setSyncUnitIds] = useState<string[] | null>(null);
+  const [syncTargetIds, setSyncTargetIds] = useState<string[]>([]);
   const lastAutoName = useRef('');
   const [curriculumNodes, setCurriculumNodes] = useState<CourseFormValues['curriculum']>([]);
   const [curriculumError, setCurriculumError] = useState('');
@@ -360,6 +364,8 @@ export function CourseDialog({
 
   useEffect(() => {
     if (!open) return;
+    setSyncUnitIds(null);
+    setSyncTargetIds([]);
     setCurriculumNodes(form.getFieldValue('curriculum') ?? []);
     setOriginalSpaceId(form.getFieldValue('learningSpaceId') || '');
     setCurriculumError('');
@@ -450,6 +456,14 @@ export function CourseDialog({
   const curriculumNodeIsLeaf = (nodeId: string) => !curriculumNodes.some((node) => node.parentId === nodeId);
   const missingCurriculumTypes = () => ['unit'].filter((type) => !curriculumNodes.some((node) => node.type === type));
 
+  const syncPicker = (unitId?: string) => syncUnitIds !== null && (unitId ? syncUnitIds.includes(unitId) : syncUnitIds.length === 0) ? <div className="directory-sync-picker">
+    <Typography.Text strong>{unitId ? '此 Unit 同步到' : '整套目录同步到'}</Typography.Text>
+    <Checkbox.Group aria-label="目标班型" options={syncTargets || []} value={syncTargetIds} disabled={loading} onChange={ids => setSyncTargetIds(ids.map(String))} />
+    {!syncTargets?.length && <Typography.Text type="secondary">没有同范围的其他班型课程</Typography.Text>}
+    <Typography.Text type="secondary">保留目标已有资料；保存后预览目录变更。</Typography.Text>
+    <Button type="link" size="small" onClick={() => { setSyncUnitIds(null); setSyncTargetIds([]); }}>取消同步选择</Button>
+  </div> : null;
+
   return (
     <FormDrawer
       title={dialogTitle || (copiedFrom ? '确认复制的课程' : editing ? '编辑课程' : '新增课程')}
@@ -459,8 +473,9 @@ export function CourseDialog({
       width="min(760px, 100vw)"
       submitDisabled={!hasSpaceOptions || scopeChanged && (scopeImpact.isFetching || !!scopeImpact.error || blockedScope)}
       submitting={loading}
+      submitText={syncTargetIds.length && syncUnitIds !== null ? "保存并预览同步" : "保存"}
     >
-      {onSync && <Button style={{ marginBottom: 16 }} disabled={loading} onClick={() => onSync(curriculumNodes)}>跨班型同步</Button>}
+      {onSaveAndSync && <><Button style={{ marginBottom: 12 }} disabled={loading} onClick={() => setSyncUnitIds([])}>同步整套目录</Button>{syncPicker()}</>}
       {!availableSpaces.length && (
         <Alert
           type="info"
@@ -491,7 +506,9 @@ export function CourseDialog({
           setCurriculumError('请填写所有叶子节点名称。');
           return;
         }
-        onSubmit({ ...values, curriculum: curriculumNodes });
+        if (syncUnitIds?.some(id => !curriculumNodes.some(node => node.id === id && node.type === 'unit'))) { setCurriculumError('所选同步 Unit 已删除，请重新选择'); return; }
+        if (onSaveAndSync && syncUnitIds !== null && syncTargetIds.length) onSaveAndSync({ ...values, curriculum: curriculumNodes }, syncTargetIds, syncUnitIds);
+        else onSubmit({ ...values, curriculum: curriculumNodes });
       }}>
         <Form.Item name="name" label="课程名称" rules={[{ required: true, message: '请输入课程名称' }]}>
           <Input placeholder="例如：五年级英语 S1 Q1 阅读课程" />
@@ -564,7 +581,9 @@ export function CourseDialog({
               <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('chapter', unit.id).length} 个 Chapter</Typography.Text>
               <Button danger type="text" size="small" htmlType="button" disabled={checkingReferences} onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
             </div>
+            {syncPicker(unit.id)}
             <div className="curriculum-node-actions">
+              {onSaveAndSync && <Button size="small" htmlType="button" disabled={loading} onClick={() => setSyncUnitIds([unit.id])}>同步此 Unit</Button>}
               <span>批量创建 Chapter</span>
               <InputNumber min={0} max={200} size="small" aria-label={`${unit.name} Chapter数量`} value={chapterCounts[unit.id] ?? curriculumChildren('chapter', unit.id).length} onChange={(value) => setChapterCounts((current) => ({ ...current, [unit.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)} />
               <Button size="small" htmlType="button" onClick={() => generateCurriculumChildren('chapter', chapterCounts[unit.id] ?? 0, unit.id)}>生成</Button>

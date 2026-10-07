@@ -238,6 +238,41 @@ func (s *MemoryStore) directorySyncSource(p learning.Principal, req learning.Cou
 	if len(req.TargetCourseIDs) == 0 {
 		return source, errors.New("请选择目标课程")
 	}
+	if len(req.UnitIDs) > 0 {
+		if _, err := directoryPaths(source.Curriculum); err != nil {
+			return source, err
+		}
+		selected := map[string]bool{}
+		for _, id := range req.UnitIDs {
+			found := false
+			for _, node := range source.Curriculum {
+				if node.ID == id && node.Type == learning.CurriculumUnit && node.ParentID == "" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return source, errors.New("请选择有效的 Unit")
+			}
+			selected[id] = true
+		}
+		for changed := true; changed; {
+			changed = false
+			for _, node := range source.Curriculum {
+				if !selected[node.ID] && selected[node.ParentID] {
+					selected[node.ID] = true
+					changed = true
+				}
+			}
+		}
+		nodes := []learning.CurriculumNode{}
+		for _, node := range source.Curriculum {
+			if selected[node.ID] {
+				nodes = append(nodes, node)
+			}
+		}
+		source.Curriculum = nodes
+	}
 	return source, nil
 }
 

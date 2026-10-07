@@ -118,7 +118,7 @@ func (s *MemoryStore) importCourseFamilyUnlocked(operator string, principal lear
 		}
 		idMaps[index] = mapping
 		for _, plan := range s.teachingPlans {
-			if plan.CourseID == course.ID && mapping[plan.LessonID] == "" {
+			if plan.CourseID == course.ID && plan.LessonID != "" && mapping[plan.LessonID] == "" {
 				return learning.CourseFamily{}, fmt.Errorf("课程“%s”存在无法对应的教案章节", course.Name)
 			}
 		}

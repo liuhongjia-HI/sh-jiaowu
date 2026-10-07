@@ -3262,3 +3262,21 @@ button.schedule-block:hover {
  .calendar-column .schedule-timeline-body { gap: 0; padding: 2px 4px; }
  .calendar-column .schedule-timeline-body > strong { font-size: 11px; line-height: 14px; }
 }
+
+/* Resource browsing and in-editor directory synchronization. */
+.resource-filter-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; margin-bottom: 10px; }
+.resource-filter-label { width: 64px; flex: 0 0 64px; padding-top: 3px; }
+.resource-filter-options { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.resource-filter-options .ant-btn { height: auto; min-height: 28px; white-space: normal; }
+.directory-sync-picker { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 8px 0; background: #f0f7fc; border-radius: 8px; }
+.directory-sync-picker .ant-checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.teaching-plans-page > .page-heading { padding: 16px; border-radius: 10px; background: #edf5fc; }
+.teaching-plan-course-heading { margin: 12px 0; }
+.teachers-page .teacher-name { overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 640px) {
+  .resource-filter-row { gap: 6px; }
+  .resource-filter-label { width: 56px; flex-basis: 56px; }
+}
+
+.teaching-plans-page, .content-page, .course-catalog { grid-template-columns: minmax(0, 1fr); }
+.teaching-plans-page .ant-card-head-wrapper { flex-wrap: wrap; gap: 8px; }

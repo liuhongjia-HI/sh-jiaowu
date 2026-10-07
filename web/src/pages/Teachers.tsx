@@ -113,12 +113,12 @@ export default function Teachers() {
     });
   }
 
-  function teacherActions(teacher: Teacher) {
+  function teacherActions(teacher: Teacher, kind: 'all' | 'common' | 'account' = 'all') {
     return <Space size={4}>
-      <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(teacher)} />
-      <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(teacher)} />
-      <Button size="small" type="text" danger={teacher.accountStatus === '正常'} loading={changeStatus.isPending && changeStatus.variables?.id === teacher.id} onClick={() => confirmStatus(teacher)}>{teacher.accountStatus === '正常' ? '停用' : '启用'}</Button>
-      <Button size="small" type="text" danger loading={deleteTeacher.isPending && deleteTeacher.variables?.id === teacher.id} onClick={() => confirmDelete(teacher)}>删除</Button>
+      {kind !== 'account' && <><ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => openEdit(teacher)} />
+      <ActionButton tooltip="重置密码" icon={<KeyOutlined />} loading={resetPassword.isPending} onClick={() => resetPassword.mutate(teacher)} /></>}
+      {kind !== 'common' && <><Button size="small" type="text" danger={teacher.accountStatus === '正常'} loading={changeStatus.isPending && changeStatus.variables?.id === teacher.id} onClick={() => confirmStatus(teacher)}>{teacher.accountStatus === '正常' ? '停用' : '启用'}</Button>
+      <Button size="small" type="text" danger loading={deleteTeacher.isPending && deleteTeacher.variables?.id === teacher.id} onClick={() => confirmDelete(teacher)}>删除</Button></>}
     </Space>;
   }
 
@@ -222,24 +222,21 @@ export default function Teachers() {
             rowKey="id"
             dataSource={rows}
             pagination={false}
-            scroll={{ x: 1640 }}
+            scroll={{ x: 1806 }}
             tableLayout="fixed"
             columns={[
-          { title: '资料查阅范围', key: 'library', width: 240, render: (_: unknown, record: Teacher) => libraryScopeTags(record, learningSpaces.data ?? []) },
-              { title: '姓名', dataIndex: 'name', width: 120 },
+              { title: '常用操作', key: 'commonActions', width: 96, fixed: 'left', render: (_, record) => teacherActions(record, 'common') },
+              { title: '姓名', dataIndex: 'name', width: 140, fixed: 'left', render: value => <span className="teacher-name">{value}</span> },
+              { title: '资料查阅范围', key: 'library', width: 240, render: (_: unknown, record: Teacher) => libraryScopeTags(record, learningSpaces.data ?? []) },
+              { title: '授课范围', width: 220, render: (_, record: Teacher) => teachingRangeTags(record, learningSpaces.data ?? []) },
+              { title: '可上传内容', width: 180, render: (_, record) => uploadTags(record) },
+              { title: '可批改', dataIndex: 'canReview', width: 100, render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag> },
               { title: '手机号', dataIndex: 'phone', width: 140 },
               { title: '登录方式', dataIndex: 'bindStatus', width: 130, render: passwordFallbackTag },
               { title: '账号状态', dataIndex: 'accountStatus', width: 110, render: (value: string) => <Tag color={value === '正常' ? 'green' : 'default'}>{value}</Tag> },
-              { title: '授课范围', width: 200, render: (_, record: Teacher) => teachingRangeTags(record, learningSpaces.data ?? []) },
-              { title: '可上传内容', width: 180, render: (_, record) => uploadTags(record) },
-              { title: '可批改', dataIndex: 'canReview', width: 100, render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag> },
               { title: '备注', dataIndex: 'remark', width: 200, ellipsis: true },
-              {
-                title: '操作',
-                width: 220,
-                fixed: 'right',
-                render: (_, record) => teacherActions(record)
-              }
+              { title: '账号操作', key: 'accountActions', width: 150, render: (_, record) => teacherActions(record, 'account') }
+
             ]}
           />
         )}

@@ -31,12 +31,25 @@ type TeachingPlanScope struct {
 	Subject string `json:"subject"`
 }
 
+type TeachingPlanCourse struct {
+	ID         string `json:"id"`
+	FamilyID   string `json:"familyId,omitempty"`
+	FamilyName string `json:"familyName,omitempty"`
+	Name       string `json:"name"`
+	Grade      string `json:"grade"`
+	Subject    string `json:"subject"`
+	Semester   string `json:"semester"`
+	Phase      string `json:"phase"`
+	Level      string `json:"level"`
+}
+
 type TeachingPlanList struct {
-	Plans         []TeachingPlan      `json:"plans"`
-	UploadScopes  []TeachingPlanScope `json:"uploadScopes"`
-	CanUpload     bool                `json:"canUpload"`
-	Directories   []Course            `json:"directories"`
-	UnreadPlanIDs []string            `json:"unreadPlanIds"`
+	Courses       []TeachingPlanCourse `json:"courses"`
+	Plans         []TeachingPlan       `json:"plans"`
+	UploadScopes  []TeachingPlanScope  `json:"uploadScopes"`
+	CanUpload     bool                 `json:"canUpload"`
+	Directories   []Course             `json:"directories"`
+	UnreadPlanIDs []string             `json:"unreadPlanIds"`
 }
 
 type TeachingPlanReadRequest struct {

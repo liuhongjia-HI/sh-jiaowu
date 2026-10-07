@@ -321,3 +321,55 @@ func hasDirectoryNodeID(nodes []learning.CurriculumNode, id string) bool {
 	}
 	return false
 }
+
+func TestDirectorySyncSelectedUnitIncludesDescendantsAndPreservesOthers(t *testing.T) {
+	s, p, source, target := directorySyncFixture(t)
+	source.Curriculum = append(source.Curriculum,
+		learning.CurriculumNode{ID: "unit-two", Type: learning.CurriculumUnit, Name: "第二单元", SortOrder: 2},
+		learning.CurriculumNode{ID: "chapter-two", ParentID: "unit-two", Type: learning.CurriculumChapter, Name: "章节", SortOrder: 1},
+		learning.CurriculumNode{ID: "lesson-two", ParentID: "chapter-two", Type: learning.CurriculumLesson, Name: "课节", SortOrder: 1})
+	var err error
+	source, err = s.UpdateCourse("管理员", p, source.ID, learning.CourseUpsertRequest{Name: source.Name, LearningSpaceID: source.LearningSpaceID, Curriculum: source.Curriculum})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := learning.CourseDirectorySyncRequest{SourceCourseID: source.ID, TargetCourseIDs: []string{target.ID}, UnitIDs: []string{"unit-two"}}
+	preview, err := s.PreviewCourseDirectorySync(p, req)
+	if err != nil || len(preview.Targets[0].Added) != 3 {
+		t.Fatalf("selected preview: %#v %v", preview, err)
+	}
+	req.Snapshots = map[string]string{target.ID: preview.Targets[0].Snapshot}
+	result, err := s.SyncCourseDirectory("管理员", p, req)
+	if err != nil || result.Targets[0].Error != "" {
+		t.Fatalf("sync: %#v %v", result, err)
+	}
+	got, _ := s.findCourse(target.ID)
+	if len(got.Curriculum) != 4 || got.Curriculum[0] != target.Curriculum[0] {
+		t.Fatalf("unexpected merged branch: %#v", got.Curriculum)
+	}
+	for _, node := range got.Curriculum {
+		if node.Name == source.Curriculum[0].Name {
+			t.Fatal("unselected unit synchronized")
+		}
+	}
+	result, err = s.SyncCourseDirectory("管理员", p, req)
+	if err != nil || result.Targets[0].Error != "" {
+		t.Fatalf("retry: %#v %v", result, err)
+	}
+	got, _ = s.findCourse(target.ID)
+	if len(got.Curriculum) != 4 {
+		t.Fatal("retry duplicated nodes")
+	}
+	for _, id := range []string{"missing", "chapter-two", "lesson-two"} {
+		req.UnitIDs = []string{id}
+		if _, err = s.PreviewCourseDirectorySync(p, req); err == nil {
+			t.Fatalf("accepted invalid Unit %s", id)
+		}
+	}
+	// A preview for one branch must not authorize another branch.
+	req.UnitIDs = []string{source.Curriculum[0].ID}
+	result, err = s.SyncCourseDirectory("管理员", p, req)
+	if err != nil || result.Targets[0].Error == "" {
+		t.Fatalf("changed scope accepted old snapshot: %#v %v", result, err)
+	}
+}

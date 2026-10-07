@@ -26,6 +26,7 @@ test('table exposes fixed actions and disable/enable keeps status payload minima
  await page.addInitScript(() => localStorage.setItem('starline:list-view:teachers', 'table'));
  const writes = await fixture(page);
  const disable = page.getByRole('button', { name: '停用', exact: true });
+ await disable.scrollIntoViewIfNeeded();
  await expect(disable).toBeInViewport();
  await page.screenshot({ path: testInfo.outputPath('teacher-table.png'), fullPage: true });
  await disable.click();

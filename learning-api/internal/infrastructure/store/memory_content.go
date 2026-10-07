@@ -238,7 +238,7 @@ func (s *MemoryStore) validateCourseContentBindings(course learning.Course) erro
 			continue
 		}
 		space, ok := s.findLearningSpace(course.LearningSpaceID)
-		if !availableNodeIDs[plan.LessonID] || !curriculumLeaf(course.Curriculum, plan.LessonID) || !ok || course.Grade != plan.Grade || !subjectsMatch(course.Subject, plan.Subject) || space.Semester != plan.Semester || space.Phase != plan.Phase {
+		if plan.LessonID != "" && (!availableNodeIDs[plan.LessonID] || !curriculumLeaf(course.Curriculum, plan.LessonID)) || !ok || course.Grade != plan.Grade || !subjectsMatch(course.Subject, plan.Subject) || space.Semester != plan.Semester || space.Phase != plan.Phase {
 			return errors.New("目录仍有关联教案，请先重新关联教案再删除章节或切换教学范围")
 		}
 	}

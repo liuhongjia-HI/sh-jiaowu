@@ -1,6 +1,7 @@
 package learning
 
 type CourseDirectorySyncRequest struct {
+	UnitIDs         []string          `json:"unitIds,omitempty"`
 	SourceCourseID  string            `json:"sourceCourseId"`
 	TargetCourseIDs []string          `json:"targetCourseIds"`
 	Snapshots       map[string]string `json:"snapshots,omitempty"`

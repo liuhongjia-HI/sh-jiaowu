@@ -144,6 +144,18 @@ func (s *MemoryStore) TeachingPlans(p learning.Principal) learning.TeachingPlanL
 	}
 	out.CanUpload = len(out.UploadScopes) > 0
 	for _, course := range s.courses {
+		if s.canViewPlan(p, course.Grade, course.Subject) {
+			if space, ok := s.findLearningSpace(course.LearningSpaceID); ok {
+				familyName := ""
+				for _, family := range s.courseFamilies {
+					if course.FamilyID != "" && family.ID == course.FamilyID {
+						familyName = family.Name
+						break
+					}
+				}
+				out.Courses = append(out.Courses, learning.TeachingPlanCourse{ID: course.ID, FamilyID: course.FamilyID, FamilyName: familyName, Name: course.Name, Grade: course.Grade, Subject: course.Subject, Semester: space.Semester, Phase: space.Phase, Level: space.Level})
+			}
+		}
 		if course.Status == learning.StatusEnabled && s.canUploadPlan(p, course.Grade, course.Subject) && (isPlanAdmin(p) || containsString(p.LearningSpaceIDs, course.LearningSpaceID)) {
 			out.Directories = append(out.Directories, course)
 		}
@@ -237,6 +249,10 @@ func (s *MemoryStore) assignPlanChapter(p learning.Principal, plan *learning.Tea
 		space, ok := s.findLearningSpace(course.LearningSpaceID)
 		if !ok || space.Status != learning.StatusEnabled || !isPlanAdmin(p) && !containsString(p.LearningSpaceIDs, space.ID) {
 			return errors.New("没有权限关联该教学范围的目录")
+		}
+		if lessonID == "" {
+			plan.CourseID, plan.LessonID, plan.Chapter, plan.Semester, plan.Phase = courseID, "", "", space.Semester, space.Phase
+			return nil
 		}
 		path, err := curriculumPathForLesson(course, lessonID)
 		if err != nil {

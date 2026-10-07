@@ -177,7 +177,7 @@ test('dropped teaching plans keep per-file chapters when only failed file is ret
     await page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id=${JSON.stringify(listId)}]`) }).locator('.ant-select-item-option').nth(index).click();
   };
   await chooseChapter('教案章节', 0);
-  await chooseChapter('第 2 份教案章节', 1);
+  await chooseChapter('第 2 份教案章节', 2);
   await drawer.getByRole('textbox', { name: '第 2 份教案标题', exact: true }).fill('第二课备课');
   await drawer.getByRole('button', { name: '上传 2 份', exact: true }).click();
   await expect(drawer).toContainText('第二份教案暂时失败');
@@ -316,8 +316,7 @@ test('course return restores grade, subject, search, pagination and actual conte
   await page.goto('/content');
   await page.getByPlaceholder('搜索课程').fill('英语备课');
   for (const [label, value] of [['年级', '五年级'], ['学科', 'English']]) {
-    await page.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: label, exact: true }) }).locator('.ant-select-selector').click();
-    await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText(value, { exact: true }).last().click();
+    await page.getByRole('group', { name: label, exact: true }).getByRole('button', { name: value, exact: true }).click();
   }
   await page.locator('.ant-pagination-item-2').click();
   const course = page.getByText('英语备课 18', { exact: true });
@@ -347,6 +346,7 @@ test('directory editor previews per-target changes and keeps material sync separ
     let data: any = [];
     if (path === '/auth/me') data = user;
     if (path === '/courses') data = [source, target];
+    if (path === `/courses/${source.id}` && route.request().method() === 'PUT') data = { ...source, ...route.request().postDataJSON() };
     if (path === '/materials') data = [{ id: 'm1', courseId: 'source', course: '源课程', learningSpaceId: 'e1', lessonId: 'u1', title: '课节讲义', fileId: 'file1', fileName: 'HD.pdf', tagCode: 'HD', status: '启用', publishStatus: '已发布', type: '课程讲义', previewStatus: '可预览', allowDownload: true }];
     if (path === '/subjects') data = [{ id: 'english', name: 'English', status: '启用' }];
     if (path === '/learning-spaces') data = spaces;
@@ -359,19 +359,14 @@ test('directory editor previews per-target changes and keeps material sync separ
   await page.goto('/content');
   await page.getByRole('row').filter({ hasText: '源课程' }).getByRole('button', { name: '编辑', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '编辑课程', exact: true });
-  await editor.getByRole('textbox', { name: 'Unit名称（必填）', exact: true }).fill('尚未保存的修改');
-  await editor.getByRole('button', { name: '跨班型同步', exact: true }).click();
-  await expect(page.getByText('请先保存目录修改，再进行同步', { exact: true })).toBeVisible();
-  await expect(editor).toBeVisible();
-  await editor.getByRole('textbox', { name: 'Unit名称（必填）', exact: true }).fill('第一课');
-  await editor.getByRole('button', { name: '跨班型同步', exact: true }).click();
+  await editor.getByRole('button', { name: '同步整套目录', exact: true }).click();
+  await editor.getByRole('checkbox', { name: '目标课程', exact: true }).check();
+  await editor.getByRole('button', { name: '保存并预览同步', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '跨班型同步 · 源课程', exact: true });
   await expect(editor).toBeHidden();
-  await dialog.getByRole('checkbox', { name: '目标课程', exact: true }).check();
-  await dialog.getByRole('button', { name: '预览目录变更', exact: true }).click();
   await expect(dialog).toContainText('新增 1 · 更新 0 · 保留 2');
   await page.screenshot({ path: '/tmp/starline-directory-sync-preview.png', fullPage: true });
-  await dialog.getByRole('button', { name: '确认同步目录', exact: true }).click();
+  await dialog.getByRole('button', { name: /确认同步目录/ }).click();
   await expect(dialog).toContainText('已同步');
   expect(writes[1]).toEqual({ path: '/courses/directory-sync', body: { sourceCourseId: 'source', targetCourseIds: ['target'], snapshots: { target: 'checked-directory' } } });
   await dialog.getByRole('button', { name: '同步该课节讲义', exact: true }).click();
@@ -392,6 +387,7 @@ for (const failure of ['database-reject', 'lost-response']) {
       let data: any = [];
       if (path === '/auth/me') data = user;
       if (path === '/courses') data = [source, target];
+    if (path === `/courses/${source.id}` && route.request().method() === 'PUT') data = { ...source, ...route.request().postDataJSON() };
       if (path === '/subjects') data = [{ id: 'english', name: 'English', status: '启用' }];
       if (path === '/learning-spaces') data = ['retry-e1', 'retry-e2'].map(id => ({ id, grade: '五年级', subject: 'English', semester: 'S1', phase: 'Q1', status: '启用' }));
       if (path === '/courses/directory-sync-preview') {
@@ -409,21 +405,22 @@ for (const failure of ['database-reject', 'lost-response']) {
     });
     await page.goto('/content');
     await page.getByRole('row').filter({ hasText: source.name }).getByRole('button', { name: '编辑', exact: true }).click();
-    await page.getByRole('dialog', { name: '编辑课程', exact: true }).getByRole('button', { name: '跨班型同步', exact: true }).click();
+    const editor = page.getByRole('dialog', { name: '编辑课程', exact: true });
+    await editor.getByRole('button', { name: '同步整套目录', exact: true }).click();
+    await editor.getByRole('checkbox', { name: target.name, exact: true }).check();
+    await editor.getByRole('button', { name: '保存并预览同步', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `跨班型同步 · ${source.name}`, exact: true });
-    await dialog.getByRole('checkbox', { name: target.name, exact: true }).check();
-    await dialog.getByRole('button', { name: '预览目录变更', exact: true }).click();
-    await dialog.getByRole('button', { name: '确认同步目录', exact: true }).click();
+    await dialog.getByRole('button', { name: /确认同步目录/ }).click();
     await expect(dialog).toContainText('操作结果未确认');
     await expect(dialog.getByRole('checkbox', { name: target.name, exact: true })).toBeChecked();
-    await expect(dialog.getByRole('button', { name: '确认同步目录', exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: /确认同步目录/ })).toHaveCount(0);
     const retryPreview = dialog.getByRole('button', { name: /预览目录变更/ });
     await expect(retryPreview).toBeEnabled();
     await page.screenshot({ path: `/tmp/starline-directory-${failure}.png`, fullPage: false, animations: 'disabled' });
     await retryPreview.click();
     await expect(dialog).not.toContainText('操作结果未确认');
     await expect(dialog).toContainText(failure === 'lost-response' ? '新增 0' : '新增 1');
-    await dialog.getByRole('button', { name: '确认同步目录', exact: true }).click();
+    await dialog.getByRole('button', { name: /确认同步目录/ }).click();
     await expect(dialog).toContainText('已同步');
     expect(previews).toBe(2); expect(attempts).toBe(2); expect(writes).toBe(1);
     expect(snapshots).toEqual(['fresh-1', 'fresh-2']);
@@ -477,7 +474,7 @@ test('teaching plans reuse curriculum on upload and let old plans change chapter
     await route.fulfill({ json: { code: 0, data } });
   });
   await page.goto('/teaching-plans');
-  await expect(page.getByText('未归类', { exact: true })).toBeVisible();
+  await expect(page.getByText('未关联课程', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: /上传教案/ }).click();
   const drawer = page.getByRole('dialog', { name: '上传教案', exact: true });
   await expect(drawer).toContainText('五年级英语 S1 Q1');
