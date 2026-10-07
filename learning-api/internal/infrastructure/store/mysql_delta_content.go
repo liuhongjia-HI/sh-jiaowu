@@ -6,7 +6,7 @@ func contentRows(s *MemoryStore) []persistenceRow {
 		rows = append(rows, simpleRow("teacher_material_reads", "id", read.ID, `INSERT INTO teacher_material_reads (id,user_id,material_id,material_version) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE material_version=VALUES(material_version)`, read.ID, read.UserID, read.MaterialID, read.Version))
 	}
 	for _, job := range s.materialDownloads {
-		rows = append(rows, simpleRow("material_download_jobs", "id", job.ID, `INSERT INTO material_download_jobs (id,owner_id,status,payload) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status), payload=VALUES(payload)`, job.ID, job.OwnerID, job.Status, mustJSON(storedDownloadJob{job, job.OwnerID, job.ArchivePath, job.Items})))
+		rows = append(rows, simpleRow("material_download_jobs", "id", job.ID, `INSERT INTO material_download_jobs (id,owner_id,status,payload) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status), payload=VALUES(payload)`, job.ID, job.OwnerID, job.Status, mustJSON(storedDownloadJob{job.GuardianID, job, job.OwnerID, job.ArchivePath, job.Items})))
 	}
 	for _, family := range s.courseFamilies {
 		rows = append(rows, simpleRow("course_families", "id", family.ID, `INSERT INTO course_families (id, name, grade, subject, semester, phase, curriculum_json) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), grade=VALUES(grade), subject=VALUES(subject), semester=VALUES(semester), phase=VALUES(phase), curriculum_json=VALUES(curriculum_json)`, family.ID, family.Name, family.Grade, family.Subject, family.Semester, family.Phase, mustJSON(family.Curriculum)))

@@ -3,10 +3,13 @@ package handler
 import (
 	"starline/learning-api/internal/application/learningapp"
 	"starline/learning-api/internal/infrastructure/auth"
+	"sync"
 )
 
 // LearningHandler owns HTTP-facing dependencies shared by domain handlers.
 type LearningHandler struct {
+	pickupMu                  sync.Mutex
+	pickups                   map[string]downloadPickup
 	service                   *learningapp.Service
 	tokens                    *auth.TokenManager
 	loginProtector            *auth.LoginProtector

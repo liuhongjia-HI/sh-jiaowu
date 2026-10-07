@@ -27,6 +27,9 @@ func protected(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.
 
 func registerPublicRoutes(api *gin.RouterGroup, h *handler.LearningHandler) {
 	api.GET("/health", h.Health)
+	api.POST("/download-pickups", h.CreateDownloadPickup)
+	api.GET("/download-pickups/:challenge", h.DownloadPickupStatus)
+	api.GET("/download-pickups/:challenge/archive", h.DownloadPickupArchive)
 	// 学生头像由 image 组件直接读取，不能依赖 Authorization header；文件名使用不可预测随机值。
 	api.GET("/student/avatars/:asset", h.StudentAvatar)
 	// 轮播图和头像一样：小程序首页 image 组件在登录前就要显示，不能挂 Authorization header。
@@ -252,6 +255,13 @@ func registerSuperRoutes(api *gin.RouterGroup, service *learningapp.Service, tok
 func registerStudentRoutes(api *gin.RouterGroup, service *learningapp.Service, tokens *auth.TokenManager, h *handler.LearningHandler) {
 	g := api.Group("/student", middleware.AuthRequired(tokens, service, learning.RoleStudent))
 	g.GET("/home", h.StudentHome)
+	g.POST("/material-downloads/selection", h.MaterialDownloadSelection)
+	g.POST("/material-downloads", h.CreateMaterialDownload)
+	g.GET("/material-downloads", h.MaterialDownloads)
+	g.POST("/material-downloads/:id/retry", h.RetryMaterialDownload)
+	g.GET("/material-downloads/:id/archive", h.MaterialDownloadArchive)
+	g.GET("/download-pickups/:challenge", h.StudentDownloadPickup)
+	g.POST("/download-pickups/:challenge/confirm", h.ConfirmDownloadPickup)
 	g.GET("/recommendations", h.StudentRecommendations)
 	g.GET("/launch-campaign", h.StudentLaunchCampaign)
 	g.POST("/class-reservations", h.CreateClassReservation)

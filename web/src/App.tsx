@@ -475,7 +475,10 @@ function Shell({ user }: { user: CurrentUser }) {
   );
 }
 
+const StudentDownloadPickup = lazy(() => import("./pages/StudentDownloadPickup"));
+
 export default function App() {
+  const isStudentPickup = window.location.pathname === "/student-download";
   const token = getToken();
   const loginRoutes = (
     <BrowserRouter>
@@ -486,7 +489,7 @@ export default function App() {
   );
   const me = useQuery({
     queryKey: ['auth', 'me', token],
-    enabled: Boolean(token),
+    enabled: Boolean(token) && !isStudentPickup,
     retry: false,
     queryFn: () => getData<CurrentUser>('/auth/me')
   });
@@ -495,13 +498,15 @@ export default function App() {
   // 拉不到就用内置默认值，不能让非关键展示配置挡住整个后台。
   const subjects = useQuery({
     queryKey: ['subjects-for-schedule', token],
-    enabled: Boolean(token),
+    enabled: Boolean(token) && !isStudentPickup,
     retry: false,
     queryFn: () => getData<SubjectMetadata[]>('/subjects')
   });
   useEffect(() => {
     if (subjects.data) loadSubjectColors(subjects.data);
   }, [subjects.data]);
+
+  if (isStudentPickup) return <Suspense fallback={<PageLoading />}><StudentDownloadPickup /></Suspense>;
 
   if (!token) {
     return loginRoutes;

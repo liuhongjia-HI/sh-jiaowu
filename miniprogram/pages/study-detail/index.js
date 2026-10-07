@@ -62,6 +62,7 @@ Page({
       });
     });
   },
+  openDownloads() { wx.navigateTo({ url: `/pages/material-downloads/index?courseId=${encodeURIComponent(this.courseId)}` }); },
   tapLesson(event) {
     const { status, lessonId, materialId, homeworkId } = event.currentTarget.dataset;
     if (status === "未开通" || status === "未解锁" || status === "暂无内容") return;

@@ -17,7 +17,8 @@
     "pages/growth/index",
     "pages/badges/index",
     "pages/favorites/index",
-    "pages/login/index"
+    "pages/login/index",
+    "pages/material-downloads/index"
   ],
   "window": {
     "navigationBarTitleText": "Starline Learning",

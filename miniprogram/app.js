@@ -82,6 +82,7 @@ App({
   },
   globalData: {
     apiBaseUrl: resolveApiBaseUrl(),
+    webBaseUrl: "https://sa.starlineeducation.com.cn",
     subscribeTemplateIds: SUBSCRIBE_TEMPLATE_IDS,
     // 登录时上送 wx.login() 真实 code，由后端 jscode2session 换取 openId。
     useRealWechatLogin: resolveUseRealWechatLogin()

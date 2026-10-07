@@ -13,6 +13,8 @@
     <view class="detail-book-art">📖</view>
   </view>
 
+  <button class="batch-download-entry" bindtap="openDownloads">Download course materials</button>
+
   <view class="detail-section-head">
     <view class="detail-section-title">Course outline <text>· {{lessonCount}} lessons</text></view>
   </view>

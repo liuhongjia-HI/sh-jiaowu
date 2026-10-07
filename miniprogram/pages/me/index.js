@@ -169,6 +169,7 @@ Page({
     this.navigateByAction(this.data.supportNotice.action);
   },
   navigateByAction(action) {
+    if (action === "downloads") { wx.navigateTo({ url: "/pages/material-downloads/index" }); return; }
     if (action === "answer") {
       this.goAnswer();
       return;
@@ -618,6 +619,7 @@ function buildQuickActions() {
   return [
     { title: "My Schedule", action: "schedule", symbol: "▣", tone: "schedule" },
     { title: "Course Materials", action: "study", symbol: "▰", tone: "materials" },
+    { title: "My Downloads", action: "downloads", symbol: "↓", tone: "materials" },
     { title: "Class Feedback", action: "feedback", symbol: "▤", tone: "feedback" },
     { title: "Favorites", action: "favorites", symbol: "★", tone: "favorites" },
     { title: "Learning Reminders", action: "notices", symbol: "🔔", tone: "notice" },

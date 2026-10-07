@@ -242,7 +242,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		}
 	}
 	for _, job := range s.materialDownloads {
-		if _, err := tx.Exec(`INSERT INTO material_download_jobs (id,owner_id,status,payload) VALUES (?,?,?,?)`, job.ID, job.OwnerID, job.Status, mustJSON(storedDownloadJob{job, job.OwnerID, job.ArchivePath, job.Items})); err != nil {
+		if _, err := tx.Exec(`INSERT INTO material_download_jobs (id,owner_id,status,payload) VALUES (?,?,?,?)`, job.ID, job.OwnerID, job.Status, mustJSON(storedDownloadJob{job.GuardianID, job, job.OwnerID, job.ArchivePath, job.Items})); err != nil {
 			return err
 		}
 	}

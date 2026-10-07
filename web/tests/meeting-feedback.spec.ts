@@ -359,8 +359,11 @@ test('directory editor previews per-target changes and keeps material sync separ
   await page.goto('/content');
   await page.getByRole('row').filter({ hasText: '源课程' }).getByRole('button', { name: '编辑', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '编辑课程', exact: true });
+  await expect(editor.locator('.curriculum-section-heading')).toContainText('课程目录');
+  await expect(editor.locator('.curriculum-section-heading').getByRole('button', { name: '同步整套目录', exact: true })).toBeVisible();
   await editor.getByRole('button', { name: '同步整套目录', exact: true }).click();
   await editor.getByRole('checkbox', { name: '目标课程', exact: true }).check();
+  await page.screenshot({ path: '/tmp/starline-whole-directory-entry.png', fullPage: false });
   await editor.getByRole('button', { name: '保存并预览同步', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '跨班型同步 · 源课程', exact: true });
   await expect(editor).toBeHidden();

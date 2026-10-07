@@ -475,7 +475,6 @@ export function CourseDialog({
       submitting={loading}
       submitText={syncTargetIds.length && syncUnitIds !== null ? "保存并预览同步" : "保存"}
     >
-      {onSaveAndSync && <><Button style={{ marginBottom: 12 }} disabled={loading} onClick={() => setSyncUnitIds([])}>同步整套目录</Button>{syncPicker()}</>}
       {!availableSpaces.length && (
         <Alert
           type="info"
@@ -556,7 +555,9 @@ export function CourseDialog({
             {blockedScope && <a href="/teaching-plans" target="_blank" rel="noreferrer">打开教案管理并重新关联章节</a>}
           </>}
         </Card>}
-        <Form.Item label="课程目录" extra="支持一至三级目录；没有下级节点的叶子节点必须填写名称，上级节点名称可选。">
+        <Form.Item extra="支持一至三级目录；没有下级节点的叶子节点必须填写名称，上级节点名称可选。">
+          <div className="curriculum-section-heading"><Typography.Text>课程目录</Typography.Text>{onSaveAndSync && <Button size="small" htmlType="button" disabled={loading || !curriculumNodes.length} onClick={() => setSyncUnitIds([])}>同步整套目录</Button>}</div>
+          {syncPicker()}
           <div className="curriculum-toolbar">
             <Typography.Text type="secondary">共 {curriculumNodes.filter((node) => node.type === 'unit').length} 个 Unit · {curriculumNodes.filter((node) => node.type === 'chapter').length} 个 Chapter · {curriculumNodes.filter((node) => node.type === 'lesson').length} 个 Lesson</Typography.Text>
             {curriculumNodes.length > 0 && <Button type="link" size="small" htmlType="button" onClick={() => {

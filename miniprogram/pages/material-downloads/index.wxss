@@ -1,0 +1,27 @@
+page { background: #f7f7f8; }
+.downloads-page { padding: 28rpx; padding-bottom: calc(36rpx + env(safe-area-inset-bottom)); color: #24242a; }
+.student-heading,.section-title { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 24rpx; }
+.card { background: #fff; border-radius: 20rpx; padding: 24rpx; margin-bottom: 24rpx; }
+.title { font-weight: 600; font-size: 30rpx; margin-bottom: 12rpx; overflow-wrap: anywhere; }
+.hint { color: #777; font-size: 24rpx; margin: 12rpx 0; overflow-wrap: anywhere; }
+.error { color: #b93830; font-size: 26rpx; margin-bottom: 16rpx; overflow-wrap: anywhere; }
+.success { color: #228158; margin-top: 24rpx; }
+.primary { background: #ff5a1f; color: #fff; font-size: 26rpx; margin-top: 16rpx; border-radius: 14rpx; }
+button[disabled] { opacity: .55; }
+.scan { color: #ff5a1f; background: #fff3eb; font-size: 26rpx; margin-bottom: 24rpx; }
+.group { margin-top: 24rpx; }
+.group-head,.file-row { display: flex; align-items: center; gap: 12rpx; padding: 16rpx 0; }
+.group-head { font-weight: 600; background: #fff7f2; border-radius: 12rpx; }
+.file-row { border-bottom: 1rpx solid #eee; }
+.file-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: 26rpx; }
+checkbox { flex-shrink: 0; transform: scale(.85); }
+.selection-footer { border-top: 1rpx solid #eee; padding-top: 20rpx; font-size: 26rpx; }
+.job-header,.job-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12rpx; }
+.status { color: #228158; font-size: 24rpx; }
+.job-actions button { margin: 12rpx 0 0; }
+
+.chapter { padding-left: 16rpx; }
+.chapter-head { display: flex; align-items: center; gap: 12rpx; padding-top: 16rpx; font-size: 26rpx; }
+
+.task-file-list { max-height: 400rpx; margin-top: 16rpx; }
+.task-file { padding: 12rpx 0; font-size: 26rpx; overflow-wrap: anywhere; border-bottom: 1rpx solid #eee; }

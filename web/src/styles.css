@@ -3280,3 +3280,11 @@ button.schedule-block:hover {
 
 .teaching-plans-page, .content-page, .course-catalog { grid-template-columns: minmax(0, 1fr); }
 .teaching-plans-page .ant-card-head-wrapper { flex-wrap: wrap; gap: 8px; }
+
+.curriculum-section-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+
+.student-download-pickup { width: min(640px, 100%); padding: 28px 16px; margin: 0 auto; min-height: 100vh; box-sizing: border-box; }
+.student-download-pickup .ant-card { min-width: 0; }
+.pickup-qr { display: flex; flex-direction: column; align-items: center; gap: 16px; margin: 24px 0; }
+.pickup-file-list { margin-top: 24px; max-height: 360px; overflow: auto; }
+.pickup-file-list > div { padding: 10px 0; border-bottom: 1px solid #eee; overflow-wrap: anywhere; }

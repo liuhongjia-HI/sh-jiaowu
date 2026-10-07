@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -198,6 +199,23 @@ func (w *MaterialDownloadWorker) generate(ctx context.Context, job learning.Mate
 	if ctx.Err() != nil {
 		_ = writer.Close()
 		return "", ctx.Err()
+	}
+	if job.StudentID != "" {
+		list, err := writer.Create("资料清单.txt")
+		if err != nil {
+			_ = writer.Close()
+			return "", err
+		}
+		if _, err = fmt.Fprintf(list, "学生：%s\n课程：%s\n文件数量：%d\n\n", job.StudentName, job.CourseName, job.Count); err != nil {
+			_ = writer.Close()
+			return "", err
+		}
+		for index, item := range job.Items {
+			if _, err = fmt.Fprintf(list, "%d. %s (%d bytes)\n", index+1, item.Name, item.Size); err != nil {
+				_ = writer.Close()
+				return "", err
+			}
+		}
 	}
 	manifest, err := writer.Create("manifest.json")
 	if err != nil {

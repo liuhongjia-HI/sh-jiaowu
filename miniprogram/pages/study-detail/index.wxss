@@ -324,3 +324,5 @@
   font-size: 22rpx;
   line-height: 1.5;
 }
+
+.batch-download-entry { margin: 24rpx 0; color: #ff5a1f; background: #fff5ed; border-radius: 16rpx; font-size: 28rpx; }

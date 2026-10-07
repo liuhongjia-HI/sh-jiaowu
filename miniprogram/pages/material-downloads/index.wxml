@@ -1,0 +1,42 @@
+<view class="downloads-page">
+  <view class="student-heading">{{studentName || 'Current student'}} · Downloads</view>
+  <view wx:if="{{loading}}" class="hint">Loading…</view>
+  <view wx:if="{{error}}" class="error"><text>{{error}}</text><button size="mini" bindtap="load">Retry</button></view>
+  <block wx:if="{{pickup}}">
+    <view class="card">
+      <view class="title">Confirm computer download</view>
+      <view>{{pickup.studentName}}</view><view>{{pickup.courseName || pickup.scope.subject}} · {{pickup.count}} files · {{pickup.sizeText}}</view>
+      <view class="hint">Only this download package will be available on this computer.</view>
+      <button wx:if="{{!confirmed}}" class="primary" loading="{{confirming}}" disabled="{{confirming}}" bindtap="confirmPickup">Allow this computer to download</button>
+      <view wx:else class="success">Confirmed. You can download on your computer now.</view>
+    </view>
+  </block>
+  <block wx:elif="{{!loading}}">
+    <button class="scan" bindtap="scanPickup">Scan to confirm computer download</button>
+    <view wx:if="{{groups.length}}" class="card">
+      <view class="title">{{courses[0]}}</view>
+      <view class="hint">Published materials you can download</view>
+      <button size="mini" disabled="{{generating}}" bindtap="toggleAll">Select / clear all</button>
+      <view wx:for="{{groups}}" wx:key="name" wx:for-item="group" wx:for-index="groupIndex" class="group">
+        <view class="group-head" data-index="{{groupIndex}}" bindtap="toggleGroup"><checkbox checked="{{group.checked}}" disabled="{{generating}}" color="#ff5a1f"/><text>{{group.name}}</text></view>
+        <view wx:for="{{group.chapters}}" wx:key="name" wx:for-item="chapter" wx:for-index="chapterIndex" class="chapter">
+          <view class="chapter-head" data-group-index="{{groupIndex}}" data-chapter-index="{{chapterIndex}}" bindtap="toggleChapter"><checkbox checked="{{chapter.checked}}" disabled="{{generating}}" color="#ff5a1f"/><text>{{chapter.name}}</text></view>
+          <view wx:for="{{chapter.items}}" wx:key="id" class="file-row" data-id="{{item.id}}" bindtap="toggleItem">
+            <checkbox checked="{{item.checked}}" disabled="{{generating}}" color="#ff5a1f"/><view class="file-copy"><view>{{item.fileName}}</view><view class="hint">{{item.lesson}} · {{item.sizeText}}</view></view>
+          </view>
+        </view>
+      </view>
+      <view class="selection-footer"><text>{{selectedCount}} files · {{selectedSize}}</text><button class="primary" disabled="{{!selectedCount || generating}}" loading="{{generating}}" bindtap="generate">Create package</button></view>
+    </view>
+    <view class="section-title">My download tasks</view>
+    <view wx:if="{{!jobs.length}}" class="hint">No downloads yet. Open a course to select its materials.</view>
+    <view wx:for="{{jobs}}" wx:key="id" class="card">
+      <view class="job-header"><view class="title">{{item.studentName}} · {{item.courseName || item.scope.subject}}</view><text class="status">{{item.statusText}}</text></view>
+      <view>{{item.count}} files · {{item.sizeText}}</view>
+      <view wx:if="{{item.expiresText}}" class="hint">Expires: {{item.expiresText}}</view>
+      <view wx:if="{{item.error}}" class="error">{{item.error}}</view>
+      <scroll-view wx:if="{{item.expanded}}" scroll-y="true" class="task-file-list" style="height: {{item.count > 4 ? 400 : item.count * 100}}rpx;"><view wx:for="{{item.materials}}" wx:for-item="file" wx:key="id" class="task-file"><view>{{file.fileName}}</view><view class="hint">{{file.pathText}}</view></view></scroll-view>
+      <view class="job-actions"><button wx:if="{{item.ready}}" class="primary" data-id="{{item.id}}" bindtap="copyLink">Copy computer link</button><button size="mini" data-id="{{item.id}}" bindtap="showFiles">File list</button><button wx:if="{{item.retryable}}" size="mini" data-id="{{item.id}}" disabled="{{generating}}" bindtap="retryJob">Create again</button></view>
+    </view>
+  </block>
+</view>

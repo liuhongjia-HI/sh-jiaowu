@@ -7,6 +7,7 @@ import (
 )
 
 type storedDownloadJob struct {
+	GuardianID  string                          `json:"guardianId,omitempty"`
 	Job         learning.MaterialDownloadJob    `json:"job"`
 	OwnerID     string                          `json:"ownerId"`
 	ArchivePath string                          `json:"archivePath"`
@@ -30,7 +31,7 @@ func (s *MemoryStore) loadMaterialDownloadsFromDB() error {
 			return err
 		}
 		job := stored.Job
-		job.OwnerID, job.ArchivePath, job.Items = stored.OwnerID, stored.ArchivePath, stored.Items
+		job.OwnerID, job.ArchivePath, job.Items, job.GuardianID = stored.OwnerID, stored.ArchivePath, stored.Items, stored.GuardianID
 		jobs = append(jobs, job)
 	}
 	sort.SliceStable(jobs, func(i, j int) bool { return jobs[i].CreatedAt > jobs[j].CreatedAt })
