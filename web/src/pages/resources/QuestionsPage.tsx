@@ -1,3 +1,4 @@
+import { clampListPage, useListState } from '../../hooks/useListState';
 import { Alert, Button, Card, Form, Input, Pagination, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import { EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
@@ -13,10 +14,10 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
   const [form] = Form.useForm<QuestionBankUpsertRequest>();
   const [editing, setEditing] = useState<QuestionBankItem | null>(null);
   const [open, setOpen] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const [gradeFilter, setGradeFilter] = useState<string>();
-  const [subjectFilter, setSubjectFilter] = useState<string>();
-  const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useListState('questions:keyword', '');
+  const [gradeFilter, setGradeFilter] = useListState<string>('questions:gradeFilter');
+  const [subjectFilter, setSubjectFilter] = useListState<string>('questions:subjectFilter');
+  const [page, setPage] = useListState('questions:page', 1);
   const [viewMode, setViewMode] = useListViewMode('starline:list-view:questions', 'table');
   const client = useQueryClient();
   const questions = useQuery({ queryKey: ['questions', gradeFilter, subjectFilter, keyword], queryFn: () => getData<QuestionBankItem[]>('/questions', { grade: gradeFilter || '', subject: subjectFilter || '', keyword }) });
@@ -58,7 +59,7 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
     onError: (error: Error) => message.error(error.message || '保存题目失败，请检查题干、选项和答案。')
   });
   const rows = questions.data ?? [];
-  const paged = rows.slice((page - 1) * 10, page * 10);
+  const currentPage = clampListPage(page, rows.length); const paged = rows.slice((currentPage - 1) * 10, currentPage * 10);
   const questionActions = (item: QuestionBankItem) => <ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => start(item)} />;
 
   const start = (item?: QuestionBankItem) => {
@@ -94,7 +95,7 @@ export default function QuestionsPage({ user }: { user?: CurrentUser }) {
         </Space>
       </div>
       {viewMode === 'table' ? <Table rowKey="id" dataSource={paged} pagination={false} columns={[{ title: '题目', dataIndex: 'title', render: (title, row) => title || row.stem }, { title: '年级', dataIndex: 'grade' }, { title: '学期', dataIndex: 'semester' }, { title: '学科', dataIndex: 'subject', render: (value: string) => subjectLabel(value) }, { title: '题型', dataIndex: 'type' }, { title: '操作', render: (_: unknown, row: QuestionBankItem) => questionActions(row) }]} /> : <CardList rows={paged} rowKey={(item) => item.id} emptyText={keyword || gradeFilter || subjectFilter ? '没有符合条件的题目。' : '还没有题目，先新增一道题目。'} renderCard={(item) => <InfoCard title={item.title || questionTitle(item)} subtitle={`${item.grade} · ${item.semester} · ${subjectLabel(item.subject)}`} status={<Tag color={item.status === '启用' ? 'green' : 'default'}>{item.status || '启用'}</Tag>} fields={[{ label: '题型', value: questionTypeLabel(item.type) }, { label: '分值', value: `${item.score || 0} 分` }, { label: '题干', value: item.stem || '未填写', fullWidth: true }]} actions={questionActions(item)} />} />}
-      {rows.length > 10 && <Pagination current={page} pageSize={10} total={rows.length} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />}
+      {rows.length > 10 && <Pagination current={currentPage} pageSize={10} total={rows.length} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />}
     </Card>}
     <QuestionDialog form={form} open={open} editing={Boolean(editing)} loading={save.isPending} scopeLoading={!questionScope.unrestricted && learningSpaces.isLoading} scopeError={Boolean(!questionScope.unrestricted && learningSpaces.error)} gradeOptions={questionScope.gradeOptions} semesterOptions={questionScope.semesterOptions} allowedSpaces={questionScope.spaces} unrestricted={questionScope.unrestricted} hasScope={questionScope.hasScope} onCancel={() => setOpen(false)} onSubmit={(values) => save.mutate(values)} />
   </div>;

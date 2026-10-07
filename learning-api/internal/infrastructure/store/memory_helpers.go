@@ -586,14 +586,16 @@ func adminStaffFromUser(user learning.User) learning.AdminStaff {
 		bindStatus = "已绑定"
 	}
 	return learning.AdminStaff{
-		ID:            user.ID,
-		Name:          user.Name,
-		Phone:         user.Phone,
-		Role:          primaryAdminRole(user.Roles),
-		CampusID:      user.CampusID,
-		AccountStatus: user.AccountStatus,
-		BindStatus:    bindStatus,
-		Remark:        user.Remark,
+		ID:                 user.ID,
+		Name:               user.Name,
+		Phone:              user.Phone,
+		Role:               primaryAdminRole(user.Roles),
+		CampusID:           user.CampusID,
+		AccountStatus:      user.AccountStatus,
+		BindStatus:         bindStatus,
+		Remark:             user.Remark,
+		PasswordEnabled:    user.PasswordHash != "",
+		MustChangePassword: user.MustChangePassword,
 	}
 }
 

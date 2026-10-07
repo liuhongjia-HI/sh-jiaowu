@@ -1,3 +1,4 @@
+import { useListPagination } from '../hooks/useListState';
 import {
   Alert,
   Button,
@@ -67,6 +68,7 @@ export default function Commercial() {
   const [orderForm] = Form.useForm<CommercialOrderCreateRequest>();
   const [actionForm] = Form.useForm();
   const queryClient = useQueryClient();
+  const pagination = useListPagination('commercial', 8);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<{ kind: ActionKind; order: CommercialOrder } | null>(null);
 
@@ -245,7 +247,7 @@ export default function Commercial() {
           rowKey="id"
           columns={columns}
           dataSource={orders.data ?? []}
-          pagination={{ pageSize: 8 }}
+          pagination={pagination}
           scroll={{ x: 1160 }}
           locale={{ emptyText: '暂无订单。先为学生创建订单，再记录线下收款和课消。' }}
         />

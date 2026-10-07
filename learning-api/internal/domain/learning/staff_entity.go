@@ -54,14 +54,17 @@ type LearningSpace struct {
 }
 
 type AdminStaff struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Phone         string `json:"phone"`
-	Role          Role   `json:"role"`
-	CampusID      string `json:"campusId,omitempty"`
-	AccountStatus string `json:"accountStatus"`
-	BindStatus    string `json:"bindStatus"`
-	Remark        string `json:"remark"`
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	Phone              string `json:"phone"`
+	Role               Role   `json:"role"`
+	CampusID           string `json:"campusId,omitempty"`
+	AccountStatus      string `json:"accountStatus"`
+	BindStatus         string `json:"bindStatus"`
+	Remark             string `json:"remark"`
+	PasswordEnabled    bool   `json:"passwordEnabled"`
+	MustChangePassword bool   `json:"mustChangePassword"`
+	TemporaryPassword  string `json:"temporaryPassword,omitempty"`
 }
 
 type AdminStaffUpsertRequest struct {

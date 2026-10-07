@@ -3,7 +3,7 @@ import { Alert, Badge, Button, Card, Empty, Input, Modal, Select, Skeleton, Spac
 import type { DataNode } from 'antd/es/tree';
 import { BookOutlined, DownloadOutlined, EyeOutlined, HistoryOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useListSearchParams } from '../hooks/useListState';
 import { getData, http, postData } from '../services/http';
 import type { CurrentUser, Material, TeacherLibraryData } from '../types/starline';
 import { MaterialDownloads } from '../components/MaterialDownloads';
@@ -13,7 +13,7 @@ const pathText = (m: Material) => [m.curriculum?.unit, m.curriculum?.chapter, m.
 const typeNames: Record<string, string> = { HD: '讲义', Blank: '空白讲义', HW: '作业', Exam: '试卷', Special: '专题' };
 
 export default function TeacherLibrary({ user }: { user: CurrentUser }) {
-  const [params, setParams] = useSearchParams();
+  const [params, setParams] = useListSearchParams('teacher-library', ['course', 'lesson', 'q', 'recent', 'unread', 'subject', 'grade', 'semester', 'phase', 'level', 'tag', 'page']);
   const client = useQueryClient();
   const query = useQuery({ queryKey: ['teacher-library', user.userId], queryFn: () => getData<TeacherLibraryData>('/teacher/library'), refetchOnWindowFocus: true,
     refetchInterval: current => {

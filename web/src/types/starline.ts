@@ -105,6 +105,9 @@ export type AdminStaff = {
   accountStatus: string;
   bindStatus: string;
   remark: string;
+  passwordEnabled: boolean;
+  mustChangePassword: boolean;
+  temporaryPassword?: string;
 };
 
 export type AdminStaffUpsertRequest = {

@@ -102,11 +102,10 @@ test('material upload uses one notification batch across partial failure and ret
   expect(batches[3]).not.toBe(batches[0]);
 });
 
-test('unread teaching plans require successful preview and reading persistence', async ({ page }) => {
+test('teaching plans ignore legacy unread filters and preview without reading tracking', async ({ page }) => {
   const user = { userId: 'teacher', name: '只读教师', roles: ['teacher'], teacherLibrary: { canManageCourses: false }, canUploadHandout: false, canUploadQuestion: false, canReview: false };
-  let version = 'version-1';
-  let unread = ['p1', 'p2'];
-  let failRead = true;
+  const version = 'version-1';
+  const unread = ['p1', 'p2'];
   const reads: any[] = [];
   const plans = () => [1, 2, 3].map(i => ({ id: `p${i}`, title: `内部教案 ${i}`, readVersion: i === 1 ? version : `version-${i}`, grade: '五年级', subject: 'English', fileName: `plan${i}.pdf`, fileSize: 100, fileType: 'pdf', previewStatus: '可预览', previewUrl: `/api/teaching-plans/p${i}/preview`, uploaderName: '教师', createdAt: `2026-10-03 12:0${i}:00` }));
   await page.addInitScript(user => { localStorage.setItem('starline_admin_token', 'unread-plan-fixture'); localStorage.setItem('starline_admin_user', JSON.stringify(user)); }, user);
@@ -118,16 +117,14 @@ test('unread teaching plans require successful preview and reading persistence',
     }
     if (path.endsWith('/view')) {
       reads.push(req.postDataJSON());
-      if (failRead) return route.fulfill({ status: 400, json: { code: 400, message: '阅读状态保存失败' } });
-      unread = unread.filter(id => id !== 'p1');
       return route.fulfill({ json: { code: 0, data: { read: true } } });
     }
     return route.fulfill({ json: { code: 0, data: path === '/auth/me' ? user : path === '/teaching-plans' ? { plans: plans(), unreadPlanIds: unread, uploadScopes: [], canUpload: false } : [] } });
   });
-  await page.goto('/teaching-plans');
-  await page.getByRole('button', { name: '新增与未读', exact: true }).click();
-  await expect(page).toHaveURL(/unread=1/);
-  await expect(page.getByRole('button', { name: '内部教案 3', exact: true })).toHaveCount(0);
+  await page.goto('/teaching-plans?unread=1');
+  await expect(page.getByRole('button', { name: '内部教案 3', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '新增与未读', exact: true })).toHaveCount(0);
+  await expect(page.getByText('未读', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '内部教案 2', exact: true }).click();
   const failed = page.getByRole('dialog', { name: /^内部教案 2/ });
   await expect(failed).toContainText('教案预览暂时失败');
@@ -135,20 +132,10 @@ test('unread teaching plans require successful preview and reading persistence',
   await failed.getByRole('button', { name: '返回列表', exact: true }).click();
   await page.getByRole('button', { name: '内部教案 1', exact: true }).click();
   const preview = page.getByRole('dialog', { name: /^内部教案 1/ });
-  await expect(page.getByText('阅读状态保存失败，可重新打开重试', { exact: true })).toBeVisible();
   await expect(preview.locator('iframe')).toBeVisible();
   await preview.getByRole('button', { name: '返回列表', exact: true }).click();
-  await expect(page.getByRole('row').filter({ hasText: '内部教案 1' })).toContainText('未读');
-  failRead = false;
-  await page.getByRole('button', { name: '内部教案 1', exact: true }).click();
-  await expect.poll(() => reads.length).toBe(2);
-  await expect(page.getByRole('row').filter({ hasText: '内部教案 1' })).toHaveCount(0);
-  await preview.getByRole('button', { name: '返回列表', exact: true }).click();
-  version = 'version-2'; unread = ['p1', 'p2'];
-  await page.getByRole('button', { name: /刷\s*新/ }).click();
-  await expect(page.getByRole('row').filter({ hasText: '内部教案 1' })).toContainText('未读');
-  expect(reads).toEqual([{ version: 'version-1' }, { version: 'version-1' }]);
-  await page.screenshot({ path: '/tmp/starline-unread-teaching-plans.png', fullPage: false });
+  await expect(page.getByRole('button', { name: '内部教案 1', exact: true })).toBeVisible();
+  expect(reads).toHaveLength(0);
 });
 
 test('dropped teaching plans keep per-file chapters when only failed file is retried', async ({ page }) => {

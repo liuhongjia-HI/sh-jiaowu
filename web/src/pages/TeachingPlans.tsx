@@ -1,6 +1,6 @@
+import { useListPagination, useListSearchParams, useListState } from '../hooks/useListState';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Badge, Button, Card, Drawer, Empty, Input, Modal, Select, Space, Spin, Table, Tag, Typography, message } from 'antd';
-import { useSearchParams } from 'react-router-dom';
+import { Alert, Button, Card, Drawer, Empty, Input, Modal, Select, Space, Spin, Table, Tag, Typography, message } from 'antd';
 import { DownloadOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getData, http, postData, postForm, putData } from '../services/http';
@@ -9,8 +9,8 @@ import { teachingPlanEntryQuery } from '../utils/teachingPlanEntry';
 import type { Course } from '../types/starline';
 
 type Scope = { grade: string; subject: string };
-type Plan = { id: string; readVersion?: string; title: string; grade: string; subject: string; courseId?: string; lessonId?: string; chapter?: string; semester?: string; phase?: string; fileName: string; fileSize: number; fileType: string; previewStatus: string; previewError?: string; previewUrl: string; downloadUrl?: string; uploaderName: string; createdAt: string };
-type PlanList = { plans: Plan[]; unreadPlanIds?: string[]; uploadScopes: Scope[]; canUpload: boolean; directories?: Course[] };
+type Plan = { id: string; title: string; grade: string; subject: string; courseId?: string; lessonId?: string; chapter?: string; semester?: string; phase?: string; fileName: string; fileSize: number; fileType: string; previewStatus: string; previewError?: string; previewUrl: string; downloadUrl?: string; uploaderName: string; createdAt: string };
+type PlanList = { plans: Plan[]; uploadScopes: Scope[]; canUpload: boolean; directories?: Course[] };
 type PendingNoticeBatch = { batchId: string; resourceCount: number };
 type PendingFile = { file: File; title: string; lessonId?: string; error?: string; done?: boolean };
 
@@ -21,11 +21,10 @@ const displaySubject = (subject: string) => subjectNames[subject] || subject;
 
 export default function TeachingPlans() {
   const client = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useListSearchParams('teaching-plans', []);
   const entryID = new URLSearchParams(teachingPlanEntryQuery('/teaching-plans', searchParams.toString())).get('plan');
   const handledEntry = useRef<string | null>(null);
   const [entryUnavailable, setEntryUnavailable] = useState(false);
-  const unreadOnly = searchParams.get('unread') === '1';
   const query = useQuery({ queryKey: ['teaching-plans'], queryFn: () => getData<PlanList>('/teaching-plans'), refetchOnWindowFocus: true,
     refetchInterval: current => current.state.data?.plans.some(plan => ['待转换', '转换中'].includes(plan.previewStatus)) ? 3000 : false });
   const data = query.data;
@@ -47,9 +46,10 @@ export default function TeachingPlans() {
     await client.invalidateQueries({ queryKey: ['teaching-plan-notice-batches'] });
     return !failure;
   };
-  const [keyword, setKeyword] = useState('');
-  const [gradeFilter, setGradeFilter] = useState<string>();
-  const [subjectFilter, setSubjectFilter] = useState<string>();
+  const [keyword, setKeyword] = useListState('teaching-plans:keyword', '');
+  const [gradeFilter, setGradeFilter] = useListState<string>('teaching-plans:gradeFilter');
+  const [subjectFilter, setSubjectFilter] = useListState<string>('teaching-plans:subjectFilter');
+  const pagination = useListPagination('teaching-plans', 12, JSON.stringify([keyword, gradeFilter, subjectFilter]));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [uploadScope, setUploadScope] = useState<string>();
   const [directoryId, setDirectoryId] = useState<string>();
@@ -99,10 +99,7 @@ export default function TeachingPlans() {
   const canRetry = !!active && uploadScopes.some(scope => scope.grade === active.grade && scope.subject === active.subject);
   const gradeOptions = useMemo(() => Array.from(new Set((data?.plans || []).map(plan => plan.grade))).map(value => ({ value, label: value })), [data]);
   const subjectOptions = useMemo(() => Array.from(new Set((data?.plans || []).filter(plan => !gradeFilter || plan.grade === gradeFilter).map(plan => plan.subject))).map(value => ({ value, label: displaySubject(value) })), [data, gradeFilter]);
-  const unread = new Set(data?.unreadPlanIds || []);
-  const visible = (data?.plans || []).filter(plan => (!unreadOnly || unread.has(plan.id)) && (!gradeFilter || plan.grade === gradeFilter) && (!subjectFilter || plan.subject === subjectFilter) && (!keyword.trim() || `${plan.title} ${plan.fileName} ${plan.uploaderName}`.toLocaleLowerCase().includes(keyword.trim().toLocaleLowerCase())));
-  if (unreadOnly) visible.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const showUnread = (enabled: boolean) => { const next = new URLSearchParams(searchParams); if (enabled) { next.set('unread', '1'); setKeyword(''); setGradeFilter(undefined); setSubjectFilter(undefined); } else next.delete('unread'); setSearchParams(next); };
+  const visible = (data?.plans || []).filter(plan => (!gradeFilter || plan.grade === gradeFilter) && (!subjectFilter || plan.subject === subjectFilter) && (!keyword.trim() || `${plan.title} ${plan.fileName} ${plan.uploaderName}`.toLocaleLowerCase().includes(keyword.trim().toLocaleLowerCase())));
 
   useEffect(() => {
     if (!active || active.previewStatus !== '可预览') return;
@@ -115,10 +112,9 @@ export default function TeachingPlans() {
       if (cancelled) return;
       objectURL = URL.createObjectURL(response.data);
       setPreviewURL(objectURL);
-      if (active.readVersion) void postData(`/teaching-plans/${active.id}/view`, { version: active.readVersion }).then(() => client.invalidateQueries({ queryKey: ['teaching-plans'] })).catch(() => { if (!cancelled) message.warning('阅读状态保存失败，可重新打开重试'); });
     }).catch(error => { if (!cancelled) setPreviewError(error instanceof Error ? error.message : '教案打开失败'); }).finally(() => { if (!cancelled) setPreviewLoading(false); });
     return () => { cancelled = true; controller.abort(); if (objectURL) URL.revokeObjectURL(objectURL); };
-  }, [active?.id, active?.previewStatus, active?.readVersion, previewAttempt, client]);
+  }, [active?.id, active?.previewStatus, previewAttempt, client]);
 
   const openPreview = (plan: Plan) => { setPreviewURL(''); setPreviewError(''); setSelected(plan); };
   const closePreview = () => { setSelected(undefined); setPreviewURL(''); const next = new URLSearchParams(searchParams); next.delete('plan'); setSearchParams(next, { replace: true }); };
@@ -206,12 +202,12 @@ export default function TeachingPlans() {
   };
 
   return <div className="page-stack">
-    <div className="page-heading"><div><Typography.Title level={3}>教案</Typography.Title><Typography.Text type="secondary">按年级和学科查找内部教案。管理员与对应年级学科教师可见。</Typography.Text></div><Space wrap><Badge count={unread.size}><Button type={unreadOnly ? 'primary' : 'default'} onClick={() => showUnread(!unreadOnly)}>新增与未读</Button></Badge>{unreadOnly && <Button onClick={() => showUnread(false)}>全部教案</Button>}<Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => query.refetch()}>刷新</Button>{data?.canUpload && <Button type="primary" icon={<PlusOutlined />} onClick={openUpload}>上传教案</Button>}</Space></div>
+    <div className="page-heading"><div><Typography.Title level={3}>教案</Typography.Title><Typography.Text type="secondary">按年级和学科查找内部教案。管理员与对应年级学科教师可见。</Typography.Text></div><Space wrap><Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => query.refetch()}>刷新</Button>{data?.canUpload && <Button type="primary" icon={<PlusOutlined />} onClick={openUpload}>上传教案</Button>}</Space></div>
     {data?.canUpload && (noticeError || (pendingBatches.data?.length ?? 0) > 0 || pendingBatches.error) && <Alert type="warning" showIcon message={noticeError || (pendingBatches.error ? '待汇总提醒加载失败' : `有 ${pendingBatches.data?.length} 批教案待汇总提醒`)} action={<Button loading={completingNotices || pendingBatches.isFetching} disabled={uploading} onClick={() => pendingBatches.error ? pendingBatches.refetch() : completeNotices((pendingBatches.data ?? []).map(row => row.batchId))}>{pendingBatches.error ? '重试' : '汇总提醒'}</Button>} />}
     {query.isLoading ? <Card><Spin /></Card> : query.error ? <Alert type="error" message="教案加载失败" description="请检查网络后重试" action={<Button onClick={() => query.refetch()}>重试</Button>} /> : <Card title="教案列表" extra={<Typography.Text type="secondary">{visible.length} 份</Typography.Text>}>
       <Space wrap style={{ marginBottom: 16 }}><Input.Search aria-label="搜索教案" placeholder="搜索教案、文件名或上传人" allowClear value={keyword} onChange={event => setKeyword(event.target.value)} style={{ width: 270 }} /><Select aria-label="筛选年级" placeholder="全部年级" allowClear value={gradeFilter} options={gradeOptions} onChange={value => { setGradeFilter(value); setSubjectFilter(undefined); }} style={{ minWidth: 130 }} /><Select aria-label="筛选学科" placeholder="全部学科" allowClear value={subjectFilter} options={subjectOptions} onChange={setSubjectFilter} style={{ minWidth: 130 }} />{(keyword || gradeFilter || subjectFilter) && <Button onClick={() => { setKeyword(''); setGradeFilter(undefined); setSubjectFilter(undefined); }}>重置</Button>}</Space>
-      <Table<Plan> rowKey="id" dataSource={visible} pagination={{ pageSize: 12, showSizeChanger: false }} locale={{ emptyText: <Empty description={unreadOnly ? '暂无未读教案' : keyword || gradeFilter || subjectFilter ? '当前条件下没有教案，请调整筛选条件' : '当前范围暂无教案'} /> }} columns={[
-        { title: '教案', key: 'title', render: (_, plan) => <div><Button type="link" style={{ padding: 0, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => openPreview(plan)}>{plan.title}</Button>{unread.has(plan.id) && <Tag color="blue" style={{ marginLeft: 8 }}>未读</Tag>}<div><Typography.Text type="secondary">{plan.fileName}</Typography.Text></div></div> },
+      <Table<Plan> rowKey="id" dataSource={visible} pagination={pagination} locale={{ emptyText: <Empty description={keyword || gradeFilter || subjectFilter ? '当前条件下没有教案，请调整筛选条件' : '当前范围暂无教案'} /> }} columns={[
+        { title: '教案', key: 'title', render: (_, plan) => <div><Button type="link" style={{ padding: 0, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => openPreview(plan)}>{plan.title}</Button><div><Typography.Text type="secondary">{plan.fileName}</Typography.Text></div></div> },
         { title: '年级 · 学科', key: 'scope', render: (_, plan) => <Tag>{plan.grade} · {displaySubject(plan.subject)}</Tag> },
         { title: '章节', key: 'chapter', render: (_, plan) => <div>{plan.chapter || <Typography.Text type="secondary">未归类</Typography.Text>}{plan.semester && <div><Typography.Text type="secondary">{semesterLabel(plan.semester)} · {phaseLabel(plan.phase)}</Typography.Text></div>}{uploadScopes.some(scope => scope.grade === plan.grade && subjectsMatch(scope.subject, plan.subject)) && <Button type="link" style={{ padding: 0, display: "block" }} onClick={() => { setChapterPlan(plan); setChapterCourseId(plan.courseId); setChapterLessonId(plan.lessonId); }}>关联章节</Button>}</div> },
         { title: '上传人', dataIndex: 'uploaderName' },

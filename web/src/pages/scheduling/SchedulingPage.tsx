@@ -1,3 +1,4 @@
+import { useListState } from '../../hooks/useListState';
 import { DeleteOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Drawer, Form, Input, InputNumber, Modal, Segmented, Select, Skeleton, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,7 +59,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [formCourseSubject, setFormCourseSubject] = useState<string>();
   // 人员日历是高频入口，默认展开。
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [calendarPeople, setCalendarPeople] = useState<string[]>([]);
+  const [calendarPeople, setCalendarPeople] = useListState<string[]>('scheduling:calendarPeople', []);
   const [cancelRecord, setCancelRecord] = useState<ScheduleClass | null>(null);
   const [cancelScope, setCancelScope] = useState('this');
   const [editScope, setEditScope] = useState('this');
@@ -78,20 +79,20 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     try { const saved = localStorage.getItem(`starline-calendar-view:${user.userId}`); if (saved === 'workweek') return 'week'; return ['day','week','month','list'].includes(saved ?? '') ? saved as CalendarMode : 'day'; } catch { return 'day'; }
   });
   useEffect(() => { try { localStorage.setItem(`starline-calendar-view:${user.userId}`, viewMode); } catch { /* storage unavailable */ } }, [viewMode, user.userId]);
-  const [classGradeFilter, setClassGradeFilter] = useState<string>();
-  const [classSubjectFilter, setClassSubjectFilter] = useState<string>();
-  const [classTeacherFilter, setClassTeacherFilter] = useState<string>();
-  const [classStudentFilter, setClassStudentFilter] = useState<string>();
-  const [classCampusFilter, setClassCampusFilter] = useState<string>();
-  const [classCourseFilter, setClassCourseFilter] = useState<string>();
-  const [classTypeFilter, setClassTypeFilter] = useState<string>();
-  const [statusFilter, setStatusFilter] = useState<string>('全部');
-  const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [classGradeFilter, setClassGradeFilter] = useListState<string>('scheduling:classGradeFilter');
+  const [classSubjectFilter, setClassSubjectFilter] = useListState<string>('scheduling:classSubjectFilter');
+  const [classTeacherFilter, setClassTeacherFilter] = useListState<string>('scheduling:classTeacherFilter');
+  const [classStudentFilter, setClassStudentFilter] = useListState<string>('scheduling:classStudentFilter');
+  const [classCampusFilter, setClassCampusFilter] = useListState<string>('scheduling:classCampusFilter');
+  const [classCourseFilter, setClassCourseFilter] = useListState<string>('scheduling:classCourseFilter');
+  const [classTypeFilter, setClassTypeFilter] = useListState<string>('scheduling:classTypeFilter');
+  const [statusFilter, setStatusFilter] = useListState<string>('scheduling:statusFilter', '全部');
+  const [selectedWeekStart, setSelectedWeekStart] = useListState<Date>('scheduling:selectedWeekStart', () => startOfWeek(new Date()));
   // 日视图选中的那一天。始终保持在 selectedWeekStart 所在周内，
   // 这样日/周视图共用同一份按 dayOfWeek 分组的数据，切换视图不用重新取数。
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
-  const [hiddenSubjects, setHiddenSubjects] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useListState<Date>('scheduling:selectedDate', () => new Date());
+  const [calendarMonth, setCalendarMonth] = useListState<Date>('scheduling:calendarMonth', () => startOfMonth(new Date()));
+  const [hiddenSubjects, setHiddenSubjects] = useListState<string[]>('scheduling:hiddenSubjects', []);
   const queryClient = useQueryClient();
   // 排课权限下放：老师也能建课，但落「待审核」，通过后才对学生可见。
   const canCreateClass = user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));

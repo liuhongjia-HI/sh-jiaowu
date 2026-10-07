@@ -1,3 +1,4 @@
+import { useListPagination, useListState } from '../../hooks/useListState';
 import { Alert, Button, Card, Drawer, Empty, Select, Skeleton, Space, Table, Tag, Typography } from 'antd';
 import { DownloadOutlined, EyeOutlined, UploadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
@@ -45,12 +46,13 @@ export function MaterialUploadOverview({ courses, canManage, onUpload, onOpenFil
   onUpload: (courseId: string, lessonId: string) => void;
   onOpenFile: (material: Material, download: boolean) => void;
 }) {
-  const [semester, setSemester] = useState<string>();
-  const [phase, setPhase] = useState<string>();
-  const [level, setLevel] = useState<string>();
-  const [tagCode, setTagCode] = useState<string>();
+  const [semester, setSemester] = useListState<string>('materials-overview:semester');
+  const [phase, setPhase] = useListState<string>('materials-overview:phase');
+  const [level, setLevel] = useListState<string>('materials-overview:level');
+  const [tagCode, setTagCode] = useListState<string>('materials-overview:tagCode');
   const [selection, setSelection] = useState<Selection | null>(null);
   const [missingOnly, setMissingOnly] = useState(false);
+  const pagination = useListPagination('materials-overview-details', 10, JSON.stringify([semester, phase, level, tagCode, selection, missingOnly]));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const params = Object.fromEntries(Object.entries({ semester, phase, level, tagCode }).filter(([, value]) => Boolean(value))) as Record<string, string>;
   const overview = useQuery({ queryKey: ['materials-overview', params], queryFn: () => getData<MaterialOverview>('/materials/overview', params) });
@@ -99,7 +101,7 @@ export function MaterialUploadOverview({ courses, canManage, onUpload, onOpenFil
       <div className="opening-overview-footer"><Typography.Text type="secondary">点击格子查看课程与课节；文件数可相加，覆盖课节按课程去重</Typography.Text><span className="opening-matrix-legend">文件少 <i /> 多 · — 无课程</span></div>
     </>}
     <Drawer title={selection ? `${selection.grade} · ${subjectLabel(selection.subject)} · 讲义明细` : missingOnly ? '待上传课节' : '全部讲义明细'} open={drawerOpen} width="min(920px, 100vw)" onClose={() => { setDrawerOpen(false); setSelection(null); setMissingOnly(false); }} extra={<Space><Button type={missingOnly ? 'primary' : 'default'} onClick={() => setMissingOnly((value) => !value)}>只看待上传</Button><Button onClick={() => exportOverview(selectedRows, courses)}>导出当前明细</Button></Space>}>
-      <Table<MaterialOverviewLesson> rowKey={(row) => `${row.courseId}:${row.lessonId}`} dataSource={selectedRows} pagination={{ pageSize: 10 }} columns={[
+      <Table<MaterialOverviewLesson> rowKey={(row) => `${row.courseId}:${row.lessonId}`} dataSource={selectedRows} pagination={pagination} columns={[
         { title: '课节', width: 260, render: (_value, row) => <div><strong>{formatResourceCurriculumLabel(row, courses.find((course) => course.id === row.courseId))}</strong><div><Typography.Text type="secondary">{row.courseName} · {row.level || '未设置班型'}</Typography.Text></div></div> },
         { title: '讲义文件', render: (_value, row) => (row.materials ?? []).length ? <Space direction="vertical" size={6}>{(row.materials ?? []).map((item) => <Space key={item.id} wrap><Tag>{item.tagCode || '未标签'}</Tag><span>{item.fileName || item.title}</span><Typography.Text type="secondary">{item.ownerTeacherName || '—'} · {item.createdAt || '—'}</Typography.Text><Button type="text" size="small" icon={<EyeOutlined />} disabled={item.previewStatus !== '可预览'} onClick={() => onOpenFile(item, false)} aria-label={`预览 ${item.fileName || item.title}`} /><Button type="text" size="small" icon={<DownloadOutlined />} onClick={() => onOpenFile(item, true)} aria-label={`下载 ${item.fileName || item.title}`} /></Space>)}</Space> : <Tag color="warning">待上传</Tag> },
         { title: '操作', width: 105, render: (_value, row) => canManage ? <Button type="link" icon={<UploadOutlined />} onClick={() => onUpload(row.courseId, row.lessonId)}>上传讲义</Button> : null }

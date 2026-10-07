@@ -1,3 +1,4 @@
+import { clampListPage, useListPagination, useListState } from '../../hooks/useListState';
 import { Alert, Button, Card, Checkbox, Form, Input, Modal, Pagination, Popconfirm, Select, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type React from 'react';
@@ -70,12 +71,13 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
   const [copySpaceId, setCopySpaceId] = useState<string>();
   const [copyMaterials, setCopyMaterials] = useState(true);
   const [copyHomework, setCopyHomework] = useState(true);
-  const [keyword, setKeyword] = useState('');
-  const [gradeFilter, setGradeFilter] = useState<string>();
-  const [subjectFilter, setSubjectFilter] = useState<string>();
-  const [termFilter, setTermFilter] = useState<string>();
-  const [statusFilter, setStatusFilter] = useState<string>();
-  const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useListState('courses:keyword', '');
+  const [gradeFilter, setGradeFilter] = useListState<string>('courses:gradeFilter');
+  const [subjectFilter, setSubjectFilter] = useListState<string>('courses:subjectFilter');
+  const [termFilter, setTermFilter] = useListState<string>('courses:termFilter');
+  const [statusFilter, setStatusFilter] = useListState<string>('courses:statusFilter');
+  const [page, setPage] = useListState('courses:page', 1);
+  const familyPagination = useListPagination('course-families', 10, JSON.stringify([keyword, gradeFilter, subjectFilter, termFilter, statusFilter]));
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [familyScopeKey, setFamilyScopeKey] = useState<string>();
   const [familySpaceIDs, setFamilySpaceIDs] = useState<string[]>([]);
@@ -264,7 +266,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
   }
   if (courses.isLoading || spaces.isLoading || families.isLoading) return <Skeleton active />;
   if (courses.error || spaces.error || families.error) return <Alert type="error" message="课程内容加载失败，请稍后重试。" />;
-  const paged = rows.slice((page - 1) * 10, page * 10);
+  const currentPage = clampListPage(page, rows.length); const paged = rows.slice((currentPage - 1) * 10, currentPage * 10);
   const hasFilters = Boolean(keyword || gradeFilter || subjectFilter || termFilter || statusFilter);
   const spaceLabel = (course: Course) => courseSpaceLabel(course, spaceById);
   const editAction = (course: Course) => canManage ? <Space size={4}><ActionButton tooltip="复制" icon={<CopyOutlined />} loading={copy.isPending && copy.variables?.course.id === course.id} onClick={() => startCopy(course)} /><ActionButton tooltip="编辑" icon={<EditOutlined />} onClick={() => { setCopiedFrom(undefined); setCopySummary(undefined); setEditing(course); form.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); setOpen(true); }} /></Space> : null;
@@ -364,7 +366,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
         <Table<CourseFamily>
           rowKey="id"
           dataSource={familyRows}
-          pagination={{ pageSize: 10 }}
+          pagination={familyPagination}
           locale={{ emptyText: '暂无课程系列。点击右上角新增后，一次创建所需班型。' }}
           columns={[
             { title: '课程系列', render: (_: unknown, family: CourseFamily) => <div><Typography.Link onClick={() => editFamily(family)}>{family.name}</Typography.Link><div className="sub">{family.grade} · {subjectLabel(family.subject)}</div></div> },
@@ -409,7 +411,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
             )}
           />
         ))}
-        {rows.length > 10 && <Pagination current={page} pageSize={10} total={rows.length} showSizeChanger={false} onChange={(nextPage) => setPage(nextPage)} style={{ marginTop: 16 }} />}
+        {rows.length > 10 && <Pagination current={currentPage} pageSize={10} total={rows.length} showSizeChanger={false} onChange={(nextPage) => setPage(nextPage)} style={{ marginTop: 16 }} />}
       </Card>
       <Modal title="新增课程系列 · 选择班型" open={familySetupOpen} onCancel={() => setFamilySetupOpen(false)} onOk={continueFamilyCreate} okText="下一步：编辑共享目录" okButtonProps={{ disabled: !familySpaceIDs.length }}>
         <Typography.Paragraph type="secondary">选择一个年级、学科、学期和阶段，再勾选本次实际开设的班型。班型来自现有学习空间配置。</Typography.Paragraph>

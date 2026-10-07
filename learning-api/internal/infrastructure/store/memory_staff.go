@@ -33,11 +33,15 @@ func (s *MemoryStore) createAdminStaffUnlocked(operator string, req learning.Adm
 	if s.userPhoneExists("", req.Phone) {
 		return learning.AdminStaff{}, errors.New("手机号已存在")
 	}
+	temporaryPassword, err := generateTemporaryPassword()
+	if err != nil {
+		return learning.AdminStaff{}, errors.New("临时密码生成失败")
+	}
 	user := learning.User{
-		ID:                 "user-admin-" + time.Now().Format("20060102150405"),
+		ID:                 "user-admin-" + time.Now().Format("20060102150405.000000000"),
 		Name:               req.Name,
 		Phone:              req.Phone,
-		PasswordHash:       mustPasswordHash(demoLoginPassword),
+		PasswordHash:       mustPasswordHash(temporaryPassword),
 		MustChangePassword: true,
 		AccountStatus:      "正常",
 		Roles:              []learning.Role{req.Role},
@@ -46,7 +50,9 @@ func (s *MemoryStore) createAdminStaffUnlocked(operator string, req learning.Adm
 	}
 	s.users = append(s.users, user)
 	s.prependLog(operator, "新增管理人员", user.Name+" / "+roleName(req.Role))
-	return adminStaffFromUser(user), nil
+	created := adminStaffFromUser(user)
+	created.TemporaryPassword = temporaryPassword
+	return created, nil
 }
 
 func (s *MemoryStore) updateAdminStaffUnlocked(operator string, principal learning.Principal, id string, req learning.AdminStaffUpsertRequest) (learning.AdminStaff, error) {
@@ -78,6 +84,9 @@ func (s *MemoryStore) updateAdminStaffUnlocked(operator string, principal learni
 			return learning.AdminStaff{}, errors.New("至少保留一个正常的超级管理员")
 		}
 		before := adminStaffFromUser(s.users[i])
+		if (s.users[i].AccountStatus == "正常" && req.AccountStatus == "停用") || s.users[i].Phone != req.Phone || primaryAdminRole(s.users[i].Roles) != req.Role || s.users[i].CampusID != req.CampusID {
+			s.users[i].TokenVersion++
+		}
 		s.users[i].Name = req.Name
 		s.users[i].Phone = req.Phone
 		s.users[i].Roles = []learning.Role{req.Role}

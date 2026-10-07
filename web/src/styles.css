@@ -276,7 +276,8 @@ body {
   gap: 20px;
 }
 
-.teachers-page {
+.teachers-page,
+.admin-staff-page {
   grid-template-columns: minmax(0, 1fr);
 }
 

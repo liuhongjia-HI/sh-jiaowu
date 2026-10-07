@@ -1,3 +1,5 @@
+import { useListPagination } from '../../hooks/useListState';
+import { useListState } from '../../hooks/useListState';
 import { Alert, Button, Card, Checkbox, Form, Input, Modal, Popconfirm, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, HolderOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
@@ -122,15 +124,15 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
   const client = useQueryClient();
   const title = kind === 'materials' ? '课程讲义' : '课后练习';
   const path = kind === 'materials' ? '/materials' : '/homework';
-  const [keyword, setKeyword] = useState('');
-  const [subject, setSubject] = useState<string>();
-  const [grade, setGrade] = useState<string>();
-  const [tagCode, setTagCode] = useState<string>();
-  const [assessmentType, setAssessmentType] = useState<string>();
-  const [homeworkCourseId, setHomeworkCourseId] = useState<string>();
-  const [uploaderId, setUploaderId] = useState<string>();
-  const [uploadedFrom, setUploadedFrom] = useState('');
-  const [uploadedTo, setUploadedTo] = useState('');
+  const [keyword, setKeyword] = useListState(`resources:${kind}:keyword`, '');
+  const [subject, setSubject] = useListState<string>(`resources:${kind}:subject`);
+  const [grade, setGrade] = useListState<string>(`resources:${kind}:grade`);
+  const [tagCode, setTagCode] = useListState<string>(`resources:${kind}:tagCode`);
+  const [assessmentType, setAssessmentType] = useListState<string>(`resources:${kind}:assessmentType`);
+  const [homeworkCourseId, setHomeworkCourseId] = useListState<string>(`resources:${kind}:homeworkCourseId`);
+  const [uploaderId, setUploaderId] = useListState<string>(`resources:${kind}:uploaderId`);
+  const [uploadedFrom, setUploadedFrom] = useListState(`resources:${kind}:uploadedFrom`, '');
+  const [uploadedTo, setUploadedTo] = useListState(`resources:${kind}:uploadedTo`, '');
   const [draggingPackKey, setDraggingPackKey] = useState('');
   const [draggingHomeworkId, setDraggingHomeworkId] = useState('');
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -139,6 +141,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
   const [syncLessonIds, setSyncLessonIds] = useState<Record<string, string>>({});
   const [syncPreview, setSyncPreview] = useState<MaterialSyncPreview | null>(null);
   const [uploadTarget, setUploadTarget] = useState<{ courseId: string; lessonId: string } | null>(null);
+  const pagination = useListPagination(`resources:${kind}`, 10, JSON.stringify([keyword, subject, grade, tagCode, assessmentType, homeworkCourseId, uploaderId, uploadedFrom, uploadedTo, courseId, packageId]));
   const materialParams = Object.fromEntries(Object.entries({ keyword, subject, tagCode, uploaderId, uploadedFrom, uploadedTo }).filter(([, value]) => Boolean(value))) as Record<string, string>;
   const resources = useQuery({ queryKey: [kind, materialParams], queryFn: () => getData<(Material | Homework)[]>(path, kind === 'materials' ? materialParams : undefined) });
   const allMaterials = useQuery({ queryKey: ['materials', 'all-for-reorder'], enabled: kind === 'materials', queryFn: () => getData<Material[]>('/materials') });
@@ -557,7 +560,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
           rowKey="key"
           rowSelection={canManage ? { selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) } : undefined}
           dataSource={materialPacks}
-          pagination={{ pageSize: 10 }}
+          pagination={pagination}
           onRow={(row) => {
             if (!canManage) return {};
             return {
@@ -606,7 +609,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
         rowKey="id"
         rowSelection={canManage ? { selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) } : undefined}
         dataSource={tableRows}
-        pagination={{ pageSize: 10 }}
+        pagination={pagination}
         onRow={(row) => {
           if (!canManage) return {};
           return {

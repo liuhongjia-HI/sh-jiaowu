@@ -1,3 +1,4 @@
+import { clampListPage, useListState } from '../../hooks/useListState';
 import { Alert, Button, Card, Form, Input, Pagination, Popconfirm, Select, Skeleton, Space, Table, Typography, message } from 'antd';
 import { CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
@@ -16,11 +17,11 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
   const [editing, setEditing] = useState<StudyPackage | null>(null);
   const [copiedFrom, setCopiedFrom] = useState<string>();
   const [copiedYearChanged, setCopiedYearChanged] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const [gradeFilter, setGradeFilter] = useState<string>();
-  const [subjectFilter, setSubjectFilter] = useState<string>();
-  const [levelFilter, setLevelFilter] = useState<string>();
-  const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useListState('packages:keyword', '');
+  const [gradeFilter, setGradeFilter] = useListState<string>('packages:gradeFilter');
+  const [subjectFilter, setSubjectFilter] = useListState<string>('packages:subjectFilter');
+  const [levelFilter, setLevelFilter] = useListState<string>('packages:levelFilter');
+  const [page, setPage] = useListState('packages:page', 1);
   const client = useQueryClient();
   const packages = useQuery({ queryKey: ['packages'], queryFn: () => getData<StudyPackage[]>('/packages') });
   const spaces = useQuery({ queryKey: ['learning-spaces-for-packages'], queryFn: () => getData<LearningSpace[]>('/learning-spaces') });
@@ -91,7 +92,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
   // 历史遗留列，纯展示、不参与匹配，用它拼下拉会让运营选到一个和校历对不上的学年。
   const years = Array.from(new Set([academicYearForDate(), ...academicYearsFromCalendar(settings.data?.academicCalendar), ...(packages.data ?? []).map((item) => item.academicYear), DEFAULT_ACADEMIC_YEAR].filter(Boolean))).map((value) => ({ label: String(value), value: String(value) }));
   const semesters = semesterOptions(settings.data?.semesters);
-  const paged = rows.slice((page - 1) * 10, page * 10);
+  const currentPage = clampListPage(page, rows.length); const paged = rows.slice((currentPage - 1) * 10, currentPage * 10);
   const defaults: PackageUpsertRequest = { name: '', academicYear: academicYearForDate(), grade: '' as never, subject: '' as never, semester: semesters[0]?.value || 'S1', level: 'S', phaseScope: '全学期', packageType: '', summary: '', learningSpaceIds: [], contentTypeCodes: ['question', 'handout'], status: '启用' };
   const initialValues: PackageUpsertRequest = editing
     ? { name: editing.name, academicYear: editing.academicYear, grade: editing.grade, subject: editing.subject, semester: editing.semester, level: editing.level || 'S', phaseScope: editing.phaseScope, packageType: editing.packageType, summary: editing.summary, learningSpaceIds: editing.learningSpaceIds ?? [], contentTypeCodes: editing.contentTypeCodes ?? [], trialEnabled: editing.trialEnabled, status: editing.status }
@@ -175,7 +176,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
             ) }] : [])
           ]}
         />
-        {rows.length > 10 && <Pagination current={page} pageSize={10} total={rows.length} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />}
+        {rows.length > 10 && <Pagination current={currentPage} pageSize={10} total={rows.length} showSizeChanger={false} onChange={setPage} style={{ marginTop: 16 }} />}
       </Card>
       <PackageDialog form={form} open={open} editing={Boolean(editing)} copiedFrom={copiedFrom} copiedYearChanged={copiedYearChanged} loading={save.isPending} learningSpaces={spaces.data ?? []} academicYearOptions={years} semesterOptions={semesters} initialValues={initialValues} onCancel={closeDialog} onSubmit={(values) => save.mutate(values)} />
     </div>

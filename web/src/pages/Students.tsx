@@ -1,3 +1,4 @@
+import { useListPagination, useListState } from '../hooks/useListState';
 import {
   Alert,
   Badge,
@@ -157,12 +158,13 @@ function TutoringTeacherNames({ assignments }: { assignments?: TutoringAssignmen
 }
 
 export default function Students({ user }: { user: CurrentUser }) {
-  const [openingFilter, setOpeningFilter] = useState<OpeningSelection | null>(null);
-  const [openingLevel, setOpeningLevel] = useState<string | undefined>();
+  const [openingFilter, setOpeningFilter] = useListState<OpeningSelection | null>('students:openingFilter', null);
+  const [openingLevel, setOpeningLevel] = useListState<string | undefined>('students:openingLevel');
   const studentListRef = useRef<HTMLDivElement>(null);
-  const [filters, setFilters] = useState<StudentFilters>({});
-  const [keywordInput, setKeywordInput] = useState('');
+  const [filters, setFilters] = useListState<StudentFilters>('students:filters', {});
+  const [keywordInput, setKeywordInput] = useListState('students:keywordInput', '');
   const [studentForm] = Form.useForm<StudentFormValues>();
+  const pagination = useListPagination('students', 8, JSON.stringify([filters, openingFilter]));
   const [editing, setEditing] = useState<Student | null>(null);
   const [studentDrawerOpen, setStudentDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Student | null>(null);
@@ -625,7 +627,7 @@ export default function Students({ user }: { user: CurrentUser }) {
               )}
             />
           ) : (
-            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" rowSelection={studentRowSelection} columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1160 }} pagination={{ pageSize: 8 }} sortDirections={['ascend', 'descend']} /></div>
+            rows.length === 0 ? <Empty description="还没有学生，先新增学生或批量导入。" /> : <div className="student-table-scroll"><Table className="student-table" rowKey="id" rowSelection={studentRowSelection} columns={columns} dataSource={rows} rowClassName={(record) => record.followUpStatus === '待跟进' ? 'student-follow-up-row' : ''} tableLayout="fixed" scroll={{ x: 1160 }} pagination={pagination} sortDirections={['ascend', 'descend']} /></div>
           )}
         </div>
       </Card>
