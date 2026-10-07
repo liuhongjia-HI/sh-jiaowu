@@ -96,3 +96,21 @@ export function availabilityCovers(slot: AvailabilitySlot, dayOfWeek: number, st
 export function isClockText(value?: string) {
   return /^\d{2}:\d{2}$/.test(value || '');
 }
+
+// 同一账号的不同日期/视图各自保留滚动位置，返回课表后仍看到原时段。
+function calendarScrollStorageKey(view: string) {
+  try {
+    const user = JSON.parse(localStorage.getItem('starline_admin_user') || '{}');
+    return `starline:calendar-scroll:${user.userId || 'anonymous'}:${view}`;
+  } catch { return `starline:calendar-scroll:anonymous:${view}`; }
+}
+export function readCalendarScroll(view: string): number | undefined {
+  try {
+    const saved = sessionStorage.getItem(calendarScrollStorageKey(view));
+    const value = saved === null ? NaN : Number(saved);
+    return Number.isFinite(value) && value >= 0 ? value : undefined;
+  } catch { return undefined; }
+}
+export function rememberCalendarScroll(view: string, position: number) {
+  try { sessionStorage.setItem(calendarScrollStorageKey(view), String(position)); } catch { /* unavailable storage does not block scheduling */ }
+}

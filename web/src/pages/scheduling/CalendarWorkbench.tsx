@@ -3,8 +3,8 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { Button, Empty, Space, Tag, Tooltip } from 'antd';
 import { subjectLabel } from '../../utils/curriculum';
 import type { AvailabilitySlot, Course, ScheduleClass, Student, Teacher } from '../../types/starline';
-import { availabilityCovers, localDateText, startOfWeek, weekdayOfDateText } from './scheduling-utils';
-import { buildTimelineItems, buildWeekDays, layoutOverlappingItems, TimelineBlock, type ScheduleMoveTarget } from './SchedulingViews';
+import { availabilityCovers, localDateText, readCalendarScroll, rememberCalendarScroll, startOfWeek, weekdayOfDateText } from './scheduling-utils';
+import { buildTimelineItems, buildWeekDays, layoutOverlappingItems, TimelineBlock, gradeCode, type ScheduleMoveTarget } from './SchedulingViews';
 
 export type CalendarMode = 'day' | 'week' | 'month' | 'list';
 export type CalendarSelection = { startTime?: string; endTime?: string; ownerKey?: string };
@@ -20,7 +20,8 @@ export function slotsOnDate(slots: AvailabilitySlot[], date: string, person?: Ca
     && (!slot.startDate || slot.startDate <= date) && (!slot.endDate || slot.endDate >= date));
 }
 
-export function CalendarTimeline({ mode, date, people, lessons, slots, courseById, teacherById, studentById, canManage, onCreate, onEdit, onCopy, onMove, onResize }: {
+export function CalendarTimeline({ mode, date, people, lessons, slots, courseById, teacherById, studentById, canManage, onCreate, onEdit, onCopy, onMove, onResize, canAdjustClass }: {
+  canAdjustClass?: (record: ScheduleClass) => boolean;
   mode: 'day' | 'week'; date: Date; people: CalendarPerson[];
   lessons: ScheduleClass[]; slots: AvailabilitySlot[]; courseById: Record<string, Course>;
   teacherById: Record<string, Teacher>; studentById: Record<string, Student>; canManage: boolean;
@@ -30,6 +31,11 @@ export function CalendarTimeline({ mode, date, people, lessons, slots, courseByI
   onResize: (lesson: ScheduleClass, endTime: string) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
+  const [draggedLesson, setDraggedLesson] = useState<ScheduleClass>();
+  const [selectedLesson, setSelectedLesson] = useState<string>();
+  const [now, setNow] = useState(() => new Date());
+  const scrollKey = `${mode}:${localDateText(date)}`;
+  useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   const columns = useMemo(() => {
     const days = mode === 'day' ? [date] : buildWeekDays(startOfWeek(date)).map(day => day.date);
     return days.flatMap(day => {
@@ -47,28 +53,33 @@ export function CalendarTimeline({ mode, date, people, lessons, slots, courseByI
   const height = (end - start) / 30 * 44;
   useEffect(() => {
     const first = columns.flatMap(column => column.lessons).filter(lesson => lesson.status !== '已取消').map(lesson => minuteOf(lesson.startTime));
-    if (scroller.current) scroller.current.scrollTop = first.length ? Math.max(0, (Math.min(...first) - start) / 30 * 44 - 44) : 0;
-  }, [date, mode, start]);
-  return <div ref={scroller} className="schedule-timeline-scroll calendar-scroll">
+    const node = scroller.current;
+    if (node) node.scrollTop = readCalendarScroll(scrollKey) ?? (first.length ? Math.max(0, (Math.min(...first) - start) / 30 * 44 - 44) : 0);
+  }, [scrollKey, start]);
+  return <div ref={scroller} className="schedule-timeline-scroll calendar-scroll"
+    onDragStartCapture={event => { const id = (event.target as HTMLElement).closest('[data-lesson-id]')?.getAttribute('data-lesson-id'); setDraggedLesson(lessons.find(item => item.id === id)); }}
+    onDragEnd={() => setDraggedLesson(undefined)} onScroll={event => rememberCalendarScroll(scrollKey, event.currentTarget.scrollTop)}>
+
     <div className="schedule-timeline-grid is-resource" style={{ '--lane-count': columns.length, '--timeline-height': `${height}px` } as CSSProperties}>
       <div className="schedule-time-gutter schedule-day-head-spacer" />
       {columns.map(column => <div className="schedule-day-head schedule-lane-head" key={column.key}>
-        <strong>{mode === 'day' ? column.person?.name ?? '全部课程' : `${Number(column.date.slice(5, 7))}/${Number(column.date.slice(8))} ${['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][weekdayOfDateText(column.date)]}`}</strong>
+        <strong className={column.date === localDateText(now) ? 'calendar-today-heading' : ''}>{mode === 'day' ? column.person?.name ?? '全部课程' : `${Number(column.date.slice(5, 7))}/${Number(column.date.slice(8))} ${['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'][weekdayOfDateText(column.date)]}`}</strong>
         <span>{column.person ? (column.person.kind === 'teacher' ? '教师' : '学生') : '课程总览'} · {column.lessons.filter(lesson => lesson.status !== '已取消').length} 节课</span>
         {column.person && <small>{column.slots.some(slot => !slot.unavailable) ? '已登记可上课时间' : '当天可上课时间未登记'}</small>}
       </div>)}
       <div className="schedule-time-gutter schedule-time-axis" style={{ height }}>
         {Array.from({ length: (end - start) / 30 }, (_, i) => <div className="schedule-time-label" key={i} style={{ top: i * 44 }}>{minuteText(start + i * 30)}</div>)}
       </div>
-      {columns.map(column => <CalendarColumn {...column} key={column.key} sourceLessons={lessons} start={start} end={end} height={height}
-        courseById={courseById} teacherById={teacherById} studentById={studentById} canManage={canManage}
-        onCreate={onCreate} onEdit={onEdit} onCopy={onCopy} onMove={onMove} onResize={onResize} />)}
+      {columns.map(column => <CalendarColumn {...column} key={column.key} sourceLessons={lessons} draggedLesson={draggedLesson} now={now} selectedLesson={selectedLesson} start={start} end={end} height={height}
+        courseById={courseById} teacherById={teacherById} studentById={studentById} canManage={canManage} canAdjustClass={canAdjustClass}
+        onCreate={onCreate} onEdit={lesson => { setSelectedLesson(lesson.id); onEdit(lesson); }} onCopy={onCopy} onMove={onMove} onResize={onResize} />)}
     </div>
   </div>;
 }
 
-function CalendarColumn({ date, person, lessons, sourceLessons, slots, start, end, height, courseById, teacherById, studentById, canManage, onCreate, onEdit, onCopy, onMove, onResize }: {
-  date: string; person?: CalendarPerson; lessons: ScheduleClass[]; sourceLessons: ScheduleClass[]; slots: AvailabilitySlot[]; start: number; end: number; height: number;
+function CalendarColumn({ date, person, lessons, sourceLessons, draggedLesson, now, selectedLesson, slots, start, end, height, courseById, teacherById, studentById, canManage, onCreate, onEdit, onCopy, onMove, onResize, canAdjustClass }: {
+  canAdjustClass?: (record: ScheduleClass) => boolean;
+  date: string; person?: CalendarPerson; lessons: ScheduleClass[]; sourceLessons: ScheduleClass[]; draggedLesson?: ScheduleClass; now: Date; selectedLesson?: string; slots: AvailabilitySlot[]; start: number; end: number; height: number;
   courseById: Record<string, Course>; teacherById: Record<string, Teacher>; studentById: Record<string, Student>;
   canManage: boolean; onCreate: (date: string, selection?: CalendarSelection) => void;
   onEdit: (lesson: ScheduleClass) => void; onCopy: (lesson: ScheduleClass) => void;
@@ -76,6 +87,7 @@ function CalendarColumn({ date, person, lessons, sourceLessons, slots, start, en
 }) {
   const columnRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(190);
+  const [dropMinute, setDropMinute] = useState<number>();
   const [selection, setSelection] = useState<{ from: number; to: number } | null>(null);
   const drag = useRef<{ from: number; to: number; y: number; moved: boolean } | null>(null);
   useEffect(() => {
@@ -88,8 +100,8 @@ function CalendarColumn({ date, person, lessons, sourceLessons, slots, start, en
   const items = buildTimelineItems([day], {}, { [day.dayOfWeek]: lessons }, courseById, teacherById, studentById).map(item => {
     const lesson = item.record as ScheduleClass;
     const course = courseById[lesson.courseId];
-    return { ...item, title: [course ? subjectLabel(course.subject) : lesson.courseName, course?.grade].filter(Boolean).join(' · '), subtitle: '',
-      meta: person?.kind === 'student' ? `教师：${teacherById[lesson.teacherId]?.name ?? lesson.teacherName}` : `${person ? '' : (teacherById[lesson.teacherId]?.name ?? lesson.teacherName) + ' · '}${lesson.students.map(student => studentById[student.id]?.name ?? student.name).join('、') || '待补学生'}` };
+    return { ...item, title: [teacherById[lesson.teacherId]?.name ?? lesson.teacherName, gradeCode(course?.grade), course ? subjectLabel(course.subject) : lesson.courseName].filter(Boolean).join(' · '), subtitle: course?.name ?? '',
+      meta: person?.kind === 'student' ? `教师：${teacherById[lesson.teacherId]?.name ?? lesson.teacherName}` : `${lesson.students.map(student => studentById[student.id]?.name ?? student.name).join('、') || '待补学生'}` };
   });
   const layout = layoutOverlappingItems(items, width);
   const position = (clientY: number) => Math.max(start, Math.min(end - 30, start + Math.floor((clientY - columnRef.current!.getBoundingClientRect().top) / 44) * 30));
@@ -100,7 +112,7 @@ function CalendarColumn({ date, person, lessons, sourceLessons, slots, start, en
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (!cancelled && active?.moved) createAt(Math.min(active.from, active.to), Math.max(active.from, active.to) + 30);
   };
-  return <div ref={columnRef} className="schedule-day-column calendar-column" data-date={date} data-owner={person?.key ?? 'all'} style={{ height }}
+  return <div ref={columnRef} className={`schedule-day-column calendar-column ${dropMinute !== undefined && draggedLesson ? 'is-drop-target' : ''}`} data-date={date} data-owner={person?.key ?? 'all'} style={{ height }}
     onPointerDown={event => {
       if (!canManage || event.button !== 0 || event.target !== event.currentTarget) return;
       const from = position(event.clientY); drag.current = { from, to: from, y: event.clientY, moved: false };
@@ -114,13 +126,14 @@ function CalendarColumn({ date, person, lessons, sourceLessons, slots, start, en
     }}
     onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)}
     onDoubleClick={event => { if (canManage && event.target === event.currentTarget) createAt(position(event.clientY), position(event.clientY) + 90); }}
-    onDragOver={event => { if (canManage) event.preventDefault(); }}
+    onDragOver={event => { if (canManage && draggedLesson && (!person || personHasClass(person, draggedLesson))) { event.preventDefault(); setDropMinute(Math.min(1440 - draggedLesson.durationMinutes, position(event.clientY))); } }}
+    onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropMinute(undefined); }}
     onDrop={event => {
-      event.preventDefault();
+      event.preventDefault(); setDropMinute(undefined);
       if (!canManage) return;
       const lesson = sourceLessons.find(item => item.id === event.dataTransfer.getData('text/schedule-class-id'));
       if (lesson && person && !personHasClass(person, lesson)) return;
-      if (!lesson || lesson.status === '已取消') return;
+      if (!lesson || lesson.status === '已取消' || lesson.status === '已上课' || canAdjustClass && !canAdjustClass(lesson)) return;
       const from = Math.min(1440 - lesson.durationMinutes, position(event.clientY));
       onMove(lesson, { lessonDate: date, startTime: minuteText(from), endTime: minuteText(from + lesson.durationMinutes), label: `${date} ${minuteText(from)}-${minuteText(from + lesson.durationMinutes)}` });
     }}>
@@ -128,7 +141,9 @@ function CalendarColumn({ date, person, lessons, sourceLessons, slots, start, en
     {slots.map(slot => <div key={slot.id} className={`calendar-availability is-${slot.ownerType} ${slot.unavailable ? 'is-unavailable' : ''}`} title={`${slot.ownerName} ${slot.unavailable ? '不可上课' : '可上课'} ${slot.startTime}-${slot.endTime}`}
       style={{ top: (minuteOf(slot.startTime) - start) / 30 * 44, height: (minuteOf(slot.endTime) - minuteOf(slot.startTime)) / 30 * 44 }} />)}
     {selection && <div className="calendar-selection" style={{ top: (selection.from - start) / 30 * 44, height: (selection.to - selection.from) / 30 * 44 }}>{minuteText(selection.from)}–{minuteText(selection.to)}</div>}
-    {layout.map(item => <TimelineBlock key={`${item.kind}:${item.id}`} item={item} rangeStart={start} canManage={canManage}
+    {date === localDateText(now) && now.getHours() * 60 + now.getMinutes() >= start && now.getHours() * 60 + now.getMinutes() <= end && <div className="calendar-now-line" style={{ top: (now.getHours() * 60 + now.getMinutes() - start) / 30 * 44 }} title={`当前时间 ${minuteText(now.getHours() * 60 + now.getMinutes())}`} />}
+    {draggedLesson && dropMinute !== undefined && <div className="calendar-drag-preview" style={{ top: (dropMinute - start) / 30 * 44, height: draggedLesson.durationMinutes / 30 * 44 }}>{date} {minuteText(dropMinute)}–{minuteText(dropMinute + draggedLesson.durationMinutes)}</div>}
+    {layout.map(item => <TimelineBlock selected={item.id === selectedLesson} canAdjustClass={canAdjustClass} key={`${item.kind}:${item.id}`} item={item} rangeStart={start} canManage={canManage}
       onEditClass={onEdit} onCopyClass={onCopy} onResizeClass={onResize} />)}
   </div>;
 }

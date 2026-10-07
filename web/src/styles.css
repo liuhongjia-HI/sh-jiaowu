@@ -1969,100 +1969,38 @@ button.schedule-block:hover {
   margin: 0;
 }
 
-.month-board {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(132px, 1fr));
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.month-day {
-  min-width: 132px;
-  min-height: 154px;
-  border: 1px solid #e6ebf2;
-  border-radius: 8px;
-  background: #fbfcff;
-  overflow: hidden;
-}
-
-.month-day-head {
-  height: 42px;
-  padding: 8px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #e6ebf2;
-  background: #fff;
-}
-
-.month-day-head strong {
-  font-size: 16px;
-}
-
-.month-day-head span {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.month-day-body {
-  display: grid;
-  gap: 6px;
-  padding: 8px;
-}
-
-.month-day-empty {
-  padding-top: 34px;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 12px;
-}
-
-/* 月视图条目是单行的：一格要放得下四条，多行 grid 一条就占掉整格。
-   学科主色只做左侧色条和底色，不整块上色——月视图一格四条，
-   四块饱和色排在一起会盖掉「哪天忙」这个总览信息。 */
-.month-class {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  border: 1px solid transparent;
-  border-left: 3px solid var(--subject-color, #94a3b8);
-  border-radius: 4px;
-  background: var(--subject-bg, #f8fafc);
-  padding: 3px 6px;
-  color: #1f2937;
-  text-align: left;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1.5;
-  min-width: 0;
-}
-
-.month-class:hover {
-  border-color: var(--subject-color, #94a3b8);
-}
-
-.month-class-time {
-  color: #475569;
-  font-variant-numeric: tabular-nums;
-  flex: 0 0 auto;
-}
-
-/* 月格内使用短行；当天完整列表和课次列表允许姓名换行。 */
-.month-class-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.month-class.is-canceled {
-  border-color: #d1d5db;
-  background: #f3f4f6;
-  color: #6b7280;
-}
+/* 月历使用完整周网格；每周行高由该周最忙的日期决定。 */
+.month-calendar-scroll { overflow: auto; max-height: calc(100vh - 260px); min-height: 420px; border: 1px solid #e1e7f0; border-radius: 6px; }
+.month-weekdays { display: grid; grid-template-columns: repeat(7, minmax(140px, 1fr)); min-width: 980px; position: sticky; top: 0; z-index: 8; background: #f5f8fc; border-bottom: 1px solid #e1e7f0; }
+.month-weekdays strong { text-align: center; padding: 9px 4px; font-size: 13px; font-weight: 500; border-right: 1px solid #e1e7f0; }
+.month-board { display: grid; grid-template-columns: repeat(7, minmax(140px, 1fr)); min-width: 980px; gap: 0; }
+.month-day { min-width: 0; min-height: 170px; background: #fff; border-right: 1px solid #e1e7f0; border-bottom: 1px solid #e1e7f0; position: relative; }
+.month-day.is-weekend { background: #f7f9fd; }
+.month-day.is-outside .month-date-number { color: #94a3b8; }
+.month-day.is-selected-date { box-shadow: inset 0 0 0 1px #91caff; }
+.month-day-head { padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
+.month-date-number { border: 0; background: transparent; color: #1e293b; width: 28px; height: 28px; border-radius: 50%; font-size: 15px; font-weight: 600; cursor: pointer; }
+.month-date-number:hover { background: #e6f4ff; }
+.month-date-number.is-today { color: white; background: #1677ff; }
+.month-day-body { display: grid; align-content: start; gap: 5px; padding: 0 7px 8px; }
+.month-class { display: grid; gap: 2px; width: 100%; min-width: 0; padding: 6px 7px; border: 1px solid transparent; border-left: 3px solid var(--subject-color, #94a3b8); border-radius: 5px; background: var(--subject-bg, #f8fafc); color: #1f2937; text-align: left; cursor: pointer; font-size: 12px; line-height: 1.45; }
+.month-class:hover, .month-class:focus-visible { border-color: var(--subject-color, #94a3b8); outline: none; }
+.month-class.is-selected { border-color: #1677ff; box-shadow: 0 0 0 1px #1677ff; }
+.month-class-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; min-width: 0; }
+.month-class-time { color: #182c48; font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.month-class-teacher { color: #54657c; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.month-class-subject { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
+.month-course-name { font-size: 11px; border: 1px solid #94a3b855; padding: 0 3px; border-radius: 3px; overflow-wrap: anywhere; }
+.month-class-text { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.month-class-footer { display: flex; align-items: center; justify-content: space-between; gap: 4px; color: #64748b; font-size: 11px; }
+.month-class-status.is-pending { color: #9c6500; background: #fff3cf; border-radius: 3px; padding: 0 3px; }
+.month-class-status.is-rejected { color: #b42318; background: #fff1f0; border-radius: 3px; padding: 0 3px; }
+.month-class-more { border: 0; padding: 0 3px; min-width: 22px; min-height: 22px; background: transparent; color: #405778; cursor: pointer; font-weight: 700; border-radius: 3px; }
+.month-class-more:hover { background: #ffffffaa; }
+.month-class.is-canceled { border-left-color: #94a3b8; background: #f0f2f5; color: #6b7280; }
+.month-class.is-canceled .month-class-time { text-decoration: line-through; color: #64748b; }
+.month-day.is-drop-target { box-shadow: inset 0 0 0 2px #1677ff; background: #e6f4ff; }
+.month-drop-hint { pointer-events: none; position: sticky; bottom: 0; padding: 6px; font-size: 12px; color: #1668dc; background: #e6f4ff; }
 
 .page-loading {
   min-height: 100vh;
@@ -3267,11 +3205,9 @@ button.schedule-block:hover {
 
 .month-day-count { border: 0; background: #edf4ff; color: #1668dc; border-radius: 4px; padding: 2px 4px; cursor: pointer; font-size: 12px; }
 .month-full-day-list { display: grid; gap: 8px; }
-.month-class.is-expanded { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 10px 12px; font-size: 14px; }
-.month-class.is-expanded .month-class-time { grid-column: 1; font-weight: 600; }
-.month-class.is-expanded .month-class-text { grid-column: 1 / -1; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
-.month-class.is-expanded .schedule-recurrence-mark { grid-column: 2; grid-row: 1; }
-.month-class-meta { grid-column: 1 / -1; color: #64748b; font-size: 12px; }
+.month-class.is-expanded { padding: 10px 12px; font-size: 14px; }
+.month-class.is-expanded .month-class-time { font-size: 14px; }
+.month-class-meta { color: #64748b; font-size: 12px; }
 
 .schedule-lesson-list { display: grid; gap: 12px; }
 .schedule-lesson-list-row { display: grid; grid-template-columns: 105px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e6ebf2; border-radius: 8px; background: #fff; }
@@ -3282,4 +3218,47 @@ button.schedule-block:hover {
 }
 
 .month-class-icons { display: inline-flex; align-items: center; gap: 4px; color: #64748b; }
-.month-class.is-expanded .month-class-icons { grid-column: 2; grid-row: 1; }
+
+
+/* 排课工具栏与图例只服务当前课表。 */
+.calendar-filterbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 0 12px 10px; border-bottom: 1px solid #e1e7f0; }
+.calendar-filterbar .ant-select { width: 130px; }
+.calendar-extra-filters { padding: 10px 12px; border-bottom: 1px solid #e1e7f0; background: #fafcff; }
+.calendar-extra-filters .ant-select { width: 180px; }
+.calendar-review-button { color: #ad6800; border-color: #ffd591; background: #fffaf0; }
+.calendar-subject-legend { display: inline-flex; align-items: center; gap: 5px; }
+.calendar-subject-legend i { width: 9px; height: 9px; border-radius: 50%; }
+.calendar-workbench .calendar-toolbar { border-bottom: 0; }
+.calendar-workbench .schedule-outlook-main { padding: 8px; }
+.calendar-column.is-drop-target { background: #e6f4ff; }
+.calendar-drag-preview { position: absolute; left: 2px; right: 2px; z-index: 6; pointer-events: none; border: 2px dashed #1677ff; border-radius: 4px; background: #e6f4ffdd; color: #1668dc; padding: 4px; font-size: 12px; }
+.calendar-now-line { position: absolute; left: 0; right: 0; height: 2px; background: #e5484d; z-index: 5; pointer-events: none; }
+.calendar-now-line::before { content: ''; position: absolute; left: -3px; top: -3px; height: 8px; width: 8px; border-radius: 50%; background: #e5484d; }
+.schedule-resize-preview { position: absolute; bottom: 8px; right: 4px; background: #1677ff; color: #fff; font-size: 11px; padding: 2px 4px; border-radius: 3px; pointer-events: none; }
+.calendar-scroll .schedule-time-axis { position: sticky; left: 0; z-index: 7; background: #fff; }
+.calendar-scroll .schedule-day-head-spacer { position: sticky; left: 0; z-index: 9; }
+@media (min-width: 1650px) {
+ .month-weekdays, .month-board { grid-template-columns: repeat(7, minmax(175px, 1fr)); }
+}
+@media (max-width: 700px) {
+ .month-calendar-scroll { max-height: 70vh; }
+ .month-weekdays { display: none; }
+ .month-board { display: block; min-width: 0; }
+ .month-day { min-height: 80px; }
+ .month-day.is-outside { display: none; }
+ .month-day-head::after { content: attr(data-label); }
+ .month-day-head { background: #f8fafc; }
+ .month-date-number { width: auto; padding: 0 8px; border-radius: 4px; }
+ .calendar-filterbar .ant-select { width: 135px; }
+ .calendar-filterbar { padding: 0 8px 8px; }
+}
+.calendar-today-heading { color: #1677ff; }
+.calendar-column .schedule-timeline-block.is-selected { outline: 2px solid #1677ff; outline-offset: -1px; }
+.month-day-body:empty { min-height: 110px; }
+.schedule-timeline-head { display: flex; align-items: center; justify-content: space-between; gap: 3px; min-width: 0; }
+.schedule-timeline-audit { background: #fff1c2; color: #9c6500; border-radius: 3px; font-size: 10px; padding: 0 2px; white-space: nowrap; }
+@container (max-height: 42px) {
+ .calendar-column .schedule-timeline-time { display: block; font-size: 11px; line-height: 14px; }
+ .calendar-column .schedule-timeline-body { gap: 0; padding: 2px 4px; }
+ .calendar-column .schedule-timeline-body > strong { font-size: 11px; line-height: 14px; }
+}

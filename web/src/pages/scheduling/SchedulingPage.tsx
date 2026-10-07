@@ -1,6 +1,7 @@
 import { useListState } from '../../hooks/useListState';
+import { subjectPalette } from '../../utils/subject-colors';
 import { DeleteOutlined, LeftOutlined, PlusOutlined, ReloadOutlined, RightOutlined, SaveOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Drawer, Form, Input, InputNumber, Modal, Segmented, Select, Skeleton, Space, Switch, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Segmented, Select, Skeleton, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { getData, postData, putData } from '../../services/http';
@@ -57,8 +58,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const [scopeTeacher, setScopeTeacher] = useState<Teacher | null>(null);
   const [formCourseGrade, setFormCourseGrade] = useState<string>();
   const [formCourseSubject, setFormCourseSubject] = useState<string>();
-  // 人员日历是高频入口，默认展开。
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState<string>();
   const [calendarPeople, setCalendarPeople] = useListState<string[]>('scheduling:calendarPeople', []);
   const [cancelRecord, setCancelRecord] = useState<ScheduleClass | null>(null);
   const [cancelScope, setCancelScope] = useState('this');
@@ -74,9 +77,9 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   // 重复排课默认关闭：绝大多数排课是单节，默认展开一堆重复选项只会碍事。
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
-  // 默认停在资源泳道日视图：这是排课场景真正读得清的密度，周视图退居总览。
+  // 首次进入展示月历，后续沿用个人选择。
   const [viewMode, setViewMode] = useState<CalendarMode>(() => {
-    try { const saved = localStorage.getItem(`starline-calendar-view:${user.userId}`); if (saved === 'workweek') return 'week'; return ['day','week','month','list'].includes(saved ?? '') ? saved as CalendarMode : 'day'; } catch { return 'day'; }
+    try { const saved = localStorage.getItem(`starline-calendar-view:${user.userId}`); if (saved === 'workweek') return 'week'; return ['day','week','month','list'].includes(saved ?? '') ? saved as CalendarMode : 'month'; } catch { return 'month'; }
   });
   useEffect(() => { try { localStorage.setItem(`starline-calendar-view:${user.userId}`, viewMode); } catch { /* storage unavailable */ } }, [viewMode, user.userId]);
   const [classGradeFilter, setClassGradeFilter] = useListState<string>('scheduling:classGradeFilter');
@@ -98,6 +101,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const canCreateClass = user.roles.some((role) => ['teacher', 'ops_staff', 'campus_admin', 'super_admin'].includes(role));
   // 审核仍然只归管理员。
   const canReviewClass = user.roles.some((role) => ['ops_staff', 'campus_admin', 'super_admin'].includes(role));
+
+  const canAdjustLesson = (record: ScheduleClass) => canCreateClass && record.status !== '已取消' && record.status !== '已上课'
+    && (canReviewClass || record.teacherId === user.userId && ['待审核', '已驳回'].includes(record.auditStatus));
+  const detailReadOnly = !canCreateClass || Boolean(editingClass && !copyingClass && !canAdjustLesson(editingClass));
 
   const teachers = useQuery({ queryKey: ['teachers'], queryFn: () => getData<Teacher[]>('/teachers') });
   const students = useQuery({ queryKey: ['students'], queryFn: () => getData<Student[]>('/students') });
@@ -263,8 +270,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   const studentById = useMemo(() => Object.fromEntries((students.data ?? []).map((item) => [item.id, item])), [students.data]);
   const statusOptions = [
     { label: '全部状态', value: '全部' },
-    { label: '待确认', value: '待确认' },
-    { label: '已确认', value: '已确认' },
+    { label: '待成班', value: '待确认' },
+    { label: '待上课', value: '已确认' },
+    { label: '待审核', value: '待审核' },
+    { label: '已驳回', value: '已驳回' },
     { label: '已上课', value: '已上课' },
     { label: '已取消', value: '已取消' }
   ];
@@ -283,7 +292,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     ...(students.data ?? []).map(item => ({ key: `student:${item.id}`, id: item.id, name: studentDisplayName(item), kind: 'student' as const }))
   ];
   const selectedPeople = allPeople.filter(person => calendarPeople.includes(person.key));
-  const dayPeople = calendarPeople.length ? selectedPeople : allPeople.filter(person => person.kind === 'teacher');
+  const dayPeople = calendarPeople.length ? selectedPeople : allPeople.filter(person => person.kind === 'teacher' && (!classTeacherFilter || person.id === classTeacherFilter));
   const filteredClasses = useMemo(() => filterClasses(classes.data ?? [], classFilters, courseById).filter(item => !calendarPeople.length || calendarPeople.some(key => key === `teacher:${item.teacherId}` || item.students.some(student => key === `student:${student.id}`))), [classes.data, classFilters, courseById, calendarPeople]);
   const subjectVisibleClasses = useMemo(
     () => filteredClasses.filter((item) => !hiddenSubjects.includes(scheduleClassSubject(item, courseById) || '其他')),
@@ -348,6 +357,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     finally { setPreflightBusy(false); }
   }
   function openEdit(record: ScheduleClass) {
+    setSelectedLessonId(record.id);
     setEditScope('this');
     setAssistantOpen(false);
     setCreatingClass(false);
@@ -404,7 +414,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   // 拖块下沿改时长。走的是同一条调课链路，所以重复课次同样要问影响范围——
   // 少了这一步，拉伸就成了绕过三选一的后门，又变回「改一节动整个学期」。
   function confirmResizeClass(record: ScheduleClass, endTime: string) {
-    if (!canCreateClass || record.status === '已取消' || endTime === record.endTime) return;
+    if (!canAdjustLesson(record) || endTime === record.endTime) return;
     const target: ScheduleMoveTarget = {
       lessonDate: record.lessonDate,
       startTime: record.startTime,
@@ -462,10 +472,16 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
     setCalendarMonth(startOfMonth(date));
   }
 
+  function navigateMonth(offset: number) {
+    const month = addMonths(calendarMonth, offset);
+    const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    goToDate(new Date(month.getFullYear(), month.getMonth(), Math.min(selectedDate.getDate(), lastDay)));
+  }
+
   function confirmMoveClass(record: ScheduleClass, target: ScheduleMoveTarget) {
     const isSameTarget = record.lessonDate === target.lessonDate &&
       (!target.startTime || (record.startTime === target.startTime && record.endTime === target.endTime));
-    if (!canCreateClass || record.status === '已取消' || isSameTarget) return;
+    if (!canAdjustLesson(record) || isSameTarget) return;
 
     // 单次课，以及已经单独调整过、不再跟随系列的课次，都只影响它自己，不必问范围。
     const isRepeating = Boolean(record.seriesId) && !record.detached;
@@ -486,21 +502,10 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
   }
 
   if (teachers.isLoading || students.isLoading || courses.isLoading || classes.isLoading || availabilityOverview.isLoading) return <Skeleton active />;
-  if (teachers.error || students.error || courses.error || classes.error || availabilityOverview.error) return <Alert type="error" message="排课数据加载失败，请稍后重试。" />;
+  if (teachers.error || students.error || courses.error || classes.error || availabilityOverview.error) return <Alert type="error" message="排课数据加载失败" action={<Button onClick={() => { void teachers.refetch(); void students.refetch(); void courses.refetch(); void classes.refetch(); void availabilityOverview.refetch(); }}>重试</Button>} />;
 
   return (
     <div className="page-stack calendar-page">
-      <div className="page-heading">
-        <div>
-          <Typography.Title level={3}>排课管理</Typography.Title>
-
-        </div>
-        <Space wrap>
-          <Button icon={<SaveOutlined />} onClick={() => setAvailabilityOpen(true)}>教师可上课时间</Button>
-          <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()} />
-        </Space>
-      </div>
-
       {/* 老师排的课在通过审核前学生端看不到，这里给老师一个明确的预期，
           免得排完以为已经生效了。 */}
       {!canReviewClass && canCreateClass && (
@@ -512,38 +517,36 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         />
       )}
 
-      {canReviewClass && (pendingClasses.data ?? []).length > 0 && (
-        <Card title={`待审核排课（${(pendingClasses.data ?? []).length}）`}>
-          <Table<ScheduleClass>
-            rowKey="id"
-            size="small"
-            pagination={false}
-            dataSource={pendingClasses.data ?? []}
-            loading={pendingClasses.isFetching}
-            columns={pendingReviewColumns(
-              courseById,
-              (record) => reviewClass.mutate({ id: record.id, approve: true }),
-              (record, reason) => reviewClass.mutate({ id: record.id, approve: false, reason }),
-              reviewClass.isPending
-            )}
-          />
-        </Card>
-      )}
-
       <div className="calendar-workbench">
         <div className="calendar-toolbar">
           <Space wrap size={6}>
             <Button onClick={() => setSidebarOpen(open => !open)}>{sidebarOpen ? '收起侧栏' : '人员日历'}</Button>
-            <Button icon={<LeftOutlined />} aria-label="上一期" onClick={() => viewMode === 'month' ? goToDate(addMonths(calendarMonth, -1)) : goToDate(addDays(selectedDate, viewMode === 'day' ? -1 : -7))} />
+            <Button icon={<LeftOutlined />} aria-label="上一期" onClick={() => viewMode === 'month' ? navigateMonth(-1) : goToDate(addDays(selectedDate, viewMode === 'day' ? -1 : -7))} />
             <Button onClick={() => goToDate(new Date())}>今天</Button>
-            <Button icon={<RightOutlined />} aria-label="下一期" onClick={() => viewMode === 'month' ? goToDate(addMonths(calendarMonth, 1)) : goToDate(addDays(selectedDate, viewMode === 'day' ? 1 : 7))} />
+            <Button icon={<RightOutlined />} aria-label="下一期" onClick={() => viewMode === 'month' ? navigateMonth(1) : goToDate(addDays(selectedDate, viewMode === 'day' ? 1 : 7))} />
             <strong>{viewMode === 'day' ? localDateText(selectedDate) : viewMode === 'list' ? '全部课次' : viewMode === 'month' ? `${calendarMonth.getFullYear()} 年 ${calendarMonth.getMonth() + 1} 月` : formatWeekRange(selectedWeekStart)}</strong>
-            {canCreateClass && <Button aria-label="新建课程" type="primary" icon={<PlusOutlined />} onClick={() => openCreateClassForDay(localDateText(selectedDate))}>新建课程</Button>}
           </Space>
-          <Segmented value={viewMode} onChange={value => setViewMode(value as CalendarMode)} options={[
-            { label: '日', value: 'day' }, { label: '周', value: 'week' }, { label: '月', value: 'month' }, { label: '列表', value: 'list' }
-          ]} />
+          <Space wrap><Segmented value={viewMode} onChange={value => setViewMode(value as CalendarMode)} options={[
+            { label: '月', value: 'month' }, { label: '周', value: 'week' }, { label: '日', value: 'day' }, { label: '列表', value: 'list' }
+          ]} />{canCreateClass && <Button aria-label="新建课程" type="primary" icon={<PlusOutlined />} onClick={() => openCreateClassForDay(localDateText(selectedDate))}>新建课程</Button>}</Space>
         </div>
+        <div className="calendar-filterbar">
+          <Space wrap size={8}>
+            <Select aria-label="教师筛选" allowClear showSearch optionFilterProp="label" placeholder="全部教师" options={teacherOptions} value={classTeacherFilter} onChange={setClassTeacherFilter} />
+            <Select aria-label="学生筛选" allowClear showSearch optionFilterProp="label" placeholder="全部学生" options={studentOptions} value={classStudentFilter} onChange={setClassStudentFilter} />
+            <Select aria-label="年级筛选" allowClear placeholder="全部年级" options={gradeOptions()} value={classGradeFilter} onChange={setClassGradeFilter} />
+            <Select aria-label="学科筛选" allowClear placeholder="全部学科" options={classSubjectOptions} value={classSubjectFilter} onChange={setClassSubjectFilter} />
+            <Select aria-label="状态筛选" options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
+            <Button onClick={() => setFiltersOpen(open => !open)}>更多筛选</Button>
+            {hasClassFilters && <Button type="text" onClick={() => { setClassGradeFilter(undefined); setClassSubjectFilter(undefined); setClassCampusFilter(undefined); setClassCourseFilter(undefined); setClassTypeFilter(undefined); setClassTeacherFilter(undefined); setClassStudentFilter(undefined); setHiddenSubjects([]); setStatusFilter('全部'); }}>清空筛选</Button>}
+          </Space>
+          <Space wrap>{canReviewClass && <Button className="calendar-review-button" onClick={() => setReviewOpen(true)}>待审核 {pendingClasses.data?.length ?? 0}</Button>}<Button icon={<SaveOutlined />} onClick={() => setAvailabilityOpen(true)}>教师可上课时间</Button><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries()} /></Space>
+        </div>
+        {filtersOpen && <div className="calendar-extra-filters"><Space wrap>
+          <Select aria-label="校区筛选" allowClear placeholder="全部校区" options={campusOptions} value={classCampusFilter} onChange={setClassCampusFilter} />
+          <Select aria-label="课程筛选" allowClear showSearch optionFilterProp="label" placeholder="全部课程" options={courseOptions} value={classCourseFilter} onChange={setClassCourseFilter} />
+          <Select aria-label="班型筛选" allowClear placeholder="全部班型" options={classTypeOptions} value={classTypeFilter} onChange={setClassTypeFilter} />
+        </Space></div>}
         <div className={sidebarOpen ? 'schedule-outlook-shell' : 'calendar-shell-collapsed'}>
           {sidebarOpen && <aside className="schedule-outlook-sidebar">
             <div className="schedule-sidebar-section">
@@ -558,33 +561,25 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
               <Select aria-label="选择人员日历" mode="multiple" allowClear showSearch optionFilterProp="label" placeholder="全部教师" value={calendarPeople} onChange={setCalendarPeople}
                 options={allPeople.map(person => ({ value: person.key, label: `${person.kind === 'teacher' ? '教师' : '学生'} · ${person.name}` }))} />
             </div>
-            <details className="calendar-filters"><summary>更多筛选{hasClassFilters ? ' · 已生效' : ''}</summary>
-              <div className="schedule-sidebar-filters">
-                <Select aria-label="年级筛选" allowClear placeholder="全部年级" options={gradeOptions()} value={classGradeFilter} onChange={setClassGradeFilter} />
-                <Select aria-label="学科筛选" allowClear placeholder="全部学科" options={classSubjectOptions} value={classSubjectFilter} onChange={setClassSubjectFilter} />
-                <Select aria-label="校区筛选" allowClear placeholder="全部校区" options={campusOptions} value={classCampusFilter} onChange={setClassCampusFilter} />
-                <Select aria-label="课程筛选" allowClear showSearch optionFilterProp="label" placeholder="全部课程" options={courseOptions} value={classCourseFilter} onChange={setClassCourseFilter} />
-                <Select aria-label="班型筛选" allowClear placeholder="全部班型" options={classTypeOptions} value={classTypeFilter} onChange={setClassTypeFilter} />
-                <Select aria-label="状态筛选" options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
-                <Button onClick={() => { setClassGradeFilter(undefined); setClassSubjectFilter(undefined); setClassCampusFilter(undefined); setClassCourseFilter(undefined); setClassTypeFilter(undefined); setClassTeacherFilter(undefined); setClassStudentFilter(undefined); setHiddenSubjects([]); setStatusFilter('全部'); }}>清空筛选</Button>
-              </div>
-            </details>
           </aside>}
           <main className="schedule-outlook-main">
             <div className="calendar-context">
-              <Space wrap size={6}>{selectedPeople.length ? selectedPeople.map(person => <Tag key={person.key}>{person.name}</Tag>) : <span>全部教师</span>}{hasClassFilters && <Tag color="blue">已筛选</Tag>}</Space>
-              <Space wrap size={10}><span className="calendar-legend-teacher">教师可上课</span><span className="calendar-legend-student">学生可上课</span><span title="空白仅表示无课程，不表示已登记可上课时间">双击新建 · 拖选时段</span></Space>
+              <Space wrap size={10}>{Array.from(new Set((courses.data ?? []).map(course => course.subject))).map(subject => <span className="calendar-subject-legend" key={subject}><i style={{ background: subjectPalette(subject).accent }} />{subjectLabel(subject)}</span>)}{hasClassFilters && <Tag color="blue">已筛选</Tag>}{selectedPeople.map(person => <Tag key={person.key}>{person.name}</Tag>)}</Space>
+              {viewMode !== 'month' && viewMode !== 'list' && <Space wrap size={10}><span className="calendar-legend-teacher">教师可上课</span><span className="calendar-legend-student">学生可上课</span><span title="空白不表示已登记可上课时间">双击新建 · 拖选时段</span></Space>}
             </div>
             {viewMode === 'day' || viewMode === 'week' ? <CalendarTimeline
               mode={viewMode} date={selectedDate} people={viewMode === 'day' ? dayPeople : selectedPeople} lessons={subjectVisibleClasses}
-              slots={availabilityOverview.data ?? []} courseById={courseById} teacherById={teacherById} studentById={studentById} canManage={canCreateClass}
+              slots={availabilityOverview.data ?? []} courseById={courseById} teacherById={teacherById} studentById={studentById} canManage={canCreateClass} canAdjustClass={canAdjustLesson}
               onCreate={openCreateClassForDay} onEdit={openEdit} onCopy={openCopy} onMove={confirmMoveClass} onResize={confirmResizeClass}
-            /> : viewMode === 'month' ? <MonthScheduleBoard month={calendarMonth} classes={subjectVisibleClasses} courseById={courseById} teacherById={teacherById} canManage={canCreateClass} onEditClass={openEdit} onCopyClass={openCopy} onMoveClass={confirmMoveClass} />
-              : <ScheduleLessonList classes={subjectVisibleClasses} courseById={courseById} teacherById={teacherById} canManage={canCreateClass} onEditClass={openEdit} onCancel={record => requestCancel(record.id)} onRestore={requestRestore} cancelling={cancelClass.isPending} />}
+            /> : viewMode === 'month' ? <MonthScheduleBoard month={calendarMonth} classes={subjectVisibleClasses} courseById={courseById} teacherById={teacherById} canManage={canCreateClass} canAdjustClass={canAdjustLesson} onEditClass={openEdit} onCopyClass={openCopy} onMoveClass={confirmMoveClass} onCreate={openCreateClassForDay} selectedDate={selectedDate} onSelectDate={goToDate} onOpenDay={date => { goToDate(date); setViewMode('day'); }} selectedLessonId={selectedLessonId} onCancel={record => requestCancel(record.id)} onComplete={record => completeClass.mutate(record.id)} />
+              : <ScheduleLessonList classes={subjectVisibleClasses} courseById={courseById} teacherById={teacherById} canManage={canCreateClass} canAdjustClass={canAdjustLesson} onEditClass={openEdit} onCancel={record => requestCancel(record.id)} onRestore={requestRestore} cancelling={cancelClass.isPending} />}
           </main>
         </div>
       </div>
 
+      <Drawer title={`待审核排课（${pendingClasses.data?.length ?? 0}）`} open={reviewOpen && canReviewClass} onClose={() => setReviewOpen(false)} width="min(1000px, 100vw)">
+        {pendingClasses.error ? <Alert type="error" message="审核数据加载失败" action={<Button onClick={() => pendingClasses.refetch()}>重试</Button>} /> : <Table<ScheduleClass> rowKey="id" size="small" pagination={{ pageSize: 10 }} scroll={{ x: 760 }} dataSource={pendingClasses.data ?? []} loading={pendingClasses.isFetching} columns={pendingReviewColumns(courseById, record => reviewClass.mutate({ id: record.id, approve: true }), (record, reason) => reviewClass.mutate({ id: record.id, approve: false, reason }), reviewClass.isPending)} />}
+      </Drawer>
       <Drawer title="编辑老师授课范围" width="min(560px, 100vw)" open={!!scopeTeacher} onClose={() => setScopeTeacher(null)} destroyOnHidden extra={<Button type="primary" loading={saveTeacherScope.isPending} disabled={!teachingSpaces.data} onClick={() => teacherScopeForm.submit()}>保存范围</Button>}>
         {teachingSpaces.isLoading ? <Skeleton active /> : teachingSpaces.error ? <Alert type="error" message="授课范围加载失败" action={<Button onClick={() => teachingSpaces.refetch()}>重试</Button>} /> : <Form form={teacherScopeForm} layout="vertical" onFinish={values => saveTeacherScope.mutate(values)}><Typography.Paragraph strong>{scopeTeacher?.name}</Typography.Paragraph><TeacherScopeFields form={teacherScopeForm} spaces={teachingSpaces.data ?? []} /></Form>}
       </Drawer>
@@ -640,7 +635,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
       <Drawer
         title={copyingClass ? '复制课程' : creatingClass ? '新建课程' : '课程详情'}
         open={Boolean(editingClass) || creatingClass}
-        width={560}
+        width="min(640px, 100vw)"
         onClose={() => {
           setEditingClass(null);
           setCreatingClass(false);
@@ -648,13 +643,13 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
         }}
         extra={(editingClass || creatingClass) && (
           <Space>
-            {editingClass && editingClass.status !== '已上课' && editingClass.status !== '已取消' && editingClass.auditStatus === '已通过' && new Date(`${editingClass.lessonDate}T${editingClass.endTime}`).getTime() <= Date.now() && (
+            {canCreateClass && editingClass && editingClass.status !== '已上课' && editingClass.status !== '已取消' && editingClass.auditStatus === '已通过' && new Date(`${editingClass.lessonDate}T${editingClass.endTime}`).getTime() <= Date.now() && (
               <Button loading={completeClass.isPending} onClick={() => completeClass.mutate(editingClass.id)}>标记已上课</Button>
             )}
-            {editingClass && (
+            {editingClass && canAdjustLesson(editingClass) && (
               <Button danger loading={cancelClass.isPending} onClick={() => requestCancel(editingClass.id)}>取消课程</Button>
             )}
-            <Button type="primary" disabled={editingClass?.status === '已上课' && !copyingClass} loading={preflightBusy || updateClass.isPending || createManualClass.isPending} onClick={() => editForm.submit()}>
+            <Button type="primary" disabled={detailReadOnly} loading={preflightBusy || updateClass.isPending || createManualClass.isPending} onClick={() => editForm.submit()}>
               {copyingClass ? '创建复制课程' : creatingClass ? '创建课程' : '保存调课'}
             </Button>
           </Space>
@@ -668,7 +663,8 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             message="已带入原课程信息，请修改上课日期、时间或其他属性。"
           />
         )}
-        <Form form={editForm} layout="vertical" onFinish={values => {
+        {editingClass && !canReviewClass && editingClass.auditStatus === '已通过' && <Alert type="info" showIcon message="课程已通过审核，请联系教务调整" style={{ marginBottom: 12 }} />}
+        <Form form={editForm} disabled={detailReadOnly} layout="vertical" onFinish={values => {
           const { repeat, ...rest } = values as ScheduleClassFormValues & { repeat?: RepeatFormValues };
           const payload = { ...rest, durationMinutes: clockMinutes(values.endTime) - clockMinutes(values.startTime), editScope, ...(creatingClass && repeatEnabled && repeat ? { repeat: buildRepeatPayload(repeat) } : {}) };
           void preflight(payload, creatingClass ? undefined : editingClass?.id, () => {
@@ -685,7 +681,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
             <Select aria-label="排课课程学科" allowClear placeholder="学科" value={formCourseSubject} options={[...new Set(teachingCourses.filter(item => !formCourseGrade || item.grade === formCourseGrade).map(item => item.subject))].map(value => ({ value, label: subjectLabel(value) }))} onChange={setFormCourseSubject} style={{ width: '50%' }} />
           </Space.Compact>}
           <Form.Item name="courseId" label="课程" dependencies={['teacherId']} rules={[{ required: true, message: '请选择课程' }, { validator: async () => { if (!validTeacherCourse) throw new Error('课程不在老师授课范围，请调整课程或授课范围'); } }]}>
-            <Select showSearch optionFilterProp="label" disabled={!editingTeacherId} options={formCourseOptions} notFoundContent={editingTeacherId ? '老师尚无可排课程，请调整授课范围' : '请先选择老师'} />
+            <Select showSearch optionFilterProp="label" disabled={detailReadOnly || !editingTeacherId} options={formCourseOptions} notFoundContent={editingTeacherId ? '老师尚无可排课程，请调整授课范围' : '请先选择老师'} />
           </Form.Item>
           <Form.Item name="campusId" hidden><Input /></Form.Item>
           {editingClass?.seriesId && !editingClass.detached && <Form.Item label="本次修改范围"><Select value={editScope} onChange={setEditScope} options={scopeOptions} /></Form.Item>}
@@ -794,7 +790,7 @@ export default function Scheduling({ user }: { user: CurrentUser }) {
           <Typography.Text type="secondary">
             {moveScope === 'this'
               ? '只改这一节，这节课此后不再跟随系列的批量调整。'
-              : '按相同的天数整体平移，已经上过的课次不会被改动。'}
+              : '所选范围内的未来课次将同步调整，已上课和已单独调整的课次保留。'}
           </Typography.Text>
         </Space>
       </Modal>

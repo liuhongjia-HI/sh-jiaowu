@@ -14,6 +14,8 @@ import {
   classCapacity,
   formatWeekRange,
   localDateText,
+  readCalendarScroll,
+  rememberCalendarScroll,
   scheduleClassOccursOn,
   startOfMonth,
   startOfWeek,
@@ -132,7 +134,7 @@ const maxTimelineColumns = 4;
 // 三个可视块，不会因为再挤一个加号变成四个。
 const weekCellMaxLessons = 3;
 // 月视图最多占四个格位；较忙日期显示前三节及当天完整列表入口。
-const monthCellMaxLessons = 4;
+const monthCellMaxLessons = 7;
 // 已取消课程的幽灵条：只画出「这个时段原本有课、现在空出来了」，不需要能读字。
 const canceledGhostWidth = 10;
 const canceledGhostGap = 3;
@@ -667,8 +669,12 @@ export function TimelineBlock({
   canManage,
   onEditClass,
   onCopyClass,
-  onResizeClass
+  onResizeClass,
+  selected = false,
+  canAdjustClass
 }: {
+  canAdjustClass?: (record: ScheduleClass) => boolean;
+  selected?: boolean;
   item: TimelineLayoutItem;
   rangeStart: number;
   canManage: boolean;
@@ -676,6 +682,7 @@ export function TimelineBlock({
   onCopyClass?: (record: ScheduleClass) => void;
   onResizeClass?: (record: ScheduleClass, endTime: string) => void;
 }) {
+  const displayStatus = item.kind === 'class' ? scheduleDisplayStatus(item.record as ScheduleClass) : item.status;
   const start = timeToMinutes(item.startTime);
   const end = Math.max(timeToMinutes(item.endTime), start + timelineSlotMinutes);
   const color = subjectColor(item.subject);
@@ -713,20 +720,21 @@ export function TimelineBlock({
     'schedule-timeline-block',
     `is-${item.kind}`,
     item.status === '已取消' ? 'is-canceled' : '',
-    isGhost ? 'is-ghost' : ''
+    isGhost ? 'is-ghost' : '',
+    selected ? 'is-selected' : ''
   ].filter(Boolean).join(' ');
   // 内容包一层 body：容器查询只能作用于容器的后代，不能作用于容器自身，
   // 所以内边距必须挂在这一层才能随块宽收窄（挂在外层块上会被静默忽略）。
   const renderBody = (extra?: ReactNode) => (
     <span className="schedule-timeline-body">
-      <span className="schedule-timeline-time">{item.startTime}-{item.endTime}</span>
+      <span className="schedule-timeline-head"><span className="schedule-timeline-time">{item.startTime}-{item.endTime}</span>{item.kind === 'class' && ['待审核', '已驳回'].includes((item.record as ScheduleClass).auditStatus) && <span className="schedule-timeline-audit">{(item.record as ScheduleClass).auditStatus}</span>}</span>
       <strong>{item.title}</strong>
       <span className="schedule-timeline-subtitle">{item.subtitle}</span>
       <small>{item.meta}</small>
       <span className="schedule-timeline-tags">
         {item.classType && <Tag>{item.classType}</Tag>}
         {item.countText && <Tag>{item.countText}</Tag>}
-        {item.status && <Tag title={item.status === '已确认' ? '人数已达到开班要求；不代表家长确认' : undefined} color={item.status === '已取消' ? 'default' : item.status === '待确认' ? 'gold' : 'green'}>{item.status}</Tag>}
+        {displayStatus && <Tag title={item.status === '已确认' ? '人数已达到开班要求；不代表家长确认' : undefined} color={displayStatus === '已取消' ? 'default' : displayStatus === '待成班' || displayStatus === '待审核' ? 'gold' : displayStatus === '已驳回' ? 'red' : 'green'}>{displayStatus}</Tag>}
         {item.kind === 'class' && <RecurrenceMark item={item.record as ScheduleClass} />}
       </span>
       {extra}
@@ -802,16 +810,17 @@ export function TimelineBlock({
 
   if (item.kind === 'class') {
     const record = item.record as ScheduleClass;
-    const editable = canManage && record.status !== '已取消';
+    const editable = canManage && record.status !== '已取消' && record.status !== '已上课' && (!canAdjustClass || canAdjustClass(record));
     const block = (
       <button
         type="button"
         className={className}
+        data-lesson-id={record.id}
         style={style}
         title={title}
         draggable={editable}
         onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', record.id)}
-        onClick={() => editable ? onEditClass(record) : undefined}
+        onClick={() => onEditClass(record)}
       >
         {renderBody(
           // 下沿拉伸改时长。整块拖动只能平移时段、时长不变，
@@ -831,7 +840,7 @@ export function TimelineBlock({
         )}
       </button>
     );
-    if (!editable || !onCopyClass) return block;
+    if (!canManage || !onCopyClass) return block;
     // 右键复制：把这节课的课程、老师、学生、班型原样带进新建表单，
     // 只需要改时间就能再排一节。重复录入一模一样的信息是排课里最费时的部分。
     return (
@@ -840,7 +849,7 @@ export function TimelineBlock({
         menu={{
           items: [
             { key: 'copy', icon: <CopyOutlined />, label: '复制这节课' },
-            { key: 'edit', icon: <EditOutlined />, label: '调整这节课' }
+            ...(editable ? [{ key: 'edit', icon: <EditOutlined />, label: '调整这节课' }] : [])
           ],
           onClick: ({ key }) => key === 'copy' ? onCopyClass(record) : onEditClass(record)
         }}
@@ -857,99 +866,68 @@ export function TimelineBlock({
   );
 }
 
-export function MonthScheduleBoard({
-  month,
-  classes,
-  courseById,
-  teacherById,
-  canManage,
-  onEditClass,
-  onCopyClass,
-  onMoveClass
-}: {
-  month: Date;
-  classes: ScheduleClass[];
-  courseById: CourseLookup;
-  teacherById: Record<string, Teacher>;
-  canManage: boolean;
-  onEditClass: (record: ScheduleClass) => void;
-  onCopyClass: (record: ScheduleClass) => void;
+export function MonthScheduleBoard({ month, classes, courseById, teacherById, canManage, onEditClass, onCopyClass, onMoveClass, onCreate, selectedDate, onSelectDate, onOpenDay, selectedLessonId, onCancel, onComplete, canAdjustClass }: {
+  month: Date; classes: ScheduleClass[]; courseById: CourseLookup; teacherById: Record<string, Teacher>;
+  canManage: boolean; onEditClass: (record: ScheduleClass) => void; onCopyClass: (record: ScheduleClass) => void;
   onMoveClass: (record: ScheduleClass, target: ScheduleMoveTarget) => void;
+  onCreate: (date: string) => void; selectedDate: Date; onSelectDate: (date: Date) => void; onOpenDay: (date: Date) => void;
+  canAdjustClass?: (record: ScheduleClass) => boolean;
+  selectedLessonId?: string; onCancel: (record: ScheduleClass) => void; onComplete: (record: ScheduleClass) => void;
 }) {
-  // 之前这里写死 new Date() 且依赖数组为空，月视图翻页翻不动，永远停在当前月。
   const days = useMemo(() => buildMonthDays(month), [month]);
+  const scroller = useRef<HTMLDivElement>(null);
+  const monthKey = `${month.getFullYear()}-${month.getMonth()}`;
+  useEffect(() => {
+    const node = scroller.current;
+    if (!node) return;
+    node.scrollTop = readCalendarScroll(`month:${monthKey}`) ?? 0;
+  }, [monthKey]);
   const [expandedDate, setExpandedDate] = useState<string>();
+  const [dropDate, setDropDate] = useState<string>();
   const expandedClasses = sortByStartTime(classes.filter(item => expandedDate && scheduleClassOccursOn(item, new Date(`${expandedDate}T12:00:00`))));
-  if (classes.length === 0) return <Empty description="还没有可展示的课程。" />;
-  return (
-    <>
-    <div className="month-board">
-      {days.map((day) => {
-        const dayClasses = classes.filter((item) => scheduleClassOccursOn(item, day.date));
-        return (
-          <div
-            className="month-day"
-            data-date={day.key}
-            key={day.key}
-            onDragOver={(event) => canManage ? event.preventDefault() : undefined}
-            onDrop={(event) => {
-              const classID = event.dataTransfer.getData('text/schedule-class-id');
-              const record = classes.find((item) => item.id === classID);
-              if (record) onMoveClass(record, {
-                lessonDate: day.key,
-                label: day.label
-              });
-            }}
-          >
-            <div className="month-day-head">
-              <strong>{day.day}</strong>
-              <span>{day.weekLabel}</span>
-              {dayClasses.length > 0 && <button type="button" className="month-day-count" aria-label={`${day.key} 查看全部 ${dayClasses.length} 节课`} onClick={() => setExpandedDate(day.key)}>{dayClasses.length} 节</button>}
+  const today = localDateText(new Date());
+  const entry = (item: ScheduleClass, expanded = false) => <MonthClassEntry key={item.id} item={item} course={courseById[item.courseId]} teacher={teacherById[item.teacherId]}
+    canManage={canManage} canAdjustClass={canAdjustClass} expanded={expanded} selected={item.id === selectedLessonId} onEditClass={record => { setExpandedDate(undefined); onEditClass(record); }}
+    onCopyClass={record => { setExpandedDate(undefined); onCopyClass(record); }} onCancel={record => { setExpandedDate(undefined); onCancel(record); }} onComplete={record => { setExpandedDate(undefined); onComplete(record); }} />;
+  return <>
+    <div ref={scroller} className="month-calendar-scroll" onScroll={event => rememberCalendarScroll(`month:${monthKey}`, event.currentTarget.scrollTop)}>
+      <div className="month-weekdays">{weekOptions.map(day => <strong key={day.value}>{day.label}</strong>)}</div>
+      <div className="month-board">
+        {days.map(day => {
+          const sorted = sortByStartTime(classes.filter(item => scheduleClassOccursOn(item, day.date)));
+          const visible = sorted.slice(0, monthCellMaxLessons);
+          return <div key={day.key} data-date={day.key} className={`month-day ${day.dayOfWeek >= 6 ? 'is-weekend' : ''} ${!day.inMonth ? 'is-outside' : ''} ${day.key === localDateText(selectedDate) ? 'is-selected-date' : ''} ${dropDate === day.key ? 'is-drop-target' : ''}`}
+            onClick={() => onSelectDate(day.date)}
+            onDoubleClick={event => { if (canManage && !(event.target as HTMLElement).closest('button, .month-class')) onCreate(day.key); }}
+            onDragOver={event => { if (canManage) { event.preventDefault(); setDropDate(day.key); } }}
+            onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropDate(undefined); }}
+            onDrop={event => {
+              event.preventDefault(); setDropDate(undefined);
+              if (!canManage) return;
+              const record = classes.find(item => item.id === event.dataTransfer.getData('text/schedule-class-id'));
+              if (record && record.status !== '已取消' && record.status !== '已上课' && (!canAdjustClass || canAdjustClass(record))) onMoveClass(record, { lessonDate: day.key, label: `${day.label} ${record.startTime}-${record.endTime}` });
+            }}>
+            <div className="month-day-head" data-label={day.weekLabel}>
+              <button type="button" className={`month-date-number ${day.key === today ? 'is-today' : ''}`} aria-label={`${day.key} 查看日历`} onClick={event => { event.stopPropagation(); onOpenDay(day.date); }}>{day.day}</button>
+              <button type="button" className="month-day-count" aria-label={`${day.key} 查看全部 ${sorted.length} 节课`} onClick={event => { event.stopPropagation(); setExpandedDate(day.key); }}>{sorted.length} 节</button>
             </div>
-            <div className="month-day-body">
-              {dayClasses.length === 0 ? (
-                <span className="month-day-empty">暂无课程</span>
-              ) : (() => {
-                const sorted = sortByStartTime(dayClasses);
-                // 一格最多四个格位，超出时通过明确入口打开当天完整列表。
-                // 不折叠的话，最忙的那天会把整个月的行高一起撑高。
-                const visible = sorted.length > monthCellMaxLessons
-                  ? sorted.slice(0, monthCellMaxLessons - 1)
-                  : sorted;
-                const hidden = sorted.slice(visible.length);
-                return (
-                  <>
-                    {visible.map((item) => (
-                      <MonthClassEntry
-                        key={item.id}
-                        item={item}
-                        course={courseById[item.courseId]}
-                        teacher={teacherById[item.teacherId]}
-                        canManage={canManage}
-                        onEditClass={onEditClass}
-                        onCopyClass={onCopyClass}
-                      />
-                    ))}
-                    {hidden.length > 0 && <button type="button" className="month-overflow-toggle" onClick={() => setExpandedDate(day.key)}>另 {hidden.length} 节 · 查看全部</button>}
-
-                  </>
-                );
-              })()}
+            <div className="month-day-body">{visible.map(item => entry(item))}
+              {sorted.length > visible.length && <button type="button" className="month-overflow-toggle" onClick={() => setExpandedDate(day.key)}>还有 {sorted.length - visible.length} 节 · 查看全部</button>}
             </div>
-          </div>
-        );
-      })}
-    </div>
-    <Drawer title={`${expandedDate || ''} · 全部 ${expandedClasses.length} 节课`} open={Boolean(expandedDate)} onClose={() => setExpandedDate(undefined)} width="min(560px, 100vw)">
-      <div className="month-full-day-list">
-        {expandedClasses.map(item => <MonthClassEntry key={item.id} item={item} course={courseById[item.courseId]} teacher={teacherById[item.teacherId]} canManage={canManage} expanded onEditClass={record => { setExpandedDate(undefined); onEditClass(record); }} onCopyClass={record => { setExpandedDate(undefined); onCopyClass(record); }} />)}
+            {dropDate === day.key && <div className="month-drop-hint">移至 {day.label} · 保留原时间</div>}
+          </div>;
+        })}
       </div>
+    </div>
+    <Drawer title={`${expandedDate || ''} · 全部 ${expandedClasses.length} 节课`} open={Boolean(expandedDate)} onClose={() => setExpandedDate(undefined)} width="min(560px, 100vw)"
+      extra={canManage && <Button icon={<PlusOutlined />} onClick={() => { const date = expandedDate!; setExpandedDate(undefined); onCreate(date); }}>新建课程</Button>}>
+      <div className="month-full-day-list">{expandedClasses.length ? expandedClasses.map(item => entry(item, true)) : <Empty description="当天暂无课程" />}</div>
     </Drawer>
-    </>
-  );
+  </>;
 }
 
-export function ScheduleLessonList({ classes, courseById, teacherById, canManage, onEditClass, onCancel, onRestore, cancelling }: {
+export function ScheduleLessonList({ classes, courseById, teacherById, canManage, onEditClass, onCancel, onRestore, cancelling, canAdjustClass }: {
+ canAdjustClass?: (record: ScheduleClass) => boolean;
  classes: ScheduleClass[]; courseById: CourseLookup; teacherById: Record<string, Teacher>; canManage: boolean;
  onEditClass: (record: ScheduleClass) => void; onCancel: (record: ScheduleClass) => void; onRestore: (record: ScheduleClass) => void; cancelling: boolean;
 }) {
@@ -961,9 +939,9 @@ export function ScheduleLessonList({ classes, courseById, teacherById, canManage
  return <div className="schedule-lesson-list">
   {sorted.slice((current - 1) * 20, current * 20).map(item => <article key={item.id} className="schedule-lesson-list-row" data-lesson-id={item.id}>
    <div className="schedule-lesson-list-date">{item.lessonDate}</div>
-   <MonthClassEntry item={item} course={courseById[item.courseId]} teacher={teacherById[item.teacherId]} canManage={canManage} expanded copyable={false} onEditClass={onEditClass} onCopyClass={onEditClass} />
+   <MonthClassEntry item={item} course={courseById[item.courseId]} teacher={teacherById[item.teacherId]} canManage={canManage} canAdjustClass={canAdjustClass} expanded copyable={false} onEditClass={onEditClass} onCopyClass={onEditClass} />
    {canManage && item.status === '已取消' && <Button aria-label={`恢复课次 ${item.id}`} onClick={() => onRestore(item)}>恢复课次</Button>}
-   {canManage && item.status !== '已取消' && <Button danger aria-label={`取消课次 ${item.id}`} loading={cancelling} icon={<CloseCircleOutlined />} onClick={() => onCancel(item)}>取消课次</Button>}
+   {canManage && item.status !== '已取消' && item.status !== '已上课' && (!canAdjustClass || canAdjustClass(item)) && <Button danger aria-label={`取消课次 ${item.id}`} loading={cancelling} icon={<CloseCircleOutlined />} onClick={() => onCancel(item)}>取消课次</Button>}
   </article>)}
   <Pagination current={current} pageSize={20} total={sorted.length} showTotal={total => `共 ${total} 节课`} showSizeChanger={false} onChange={setPage} />
  </div>;
@@ -987,6 +965,10 @@ function startTimelineResize(
   const originalEnd = timeToMinutes(record.endTime);
   const startMinute = timeToMinutes(record.startTime);
   let latestEnd = originalEnd;
+  const block = target.closest('.schedule-timeline-block') as HTMLElement | null;
+  const preview = document.createElement('span');
+  preview.className = 'schedule-resize-preview';
+  block?.append(preview);
 
   const compute = (clientY: number) => {
     const deltaSlots = Math.round((clientY - startY) / timelineSlotHeight);
@@ -997,6 +979,7 @@ function startTimelineResize(
 
   const move = (moveEvent: PointerEvent) => {
     latestEnd = compute(moveEvent.clientY);
+    preview.textContent = `${formatMinute(latestEnd)} · ${latestEnd - startMinute} 分钟`;
     // 拉伸过程中只动这一块的高度，不重排整个网格——重排会让块在手底下跳。
     const block = target.closest('.schedule-timeline-block') as HTMLElement | null;
     if (block) {
@@ -1005,6 +988,8 @@ function startTimelineResize(
   };
 
   const finish = (finishEvent: PointerEvent) => {
+    preview.remove();
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
     target.removeEventListener('pointermove', move);
     target.removeEventListener('pointerup', finish);
     target.removeEventListener('pointercancel', finish);
@@ -1066,73 +1051,52 @@ export function RecurrenceMark({ item }: { item: ScheduleClass }) {
   );
 }
 
-// 月视图的单个课次。排版对标客户的 Outlook：一行放完
-// 「开始时间 · 教师 · 年级 · 科目短标签 · 学生」，超宽省略，完整内容挂 title。
-//
-// 之前这里是四行 grid（时间/科目年级/教师/学生各一行），一条占 4 行高，
-// 一格连两条都放不下——那才是月视图放不下几节课的真正原因，
-// 光加折叠不压排版等于把阈值设成 1。
-function MonthClassEntry({
-  item,
-  course,
-  teacher,
-  canManage,
-  onEditClass,
-  onCopyClass,
-  expanded = false,
-  copyable = true
-}: {
-  expanded?: boolean;
-  copyable?: boolean;
-  item: ScheduleClass;
-  course?: Course;
-  teacher?: Teacher;
-  canManage: boolean;
-  onEditClass: (record: ScheduleClass) => void;
-  onCopyClass: (record: ScheduleClass) => void;
+export function scheduleDisplayStatus(item: ScheduleClass) {
+  if (item.status === '已取消' || item.status === '已上课') return item.status;
+  if (item.auditStatus === '待审核' || item.auditStatus === '已驳回') return item.auditStatus;
+  return item.status === '待确认' ? '待成班' : '待上课';
+}
+
+// 月历、当天完整列表和课次列表共用同一套字段层级。
+function MonthClassEntry({ item, course, teacher, canManage, onEditClass, onCopyClass, expanded = false, copyable = true, selected = false, onCancel, onComplete, canAdjustClass }: {
+  canAdjustClass?: (record: ScheduleClass) => boolean;
+  expanded?: boolean; copyable?: boolean; selected?: boolean; item: ScheduleClass; course?: Course; teacher?: Teacher;
+  canManage: boolean; onEditClass: (record: ScheduleClass) => void; onCopyClass: (record: ScheduleClass) => void;
+  onCancel?: (record: ScheduleClass) => void; onComplete?: (record: ScheduleClass) => void;
 }) {
-  const editable = canManage && item.status !== '已取消';
-  // 与日/周视图共用同一个标题规则（教师 年级 科目短标签 学生），
-  // 月视图不该是另一套写法——同一节课在三个视图里读起来必须一致。
-  const label = scheduleLessonTitle(item, course, teacher);
+  const editable = canManage && item.status !== '已取消' && item.status !== '已上课' && (!canAdjustClass || canAdjustClass(item));
   const subject = scheduleClassSubject(item, course ? { [course.id]: course } : {});
   const palette = subjectColor(subject || item.courseName);
-  const full = `${item.startTime}-${item.endTime} · ${label} · ${item.classType} · ${item.status}`;
-
-  const entry = (
-    <button
-      type="button"
-      data-lesson-id={item.id}
-      className={`month-class ${expanded ? 'is-expanded' : ''} ${item.status === '已取消' ? 'is-canceled' : ''}`}
-      title={full}
-      draggable={editable && copyable}
+  const teacherName = resourceLaneTeacherName(item.teacherId, item.teacherName, teacher);
+  const studentNames = item.students.map(student => student.name).filter(Boolean).join('、') || '待补学生';
+  const status = scheduleDisplayStatus(item);
+  const full = `${item.startTime}-${item.endTime} · ${scheduleLessonTitle(item, course, teacher)} · ${item.classType} · ${status}`;
+  const canComplete = editable && item.auditStatus === '已通过' && new Date(`${item.lessonDate}T${item.endTime}`).getTime() <= Date.now();
+  const menu = { items: [
+    { key: 'detail', label: '查看详情' },
+    ...(editable ? [{ key: 'edit', icon: <EditOutlined />, label: '调整这节课' }] : []),
+    ...(canManage && copyable ? [{ key: 'copy', icon: <CopyOutlined />, label: '复制这节课' }] : []),
+    ...(canComplete && onComplete ? [{ key: 'complete', label: '标记已上课' }] : []),
+    ...(editable && onCancel ? [{ key: 'cancel', label: '取消课程', danger: true }] : [])
+  ], onClick: ({ key, domEvent }: { key: string; domEvent: { stopPropagation: () => void } }) => { domEvent.stopPropagation(); if (key === 'copy') onCopyClass(item); else if (key === 'cancel') onCancel?.(item); else if (key === 'complete') onComplete?.(item); else onEditClass(item); } };
+  return <Dropdown trigger={['contextMenu']} menu={menu}>
+    <article data-lesson-id={item.id} className={`month-class ${expanded ? 'is-expanded' : ''} ${selected ? 'is-selected' : ''} ${item.status === '已取消' ? 'is-canceled' : ''}`} title={full}
+      role="button" tabIndex={0} aria-label={full} draggable={editable && copyable}
       style={{ '--subject-color': palette.accent, '--subject-bg': palette.bg } as CSSProperties}
-      onDragStart={(event) => event.dataTransfer.setData('text/schedule-class-id', item.id)}
-      onClick={() => editable ? onEditClass(item) : undefined}
-    >
-      <span className="month-class-time">{item.startTime}{expanded && `-${item.endTime}`}</span>
-      <span className="month-class-text">{label}</span>
-      <span className="month-class-icons"><span role="img" aria-label={item.status} title={item.status}>{item.status === '已取消' ? '×' : item.status === '已确认' ? '✓' : '○'}</span><RecurrenceMark item={item} /></span>
-      {expanded && <span className="month-class-meta">{item.classType} · {item.status}{item.auditStatus && item.auditStatus !== '已通过' ? ` · ${item.auditStatus}` : ''}</span>}
-    </button>
-  );
-  if (!editable || !copyable) return entry;
-  // 右键复制在月视图同样可用：月视图是「看全貌顺手补一节」的场景，
-  // 复制现有课比从空表单重填一遍快得多。
-  return (
-    <Dropdown
-      trigger={['contextMenu']}
-      menu={{
-        items: [
-          { key: 'copy', icon: <CopyOutlined />, label: '复制这节课' },
-          { key: 'edit', icon: <EditOutlined />, label: '调整这节课' }
-        ],
-        onClick: ({ key }) => key === 'copy' ? onCopyClass(item) : onEditClass(item)
-      }}
-    >
-      {entry}
-    </Dropdown>
-  );
+      onDragStart={event => { event.dataTransfer.setData('text/schedule-class-id', item.id); event.dataTransfer.effectAllowed = 'move'; }}
+      onClick={event => { event.stopPropagation(); onEditClass(item); }}
+      onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onEditClass(item); } }}>
+      <div className="month-class-heading"><strong className="month-class-time">{item.startTime}-{item.endTime}</strong><span className="month-class-teacher">{teacherName}</span></div>
+      <div className="month-class-subject"><strong>{subject ? subjectLabel(subject) : item.courseName}</strong>{course?.grade && <span>{gradeCode(course.grade)}</span>}<span className="month-course-name">{course?.name || item.courseName}</span></div>
+      <div className="month-class-text" title={studentNames}>{studentNames}</div>
+      <div className="month-class-footer"><span className={`month-class-status is-${status === '待审核' || status === '待成班' ? 'pending' : status === '已驳回' ? 'rejected' : 'normal'}`} title={item.auditReason}>{status}</span>
+        <span className="month-class-icons"><RecurrenceMark item={item} /><span className="month-class-detail">详情</span>
+          {canManage && <Dropdown trigger={['click']} menu={menu}><button type="button" className="month-class-more" aria-label={`课程操作 ${item.id}`} onClick={event => event.stopPropagation()}>···</button></Dropdown>}
+        </span>
+      </div>
+      {expanded && <span className="month-class-meta">{item.classType} · {item.students.length}/{item.expectedStudentCount || item.capacity} 人{item.auditStatus ? ` · 审核${item.auditStatus}` : ''}</span>}
+    </article>
+  </Dropdown>;
 }
 
 export function parseOwnerKey(value?: string) {
@@ -1750,7 +1714,7 @@ export function filterClasses(items: ScheduleClass[], filters: ScheduleFilters, 
     (!filters.campusId || (item.campusId || 'campus-main') === filters.campusId) &&
     (!filters.courseId || item.courseId === filters.courseId) &&
     (!filters.classType || item.classType === filters.classType) &&
-    (!filters.status || filters.status === '全部' || item.status === filters.status)
+    (!filters.status || filters.status === '全部' || (['待审核', '已驳回'].includes(filters.status) ? item.auditStatus === filters.status : item.status === filters.status))
   );
 }
 
@@ -1779,7 +1743,7 @@ export function scheduleClassPayload(
     campusId: record.campusId || 'campus-main',
     roomName: record.roomName,
     classType: record.classType,
-    durationMinutes: record.durationMinutes,
+    durationMinutes: timeToMinutes(target.endTime ?? record.endTime) - timeToMinutes(target.startTime ?? record.startTime),
     startTime: target.startTime ?? record.startTime,
     endTime: target.endTime ?? record.endTime,
     startDate: target.lessonDate,
@@ -1824,7 +1788,7 @@ export function buildMonthDays(base: Date) {
       inMonth: date.getMonth() === base.getMonth()
     });
   }
-  return days.filter((day) => day.inMonth || day.date >= first && day.date <= last);
+  return days.slice(0, Math.ceil((((first.getDay() + 6) % 7) + last.getDate()) / 7) * 7);
 }
 
 export function buildMiniMonthDays(base: Date) {

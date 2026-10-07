@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   writes = [];
   let lessons: any[] = [structuredClone(baseLesson)];
   const slots = [...teachers.map(t => ({ id: `av-${t.id}`, ownerType: 'teacher', ownerId: t.id, ownerName: t.name, dayOfWeek: day, startTime: '08:00', endTime: '22:00' })), ...students.map(s => ({ id: `av-${s.id}`, ownerType: 'student', ownerId: s.id, ownerName: s.name, dayOfWeek: day, startTime: '08:00', endTime: '22:00' }))];
-  await page.addInitScript(user => { localStorage.setItem('starline_admin_token', 'calendar-ui-fixture'); localStorage.setItem('starline_admin_user', JSON.stringify(user)); }, user);
+  await page.addInitScript(user => { if (!localStorage.getItem('calendar-fixture-initialized')) { localStorage.setItem('starline-calendar-view:ops', 'day'); localStorage.setItem('calendar-fixture-initialized', '1'); } localStorage.setItem('starline_admin_token', 'calendar-ui-fixture'); localStorage.setItem('starline_admin_user', JSON.stringify(user)); }, user);
   await page.route('**/api/**', async route => {
     const request = route.request(); const path = new URL(request.url()).pathname.replace('/api', '');
     const body = request.postDataJSON(); let data: any = [];
@@ -37,8 +37,10 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto('/scheduling');
   await expect(page.locator('.calendar-workbench')).toBeVisible();
+  await page.getByRole('button', { name: '人员日历', exact: true }).click();
 });
 async function choosePerson(page: Page, name: string) {
+  if (!await page.getByRole('combobox', { name: '选择人员日历' }).isVisible()) await page.getByRole('button', { name: '人员日历', exact: true }).click();
   await page.getByRole('combobox', { name: '选择人员日历' }).click();
   await page.getByRole('combobox', { name: '选择人员日历' }).fill(name);
   await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText(name, { exact: false }).last().click();
@@ -334,8 +336,8 @@ test('dense month day opens every lesson with readable long names and closes bef
   await page.reload();
   await page.getByText('月', { exact: true }).click();
   const dayCell = page.locator(`.month-day[data-date="${today}"]`);
-  await expect(dayCell.locator('.month-class')).toHaveCount(3);
-  await expect(dayCell.getByRole('button', { name: '另 9 节 · 查看全部', exact: true })).toBeVisible();
+  await expect(dayCell.locator('.month-class')).toHaveCount(7);
+  await expect(dayCell.getByRole('button', { name: '还有 5 节 · 查看全部', exact: true })).toBeVisible();
   await dayCell.getByRole('button', { name: `${today} 查看全部 12 节课`, exact: true }).click();
   const drawer = page.getByRole('dialog', { name: `${today} · 全部 12 节课`, exact: true });
   await expect(drawer.locator('.month-class')).toHaveCount(12);
@@ -470,4 +472,232 @@ test('completed lesson updates only scheduling status and hides repeat action', 
   await expect(detail.getByRole('button', { name: '标记已上课', exact: true })).toHaveCount(0);
   await expect(detail.getByRole('button', { name: '保存调课', exact: true })).toBeDisabled();
   expect(writes).toEqual([{ path: '/schedule-classes/l1/completed', body: {} }]);
+});
+
+// 已确认视觉方向：完整周网格、七节可见、历史详情及日期上下文。
+test('accepted month layout keeps week alignment, seven readable lessons and navigation context', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1440 });
+  const demoDate = '2026-10-07';
+  const demoCourses = [
+    { ...courses[0], name: 'S+', subject: '英文' },
+    { ...courses[0], id: 'math', name: 'H', subject: '数学' },
+    { ...courses[0], id: 'science', name: 'S', subject: '科学' },
+    { ...courses[0], id: 'history', name: 'S+', subject: '历史' },
+    { ...courses[0], id: 'geography', name: 'S', subject: '地理' }
+  ];
+  const demoTeachers = [teachers[0], { ...teachers[1], name: 'Jennifer' }, { ...teachers[1], id: 't3', name: 'Gavin' }, { ...teachers[1], id: 't4', name: 'Tina' }];
+  const demoStudents = ['Zoe', 'Arthur', 'Victoria', 'Aiden', 'Olivia', 'Stanley', 'Alicia', 'Audrey', 'Melissa', 'Bonnie'].map((name, i) => ({ id: `demo-student-${i}`, name, grade: '五年级' }));
+  const lesson = (id: string, date: string, time: string, index: number, overrides = {}) => ({ ...baseLesson, id, lessonDate: date, startDate: date, endDate: date, dayOfWeek: new Date(`${date}T12:00:00`).getDay() || 7,
+    startTime: time, endTime: `${String(Number(time.slice(0,2))+1).padStart(2,'0')}:00`, durationMinutes: 60,
+    teacherId: demoTeachers[index % 4].id, teacherName: demoTeachers[index % 4].name, courseId: demoCourses[index % 5].id, courseName: demoCourses[index % 5].name,
+    students: [demoStudents[index % 7]], ...overrides });
+  const demoLessons = [
+    lesson('past', '2026-09-29', '16:00', 0, { status: '已上课' }),
+    lesson('cancelled', '2026-10-03', '10:00', 1, { status: '已取消' }),
+    lesson('six', '2026-10-06', '19:00', 0),
+    lesson('pending', demoDate, '16:00', 0, { auditStatus: '待审核' }),
+    lesson('rejected', demoDate, '19:00', 3, { auditStatus: '已驳回', auditReason: '时间需协调' }),
+    lesson('many-students', '2026-10-09', '19:00', 0, { students: demoStudents.slice(7), classType: '1V3', capacity: 3, expectedStudentCount: 3 }),
+    ...Array.from({ length: 4 }, (_, i) => lesson(`fri-${i}`, '2026-10-10', ['16:00','18:00','19:00','20:00'][i], i)),
+    ...Array.from({ length: 7 }, (_, i) => lesson(`seven-${i}`, '2026-10-11', ['08:00','09:00','16:00','18:00','19:00','20:00','21:00'][i], i)),
+    lesson('next-week', '2026-10-13', '19:00', 1)
+  ];
+  await page.route('**/api/students', route => route.fulfill({ json: { code: 0, data: demoStudents } }));
+  await page.route('**/api/teachers', route => route.fulfill({ json: { code: 0, data: demoTeachers } }));
+  await page.route('**/api/courses', route => route.fulfill({ json: { code: 0, data: demoCourses } }));
+  await page.route('**/api/schedule-classes', route => route.fulfill({ json: { code: 0, data: demoLessons } }));
+  await page.route('**/api/schedule-classes/pending', route => route.fulfill({ json: { code: 0, data: demoLessons.filter(l => l.auditStatus === '待审核') } }));
+  await page.clock.setFixedTime(new Date('2026-10-07T12:00:00+08:00'));
+  await page.evaluate(() => {
+    localStorage.removeItem('starline-calendar-view:ops');
+    for (const key of ['selectedDate', 'selectedWeekStart', 'calendarMonth']) sessionStorage.removeItem(`starline:list-state:v1:ops:scheduling:${key}`);
+  });
+  await page.reload();
+  const board = page.locator('.month-board');
+  await expect(board).toBeVisible();
+  await expect(page.locator('.schedule-outlook-sidebar')).toHaveCount(0);
+  await expect(board.locator('.month-day').first()).toHaveAttribute('data-date', '2026-09-28');
+  await expect(board.locator('.month-day')).toHaveCount(35);
+  const dense = board.locator('[data-date="2026-10-11"]');
+  await expect(dense.locator('.month-class')).toHaveCount(7);
+  await expect(dense.locator('.month-class-time').first()).toHaveText('08:00-09:00');
+  await expect(dense.locator('.month-class-teacher').first()).toHaveText('Clara');
+  expect(await dense.locator('.month-class').evaluateAll(elements => elements.every(el => el.scrollWidth <= el.clientWidth))).toBe(true);
+  await expect(page.getByRole('button', { name: '待审核 1', exact: true })).toBeVisible();
+  await page.screenshot({ path: '../output/scheduling-preview/month-desktop.png', animations: 'disabled' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  expect(await page.locator('.month-calendar-scroll').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.screenshot({ path: '../output/scheduling-preview/month-laptop.png', animations: 'disabled' });
+  await page.setViewportSize({ width: 1920, height: 1440 });
+  await page.getByRole('button', { name: '待审核 1', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '待审核排课（1）', exact: true })).toBeVisible();
+  await page.getByRole('dialog', { name: '待审核排课（1）', exact: true }).locator('.ant-drawer-close').click();
+  await board.locator('[data-lesson-id="cancelled"]').click();
+  const detail = page.getByRole('dialog', { name: '课程详情', exact: true });
+  await expect(detail).toBeVisible();
+  await expect(detail.getByRole('button', { name: '保存调课', exact: true })).toBeDisabled();
+  await detail.locator('.ant-drawer-close').click();
+  await page.getByRole('button', { name: '下一期', exact: true }).click();
+  await expect(page.locator('.calendar-toolbar strong')).toHaveText('2026 年 11 月');
+  await page.locator('.calendar-toolbar').getByText('日', { exact: true }).click();
+  await expect(page.locator('.calendar-toolbar strong')).toHaveText('2026-11-07');
+  await page.getByRole('button', { name: /今\s*天/ }).click();
+  await page.getByText('周', { exact: true }).click();
+  await expect(page.locator('.calendar-column')).toHaveCount(7);
+  await page.locator('.calendar-scroll').evaluate(el => el.scrollTop = 650);
+  await page.screenshot({ path: '../output/scheduling-preview/week-desktop.png', animations: 'disabled' });
+  await page.locator('.calendar-toolbar').getByText('日', { exact: true }).click();
+  await page.screenshot({ path: '../output/scheduling-preview/day-desktop.png', animations: 'disabled' });
+  await page.getByText('月', { exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await board.locator('[data-date="2026-10-07"]').scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.screenshot({ path: '../output/scheduling-preview/month-mobile.png', animations: 'disabled' });
+});
+
+test('empty month supports new lesson at blank date and status filter is independent of audit', async ({ page }) => {
+  await page.route('**/api/schedule-classes', route => route.fulfill({ json: { code: 0, data: [] } }));
+  await page.reload();
+  await page.getByText('月', { exact: true }).click();
+  const cell = page.locator(`.month-day[data-date="${today}"]`);
+  await cell.locator('.month-day-body').dblclick();
+  const draft = page.getByRole('dialog', { name: '新建课程', exact: true });
+  await expect(draft.locator('#startDate')).toHaveValue(today);
+  await draft.locator('.ant-drawer-close').click();
+  await page.route('**/api/schedule-classes', route => route.fulfill({ json: { code: 0, data: [baseLesson, { ...baseLesson, id: 'pending-only', auditStatus: '待审核' }] } }));
+  await page.reload();
+  await page.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '状态筛选', exact: true }) }).locator('.ant-select-selector').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('待审核', { exact: true }).click();
+  await expect(cell.locator('.month-class')).toHaveCount(1);
+  await expect(cell.locator('.month-class')).toHaveAttribute('data-lesson-id', 'pending-only');
+  await cell.locator('.month-class-more').click();
+  await page.getByRole('menuitem', { name: /复制这节课/ }).click();
+  await expect(page.getByRole('dialog', { name: '复制课程', exact: true })).toBeVisible();
+});
+
+test('resizing previews end time and asks series scope before a single write', async ({ page }) => {
+  const handle = page.locator('.calendar-column[data-owner="teacher:t1"] .schedule-timeline-resize');
+  await handle.scrollIntoViewIfNeeded();
+  const bounds = await handle.boundingBox();
+  expect(bounds).toBeTruthy();
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2 + 44, { steps: 4 });
+  await expect(page.locator('.schedule-resize-preview')).toHaveText('12:00 · 120 分钟');
+  expect(writes).toHaveLength(0);
+  await page.mouse.up();
+  const scope = page.getByRole('dialog', { name: '调整重复课程', exact: true });
+  await expect(scope).toBeVisible();
+  await expect(scope).toContainText('12:00');
+  await scope.getByRole('button', { name: '确认调整', exact: true }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].body).toMatchObject({ startTime: '10:00', endTime: '12:00', durationMinutes: 120, editScope: 'this' });
+  await expect(page.locator('.schedule-resize-preview')).toHaveCount(0);
+});
+
+test('month dragging previews destination and retains the original time', async ({ page }) => {
+  await page.getByRole('button', { name: '收起侧栏', exact: true }).click();
+  await page.getByText('月', { exact: true }).click();
+  const source = page.locator(`.month-day[data-date="${today}"] .month-class`);
+  const target = page.locator('.month-day').filter({ hasNot: page.locator('.month-class') }).first();
+  const targetDate = await target.getAttribute('data-date');
+  await source.dragTo(target, { targetPosition: { x: 65, y: 90 } });
+  const scope = page.getByRole('dialog', { name: '调整重复课程', exact: true });
+  await expect(scope).toBeVisible();
+  await expect(scope).toContainText('10:00-11:30');
+  await scope.getByRole('button', { name: '确认调整', exact: true }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].body).toMatchObject({ startDate: targetDate, startTime: '10:00', endTime: '11:30', durationMinutes: 90, editScope: 'this' });
+});
+
+test('review drawer approval refreshes queue count and course state', async ({ page }) => {
+  let reviewed = false;
+  const record = () => ({ ...baseLesson, auditStatus: reviewed ? '已通过' : '待审核' });
+  await page.route('**/api/schedule-classes', route => route.fulfill({ json: { code: 0, data: [record()] } }));
+  await page.route('**/api/schedule-classes/pending', route => route.fulfill({ json: { code: 0, data: reviewed ? [] : [record()] } }));
+  await page.route('**/api/schedule-classes/l1/approve', route => { reviewed = true; return route.fulfill({ json: { code: 0, data: record() } }); });
+  await page.reload();
+  await page.getByText('月', { exact: true }).click();
+  await page.getByRole('button', { name: '待审核 1', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: '待审核排课（1）', exact: true });
+  await drawer.getByRole('button', { name: /通\s*过/ }).click();
+  await expect(page.getByRole('button', { name: '待审核 0', exact: true })).toBeVisible();
+  await page.locator('.ant-drawer-close').click();
+  await expect(page.locator(`.month-day[data-date="${today}"] .month-class-status`)).toHaveText('待上课');
+});
+
+test('calendar scroll survives view switches, details and reload', async ({ page }) => {
+  await page.getByText('月', { exact: true }).click();
+  const month = page.locator('.month-calendar-scroll');
+  await month.evaluate(el => { el.scrollTop = 100; });
+  await expect.poll(() => month.evaluate(el => el.scrollTop)).toBe(100);
+  await page.locator('.calendar-toolbar').getByText('日', { exact: true }).click();
+  await page.getByText('月', { exact: true }).click();
+  await expect.poll(() => month.evaluate(el => el.scrollTop)).toBe(100);
+  await page.reload();
+  await expect.poll(() => month.evaluate(el => el.scrollTop)).toBe(100);
+  await page.locator('.calendar-toolbar').getByText('日', { exact: true }).click();
+  const timeline = page.locator('.calendar-scroll');
+  await timeline.evaluate(el => { el.scrollTop = 120; });
+  await page.locator('.calendar-column .is-class').first().click();
+  await page.getByRole('dialog', { name: '课程详情', exact: true }).locator('.ant-drawer-close').click();
+  await expect.poll(() => timeline.evaluate(el => el.scrollTop)).toBe(120);
+  await page.getByText('月', { exact: true }).click();
+  await page.locator('.calendar-toolbar').getByText('日', { exact: true }).click();
+  await expect.poll(() => timeline.evaluate(el => el.scrollTop)).toBe(120);
+});
+
+test('teacher can view and copy approved lessons but only adjust pending own lessons', async ({ page }) => {
+  const teacherUser = { ...user, userId: 't1', roles: ['teacher'], name: 'Clara' };
+  const teacherLessons = [baseLesson, { ...baseLesson, id: 'teacher-pending', auditStatus: '待审核', startTime: '18:00', endTime: '19:30' }];
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { code: 0, data: teacherUser } }));
+  await page.route('**/api/schedule-classes', route => route.fulfill({ json: { code: 0, data: teacherLessons } }));
+  await page.reload();
+  await page.getByText('月', { exact: true }).click();
+  await expect(page.getByRole('button', { name: /^待审核 \d/ })).toHaveCount(0);
+  const approved = page.locator(`.month-day[data-date="${today}"] [data-lesson-id="l1"]`);
+  await expect(approved).toHaveAttribute('draggable', 'false');
+  await approved.click();
+  const detail = page.getByRole('dialog', { name: '课程详情', exact: true });
+  await expect(detail.getByRole('button', { name: '保存调课', exact: true })).toBeDisabled();
+  await expect(detail.getByText('课程已通过审核，请联系教务调整', { exact: true })).toBeVisible();
+  await detail.locator('.ant-drawer-close').click();
+  await approved.locator('.month-class-more').click();
+  await expect(page.getByRole('menuitem', { name: /调整这节课/ })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: /复制这节课/ }).click();
+  await expect(page.getByRole('dialog', { name: '复制课程', exact: true })).toBeVisible();
+  await page.getByRole('dialog', { name: '复制课程', exact: true }).locator('.ant-drawer-close').click();
+  const pending = page.locator(`.month-day[data-date="${today}"] [data-lesson-id="teacher-pending"]`);
+  await expect(pending).toHaveAttribute('draggable', 'true');
+  await pending.click();
+  await expect(page.getByRole('dialog', { name: '课程详情', exact: true }).getByRole('button', { name: '保存调课', exact: true })).toBeEnabled();
+});
+
+test('short overlapping week lessons retain times and distinct positions with readable details', async ({ page }) => {
+  const longTeacher = 'Clara 国际课程教学负责人';
+  await page.route('**/api/teachers', route => route.fulfill({ json: { code: 0, data: teachers.map(t => t.id === 't1' ? { ...t, name: longTeacher } : t) } }));
+  await page.route('**/api/schedule-classes', route => route.fulfill({ json: { code: 0, data: [
+    { ...baseLesson, endTime: '10:30', durationMinutes: 30, teacherName: longTeacher },
+    { ...baseLesson, id: 'short-overlap', teacherId: 't2', teacherName: 'James', endTime: '10:30', durationMinutes: 30, students: [students[1]] }
+  ] } }));
+  await page.reload();
+  await page.getByText('周', { exact: true }).click();
+  const column = page.locator(`.calendar-column[data-date="${today}"]`);
+  const blocks = column.locator('.is-class');
+  await expect(blocks).toHaveCount(2);
+  for (const block of await blocks.all()) {
+    await expect(block.locator('.schedule-timeline-time')).toBeVisible();
+    await expect(block.locator('.schedule-timeline-time')).toHaveText('10:00-10:30');
+    const fits = await block.locator('.schedule-timeline-time').evaluate(el => {
+      const container = el.closest('.schedule-timeline-block')!.getBoundingClientRect();
+      const rect = el.getBoundingClientRect();
+      return el.scrollWidth <= el.clientWidth && rect.top >= container.top && rect.bottom <= container.bottom;
+    });
+    expect(fits).toBe(true);
+  }
+  const a = await blocks.nth(0).boundingBox(); const b = await blocks.nth(1).boundingBox();
+  expect(a!.x + a!.width).toBeLessThanOrEqual(b!.x + 1);
+  await page.screenshot({ path: '../output/scheduling-preview/week-short-overlap.png', animations: 'disabled' });
+  await blocks.first().click();
+  await expect(page.getByRole('dialog', { name: '课程详情', exact: true }).locator('#endTime')).toHaveValue('10:30');
 });
