@@ -516,17 +516,20 @@ type HomeworkUploadRequest struct {
 }
 
 type Review struct {
-	ID             string `json:"id"`
-	StudentID      string `json:"studentId,omitempty"`
-	HomeworkID     string `json:"homeworkId,omitempty"`
-	SubmissionID   string `json:"submissionId,omitempty"`
-	StudentName    string `json:"studentName"`
-	PackageName    string `json:"packageName"`
-	Homework       string `json:"homework"`
-	SystemScore    int    `json:"systemScore"`
-	TeacherComment string `json:"teacherComment,omitempty"`
-	Reward         string `json:"reward,omitempty"`
-	Status         string `json:"status"`
+	ExceptionReason  string `json:"exceptionReason,omitempty"`
+	ExceptionClass   string `json:"exceptionClass,omitempty"`
+	ExceptionEventID string `json:"exceptionEventId,omitempty"`
+	ID               string `json:"id"`
+	StudentID        string `json:"studentId,omitempty"`
+	HomeworkID       string `json:"homeworkId,omitempty"`
+	SubmissionID     string `json:"submissionId,omitempty"`
+	StudentName      string `json:"studentName"`
+	PackageName      string `json:"packageName"`
+	Homework         string `json:"homework"`
+	SystemScore      int    `json:"systemScore"`
+	TeacherComment   string `json:"teacherComment,omitempty"`
+	Reward           string `json:"reward,omitempty"`
+	Status           string `json:"status"`
 	// 分派信息是任务创建时的责任快照；后续换老师不会改变已进入队列的责任人。
 	ReviewerTeacherID    string `json:"reviewerTeacherId,omitempty"`
 	ReviewerTeacherName  string `json:"reviewerTeacherName,omitempty"`
@@ -544,4 +547,11 @@ type ReviewCompleteRequest struct {
 type ReviewAssignRequest struct {
 	TeacherID string `json:"teacherId"`
 	Reason    string `json:"reason"`
+}
+
+// ReviewExceptionRequest is an explicit teacher action, separate from recheck.
+type ReviewExceptionRequest struct {
+	RequestID string `json:"requestId"`
+	Reason    string `json:"reason"`
+	ClassName string `json:"className"`
 }

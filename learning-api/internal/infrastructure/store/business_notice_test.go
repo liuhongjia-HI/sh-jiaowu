@@ -255,6 +255,7 @@ func TestBusinessNoticeManualRetryRestartsDefiniteFailureAndRedactsIdentity(t *t
 	})
 	task := &s.businessNoticeTasks[0]
 	task.Status = "发送失败"
+	task.Retryable = true
 	task.Attempts = 4
 	task.FirstAttemptAt = businessTime(time.Now().Add(-time.Hour))
 	listed := s.BusinessNoticeTasks()
@@ -293,7 +294,7 @@ func TestBusinessReminderRecoveryRespectsQuietHours(t *testing.T) {
 	}
 }
 
-func TestBusinessUncertainRecoveryDoesNotBecomeWaitingBeyondDedupWindow(t *testing.T) {
+func TestBusinessUncertainRecoveryNeverAutomaticallyResends(t *testing.T) {
 	s := businessFixture(t)
 	mutateBusiness(t, s, func(work *MemoryStore) {
 		work.scheduleClasses = []learning.ScheduleClass{futureBusinessClass("dedup-window", "")}
@@ -315,7 +316,38 @@ func TestBusinessUncertainRecoveryDoesNotBecomeWaitingBeyondDedupWindow(t *testi
 			t.Fatal(err)
 		}
 	}
-	if sent != 3 || s.businessNoticeTasks[0].Status != "结果待确认" {
-		t.Fatalf("unknown response retried beyond ten minutes: sent=%d task=%#v", sent, s.businessNoticeTasks[0])
+	if sent != 1 || s.businessNoticeTasks[0].Status != "结果待确认" {
+		t.Fatalf("unknown response was automatically retried: sent=%d task=%#v", sent, s.businessNoticeTasks[0])
+	}
+}
+
+func TestBusinessNoticePermanentFailureAndUnknownFailureCannotRetry(t *testing.T) {
+	for _, sendErr := range []error{&officialSendError{reason: "invalid recipient"}, errors.New("unclassified failure")} {
+		s := businessFixture(t)
+		mutateBusiness(t, s, func(work *MemoryStore) {
+			work.scheduleClasses = []learning.ScheduleClass{futureBusinessClass("permanent-retry", "")}
+		})
+		calls := 0
+		s.officialMessageSender = func(learning.OfficialMessageRequest) (string, error) { calls++; return "", sendErr }
+		if err := s.ProcessBusinessNotices(time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		initial := calls
+		if err := s.ProcessBusinessNotices(time.Now().Add(20 * time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		if calls != initial {
+			t.Fatal("non-retryable error automatically resent")
+		}
+		for _, task := range s.businessNoticeTasks {
+			if task.Status == "发送失败" {
+				if task.Retryable {
+					t.Fatal("non-retryable failure flagged eligible")
+				}
+				if _, err := s.RetryBusinessNotice("test", task.ID); err == nil {
+					t.Fatal("permanent or unknown failure allowed manual retry")
+				}
+			}
+		}
 	}
 }

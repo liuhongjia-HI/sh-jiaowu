@@ -248,3 +248,38 @@ func TestBusinessMaterialBatchMySQLReloadAndFailedCompletion(t *testing.T) {
 		t.Fatal("retry duplicated delivery or lost updated count")
 	}
 }
+
+func TestBusinessMaterialBatchTrialGuardianDoesNotNotifyOtherParent(t *testing.T) {
+	s, p, req := materialBusinessFixture(t, true)
+	first, err := s.CreateMaterial("test", p, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	studentID := s.notices[0].RecipientStudentID
+	attachMaterialParent(s, studentID)
+	s.guardians = append(s.guardians, learning.Guardian{ID: "other-batch-parent", UnionID: "other-batch-union", AccountStatus: "正常"})
+	s.guardianStudents = append(s.guardianStudents, learning.GuardianStudent{GuardianID: "other-batch-parent", StudentID: studentID, Status: learning.GuardianStudentActive})
+	s.officialFollowers = append(s.officialFollowers, learning.OfficialFollower{OpenID: "other-batch-open", UnionID: "other-batch-union", Subscribed: true})
+	binding := s.bindingForBusinessKind(learning.NoticeMaterialsPublished)
+	binding.StudentIDs = []string{studentID}
+	binding.GuardianIDs = []string{"batch-parent"}
+	if _, err = s.UpdateBusinessNoticeBinding("test", binding); err != nil {
+		t.Fatal(err)
+	}
+	req.Title = "资料二"
+	req.File.ID = "business-file-two"
+	second, err := s.CreateMaterial("test", p, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.CompleteMaterialNoticeBatch("test", p, req.BatchID, learning.MaterialNoticeBatchRequest{CourseID: req.CourseID}); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.businessNoticeTasks) != 1 || s.businessNoticeTasks[0].GuardianID != "batch-parent" || s.businessNoticeTasks[0].Values["number3"] != "2" {
+		t.Fatal("batch target broadened or successful files not combined")
+	}
+	event, ok := s.businessEvent(s.businessNoticeTasks[0].EventID)
+	if !ok || !containsString(event.ResourceIDs, first.ID) || !containsString(event.ResourceIDs, second.ID) {
+		t.Fatal("batch lost successful resource identifiers")
+	}
+}

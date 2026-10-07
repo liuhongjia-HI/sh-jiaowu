@@ -67,6 +67,7 @@ type ContentRepository interface {
 	AddCourseFamilyCourse(string, learning.Principal, string, learning.CourseFamilyAddCourseRequest) (learning.Course, error)
 	ImportCourseFamily(string, learning.Principal, learning.CourseFamilyImportRequest) (learning.CourseFamily, error)
 	TeachingPlans(learning.Principal) learning.TeachingPlanList
+	TeachingPlanNotice(learning.Principal, string) (learning.TeachingPlanNoticeDetail, error)
 	TeachingPlanNotificationAudience(learning.Principal, learning.TeachingPlanAudienceRequest) ([]learning.TeachingPlanNoticeRecipient, error)
 	PendingTeachingPlanNoticeBatches(learning.Principal) []learning.PendingTeachingPlanNoticeBatch
 	CompleteTeachingPlanNoticeBatch(string, learning.Principal, string) (learning.MaterialNoticeBatchResult, error)
@@ -114,6 +115,8 @@ type ContentRepository interface {
 	FailPreviewJob(string, string) error
 	MarkPreviewFileMissing(string, string) error
 	RetryPreviewJob(string, learning.Principal, string) error
+	ReviewExceptionReasons(learning.Principal) ([]string, error)
+	MarkReviewException(string, learning.Principal, string, learning.ReviewExceptionRequest) (learning.Review, error)
 	CompleteReview(string, learning.Principal, string, learning.ReviewCompleteRequest) (learning.Submission, error)
 }
 
@@ -188,6 +191,7 @@ type NoticeRepository interface {
 	ContentPermissions() []learning.ContentPermissionSummary
 	OfficialTemplates() []learning.OfficialTemplate
 	SyncOfficialTemplates(string) ([]learning.OfficialTemplate, error)
+	LookupOfficialRecipient(string) (learning.OfficialRecipientLookup, error)
 	PreviewOfficialAudience(learning.OfficialAudiencePreviewRequest) (learning.OfficialAudiencePreview, error)
 	OfficialCampaigns() []learning.OfficialCampaign
 	OfficialCampaign(string) (learning.OfficialCampaignDetail, error)

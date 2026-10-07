@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 test('actual teaching plan uploads render independent files and recover a missing preview', async ({ page, request }) => {
   test.skip(!process.env.STARLINE_REAL_API, 'launched by the isolated Go browser integration');
   const token = process.env.STARLINE_REAL_TOKEN!;
   const user = JSON.parse(process.env.STARLINE_REAL_USER!);
   const root = process.env.STARLINE_REAL_PLAN_FILES!;
-  await page.addInitScript(({ token, user }) => { localStorage.setItem('starline_admin_token', token); localStorage.setItem('starline_admin_user', JSON.stringify(user)); }, { token, user });
+  await page.addInitScript(({ token, user }) => { if (!localStorage.getItem('__starline_test_auth_initialized')) { localStorage.setItem('__starline_test_auth_initialized','1'); localStorage.setItem('starline_admin_token', token); localStorage.setItem('starline_admin_user', JSON.stringify(user)); } }, { token, user });
   // All /api requests go through Vite's proxy to the actual temporary Go server.
   // There are no route mocks or simulated response bodies in this test.
   await page.goto('/teaching-plans');
@@ -28,7 +29,11 @@ test('actual teaching plan uploads render independent files and recover a missin
   await select('教案章节', 'Unit 1 · 第一课');
   await drawer.getByLabel('选择教案文件').setInputFiles([join(root, '独立第一.pdf'), join(root, '独立第二.pdf')]);
   await select('第 2 份教案章节', 'Unit 2 · 第二课');
+  const completedBatch = page.waitForResponse(r => r.request().method() === 'POST' && r.url().includes('/teaching-plans/notification-batches/') && r.url().endsWith('/complete'));
   await drawer.getByRole('button', { name: '上传 2 份', exact: true }).click();
+  const completedResponse = await completedBatch;
+  expect(completedResponse.ok()).toBeTruthy();
+  const batchId = decodeURIComponent(new URL(completedResponse.url()).pathname.split('/').at(-2)!);
   await expect(drawer).not.toBeVisible();
   const pendingResponse = await request.get(`${process.env.STARLINE_REAL_API}/api/teaching-plans/notification-batches`, { headers: { Authorization: `Bearer ${token}` } });
   expect(pendingResponse.ok()).toBeTruthy();
@@ -36,6 +41,7 @@ test('actual teaching plan uploads render independent files and recover a missin
   for (const name of ['独立第一', '独立第二']) {
     const row = page.getByRole('row').filter({ has: page.getByRole('button', { name, exact: true }) });
     await expect(row).toContainText('可预览', { timeout: 30000 });
+    await expect(row.getByText('未读', { exact: true })).toBeVisible();
     await page.getByRole('button', { name, exact: true }).click();
     const preview = page.getByRole('dialog', { name: new RegExp(`^${name}`) });
     const iframe = preview.locator('iframe');
@@ -81,4 +87,46 @@ test('actual teaching plan uploads render independent files and recover a missin
   expect(Buffer.from(linkedBytes)).toEqual(readFileSync(join(root, '独立第一.pdf')));
   await linkedPreview.getByRole('button', { name: '返回列表', exact: true }).click();
   await expect(page).toHaveURL(/\/teaching-plans$/);
+  const teacherToken = process.env.STARLINE_REAL_TEACHER_TOKEN!;
+  const teacher = JSON.parse(process.env.STARLINE_REAL_TEACHER_USER!);
+  const hash = (...parts: string[]) => createHash('sha256').update(parts.join('\0')).digest('hex');
+  const registry = hash('teaching_plan_upload_batch', user.userId, batchId);
+  const noticeId = hash(registry, teacher.userId);
+  const deniedBatch = await request.get(`${process.env.STARLINE_REAL_API}/api/teaching-plans/notifications/${noticeId}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(deniedBatch.status()).toBe(403);
+  const anonymousBatch = await request.get(`${process.env.STARLINE_REAL_API}/api/teaching-plans/notifications/${noticeId}`);
+  expect(anonymousBatch.status()).toBe(401);
+  await page.evaluate(({token,user}) => { localStorage.setItem('starline_admin_token', token); localStorage.setItem('starline_admin_user', JSON.stringify(user)); }, {token:teacherToken,user:teacher});
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(`/teaching-plans?notice=${noticeId}&plan=${encodeURIComponent(first.id)}`);
+  const noticePreview = page.getByRole('dialog',{name:/^独立第一/});
+  await expect(noticePreview.locator('iframe')).toBeVisible();
+  await noticePreview.getByRole('button',{name:'返回列表',exact:true}).click();
+  await expect(page.getByText('本次教案更新',{exact:true})).toBeVisible();
+  await expect(page.getByText('当前可查看 2 份教案',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'打开 独立第二',exact:true}).click();
+  const batchSecond = page.getByRole('dialog',{name:/^独立第二/});
+  await expect(batchSecond.locator('iframe')).toBeVisible();
+  const batchBytes = await batchSecond.locator('iframe').evaluate(async el => Array.from(new Uint8Array(await (await fetch((el as HTMLIFrameElement).src)).arrayBuffer())));
+  expect(Buffer.from(batchBytes)).toEqual(readFileSync(join(root,'独立第二.pdf')));
+  await batchSecond.getByRole('button',{name:'返回列表',exact:true}).click();
+  await expect(batchSecond).not.toBeVisible();
+  await page.evaluate(() => window.scrollTo(0,0));
+  await expect(page.getByText('本次教案更新',{exact:true})).toBeInViewport();
+  await expect(page.locator('.app-sider')).not.toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({path:'/tmp/starline-teacher-notice-batch-narrow.png',fullPage:false});
+  await page.evaluate(() => { localStorage.removeItem('starline_admin_token'); localStorage.removeItem('starline_admin_user'); });
+  await page.goto(`/teaching-plans?notice=${noticeId}&plan=${encodeURIComponent(first.id)}`);
+  await expect(page).toHaveURL(/\/login\?/);
+  expect(new URL(page.url()).searchParams.get('notice')).toBe(noticeId);
+  expect(new URL(page.url()).searchParams.get('plan')).toBe(first.id);
+  await page.getByPlaceholder('请输入手机号',{exact:true}).fill('13800000004');
+  await page.getByPlaceholder('请输入密码',{exact:true}).fill('123456');
+  await page.getByRole('button',{name:/进入工作台/}).click();
+  await expect(page).toHaveURL(/\/teaching-plans\?/);
+  expect(new URL(page.url()).searchParams.get('notice')).toBe(noticeId);
+  await expect(page.getByRole('dialog',{name:/^独立第一/}).locator('iframe')).toBeVisible();
+
+
 });

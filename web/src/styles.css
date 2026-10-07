@@ -3288,3 +3288,7 @@ button.schedule-block:hover {
 .pickup-qr { display: flex; flex-direction: column; align-items: center; gap: 16px; margin: 24px 0; }
 .pickup-file-list { margin-top: 24px; max-height: 360px; overflow: auto; }
 .pickup-file-list > div { padding: 10px 0; border-bottom: 1px solid #eee; overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .teaching-plan-notice-entry .app-sider { display: none; }
+}

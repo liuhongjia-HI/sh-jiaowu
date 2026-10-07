@@ -86,6 +86,7 @@ func main() {
 		return
 	}
 	go downloadWorker.Run(ctx)
+	go repo.RunOfficialCampaignWorker(ctx, func(err error) { log.Errorf("official campaigns: %v", err) })
 	go repo.RunBusinessNoticeWorker(ctx, func(err error) { log.Errorf("business notifications: %v", err) })
 
 	r := router.New(router.Dependencies{

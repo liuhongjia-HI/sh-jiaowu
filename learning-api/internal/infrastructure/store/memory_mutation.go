@@ -264,6 +264,7 @@ func cloneOfficialTemplates(values []learning.OfficialTemplate) []learning.Offic
 func cloneOfficialCampaigns(values []learning.OfficialCampaign) []learning.OfficialCampaign {
 	out := make([]learning.OfficialCampaign, len(values))
 	for i, value := range values {
+		value.GuardianIDs = cloneStrings(value.GuardianIDs)
 		value.Grades = cloneStrings(value.Grades)
 		value.Values = cloneMap(value.Values)
 		out[i] = value

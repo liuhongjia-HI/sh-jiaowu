@@ -306,3 +306,14 @@ func (s *Service) PendingTeachingPlanNoticeBatches(p learning.Principal) []learn
 func (s *Service) CompleteTeachingPlanNoticeBatch(operator string, p learning.Principal, batchID string) (learning.MaterialNoticeBatchResult, error) {
 	return s.content.CompleteTeachingPlanNoticeBatch(operator, p, batchID)
 }
+
+func (s *Service) ReviewExceptionReasons(p learning.Principal) ([]string, error) {
+	return s.content.ReviewExceptionReasons(p)
+}
+func (s *Service) MarkReviewException(o string, p learning.Principal, id string, r learning.ReviewExceptionRequest) (learning.Review, error) {
+	return s.content.MarkReviewException(o, p, id, r)
+}
+
+func (s *Service) TeachingPlanNotice(p learning.Principal, id string) (learning.TeachingPlanNoticeDetail, error) {
+	return s.content.TeachingPlanNotice(p, id)
+}

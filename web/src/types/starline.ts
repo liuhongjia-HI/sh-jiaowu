@@ -170,7 +170,7 @@ export type WechatSettingsUpdateRequest = {
 export type OfficialTemplateField = { key: string; label: string; example?: string; maxLength?: number };
 export type OfficialTemplate = { id: string; title: string; content: string; example?: string; fields: OfficialTemplateField[]; status: string; syncedAt: string };
 export type OfficialAudiencePreview = { studentCount: number; guardianCount: number; reachableCount: number; unreachableCount: number; unmatchedCount: number; duplicateCount: number; grades: string[]; unreachableReasons?: string[] };
-export type OfficialCampaign = { id: string; templateId: string; templateTitle: string; grades: string[]; values: Record<string, string>; pagePath: string; targetCount: number; successCount: number; failureCount: number; status: string; createdBy: string; createdAt: string; sentAt?: string };
+export type OfficialCampaign = { recipientMode?: string; guardianIds?: string[]; requestId?: string; id: string; templateId: string; templateTitle: string; grades: string[]; values: Record<string, string>; pagePath: string; targetCount: number; successCount: number; failureCount: number; retryableCount?: number; status: string; createdBy: string; createdAt: string; sentAt?: string };
 
 export type StudyPackage = {
   id: string;
@@ -775,6 +775,9 @@ export type QuestionBankUpsertRequest = {
 };
 
 export type Review = {
+  exceptionReason?: string;
+  exceptionClass?: string;
+  exceptionEventId?: string;
   id: string;
   studentId?: string;
   homeworkId?: string;
@@ -1132,3 +1135,6 @@ export type LessonFeedback = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type OfficialRecipientLookup = { guardianId: string; name: string; phone: string; studentNames: string[]; reachable: boolean; reason?: string };
+export type OfficialCampaignDetail = { campaign: OfficialCampaign; recipients: { id: string; guardianName: string; studentNames: string; status: string; messageId?: string; failureReason?: string; retryable: boolean }[] };

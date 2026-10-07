@@ -34,7 +34,7 @@ func (s *MemoryStore) businessTaskValidity(task learning.BusinessNoticeTask, now
 		return "通知已过期"
 	}
 	binding := s.bindingForBusinessKind(task.Kind)
-	if !binding.Enabled || !bindingStudentIncluded(binding, task.StudentID) {
+	if !binding.Enabled || !bindingStudentIncluded(binding, task.StudentID) || !bindingGuardianIncluded(binding, task.GuardianID) {
 		return "自动通知已关闭或不在试运行范围"
 	}
 	if !binding.Ready {
@@ -67,6 +67,28 @@ func (s *MemoryStore) businessTaskValidity(task learning.BusinessNoticeTask, now
 			return "资料模板字段映射已变更"
 		}
 	}
+	if task.Kind == learning.NoticeReviewException {
+		review, valid := s.currentReviewException(event)
+		if !valid {
+			return "批改异常已解除或更新"
+		}
+		homework, found := s.findHomework(review.HomeworkID)
+		if !found || homework.PublishStatus != "已发布" || businessShortName(homework.Title) != task.Values["thing7"] {
+			return "作业已撤回或内容已变更"
+		}
+		if !containsString(binding.ApprovedReasons, review.ExceptionReason) {
+			return "异常原因已不在审核原因列表"
+		}
+		if _, err := s.studentHomeworkUnlocked(learning.Principal{StudentID: task.StudentID}, review.HomeworkID); err != nil {
+			return "作业访问权限已失效"
+		}
+		if !reflect.DeepEqual(task.Values, reviewExceptionValues(review)) {
+			return "批改异常内容已变更"
+		}
+		if err := validateOfficialMessageValues(task.Values); err != nil {
+			return "批改异常字段不可用：" + err.Error()
+		}
+	}
 	if task.Kind == learning.NoticeHomeworkSubmitted {
 		submission, found := s.submissions[event.RelatedID]
 		if !found || submission.StudentID != task.StudentID {
@@ -74,6 +96,68 @@ func (s *MemoryStore) businessTaskValidity(task learning.BusinessNoticeTask, now
 		}
 		if _, err := s.studentHomeworkUnlocked(learning.Principal{StudentID: task.StudentID}, submission.HomeworkID); err != nil {
 			return "作业访问权限已失效"
+		}
+	}
+	if task.Kind == learning.NoticeScheduleReminder {
+		if !reflect.DeepEqual(task.Values, reminderNoticeValues(binding, event)) {
+			return "课前提醒字段映射已变更"
+		}
+		for key := range binding.RequiredFields {
+			if task.Values[key] == "" {
+				return "课前提醒缺少字段：" + key
+			}
+		}
+	}
+	if task.Kind == learning.NoticeHomeworkPublished || task.Kind == learning.NoticeReviewCompleted {
+		homeworkID := event.RelatedID
+		if task.Kind == learning.NoticeReviewCompleted {
+			submission, found := s.submissions[event.RelatedID]
+			if !found || submission.StudentID != task.StudentID || submission.Status != "已批改" {
+				return "批改结果已失效或尚未最终完成"
+			}
+			homeworkID = submission.HomeworkID
+		}
+		homework, found := s.findHomework(homeworkID)
+		if !found || homework.PublishStatus != "已发布" {
+			return "作业已撤回或不存在"
+		}
+		if task.Kind == learning.NoticeHomeworkPublished {
+			if deadline, valid := homeworkNotificationDeadline(homework); valid && !deadline.After(now) {
+				return "作业已超过截止时间"
+			}
+		}
+		if _, err := s.studentHomeworkUnlocked(learning.Principal{StudentID: task.StudentID}, homeworkID); err != nil {
+			return "作业访问权限已失效"
+		}
+		if !reflect.DeepEqual(task.Values, s.homeworkNotificationValues(binding, event)) {
+			return "作业内容或通知字段映射已变更"
+		}
+		for key := range binding.RequiredFields {
+			if task.Values[key] == "" {
+				return "作业通知缺少字段：" + key
+			}
+		}
+		if err := validateOfficialMessageValues(task.Values); err != nil {
+			return "作业通知字段不可用：" + err.Error()
+		}
+	}
+	if task.Kind == learning.NoticeScheduleCancelled {
+		if len(event.Lessons) == 0 {
+			return "取消课次不存在"
+		}
+		for _, change := range event.Lessons {
+			cancelled := false
+			for _, current := range s.scheduleClasses {
+				if current.ID == change.After.ID && current.Status == "已取消" && businessLessonVersion(current) == businessLessonVersion(change.After) {
+					cancelled = true
+				}
+			}
+			if !cancelled {
+				return "取消状态已失效或课程已恢复"
+			}
+		}
+		if !reflect.DeepEqual(task.Values, cancellationNoticeValues(binding, event)) {
+			return "取消通知字段映射已变更"
 		}
 	}
 
@@ -101,7 +185,7 @@ func (s *MemoryStore) businessTaskValidity(task learning.BusinessNoticeTask, now
 }
 
 func (s *MemoryStore) businessTaskCanRetry(task learning.BusinessNoticeTask, now time.Time) bool {
-	return task.Status == "发送失败" && s.businessTaskValidity(task, now) == "" && task.OpenID != ""
+	return task.Status == "发送失败" && task.Retryable && s.businessTaskValidity(task, now) == "" && task.OpenID != ""
 }
 
 func (s *MemoryStore) RetryBusinessNotice(operator, id string) (learning.BusinessNoticeTask, error) {
@@ -173,7 +257,7 @@ func (s *MemoryStore) businessReminderSuppression(task learning.BusinessNoticeTa
 func (s *MemoryStore) claimBusinessTask(index int, now time.Time) (learning.BusinessNoticeTask, bool, error) {
 	task := s.businessNoticeTasks[index]
 	claim := func(current learning.BusinessNoticeTask) (learning.BusinessNoticeTask, bool) {
-		if current.Status != "待发送" && current.Status != "发送失败" {
+		if current.Status != "待发送" && (current.Status != "发送失败" || !current.Retryable) {
 			return current, false
 		}
 		if current.Kind == learning.NoticeScheduleReminder && businessNextReminderWindow(now).After(now) {
@@ -284,10 +368,6 @@ func (s *MemoryStore) ProcessBusinessNotices(now time.Time) error {
 				task.DueAt = businessTime(now)
 				work.businessNoticeTasks[i] = task
 			}
-			if task.Status == "结果待确认" && !parseBusinessTime(task.DueAt).After(now) && now.Sub(parseBusinessTime(task.FirstAttemptAt)) < 10*time.Minute {
-				task.Status = "待发送"
-				work.businessNoticeTasks[i] = task
-			}
 		}
 		return nil
 	})
@@ -300,7 +380,7 @@ func (s *MemoryStore) ProcessBusinessNotices(now time.Time) error {
 		s.mu.Lock()
 		index := -1
 		for i, task := range s.businessNoticeTasks {
-			if (task.Status == "待发送" || task.Status == "发送失败") && task.Attempts < 4 && !parseBusinessTime(task.DueAt).After(now) && s.businessTaskValidity(task, now) == "" {
+			if (task.Status == "待发送" || (task.Status == "发送失败" && task.Retryable)) && task.Attempts < 4 && !parseBusinessTime(task.DueAt).After(now) && s.businessTaskValidity(task, now) == "" {
 				index = i
 				break
 			}
@@ -346,6 +426,7 @@ func (s *MemoryStore) ProcessBusinessNotices(now time.Time) error {
 				current.MessageID = messageID
 				current.ClaimedAt = ""
 				current.FailureReason = ""
+				current.Retryable = false
 				if sendErr == nil {
 					current.Status = "微信已受理"
 					current.AcceptedAt = businessTime(now)
@@ -359,6 +440,7 @@ func (s *MemoryStore) ProcessBusinessNotices(now time.Time) error {
 					current.FailureReason = sendErr.Error()
 					var typed *officialSendError
 					if errors.As(sendErr, &typed) {
+						current.Retryable = typed.temporary && !typed.configuration && !typed.uncertain
 						if typed.configuration {
 							current.Status = "配置错误"
 						}
@@ -368,6 +450,9 @@ func (s *MemoryStore) ProcessBusinessNotices(now time.Time) error {
 						if !typed.temporary && !typed.uncertain {
 							current.Attempts = 4
 						}
+					}
+					if !current.Retryable {
+						current.Attempts = 4
 					}
 					if current.Attempts < 4 {
 						delay := []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute}[current.Attempts-1]
@@ -403,6 +488,7 @@ func applyBusinessReceipt(task *learning.BusinessNoticeTask, receipt learning.Of
 	if task.Status == "已送达" {
 		return
 	}
+	task.Retryable = false
 	if receipt.Status == "success" {
 		task.Status = "已送达"
 		task.DeliveredAt = receipt.ReceivedAt

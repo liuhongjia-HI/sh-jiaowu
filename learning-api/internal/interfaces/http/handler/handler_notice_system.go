@@ -339,3 +339,13 @@ func (h *LearningHandler) RevealWechatSecret(c *gin.Context) {
 	}
 	OK(c, gin.H{"value": value})
 }
+
+func (h *LearningHandler) LookupOfficialRecipient(c *gin.Context) {
+	value, err := h.service.LookupOfficialRecipient(c.Query("phone"))
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	OK(c, value)
+}

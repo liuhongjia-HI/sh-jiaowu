@@ -31,7 +31,7 @@ func TestBusinessNoticeBrowserHarness(t *testing.T) {
 	s.guardianStudents = []learning.GuardianStudent{{GuardianID: "browser-parent", StudentID: "stu-001", Status: learning.GuardianStudentActive}}
 	s.officialFollowers = []learning.OfficialFollower{{OpenID: "browser-openid", UnionID: "browser-union", Subscribed: true}}
 	s.officialTemplates = nil
-	titles := map[string]string{learning.NoticeScheduleConfirmed: "排课时间已确认通知", learning.NoticeScheduleChanged: "调课成功通知", learning.NoticeScheduleReminder: "课程预约结果通知"}
+	titles := map[string]string{learning.NoticeScheduleConfirmed: "排课时间已确认通知", learning.NoticeScheduleChanged: "调课成功通知", learning.NoticeScheduleReminder: "上课提醒"}
 	for _, binding := range defaultBusinessNoticeBindings() {
 		title, ok := titles[binding.Kind]
 		if !ok {

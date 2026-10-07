@@ -394,7 +394,7 @@ function Shell({ user }: { user: CurrentUser }) {
   }, [activeOpenKeys]);
 
   return (
-    <Layout className="app-shell">
+    <Layout className={`app-shell${location.pathname === '/teaching-plans' && new URLSearchParams(location.search).has('notice') ? ' teaching-plan-notice-entry' : ''}`}>
       <Sider width={264} theme="dark" className="app-sider">
         <div className="brand">
           <div className="brand-mark">S</div>

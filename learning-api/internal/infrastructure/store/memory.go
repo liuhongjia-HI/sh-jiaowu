@@ -33,6 +33,7 @@ type MemoryStore struct {
 	businessScheduleSnapshots map[string]learning.ScheduleClass
 	officialMessageSender     func(learning.OfficialMessageRequest) (string, error)
 	officialFollowerInfo      func(string) (learning.OfficialFollower, error)
+	officialCampaignMu        sync.Mutex
 	businessWorkerMu          sync.Mutex
 
 	mu                              sync.Mutex

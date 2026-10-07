@@ -61,7 +61,9 @@ type OfficialFollowerSyncResult struct {
 }
 
 type OfficialAudiencePreviewRequest struct {
-	Grades []string `json:"grades"`
+	RecipientMode string   `json:"recipientMode,omitempty"`
+	GuardianIDs   []string `json:"guardianIds,omitempty"`
+	Grades        []string `json:"grades"`
 }
 
 type OfficialAudiencePreview struct {
@@ -76,30 +78,40 @@ type OfficialAudiencePreview struct {
 }
 
 type OfficialCampaignCreateRequest struct {
-	TemplateID string            `json:"templateId"`
-	Grades     []string          `json:"grades"`
-	Values     map[string]string `json:"values"`
-	PagePath   string            `json:"pagePath"`
-	Draft      bool              `json:"draft"`
-}
-
-type OfficialCampaign struct {
-	ID            string            `json:"id"`
+	RequestID     string            `json:"requestId,omitempty"`
+	RecipientMode string            `json:"recipientMode,omitempty"`
+	GuardianIDs   []string          `json:"guardianIds,omitempty"`
 	TemplateID    string            `json:"templateId"`
-	TemplateTitle string            `json:"templateTitle"`
 	Grades        []string          `json:"grades"`
 	Values        map[string]string `json:"values"`
 	PagePath      string            `json:"pagePath"`
-	TargetCount   int               `json:"targetCount"`
-	SuccessCount  int               `json:"successCount"`
-	FailureCount  int               `json:"failureCount"`
-	Status        string            `json:"status"`
-	CreatedBy     string            `json:"createdBy"`
-	CreatedAt     string            `json:"createdAt"`
-	SentAt        string            `json:"sentAt,omitempty"`
+	Draft         bool              `json:"draft"`
+}
+
+type OfficialCampaign struct {
+	RecipientMode  string            `json:"recipientMode,omitempty"`
+	GuardianIDs    []string          `json:"guardianIds,omitempty"`
+	RequestID      string            `json:"requestId,omitempty"`
+	RequestDigest  string            `json:"-"`
+	ID             string            `json:"id"`
+	TemplateID     string            `json:"templateId"`
+	TemplateTitle  string            `json:"templateTitle"`
+	Grades         []string          `json:"grades"`
+	Values         map[string]string `json:"values"`
+	PagePath       string            `json:"pagePath"`
+	TargetCount    int               `json:"targetCount"`
+	SuccessCount   int               `json:"successCount"`
+	FailureCount   int               `json:"failureCount"`
+	RetryableCount int               `json:"retryableCount"`
+	Status         string            `json:"status"`
+	CreatedBy      string            `json:"createdBy"`
+	CreatedAt      string            `json:"createdAt"`
+	SentAt         string            `json:"sentAt,omitempty"`
 }
 
 type OfficialCampaignRecipient struct {
+	ClaimedAt     string `json:"claimedAt,omitempty"`
+	Retryable     bool   `json:"retryable"`
 	MessageID     string `json:"messageId,omitempty"`
 	AcceptedAt    string `json:"acceptedAt,omitempty"`
 	DeliveredAt   string `json:"deliveredAt,omitempty"`
@@ -118,4 +130,14 @@ type OfficialCampaignRecipient struct {
 type OfficialCampaignDetail struct {
 	Campaign   OfficialCampaign            `json:"campaign"`
 	Recipients []OfficialCampaignRecipient `json:"recipients"`
+}
+
+// OfficialRecipientLookup exposes account readiness without WeChat identifiers.
+type OfficialRecipientLookup struct {
+	GuardianID   string   `json:"guardianId"`
+	Name         string   `json:"name"`
+	Phone        string   `json:"phone"`
+	StudentNames []string `json:"studentNames"`
+	Reachable    bool     `json:"reachable"`
+	Reason       string   `json:"reason,omitempty"`
 }

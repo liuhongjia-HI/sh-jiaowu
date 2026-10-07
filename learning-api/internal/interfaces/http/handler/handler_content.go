@@ -250,3 +250,28 @@ func (h *LearningHandler) RecordTeacherMaterialView(c *gin.Context) {
 	}
 	OK(c, gin.H{"saved": true})
 }
+
+func (h *LearningHandler) ReviewExceptionReasons(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	reasons, err := h.service.ReviewExceptionReasons(p)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, reasons)
+}
+func (h *LearningHandler) MarkReviewException(c *gin.Context) {
+	var req learning.ReviewExceptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "异常参数无效")
+		return
+	}
+	p, _ := middleware.CurrentPrincipal(c)
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	review, err := h.service.MarkReviewException(operator.(string), p, c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, review)
+}

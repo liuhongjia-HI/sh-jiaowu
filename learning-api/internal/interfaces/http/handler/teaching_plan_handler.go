@@ -166,3 +166,13 @@ func (h *LearningHandler) CompleteTeachingPlanNoticeBatch(c *gin.Context) {
 	}
 	OK(c, result)
 }
+
+func (h *LearningHandler) TeachingPlanNotice(c *gin.Context) {
+	p, _ := middleware.CurrentPrincipal(c)
+	detail, err := h.service.TeachingPlanNotice(p, c.Param("id"))
+	if err != nil {
+		Forbidden(c, err.Error())
+		return
+	}
+	OK(c, detail)
+}

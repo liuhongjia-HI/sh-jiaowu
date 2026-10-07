@@ -77,7 +77,7 @@ func teachingPlanNoticeURL(b learning.BusinessNoticeBinding, e learning.Business
 	target, _ := url.Parse(b.WebOrigin)
 	target.Path = "/teaching-plans"
 	target.RawPath = ""
-	target.RawQuery = url.Values{"plan": []string{e.ResourceIDs[0]}}.Encode()
+	target.RawQuery = url.Values{"plan": []string{e.ResourceIDs[0]}, "notice": []string{e.ID}}.Encode()
 	return target.String()
 }
 
@@ -262,4 +262,28 @@ func (s *MemoryStore) teacherNoticeTaskValidity(task learning.BusinessNoticeTask
 		return "教案模板映射或网页入口已变更"
 	}
 	return ""
+}
+
+// A batch link is scoped to the actual recipient, with current permissions.
+func (s *MemoryStore) TeachingPlanNotice(p learning.Principal, id string) (learning.TeachingPlanNoticeDetail, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, err := s.principalByUserIDUnlocked(p.UserID)
+	if err != nil || !hasRole(current.Roles, learning.RoleTeacher) {
+		return learning.TeachingPlanNoticeDetail{}, errors.New("教师账号已失效或无权查看此通知")
+	}
+	event, found := s.businessEvent(strings.TrimSpace(id))
+	if !found || event.Kind != learning.NoticeTeachingPlansUploaded || event.RecipientUserID != current.UserID {
+		return learning.TeachingPlanNoticeDetail{}, errors.New("通知不存在或不属于当前老师")
+	}
+	detail := learning.TeachingPlanNoticeDetail{Title: event.Title, OriginalCount: len(event.ResourceIDs), Plans: []learning.TeachingPlan{}}
+	for _, id := range event.ResourceIDs {
+		if plan, err := s.planUnlocked(current, id); err == nil {
+			detail.Plans = append(detail.Plans, plan)
+		}
+	}
+	if len(detail.Plans) == 0 {
+		return learning.TeachingPlanNoticeDetail{}, errors.New("本次更新的教案不存在或访问权限已失效")
+	}
+	return detail, nil
 }

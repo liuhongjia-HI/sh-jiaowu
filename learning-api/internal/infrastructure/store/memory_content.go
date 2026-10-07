@@ -1329,7 +1329,7 @@ func (s *MemoryStore) assignReviewUnlocked(operator string, principal learning.P
 		if review.ID != strings.TrimSpace(id) {
 			continue
 		}
-		if review.Status != "待批改" && review.Status != "待复核" {
+		if review.Status != "待批改" && review.Status != "待复核" && review.Status != "批改异常" {
 			return learning.Review{}, errors.New("该任务当前不可重新分派")
 		}
 		review.ReviewerTeacherID = teacher.ID
@@ -1415,6 +1415,9 @@ func (s *MemoryStore) completeReviewUnlocked(operator string, principal learning
 	submission.Reward = req.Reward
 	submission.Status = req.FinalStatus
 	s.submissions[submission.ID] = cloneSubmission(submission)
+	review.ExceptionReason = ""
+	review.ExceptionClass = ""
+	review.ExceptionEventID = ""
 	if req.FinalStatus == "待复核" {
 		review.SubmissionID = submission.ID
 		review.SystemScore = req.Score

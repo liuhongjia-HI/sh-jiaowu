@@ -411,13 +411,13 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 			KEY idx_guardian_students_student (student_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
-	if _, err := s.db.Exec(`ALTER TABLE course_curriculum_nodes MODIFY COLUMN name VARCHAR(128) NULL`); err != nil {
-		return err
-	}
 	for _, statement := range statements {
 		if _, err := s.db.Exec(statement); err != nil {
 			return err
 		}
+	}
+	if _, err := s.db.Exec(`ALTER TABLE course_curriculum_nodes MODIFY COLUMN name VARCHAR(128) NULL`); err != nil {
+		return err
 	}
 	// Notice migrations add fields to tables created above. Running them first
 	// fails on a new database initialized from deploy/mysql/init.sql.
@@ -527,6 +527,7 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"notices", "failure_reason", "TEXT NOT NULL"},
 		{"notices", "related_type", "VARCHAR(32) NOT NULL DEFAULT ''"},
 		{"notices", "related_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
+		{"official_message_campaigns", "request_json", "TEXT NULL"},
 		{"notices", "recipient_student_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"notices", "retry_count", "INT NOT NULL DEFAULT 0"},
 		{"notices", "is_read", "TINYINT(1) NOT NULL DEFAULT 0"},
@@ -544,6 +545,9 @@ func (s *MemoryStore) ensurePersistenceSchema() error {
 		{"pending_reviews", "reviewer_teacher_name", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"pending_reviews", "tutoring_assignment_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"pending_reviews", "assigned_at", "DATETIME NULL"},
+		{"pending_reviews", "exception_reason", "VARCHAR(80) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "exception_class", "VARCHAR(80) NOT NULL DEFAULT ''"},
+		{"pending_reviews", "exception_event_id", "VARCHAR(64) NOT NULL DEFAULT ''"},
 		{"student_submission_results", "objective_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "final_score", "INT NOT NULL DEFAULT 0"},
 		{"student_submission_results", "answers_json", "TEXT NOT NULL"},

@@ -278,7 +278,7 @@ func parseOfficialTemplateFields(content string) []learning.OfficialTemplateFiel
 				continue
 			}
 			seen[key] = true
-			label := strings.TrimSpace(strings.SplitN(line, "：", 2)[0])
+			label := strings.TrimSpace(strings.SplitN(strings.ReplaceAll(line, ":", "："), "：", 2)[0])
 			if label == "" || strings.Contains(label, "{{") {
 				switch key {
 				case "first":
@@ -483,64 +483,7 @@ type officialAudienceTarget struct {
 }
 
 func (s *MemoryStore) officialAudienceUnlocked(grades []string) (learning.OfficialAudiencePreview, []officialAudienceTarget, error) {
-	gradeSet := map[string]bool{}
-	for _, grade := range compactStrings(grades) {
-		gradeSet[grade] = true
-	}
-	if len(gradeSet) == 0 {
-		return learning.OfficialAudiencePreview{}, nil, errors.New("请至少选择一个年级")
-	}
-	studentByID := map[string]learning.Student{}
-	for _, student := range s.students {
-		if gradeSet[student.Grade] && student.AccountStatus == "正常" {
-			studentByID[student.ID] = student
-		}
-	}
-	guardianByID := map[string]learning.Guardian{}
-	for _, guardian := range s.guardians {
-		guardianByID[guardian.ID] = guardian
-	}
-	followerByUnion := map[string]learning.OfficialFollower{}
-	for _, follower := range s.officialFollowers {
-		if follower.Subscribed && follower.UnionID != "" {
-			followerByUnion[follower.UnionID] = follower
-		}
-	}
-	studentNamesByGuardian := map[string][]string{}
-	for _, relation := range s.guardianStudents {
-		student, ok := studentByID[relation.StudentID]
-		if !ok || relation.Status != learning.GuardianStudentActive {
-			continue
-		}
-		studentNamesByGuardian[relation.GuardianID] = append(studentNamesByGuardian[relation.GuardianID], student.Name)
-	}
-	preview := learning.OfficialAudiencePreview{StudentCount: len(studentByID), Grades: compactStrings(grades)}
-	targets := []officialAudienceTarget{}
-	openIDs := map[string]bool{}
-	for guardianID, studentNames := range studentNamesByGuardian {
-		guardian, ok := guardianByID[guardianID]
-		if !ok || guardian.AccountStatus != "正常" {
-			continue
-		}
-		preview.GuardianCount++
-		follower, matched := followerByUnion[guardian.UnionID]
-		if !matched {
-			preview.UnmatchedCount++
-			continue
-		}
-		if openIDs[follower.OpenID] {
-			preview.DuplicateCount++
-			continue
-		}
-		openIDs[follower.OpenID] = true
-		targets = append(targets, officialAudienceTarget{GuardianID: guardian.ID, GuardianName: firstNonEmpty(guardian.Name, guardian.Nickname, "家长"), OpenID: follower.OpenID, StudentNames: uniqueStrings(studentNames)})
-	}
-	preview.ReachableCount = len(targets)
-	preview.UnreachableCount = preview.GuardianCount - preview.ReachableCount
-	if preview.UnmatchedCount > 0 {
-		preview.UnreachableReasons = append(preview.UnreachableReasons, fmt.Sprintf("%d 位家长尚未关注公众号或身份未匹配", preview.UnmatchedCount))
-	}
-	return preview, targets, nil
+	return s.officialSelectedAudienceUnlocked(learning.OfficialAudiencePreviewRequest{Grades: grades})
 }
 
 func uniqueStrings(values []string) []string {
@@ -558,7 +501,7 @@ func uniqueStrings(values []string) []string {
 func (s *MemoryStore) PreviewOfficialAudience(req learning.OfficialAudiencePreviewRequest) (learning.OfficialAudiencePreview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	preview, _, err := s.officialAudienceUnlocked(req.Grades)
+	preview, _, err := s.officialSelectedAudienceUnlocked(learning.OfficialAudiencePreviewRequest{Grades: req.Grades, RecipientMode: req.RecipientMode, GuardianIDs: req.GuardianIDs})
 	return preview, err
 }
 
@@ -566,6 +509,9 @@ func (s *MemoryStore) OfficialCampaigns() []learning.OfficialCampaign {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := cloneOfficialCampaigns(s.officialCampaigns)
+	for i := range out {
+		out[i].RetryableCount = s.officialRetryableCount(out[i].ID)
+	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
 	return out
 }
@@ -577,6 +523,7 @@ func (s *MemoryStore) OfficialCampaign(id string) (learning.OfficialCampaignDeta
 		if campaign.ID != id {
 			continue
 		}
+		campaign.RetryableCount = s.officialRetryableCount(id)
 		recipients := []learning.OfficialCampaignRecipient{}
 		for _, recipient := range s.officialCampaignRecipients {
 			if recipient.CampaignID == id {
@@ -588,11 +535,55 @@ func (s *MemoryStore) OfficialCampaign(id string) (learning.OfficialCampaignDeta
 	return learning.OfficialCampaignDetail{}, errors.New("发送记录不存在")
 }
 
+func (s *MemoryStore) officialRetryableCount(id string) int {
+	count := 0
+	for _, recipient := range s.officialCampaignRecipients {
+		if recipient.CampaignID == id && recipient.Status == "发送失败" && recipient.Retryable && recipient.RetryCount < 4 {
+			count++
+		}
+	}
+	return count
+}
+
 func (s *MemoryStore) createOfficialCampaignUnlocked(operator string, req learning.OfficialCampaignCreateRequest) (learning.OfficialCampaign, error) {
 	if s.db != nil {
 		return persistentMutation(s, func(work *MemoryStore) (learning.OfficialCampaign, error) {
 			return work.createOfficialCampaignUnlocked(operator, req)
 		})
+	}
+	req.RecipientMode = strings.TrimSpace(req.RecipientMode)
+	if req.RecipientMode == "" {
+		req.RecipientMode = "grades"
+	}
+	if req.RecipientMode != "grades" && req.RecipientMode != "specified" {
+		return learning.OfficialCampaign{}, errors.New("接收模式无效")
+	}
+	if req.RecipientMode == "grades" && len(req.GuardianIDs) > 0 {
+		return learning.OfficialCampaign{}, errors.New("按年级模式不能携带指定账号")
+	}
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	if len(req.RequestID) > 128 {
+		return learning.OfficialCampaign{}, errors.New("请求编号过长")
+	}
+	if req.RecipientMode == "specified" && !req.Draft && req.RequestID == "" {
+		return learning.OfficialCampaign{}, errors.New("指定账号发送必须携带请求编号")
+	}
+	req.GuardianIDs = compactStrings(req.GuardianIDs)
+	req.Grades = compactStrings(req.Grades)
+	sort.Strings(req.GuardianIDs)
+	sort.Strings(req.Grades)
+	digest := businessNoticeHash(mustJSON(req))
+	campaignID := ""
+	if req.RequestID != "" && !req.Draft {
+		campaignID = "oa-request-" + businessNoticeHash(operator, req.RequestID)
+		for _, old := range s.officialCampaigns {
+			if old.ID == campaignID {
+				if old.RequestDigest != digest {
+					return learning.OfficialCampaign{}, errors.New("同一请求编号不能修改目标、模板或内容")
+				}
+				return cloneOfficialCampaigns([]learning.OfficialCampaign{old})[0], nil
+			}
+		}
 	}
 	var template *learning.OfficialTemplate
 	for i := range s.officialTemplates {
@@ -616,11 +607,16 @@ func (s *MemoryStore) createOfficialCampaignUnlocked(operator string, req learni
 			return learning.OfficialCampaign{}, fmt.Errorf("%s不能超过%d个字", field.Label, field.MaxLength)
 		}
 	}
+	if !req.Draft {
+		if err := validateOfficialMessageValues(req.Values); err != nil {
+			return learning.OfficialCampaign{}, err
+		}
+	}
 	preview := learning.OfficialAudiencePreview{}
 	targets := []officialAudienceTarget{}
 	var err error
-	if len(compactStrings(req.Grades)) > 0 {
-		preview, targets, err = s.officialAudienceUnlocked(req.Grades)
+	if req.RecipientMode == "specified" || len(compactStrings(req.Grades)) > 0 {
+		preview, targets, err = s.officialSelectedAudienceUnlocked(learning.OfficialAudiencePreviewRequest{Grades: req.Grades, RecipientMode: req.RecipientMode, GuardianIDs: req.GuardianIDs})
 	} else if !req.Draft {
 		err = errors.New("请至少选择一个年级")
 	}
@@ -628,15 +624,18 @@ func (s *MemoryStore) createOfficialCampaignUnlocked(operator string, req learni
 		return learning.OfficialCampaign{}, err
 	}
 	if !req.Draft && preview.ReachableCount == 0 {
-		return learning.OfficialCampaign{}, errors.New("当前所选年级没有可触达的公众号家长")
+		return learning.OfficialCampaign{}, errors.New("当前选择没有可触达的公众号家长")
 	}
 	now := time.Now()
-	id := "oa-campaign-" + now.Format("20060102150405.000000000")
+	id := campaignID
+	if id == "" {
+		id = "oa-campaign-" + now.Format("20060102150405.000000000")
+	}
 	status := "草稿"
 	if !req.Draft {
 		status = "发送中"
 	}
-	campaign := learning.OfficialCampaign{ID: id, TemplateID: template.ID, TemplateTitle: template.Title, Grades: compactStrings(req.Grades), Values: cloneMap(req.Values), PagePath: strings.TrimSpace(req.PagePath), TargetCount: len(targets), Status: status, CreatedBy: operator, CreatedAt: now.Format("2006-01-02 15:04:05")}
+	campaign := learning.OfficialCampaign{RecipientMode: req.RecipientMode, GuardianIDs: cloneStrings(req.GuardianIDs), RequestID: req.RequestID, RequestDigest: digest, ID: id, TemplateID: template.ID, TemplateTitle: template.Title, Grades: compactStrings(req.Grades), Values: cloneMap(req.Values), PagePath: strings.TrimSpace(req.PagePath), TargetCount: len(targets), Status: status, CreatedBy: operator, CreatedAt: now.Format("2006-01-02 15:04:05")}
 	s.officialCampaigns = append([]learning.OfficialCampaign{campaign}, s.officialCampaigns...)
 	if !req.Draft {
 		for index, target := range targets {
@@ -645,115 +644,6 @@ func (s *MemoryStore) createOfficialCampaignUnlocked(operator string, req learni
 	}
 	s.prependLog(operator, map[bool]string{true: "保存公众号消息草稿", false: "发送公众号模板消息"}[req.Draft], template.Title)
 	return campaign, nil
-}
-
-func (s *MemoryStore) CreateOfficialCampaign(operator string, req learning.OfficialCampaignCreateRequest) (learning.OfficialCampaign, error) {
-	s.mu.Lock()
-	campaign, err := s.createOfficialCampaignUnlocked(operator, req)
-	s.mu.Unlock()
-	if err == nil && !req.Draft {
-		go s.deliverOfficialCampaign(campaign.ID, false)
-	}
-	return campaign, err
-}
-
-func (s *MemoryStore) RetryOfficialCampaign(operator, id string) (learning.OfficialCampaign, error) {
-	s.mu.Lock()
-	var found *learning.OfficialCampaign
-	for i := range s.officialCampaigns {
-		if s.officialCampaigns[i].ID == id {
-			s.officialCampaigns[i].Status = "发送中"
-			copy := s.officialCampaigns[i]
-			found = &copy
-			break
-		}
-	}
-	if found == nil {
-		s.mu.Unlock()
-		return learning.OfficialCampaign{}, errors.New("发送记录不存在")
-	}
-	s.prependLog(operator, "重试公众号模板消息", found.TemplateTitle)
-	s.mu.Unlock()
-	go s.deliverOfficialCampaign(id, true)
-	return *found, nil
-}
-
-func (s *MemoryStore) deliverOfficialCampaign(id string, failedOnly bool) {
-	s.mu.Lock()
-	var campaign learning.OfficialCampaign
-	found := false
-	for _, item := range s.officialCampaigns {
-		if item.ID == id {
-			campaign, found = item, true
-			break
-		}
-	}
-	sender := s.officialTemplateSender
-	messageSender := s.officialMessageSender
-	recipients := append([]learning.OfficialCampaignRecipient(nil), s.officialCampaignRecipients...)
-	s.mu.Unlock()
-	if !found {
-		return
-	}
-	results := map[string]learning.OfficialCampaignRecipient{}
-	for _, recipient := range recipients {
-		if recipient.CampaignID != id || (failedOnly && recipient.Status != "发送失败") || (!failedOnly && recipient.Status != "待发送") {
-			continue
-		}
-		updated := recipient
-		updated.RetryCount++
-
-		if messageSender != nil {
-			s.mu.Lock()
-			_, targets, audienceErr := s.officialAudienceUnlocked(campaign.Grades)
-			reachable := false
-			for _, target := range targets {
-				if target.OpenID == recipient.OpenID && target.GuardianID == recipient.GuardianID {
-					reachable = true
-				}
-			}
-			s.mu.Unlock()
-			if audienceErr != nil || !reachable {
-				updated.Status, updated.FailureReason = "发送失败", "家长已取消关注、解绑或账号不可用"
-			} else {
-				messageID, err := sendBusinessTemplateSafely(messageSender, learning.OfficialMessageRequest{TemplateID: campaign.TemplateID, OpenID: recipient.OpenID, Values: campaign.Values, PagePath: campaign.PagePath, ClientMessageID: businessNoticeHash(recipient.ID, fmt.Sprint(updated.RetryCount))})
-				if err != nil {
-					updated.Status, updated.FailureReason = "发送失败", err.Error()
-					var typed *officialSendError
-					if errors.As(err, &typed) && typed.uncertain {
-						updated.Status = "结果待确认"
-					}
-				} else {
-					updated.Status, updated.FailureReason, updated.MessageID, updated.AcceptedAt, updated.SentAt = "微信已受理", "", messageID, businessTime(time.Now()), time.Now().Format("2006-01-02 15:04:05")
-				}
-			}
-		} else if sender == nil {
-			updated.Status, updated.FailureReason = "发送失败", "公众号发送配置不可用"
-		} else if err := sender(campaign.TemplateID, recipient.OpenID, campaign.Values, campaign.PagePath); err != nil {
-			updated.Status, updated.FailureReason = "发送失败", err.Error()
-		} else {
-			updated.Status, updated.FailureReason, updated.SentAt = "发送成功", "", time.Now().Format("2006-01-02 15:04:05")
-		}
-
-		results[recipient.ID] = updated
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_, _ = persistentMutation(s, func(work *MemoryStore) (struct{}, error) {
-		for i := range work.officialCampaignRecipients {
-			if updated, ok := results[work.officialCampaignRecipients[i].ID]; ok {
-				for _, receipt := range work.businessNoticeReceipts {
-					if receipt.MessageID == updated.MessageID && receipt.OpenID == updated.OpenID {
-						applyCampaignReceipt(&updated, receipt)
-					}
-				}
-				work.officialCampaignRecipients[i] = updated
-			}
-		}
-		work.updateOfficialCampaignDelivery(id)
-
-		return struct{}{}, nil
-	})
 }
 
 func applyCampaignReceipt(recipient *learning.OfficialCampaignRecipient, receipt learning.OfficialDeliveryReceipt) {
@@ -775,8 +665,8 @@ func (s *MemoryStore) updateOfficialCampaignDelivery(id string) {
 		if campaign.ID != id {
 			continue
 		}
-		campaign.SuccessCount, campaign.FailureCount = 0, 0
-		pending, uncertain := false, false
+		campaign.SuccessCount, campaign.FailureCount, campaign.RetryableCount = 0, 0, 0
+		pending, uncertain, accepted := false, false, false
 		for _, recipient := range s.officialCampaignRecipients {
 			if recipient.CampaignID != id {
 				continue
@@ -786,9 +676,12 @@ func (s *MemoryStore) updateOfficialCampaignDelivery(id string) {
 				campaign.SuccessCount++
 			case "微信已受理":
 				campaign.SuccessCount++
-				pending = true
+				accepted = true
 			case "发送失败":
 				campaign.FailureCount++
+				if recipient.Retryable && recipient.RetryCount < 4 {
+					campaign.RetryableCount++
+				}
 			case "结果待确认":
 				uncertain = true
 			default:
@@ -801,6 +694,8 @@ func (s *MemoryStore) updateOfficialCampaignDelivery(id string) {
 		case campaign.FailureCount > 0:
 			campaign.Status = "部分失败"
 		case pending:
+			campaign.Status = "发送中"
+		case accepted:
 			campaign.Status = "微信已受理"
 		default:
 			campaign.Status = "发送完成"

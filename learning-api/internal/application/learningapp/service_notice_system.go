@@ -86,3 +86,7 @@ func (s *Service) HandleOfficialCallback(openID, event string, createTime int64)
 func (s *Service) RevealWechatSecret(field string) (string, error) {
 	return s.system.RevealWechatSecret(field)
 }
+
+func (s *Service) LookupOfficialRecipient(phone string) (learning.OfficialRecipientLookup, error) {
+	return s.notice.LookupOfficialRecipient(phone)
+}

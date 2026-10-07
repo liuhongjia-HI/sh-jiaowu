@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"os"
 	"starline/learning-api/internal/domain/learning"
 	"strings"
@@ -53,7 +52,7 @@ func TestBusinessTeacherBatchMergeRetryAndOneDelivery(t *testing.T) {
 		t.Fatalf("wrong completion: %+v %v %+v", result, err, s.businessNoticeTasks)
 	}
 	task := s.businessNoticeTasks[0]
-	if task.Values["number3"] != "2" || task.RecipientUserID != "user-teacher" || task.OpenID != "teacher-official-open" || task.URL != "https://school.example/teaching-plans?plan="+first.ID || task.PagePath != "" {
+	if task.Values["number3"] != "2" || task.RecipientUserID != "user-teacher" || task.OpenID != "teacher-official-open" || task.URL != "https://school.example/teaching-plans?notice="+task.EventID+"&plan="+first.ID || task.PagePath != "" {
 		t.Fatalf("wrong teacher delivery: %+v", task)
 	}
 	req.File.ID = "teacher-batch-file-3"
@@ -199,7 +198,7 @@ func TestBusinessTeacherBatchDisabledNoReplayAndIdentityRecovery(t *testing.T) {
 			s.officialMessageSender = func(learning.OfficialMessageRequest) (string, error) {
 				sent++
 				if sent == 1 && mode == "failed" {
-					return "", fmt.Errorf("fake definitive failure")
+					return "", &officialSendError{reason: "fake temporary definite failure", temporary: true}
 				}
 				return "fake", nil
 			}
@@ -350,8 +349,52 @@ func TestBusinessTeacherBatchPerRecipientVisibleCountAndLink(t *testing.T) {
 			plan = second
 		}
 		event, ok := s.businessEvent(task.EventID)
-		if !ok || len(event.ResourceIDs) != 1 || event.ResourceIDs[0] != plan.ID || task.Values["number3"] != "1" || task.Values["thing4"] != plan.Title || task.URL != "https://school.example/teaching-plans?plan="+plan.ID {
+		if !ok || len(event.ResourceIDs) != 1 || event.ResourceIDs[0] != plan.ID || task.Values["number3"] != "1" || task.Values["thing4"] != plan.Title || task.URL != "https://school.example/teaching-plans?notice="+task.EventID+"&plan="+plan.ID {
 			t.Fatalf("teacher task exposes unrelated resources: %+v %+v", task, event)
 		}
+	}
+}
+
+func TestBusinessTeacherNoticeBatchCurrentPermissionsAndOwnership(t *testing.T) {
+	s, p, req := teacherBatchFixture(t, true)
+	first, err := s.CreateTeachingPlan("test", p, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.File.ID = "teacher-batch-file-2"
+	req.Title = "第二课教案"
+	second, err := s.CreateTeachingPlan("test", p, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.CompleteTeachingPlanNoticeBatch("test", p, req.BatchID); err != nil {
+		t.Fatal(err)
+	}
+	task := s.businessNoticeTasks[0]
+	teacher, _ := s.PrincipalByUserID("user-teacher")
+	detail, err := s.TeachingPlanNotice(teacher, task.EventID)
+	if err != nil || len(detail.Plans) != 2 || detail.OriginalCount != 2 {
+		t.Fatalf("batch incomplete: %v", err)
+	}
+	if _, err = s.TeachingPlanNotice(p, task.EventID); err == nil {
+		t.Fatal("uploader opened another recipient's notice")
+	}
+	for i, plan := range s.teachingPlans {
+		if plan.ID == second.ID {
+			s.teachingPlans = append(s.teachingPlans[:i], s.teachingPlans[i+1:]...)
+			break
+		}
+	}
+	detail, err = s.TeachingPlanNotice(teacher, task.EventID)
+	if err != nil || len(detail.Plans) != 1 || detail.Plans[0].ID != first.ID || detail.OriginalCount != 2 {
+		t.Fatal("partial revocation leaked missing resource or hid remaining one")
+	}
+	for i := range s.users {
+		if s.users[i].ID == teacher.UserID {
+			s.users[i].AccountStatus = "停用"
+		}
+	}
+	if _, err = s.TeachingPlanNotice(teacher, task.EventID); err == nil {
+		t.Fatal("disabled teacher opened batch")
 	}
 }

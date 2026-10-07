@@ -128,7 +128,7 @@ func (s *MemoryStore) loadOfficialMessagingFromDB() error {
 	if err := followerRows.Close(); err != nil {
 		return err
 	}
-	campaignRows, err := s.db.Query(`SELECT id, template_id, template_title, grades_json, values_json, page_path, target_count, success_count, failure_count, status, created_by, created_at, sent_at FROM official_message_campaigns ORDER BY created_at DESC`)
+	campaignRows, err := s.db.Query(`SELECT id, template_id, template_title, grades_json, values_json, page_path, target_count, success_count, failure_count, status, created_by, created_at, sent_at, request_json FROM official_message_campaigns ORDER BY created_at DESC`)
 	if err != nil {
 		return err
 	}
@@ -136,11 +136,18 @@ func (s *MemoryStore) loadOfficialMessagingFromDB() error {
 	for campaignRows.Next() {
 		var item learning.OfficialCampaign
 		var gradesJSON, valuesJSON string
+		var requestJSON sql.NullString
 		var createdAt time.Time
 		var sentAt sql.NullTime
-		if err := campaignRows.Scan(&item.ID, &item.TemplateID, &item.TemplateTitle, &gradesJSON, &valuesJSON, &item.PagePath, &item.TargetCount, &item.SuccessCount, &item.FailureCount, &item.Status, &item.CreatedBy, &createdAt, &sentAt); err != nil {
+		if err := campaignRows.Scan(&item.ID, &item.TemplateID, &item.TemplateTitle, &gradesJSON, &valuesJSON, &item.PagePath, &item.TargetCount, &item.SuccessCount, &item.FailureCount, &item.Status, &item.CreatedBy, &createdAt, &sentAt, &requestJSON); err != nil {
 			campaignRows.Close()
 			return err
+		}
+		if requestJSON.Valid && requestJSON.String != "" {
+			if err := loadCampaignRequestJSON(&item, requestJSON.String); err != nil {
+				campaignRows.Close()
+				return err
+			}
 		}
 		_ = json.Unmarshal([]byte(gradesJSON), &item.Grades)
 		_ = json.Unmarshal([]byte(valuesJSON), &item.Values)
@@ -171,6 +178,7 @@ func (s *MemoryStore) loadOfficialMessagingFromDB() error {
 				return err
 			}
 			item.MessageID, item.AcceptedAt, item.DeliveredAt = stored.MessageID, stored.AcceptedAt, stored.DeliveredAt
+			item.ClaimedAt, item.Retryable = stored.ClaimedAt, stored.Retryable
 		}
 		recipients = append(recipients, item)
 	}
@@ -813,7 +821,7 @@ func (s *MemoryStore) loadPreviewJobsFromDB() error {
 }
 
 func (s *MemoryStore) loadReviewsFromDB() error {
-	rows, err := s.db.Query(`SELECT id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at FROM pending_reviews ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at, exception_reason, exception_class, exception_event_id FROM pending_reviews ORDER BY id`)
 	if err != nil {
 		return err
 	}
@@ -822,7 +830,7 @@ func (s *MemoryStore) loadReviewsFromDB() error {
 	for rows.Next() {
 		var item learning.Review
 		var assignedAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.StudentID, &item.HomeworkID, &item.SubmissionID, &item.StudentName, &item.PackageName, &item.Homework, &item.SystemScore, &item.TeacherComment, &item.Reward, &item.Status, &item.ReviewerTeacherID, &item.ReviewerTeacherName, &item.TutoringAssignmentID, &assignedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.HomeworkID, &item.SubmissionID, &item.StudentName, &item.PackageName, &item.Homework, &item.SystemScore, &item.TeacherComment, &item.Reward, &item.Status, &item.ReviewerTeacherID, &item.ReviewerTeacherName, &item.TutoringAssignmentID, &assignedAt, &item.ExceptionReason, &item.ExceptionClass, &item.ExceptionEventID); err != nil {
 			return err
 		}
 		item.AssignedAt = dateTimeString(assignedAt)

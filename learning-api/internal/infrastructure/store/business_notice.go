@@ -46,12 +46,12 @@ func defaultBusinessNoticeBindings() []learning.BusinessNoticeBinding {
 	bindings := []learning.BusinessNoticeBinding{
 		{Kind: learning.NoticeScheduleConfirmed, Title: "排课确认", RequiredFields: map[string]string{"thing1": "课程名称", "thing2": "上课学生", "time4": "上课时间"}},
 		{Kind: learning.NoticeScheduleChanged, Title: "调课成功", RequiredFields: map[string]string{"thing12": "课程名称", "time2": "调前时间", "time4": "调后时间", "thing7": "学员姓名"}},
-		{Kind: learning.NoticeScheduleReminder, Title: "课前提醒", RequiredFields: map[string]string{"thing1": "课程名称", "time2": "上课时间", "thing14": "参与人员"}},
-		{Kind: learning.NoticeScheduleCancelled, Title: "课程取消", RequiredFields: map[string]string{}},
+		{Kind: learning.NoticeScheduleReminder, Title: "课前提醒", RequiredFields: map[string]string{"thing1": "课程名称", "time2": "上课时间", "thing14": "参与人员"}, AvailableFields: map[string]string{"course_name": "课程名称", "student_name": "学生姓名", "lesson_time": "上课时间"}},
+		{Kind: learning.NoticeScheduleCancelled, Title: "课程取消", RequiredFields: map[string]string{}, AvailableFields: map[string]string{"course_name": "原课程名称", "student_name": "学生姓名", "lesson_time": "原上课时间", "cancelled_at": "取消时间", "lesson_count": "取消课次数量"}},
 		{Kind: learning.NoticeHomeworkSubmitted, Title: "作业提交成功", RequiredFields: map[string]string{"thing6": "课程名称", "thing2": "作业名称", "time4": "作业提交时间"}},
 		{Kind: learning.NoticeReviewException, Title: "作业批改异常", RequiredFields: map[string]string{"thing7": "作业名称", "thing5": "班级", "const2": "异常原因"}},
-		{Kind: learning.NoticeHomeworkPublished, Title: "作业发布", RequiredFields: map[string]string{}},
-		{Kind: learning.NoticeReviewCompleted, Title: "批改完成", RequiredFields: map[string]string{}},
+		{Kind: learning.NoticeHomeworkPublished, Title: "作业发布", RequiredFields: map[string]string{}, AvailableFields: map[string]string{"course_name": "课程名称", "homework_title": "作业名称", "student_name": "学生姓名", "published_at": "发布时间", "deadline_at": "截止时间"}},
+		{Kind: learning.NoticeReviewCompleted, Title: "批改完成", RequiredFields: map[string]string{}, AvailableFields: map[string]string{"course_name": "课程名称", "homework_title": "作业名称", "student_name": "学生姓名", "reviewed_at": "完成时间", "score": "最终得分"}},
 		{Kind: learning.NoticeMaterialsPublished, Title: "资料批量发布", RequiredFields: map[string]string{}, AvailableFields: materialNoticeFields()},
 		{Kind: learning.NoticeTeachingPlansUploaded, Title: "教师教案上传", RequiredFields: map[string]string{}, AvailableFields: map[string]string{"resource_title": "教案名称", "resource_count": "教案数量", "published_at": "上传时间", "teacher_name": "教师姓名", "teaching_scope": "年级学科"}},
 	}
@@ -76,6 +76,30 @@ func materialNoticeMappingAllowed(key, value string) bool {
 }
 
 func resourceNoticeMappingAllowed(kind, key, value string) bool {
+	if kind == learning.NoticeScheduleReminder {
+		return strings.HasPrefix(key, "thing") && (value == "course_name" || value == "student_name") || (strings.HasPrefix(key, "time") || strings.HasPrefix(key, "date")) && value == "lesson_time"
+	}
+	if kind == learning.NoticeHomeworkPublished || kind == learning.NoticeReviewCompleted {
+		if strings.HasPrefix(key, "thing") {
+			return value == "course_name" || value == "homework_title" || value == "student_name"
+		}
+		if strings.HasPrefix(key, "time") || strings.HasPrefix(key, "date") {
+			if kind == learning.NoticeHomeworkPublished {
+				return value == "published_at" || value == "deadline_at"
+			}
+			return value == "reviewed_at"
+		}
+		return kind == learning.NoticeReviewCompleted && strings.HasPrefix(key, "number") && value == "score"
+	}
+	if kind == learning.NoticeScheduleCancelled {
+		if strings.HasPrefix(key, "thing") {
+			return value == "course_name" || value == "student_name"
+		}
+		if strings.HasPrefix(key, "time") || strings.HasPrefix(key, "date") {
+			return value == "lesson_time" || value == "cancelled_at"
+		}
+		return strings.HasPrefix(key, "number") && value == "lesson_count"
+	}
 	if kind != learning.NoticeTeachingPlansUploaded {
 		return materialNoticeMappingAllowed(key, value)
 	}
@@ -94,6 +118,9 @@ func validTeacherNoticeOrigin(origin string) bool {
 }
 
 func deriveMaterialNoticeFields(binding *learning.BusinessNoticeBinding) {
+	if binding.Kind == learning.NoticeScheduleReminder && len(binding.FieldMappings) == 0 {
+		return
+	}
 	binding.RequiredFields = map[string]string{}
 	for key, value := range binding.FieldMappings {
 		binding.RequiredFields[key] = binding.AvailableFields[value]
@@ -112,6 +139,7 @@ func (s *MemoryStore) businessNoticeBindingsUnlocked() []learning.BusinessNotice
 				bindings[i].EnabledAt = item.EnabledAt
 				bindings[i].ApprovedReasons = item.ApprovedReasons
 				bindings[i].StudentIDs = item.StudentIDs
+				bindings[i].GuardianIDs = item.GuardianIDs
 				bindings[i].TeacherIDs = item.TeacherIDs
 				bindings[i].WebOrigin = item.WebOrigin
 				if bindings[i].AvailableFields != nil {
@@ -127,9 +155,6 @@ func (s *MemoryStore) businessNoticeBindingsUnlocked() []learning.BusinessNotice
 }
 
 func (s *MemoryStore) validateBusinessNoticeBinding(binding learning.BusinessNoticeBinding) string {
-	if binding.Kind == learning.NoticeReviewException {
-		return "后续阶段：业务流程尚未接入，暂不可启用"
-	}
 	if len(binding.RequiredFields) == 0 {
 		return "需先准备匹配模板和字段映射"
 	}
@@ -142,6 +167,9 @@ func (s *MemoryStore) validateBusinessNoticeBinding(binding learning.BusinessNot
 	}
 	if template == nil {
 		return "请选择已同步的模板"
+	}
+	if binding.Kind == learning.NoticeScheduleReminder && (!strings.Contains(template.Title, "课") || !strings.Contains(template.Title, "提醒")) {
+		return "课前提醒需使用上课或课程提醒模板，不能使用预约结果模板"
 	}
 	fields := parseOfficialTemplateFields(template.Content)
 	if len(fields) == 0 {
@@ -214,9 +242,24 @@ func (s *MemoryStore) UpdateBusinessNoticeBinding(operator string, req learning.
 				deriveMaterialNoticeFields(&binding)
 			}
 			binding.StudentIDs = compactStrings(req.StudentIDs)
+			binding.GuardianIDs = compactStrings(req.GuardianIDs)
+			if len(binding.GuardianIDs) > 500 {
+				return nil, errors.New("试运行家长最多 500 位")
+			}
+			for _, id := range binding.GuardianIDs {
+				found := false
+				for _, guardian := range work.guardians {
+					if guardian.ID == id {
+						found = true
+					}
+				}
+				if !found {
+					return nil, errors.New("试运行家长不存在")
+				}
+			}
 			if binding.Kind == learning.NoticeTeachingPlansUploaded {
-				if len(req.StudentIDs) != 0 {
-					return nil, errors.New("教师教案通知不能选择学生接收范围")
+				if len(req.StudentIDs) != 0 || len(req.GuardianIDs) != 0 {
+					return nil, errors.New("教师教案通知不能选择学生或家长接收范围")
 				}
 				if len(req.TeacherIDs) > 500 {
 					return nil, errors.New("试运行教师最多 500 名")
@@ -297,25 +340,17 @@ func (s *MemoryStore) businessRecipients(studentID string) []officialAudienceTar
 		if relation.StudentID != studentID || relation.Status != learning.GuardianStudentActive {
 			continue
 		}
-		for _, guardian := range s.guardians {
-			if guardian.ID != relation.GuardianID || guardian.AccountStatus != "正常" || guardian.UnionID == "" {
-				continue
-			}
-			for _, follower := range s.officialFollowers {
-				if !follower.Subscribed || follower.UnionID != guardian.UnionID || follower.OpenID == "" || seen[follower.OpenID] {
-					continue
-				}
-				seen[follower.OpenID] = true
-				out = append(out, officialAudienceTarget{GuardianID: guardian.ID, GuardianName: firstNonEmpty(guardian.Name, guardian.Nickname, "家长"), OpenID: follower.OpenID})
-			}
+		target, reason := s.reachableOfficialGuardian(relation.GuardianID)
+		if reason != "" || seen[target.OpenID] {
+			continue
 		}
+		seen[target.OpenID] = true
+		out = append(out, target)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].OpenID < out[j].OpenID })
 	return out
 }
 
-// Called on the isolated transaction state, before persistence. The snapshot is
-// the last approved arrangement, and survives any number of pending edits.
 func (s *MemoryStore) collectScheduleBusinessEvents(before *MemoryStore, now time.Time) {
 	if s.businessScheduleSnapshots == nil {
 		s.businessScheduleSnapshots = map[string]learning.ScheduleClass{}
@@ -419,9 +454,21 @@ func (s *MemoryStore) addBusinessNoticeEvent(event learning.BusinessNoticeEvent,
 		return
 	}
 	for _, target := range recipients {
+		if !bindingGuardianIncluded(binding, target.GuardianID) {
+			continue
+		}
 		id := businessNoticeHash(event.ID, event.StudentID, target.OpenID)
 		task := learning.BusinessNoticeTask{ID: id, EventID: event.ID, Kind: event.Kind, StudentID: event.StudentID, StudentName: event.StudentName, GuardianID: target.GuardianID, GuardianName: target.GuardianName, OpenID: target.OpenID, TemplateID: binding.TemplateID, Status: "待发送", DueAt: businessTime(due), ExpiresAt: event.ExpiresAt, CreatedAt: businessTime(now), ClientMessageID: id, PagePath: "pages/notice-detail/index?id=" + event.ID}
 		task.Values = businessNoticeValues(event)
+		if event.Kind == learning.NoticeScheduleReminder {
+			task.Values = reminderNoticeValues(binding, event)
+		}
+		if event.Kind == learning.NoticeHomeworkPublished || event.Kind == learning.NoticeReviewCompleted {
+			task.Values = s.homeworkNotificationValues(binding, event)
+		}
+		if event.Kind == learning.NoticeScheduleCancelled {
+			task.Values = cancellationNoticeValues(binding, event)
+		}
 		if !binding.Ready {
 			task.Status = "配置错误"
 			task.FailureReason = binding.Reason
@@ -539,6 +586,15 @@ func (s *MemoryStore) BusinessNoticeDetail(principal learning.Principal, id stri
 		if !allowed || !ok || student.AccountStatus != "正常" {
 			break
 		}
+		if event.Kind == learning.NoticeReviewException {
+			review, valid := s.currentReviewException(event)
+			if !valid {
+				return learning.BusinessNoticeDetail{}, errors.New("该批改异常已解除或更新，请查看最新作业状态")
+			}
+			if _, err := s.studentHomeworkUnlocked(learning.Principal{StudentID: event.StudentID}, review.HomeworkID); err != nil {
+				return learning.BusinessNoticeDetail{}, errors.New("作业不存在或访问权限已失效")
+			}
+		}
 		if event.Kind == learning.NoticeMaterialsPublished {
 			items := s.materialBatchAccessibleResources(event.StudentID, event.ResourceIDs)
 			if len(items) == 0 {
@@ -631,12 +687,12 @@ func (s *MemoryStore) addSubmissionBusinessEvent(submission learning.Submission,
 	s.addBusinessNoticeEvent(event, now, now, true)
 }
 
-// These events remain station-only until matching templates and field contracts
-// are available. They never fall back to the legacy generic official template.
+// External delivery requires an explicitly configured template and field mapping.
+// No event falls back to the legacy generic official template.
 func (s *MemoryStore) addHomeworkPublishedBusinessEvents(homework learning.Homework, now time.Time) {
 	batch := businessNoticeHash(learning.NoticeHomeworkPublished, homework.ID, now.Format(time.RFC3339Nano))
 	expires := now.Add(7 * 24 * time.Hour)
-	if deadline, err := time.Parse(time.RFC3339, homework.DeadlineAt); err == nil {
+	if deadline, valid := homeworkNotificationDeadline(homework); valid && deadline.Before(expires) {
 		expires = deadline
 	}
 	for _, student := range s.students {
@@ -662,4 +718,16 @@ func (s *MemoryStore) addReviewCompletedBusinessEvent(submission learning.Submis
 	id := businessNoticeHash(learning.NoticeReviewCompleted, submission.ID)
 	event := learning.BusinessNoticeEvent{ID: id, BatchID: id, Kind: learning.NoticeReviewCompleted, StudentID: student.ID, StudentName: student.Name, RelatedID: submission.ID, Title: "作业批改完成", Summary: homework.Title + " / 查看老师评语", CreatedAt: businessTime(now), ExpiresAt: businessTime(now.Add(7 * 24 * time.Hour))}
 	s.addBusinessNoticeEvent(event, now, now, true)
+}
+
+func bindingGuardianIncluded(binding learning.BusinessNoticeBinding, id string) bool {
+	if len(binding.GuardianIDs) == 0 {
+		return true
+	}
+	for _, selected := range binding.GuardianIDs {
+		if selected == id {
+			return true
+		}
+	}
+	return false
 }

@@ -10,9 +10,9 @@ import { ResourceFilterTags } from '../components/ResourceFilterTags';
 import type { Course } from '../types/starline';
 
 type Scope = { grade: string; subject: string };
-type Plan = { id: string; title: string; grade: string; subject: string; courseId?: string; lessonId?: string; chapter?: string; semester?: string; phase?: string; fileName: string; fileSize: number; fileType: string; previewStatus: string; previewError?: string; previewUrl: string; downloadUrl?: string; uploaderName: string; createdAt: string };
+type Plan = { id: string; title: string; grade: string; subject: string; courseId?: string; lessonId?: string; chapter?: string; semester?: string; phase?: string; fileName: string; fileSize: number; fileType: string; previewStatus: string; previewError?: string; previewUrl: string; downloadUrl?: string; uploaderName: string; createdAt: string; readVersion?: string };
 type PlanCourse = Pick<Course, 'id' | 'name' | 'grade' | 'subject' | 'familyId'> & { familyName?: string; semester?: string; phase?: string; level?: string };
-type PlanList = { courses?: PlanCourse[]; plans: Plan[]; uploadScopes: Scope[]; canUpload: boolean; directories?: Course[] };
+type PlanList = { courses?: PlanCourse[]; plans: Plan[]; uploadScopes: Scope[]; canUpload: boolean; directories?: Course[]; unreadPlanIds?: string[] };
 type PendingNoticeBatch = { batchId: string; resourceCount: number };
 type PendingFile = { file: File; title: string; lessonId?: string; error?: string; done?: boolean };
 
@@ -25,6 +25,8 @@ export default function TeachingPlans() {
   const client = useQueryClient();
   const [searchParams, setSearchParams] = useListSearchParams('teaching-plans', []);
   const entryID = new URLSearchParams(teachingPlanEntryQuery('/teaching-plans', searchParams.toString())).get('plan');
+  const noticeID = new URLSearchParams(teachingPlanEntryQuery('/teaching-plans', searchParams.toString())).get('notice');
+  const notice = useQuery({ queryKey: ['teaching-plan-notice', noticeID], enabled: Boolean(noticeID), queryFn: () => getData<{ title: string; plans: Plan[]; originalCount: number }>(`/teaching-plans/notifications/${noticeID}`), refetchOnWindowFocus: true });
   const handledEntry = useRef<string | null>(null);
   const [entryUnavailable, setEntryUnavailable] = useState(false);
   const query = useQuery({ queryKey: ['teaching-plans'], queryFn: () => getData<PlanList>('/teaching-plans'), refetchOnWindowFocus: true,
@@ -66,6 +68,9 @@ export default function TeachingPlans() {
   const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState<Plan>();
   const [previewURL, setPreviewURL] = useState('');
+  const loadedDocument = useRef('');
+  const recordingView = useRef(new Set<string>());
+  const [readError, setReadError] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
   const [previewAttempt, setPreviewAttempt] = useState(0);
@@ -82,7 +87,7 @@ export default function TeachingPlans() {
 
   useEffect(() => {
     if (!entryID) { handledEntry.current = null; setEntryUnavailable(false); return; }
-    if (!query.isSuccess) return;
+    if (!query.isSuccess || noticeID && !notice.isSuccess) return;
     const plan = data?.plans.find(item => item.id === entryID);
     setEntryUnavailable(!plan);
     if (handledEntry.current === entryID) return;
@@ -91,7 +96,7 @@ export default function TeachingPlans() {
     setPreviewURL('');
     setPreviewError('');
     setEntryUnavailable(!plan);
-  }, [entryID, query.isSuccess, data]);
+  }, [entryID, query.isSuccess, data, noticeID, notice.isSuccess]);
 
   const uploadScopes = data?.uploadScopes || [];
   const effectiveUploadScope = uploadScope || (uploadScopes.length === 1 ? scopeKey(uploadScopes[0]) : undefined);
@@ -125,14 +130,29 @@ export default function TeachingPlans() {
     let cancelled = false;
     const controller = new AbortController();
     setPreviewLoading(true);
+    loadedDocument.current = '';
+    setReadError('');
     setPreviewError('');
     http.get<Blob>(active.previewUrl.replace(/^\/api/, ''), { responseType: 'blob', timeout: 120000, signal: controller.signal }).then(response => {
       if (cancelled) return;
       objectURL = URL.createObjectURL(response.data);
+      loadedDocument.current = JSON.stringify([active.id, active.readVersion]);
       setPreviewURL(objectURL);
     }).catch(error => { if (!cancelled) setPreviewError(error instanceof Error ? error.message : '教案打开失败'); }).finally(() => { if (!cancelled) setPreviewLoading(false); });
     return () => { cancelled = true; controller.abort(); if (objectURL) URL.revokeObjectURL(objectURL); };
-  }, [active?.id, active?.previewStatus, previewAttempt, client]);
+  }, [active?.id, active?.previewStatus, active?.readVersion, previewAttempt, client]);
+
+  const recordView = async (plan: Plan) => {
+    const key = JSON.stringify([plan.id, plan.readVersion]);
+    if (!plan.readVersion || loadedDocument.current !== key || recordingView.current.has(key) || !data?.unreadPlanIds?.includes(plan.id)) return;
+    recordingView.current.add(key);
+    setReadError('');
+    try {
+      await postData(`/teaching-plans/${encodeURIComponent(plan.id)}/view`, { version: plan.readVersion });
+      await client.invalidateQueries({ queryKey: ['teaching-plans'] });
+    } catch (error) { setReadError(error instanceof Error ? error.message : '已读状态保存失败'); }
+    finally { recordingView.current.delete(key); }
+  };
 
   const openPreview = (plan: Plan) => { setPreviewURL(''); setPreviewError(''); setSelected(plan); };
   const closePreview = () => { setSelected(undefined); setPreviewURL(''); const next = new URLSearchParams(searchParams); next.delete('plan'); setSearchParams(next, { replace: true }); };
@@ -223,6 +243,12 @@ export default function TeachingPlans() {
   return <div className="page-stack teaching-plans-page">
     <div className="page-heading"><div><Typography.Title level={3}>教案</Typography.Title><Typography.Text type="secondary">按年级和学科查找内部教案。管理员与对应年级学科教师可见。</Typography.Text></div><Space wrap><Button icon={<ReloadOutlined />} loading={query.isFetching} onClick={() => query.refetch()}>刷新</Button>{data?.canUpload && <Button type="primary" icon={<PlusOutlined />} disabled={Boolean(selectedGroup && selectedGroup.id !== 'unassigned' && !selectedGroup.courseId)} onClick={() => openUpload(selectedGroup?.courseId)}>上传教案</Button>}</Space></div>
     {data?.canUpload && (noticeError || (pendingBatches.data?.length ?? 0) > 0 || pendingBatches.error) && <Alert type="warning" showIcon message={noticeError || (pendingBatches.error ? '待汇总提醒加载失败' : `有 ${pendingBatches.data?.length} 批教案待汇总提醒`)} action={<Button loading={completingNotices || pendingBatches.isFetching} disabled={uploading} onClick={() => pendingBatches.error ? pendingBatches.refetch() : completeNotices((pendingBatches.data ?? []).map(row => row.batchId))}>{pendingBatches.error ? '重试' : '汇总提醒'}</Button>} />}
+    {noticeID && <Card title="本次教案更新" extra={<Button onClick={() => { const next = new URLSearchParams(searchParams); next.delete('notice'); next.delete('plan'); setSearchParams(next, { replace: true }); }}>全部教案</Button>}>
+      {notice.isLoading ? <Spin /> : notice.error ? <Alert type="error" message={notice.error instanceof Error ? notice.error.message : '更新记录加载失败'} action={<Button onClick={() => notice.refetch()}>重试</Button>} /> : <>
+        <Typography.Paragraph>当前可查看 {notice.data?.plans.length ?? 0} 份教案{notice.data && notice.data.originalCount > notice.data.plans.length ? '，部分教案已失效或不再有权查看' : ''}</Typography.Paragraph>
+        <Space direction="vertical" style={{ width: '100%' }}>{notice.data?.plans.map(plan => <Card key={plan.id} size="small"><Space wrap><Typography.Text strong>{plan.title}</Typography.Text><Tag>{plan.grade} · {displaySubject(plan.subject)}</Tag><Button onClick={() => openPreview(plan)}>打开 {plan.title}</Button></Space></Card>)}</Space>
+      </>}
+    </Card>}
     {query.isLoading ? <Card><Spin /></Card> : query.error ? <Alert type="error" message="教案加载失败" description="请检查网络后重试" action={<Button onClick={() => query.refetch()}>重试</Button>} /> : <Card title="教案列表" extra={<Typography.Text type="secondary">{filtered.length} 份 · {groups.length} 个课程分组</Typography.Text>}>
       <Input.Search aria-label="搜索教案" placeholder="搜索课程、教案、文件名或上传人" allowClear value={keyword} onChange={event => setKeyword(event.target.value)} style={{ maxWidth: 320, marginBottom: 12 }} />
       <ResourceFilterTags label="年级" value={gradeFilter} options={gradeOptions} onChange={value => { setGradeFilter(value); setSubjectFilter(undefined); setTermFilter(undefined); setCourseFilter(undefined); }} />
@@ -239,7 +265,7 @@ export default function TeachingPlans() {
       ]} /> : <>
       <Space wrap className="teaching-plan-course-heading"><Typography.Text strong>{selectedGroup.name}</Typography.Text><Tag>{selectedGroup.plans.length} 份教案</Tag>{groups.length > 1 && <Button onClick={() => setCourseFilter(undefined)}>返回课程列表</Button>}</Space>
       <Table<Plan> rowKey="id" dataSource={visible} pagination={pagination} scroll={{ x: 960 }} locale={{ emptyText: <Empty description={keyword || gradeFilter || subjectFilter ? '当前条件下没有教案，请调整筛选条件' : '当前范围暂无教案'} /> }} columns={[
-        { title: '教案', key: 'title', render: (_, plan) => <div><Button type="link" style={{ padding: 0, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => openPreview(plan)}>{plan.title}</Button><div><Typography.Text type="secondary">{plan.fileName}</Typography.Text></div></div> },
+        { title: '教案', key: 'title', render: (_, plan) => <div><Button type="link" style={{ padding: 0, height: 'auto', whiteSpace: 'normal', textAlign: 'left' }} onClick={() => openPreview(plan)}>{plan.title}</Button>{data?.unreadPlanIds?.includes(plan.id) && <Tag color="blue">未读</Tag>}<div><Typography.Text type="secondary">{plan.fileName}</Typography.Text></div></div> },
         { title: '年级 · 学科', key: 'scope', render: (_, plan) => <Tag>{plan.grade} · {displaySubject(plan.subject)}</Tag> },
         { title: '章节', key: 'chapter', render: (_, plan) => <div>{plan.chapter || <Typography.Text type="secondary">{plan.courseId ? '课程通用' : '未关联课程'}</Typography.Text>}{plan.semester && <div><Typography.Text type="secondary">{plan.semester.toUpperCase()} {plan.phase?.toUpperCase()}</Typography.Text></div>}{uploadScopes.some(scope => scope.grade === plan.grade && subjectsMatch(scope.subject, plan.subject)) && <Button type="link" style={{ padding: 0, display: "block" }} onClick={() => { setChapterPlan(plan); setChapterCourseId(plan.courseId); setChapterLessonId(plan.lessonId); }}>关联章节</Button>}</div> },
         { title: '上传人', dataIndex: 'uploaderName' },
@@ -265,7 +291,8 @@ export default function TeachingPlans() {
     </Modal>
 
     <Modal destroyOnClose open={!!active} title={active ? <div>{active.title}<div style={{ fontSize: 13, fontWeight: 400 }}>{active.grade} · {displaySubject(active.subject)} · {active.fileName}</div></div> : '查看教案'} onCancel={closePreview} width="92vw" style={{ top: 24 }} footer={<Space>{active?.downloadUrl && <Button icon={<DownloadOutlined />} loading={downloading} onClick={() => download(active)}>下载原文件</Button>}<Button onClick={closePreview}>返回列表</Button></Space>}>
-      {previewLoading ? <div className="teacher-preview-placeholder"><Spin size="large" /></div> : previewError ? <Alert type="error" message={previewError} action={<Button onClick={() => setPreviewAttempt(value => value + 1)}>重试打开</Button>} /> : previewURL && active ? <iframe title={`教案预览：${active.title}`} src={previewURL} className="teacher-preview-frame" /> : <Alert type={active?.previewStatus === '转换失败' ? 'error' : 'info'} message={active?.previewStatus === '转换失败' ? '预览生成失败' : '正在生成教案预览'} description={active?.previewStatus === '转换失败' ? [active.previewError, canRetry ? '可重新生成预览，原文件仍可下载。' : '请联系可上传该范围教案的老师或管理员处理。'].filter(Boolean).join(' ') : '完成后会自动更新，您也可以先下载原文件。'} action={active?.previewStatus === '转换失败' && canRetry ? <Button loading={retrying} onClick={() => retryPreview(active)}>重新生成预览</Button> : <Button onClick={() => query.refetch()}>刷新状态</Button>} />}
+      {readError && active && <Alert type="warning" message={readError} action={<Button onClick={() => void recordView(active)}>重试保存已读</Button>} />}
+      {previewLoading ? <div className="teacher-preview-placeholder"><Spin size="large" /></div> : previewError ? <Alert type="error" message={previewError} action={<Button onClick={() => setPreviewAttempt(value => value + 1)}>重试打开</Button>} /> : previewURL && active ? <iframe title={`教案预览：${active.title}`} src={previewURL} className="teacher-preview-frame" onLoad={() => void recordView(active)} /> : <Alert type={active?.previewStatus === '转换失败' ? 'error' : 'info'} message={active?.previewStatus === '转换失败' ? '预览生成失败' : '正在生成教案预览'} description={active?.previewStatus === '转换失败' ? [active.previewError, canRetry ? '可重新生成预览，原文件仍可下载。' : '请联系可上传该范围教案的老师或管理员处理。'].filter(Boolean).join(' ') : '完成后会自动更新，您也可以先下载原文件。'} action={active?.previewStatus === '转换失败' && canRetry ? <Button loading={retrying} onClick={() => retryPreview(active)}>重新生成预览</Button> : <Button onClick={() => query.refetch()}>刷新状态</Button>} />}
     </Modal>
   </div>;
 }

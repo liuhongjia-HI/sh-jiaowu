@@ -74,6 +74,9 @@ func TestTeachingPlanRealBrowserUploadPreviewAndRecovery(t *testing.T) {
 	webDir := filepath.Clean(filepath.Join(cwd, "../../../../../web"))
 	parsed, _ := url.Parse(server.URL)
 	userJSON, _ := json.Marshal(p)
+	teacherToken := app.loginAdmin(t, "13800000004")
+	teacher, _ := app.store.PrincipalByUserID("user-teacher")
+	teacherJSON, _ := json.Marshal(teacher)
 	cmd := exec.CommandContext(ctx, "node", "node_modules/@playwright/test/cli.js", "test", "--config=playwright.real-plan.config.ts")
 	arm64Host := false
 	if runtime.GOOS == "darwin" && runtime.GOARCH == "amd64" {
@@ -86,7 +89,7 @@ func TestTeachingPlanRealBrowserUploadPreviewAndRecovery(t *testing.T) {
 		cmd = exec.CommandContext(ctx, "/usr/bin/arch", "-arm64", "node", "node_modules/@playwright/test/cli.js", "test", "--config=playwright.real-plan.config.ts")
 	}
 	cmd.Dir = webDir
-	cmd.Env = append(os.Environ(), "HTTP_PORT="+parsed.Port(), "STARLINE_REAL_API="+server.URL, "STARLINE_REAL_TOKEN="+token, "STARLINE_REAL_USER="+string(userJSON), "STARLINE_REAL_PLAN_FILES="+root)
+	cmd.Env = append(os.Environ(), "HTTP_PORT="+parsed.Port(), "STARLINE_REAL_API="+server.URL, "STARLINE_REAL_TOKEN="+token, "STARLINE_REAL_USER="+string(userJSON), "STARLINE_REAL_PLAN_FILES="+root, "STARLINE_REAL_TEACHER_TOKEN="+teacherToken, "STARLINE_REAL_TEACHER_USER="+string(teacherJSON))
 	output, err := cmd.CombinedOutput()
 	t.Log(string(output))
 	if err != nil {
@@ -97,7 +100,7 @@ func TestTeachingPlanRealBrowserUploadPreviewAndRecovery(t *testing.T) {
 	}
 	list := app.store.TeachingPlans(p)
 	if len(list.Plans) != 2 || len(list.UnreadPlanIDs) != 0 {
-		t.Fatalf("browser upload/read result not committed: %#v", list)
+		t.Fatalf("browser upload/read result not committed: plans=%d unread=%v", len(list.Plans), list.UnreadPlanIDs)
 	}
 	for _, plan := range list.Plans {
 		want := map[string]string{"独立第一": "browser-u1", "独立第二": "browser-u2"}[plan.Title]

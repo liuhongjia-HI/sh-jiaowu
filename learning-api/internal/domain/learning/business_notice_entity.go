@@ -14,6 +14,7 @@ const (
 )
 
 type BusinessNoticeBinding struct {
+	GuardianIDs     []string          `json:"guardianIds,omitempty"`
 	TeacherIDs      []string          `json:"teacherIds,omitempty"`
 	WebOrigin       string            `json:"webOrigin,omitempty"`
 	FieldMappings   map[string]string `json:"fieldMappings,omitempty"`

@@ -98,7 +98,7 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 		}
 	}
 	for _, item := range s.officialCampaigns {
-		if _, err := tx.Exec(`INSERT INTO official_message_campaigns (id, template_id, template_title, grades_json, values_json, page_path, target_count, success_count, failure_count, status, created_by, created_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.TemplateID, item.TemplateTitle, mustJSON(item.Grades), mustJSON(item.Values), item.PagePath, item.TargetCount, item.SuccessCount, item.FailureCount, item.Status, item.CreatedBy, nullableDateTime(item.CreatedAt), nullableDateTime(item.SentAt)); err != nil {
+		if _, err := tx.Exec(`INSERT INTO official_message_campaigns (id, template_id, template_title, grades_json, values_json, page_path, target_count, success_count, failure_count, status, created_by, created_at, sent_at, request_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.ID, item.TemplateID, item.TemplateTitle, mustJSON(item.Grades), mustJSON(item.Values), item.PagePath, item.TargetCount, item.SuccessCount, item.FailureCount, item.Status, item.CreatedBy, nullableDateTime(item.CreatedAt), nullableDateTime(item.SentAt), campaignRequestJSON(item)); err != nil {
 			return err
 		}
 	}
@@ -399,10 +399,10 @@ func (s *MemoryStore) bootstrapPersistAllTx(tx *sql.Tx) error {
 	}
 	for _, review := range s.reviews {
 		if _, err := tx.Exec(
-			`INSERT INTO pending_reviews (id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO pending_reviews (id, student_id, homework_id, submission_id, student_name, package_name, homework_title, system_score, teacher_comment, reward, status, reviewer_teacher_id, reviewer_teacher_name, tutoring_assignment_id, assigned_at, exception_reason, exception_class, exception_event_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			review.ID, review.StudentID, review.HomeworkID, review.SubmissionID, review.StudentName, review.PackageName, review.Homework,
-			review.SystemScore, review.TeacherComment, review.Reward, review.Status, review.ReviewerTeacherID, review.ReviewerTeacherName, review.TutoringAssignmentID, nullableDateTime(review.AssignedAt),
+			review.SystemScore, review.TeacherComment, review.Reward, review.Status, review.ReviewerTeacherID, review.ReviewerTeacherName, review.TutoringAssignmentID, nullableDateTime(review.AssignedAt), review.ExceptionReason, review.ExceptionClass, review.ExceptionEventID,
 		); err != nil {
 			return err
 		}

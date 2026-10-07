@@ -87,3 +87,9 @@ type TeachingPlanNoticeRecipient struct {
 	Reachable bool     `json:"reachable"`
 	Reason    string   `json:"reason,omitempty"`
 }
+
+type TeachingPlanNoticeDetail struct {
+	Title         string         `json:"title"`
+	Plans         []TeachingPlan `json:"plans"`
+	OriginalCount int            `json:"originalCount"`
+}

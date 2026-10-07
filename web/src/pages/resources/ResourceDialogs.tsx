@@ -174,16 +174,17 @@ export function HomeworkSubmissionDialog({
   );
 }
 
-export function ReviewBoard({ rows, onOpen, onAssign }: { rows: Review[]; onOpen: (record: Record<string, unknown>) => void; onAssign?: (review: Review) => void }) {
-  const columns = ['待批改', '待复核', '已批改'];
+export function ReviewBoard({ rows, onOpen, onAssign, onException }: { rows: Review[]; onOpen: (record: Record<string, unknown>) => void; onAssign?: (review: Review) => void; onException?: (review: Review) => void }) {
+  const columns = ['待批改', '批改异常', '待复核', '已批改'];
   const statusOf = (review: Review) => {
+    if (review.status === '批改异常') return '批改异常';
     if (review.status === '待复核') return '待复核';
     if (review.status === '已批改') return '已批改';
     return '待批改';
   };
   if (rows.length === 0) return <Empty description="暂时没有待批改练习。" />;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 16 }}>
       {columns.map((status) => {
         const items = rows.filter((row) => statusOf(row) === status);
         return (
@@ -202,14 +203,15 @@ export function ReviewBoard({ rows, onOpen, onAssign }: { rows: Review[]; onOpen
                     <Typography.Text type="secondary">{review.homework}</Typography.Text>
                     <Space wrap>
                       <Tag color="blue">{review.packageName}</Tag>
-                      <Tag color="green">系统评分 {review.systemScore}</Tag>
+                      <Tag color="green">系统评分 {review.systemScore}</Tag>{review.exceptionReason && <Tag color="red">{review.exceptionClass} · {review.exceptionReason}</Tag>}
 					  <Tag color={review.reviewerTeacherName ? 'purple' : 'orange'}>{review.reviewerTeacherName ? `负责老师：${review.reviewerTeacherName}` : '待教务分派'}</Tag>
                     </Space>
-					<Space>
+					<Space wrap>
 					  <Button size="small" type="primary" onClick={() => onOpen(review as unknown as Record<string, unknown>)}>
 						填写反馈
 					  </Button>
-					  {onAssign && <Button size="small" onClick={() => onAssign(review)}>{review.reviewerTeacherName ? '转派' : '分派'}</Button>}
+					  {onException && <Button size="small" onClick={() => onException(review)}>标记异常</Button>}
+                      {onAssign && <Button size="small" onClick={() => onAssign(review)}>{review.reviewerTeacherName ? '转派' : '分派'}</Button>}
 					</Space>
                   </Space>
                 </Card>
@@ -898,11 +900,12 @@ export function ReviewDialog({
       onOk={() => form.submit()}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" preserve={false} onFinish={onSubmit}>
+      <Form form={form} layout="vertical" preserve={false} initialValues={{ score: Number(review?.systemScore ?? 0), teacherComment: review?.teacherComment || '', reward: review?.reward || '', finalStatus: '已批改' }} onFinish={onSubmit}>
         <Alert
           type="info"
           showIcon
           message={review ? `${review.studentName} · ${review.homework}` : ''}
+          description={review?.exceptionReason ? `当前异常：${review.exceptionClass} · ${review.exceptionReason}。保存批改反馈后解除异常。` : undefined}
           style={{ marginBottom: 16 }}
         />
         <Form.Item name="score" label="分数" rules={[{ required: true, message: '请输入分数' }]}>
