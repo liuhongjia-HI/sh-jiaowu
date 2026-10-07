@@ -74,3 +74,10 @@ test('calendar dates and filters restore after reload as usable dates',async({pa
  await expect(page.locator('summary').filter({hasText:'更多筛选'})).toContainText('已生效');
  await page.getByRole('button',{name:'下一期',exact:true}).click();await expect(page.locator('.calendar-toolbar strong')).not.toHaveText(date!);
 });
+
+test('restored page beyond a shortened result list still shows available records',async({page})=>{
+ await fixture(page);await page.goto('/content');await page.locator('.ant-pagination-item-3').click();
+ await page.route('**/api/courses',route=>route.fulfill({json:{code:0,message:'ok',data:courses.slice(0,2)}}));
+ await page.reload();await expect(page.getByText('英语课程 1',{exact:true})).toBeVisible();
+ await expect(page.getByText('英语课程 2',{exact:true})).toBeVisible();
+});

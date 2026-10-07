@@ -18,7 +18,7 @@ export function useListState<T>(key: string, initial?: T | (() => T)) {
       if (!raw) return fallback;
       const saved = JSON.parse(raw).value;
       if (fallback instanceof Date) {
-        const date = new Date(saved);
+        const date = new Date(typeof saved === 'string' ? saved : NaN);
         return (Number.isNaN(date.getTime()) ? fallback : date) as T;
       }
       if (fallback !== undefined && fallback !== null && (Array.isArray(fallback) ? !Array.isArray(saved) : typeof saved !== typeof fallback)) return fallback;
@@ -48,8 +48,19 @@ export function clampListPage(page: number, total: number, size = 10) {
 // Explicit entry URLs take precedence. Detail IDs are deliberately excluded.
 export function useListSearchParams(key: string, filterKeys: string[]) {
   const [saved, setSaved] = useListState<Record<string, string>>(`${key}:url`, {});
-  const [params, setParams] = useSearchParams(saved);
+  const [params, setParams] = useSearchParams();
+  const initialSaved = useRef(saved);
+  const restored = useRef(false);
   const serialized = JSON.stringify(Object.fromEntries(filterKeys.filter(key => params.has(key)).map(key => [key, params.get(key)!])));
-  useEffect(() => { setSaved(JSON.parse(serialized)); }, [serialized, setSaved]);
+  useEffect(() => {
+    if (!restored.current) {
+      restored.current = true;
+      if (!params.toString() && Object.keys(initialSaved.current).length) {
+        setParams(initialSaved.current, { replace: true });
+        return;
+      }
+    }
+    setSaved(JSON.parse(serialized));
+  }, [params, serialized, setParams, setSaved]);
   return [params, setParams] as const;
 }
