@@ -47,6 +47,62 @@ test('new Unit saves then previews only the selected Unit and dynamic target', a
   expect(requests[1].body).toMatchObject({ snapshots: { target: 'version-2' }, unitIds: [saved.curriculum[1].id] });
 });
 
+for (const scope of ['whole', 'unit', 'save-failure'] as const) {
+  test(`upload directory maintenance supports existing sync: ${scope}`, async ({ page }) => {
+    await login(page);
+    let saved = source; let failSave = scope === 'save-failure'; const writes: any[] = [];
+    await page.route('**/api/**', route => {
+      const req = route.request(); const path = new URL(req.url()).pathname.replace('/api', '');
+      if (req.method() !== 'GET') writes.push({ path, body: req.postDataJSON() });
+      if (path === '/courses/source' && req.method() === 'PUT') {
+        if (failSave) return route.fulfill({ status: 400, json: { code: 400, message: '目录保存失败' } });
+        saved = { ...source, ...req.postDataJSON() };
+        return route.fulfill({ json: { code: 0, data: saved } });
+      }
+      if (path.includes('directory-sync')) return route.fulfill({ json: { code: 0, data: { targets: [{ courseId: target.id, courseName: target.name, added: ['第一单元'], updated: [], preserved: 1, snapshot: 'upload-directory-version', ...(path.endsWith('directory-sync') ? { status: '已同步' } : {}) }] } } });
+      const data = path === '/auth/me' ? user : path === '/courses' ? [saved, target] : path === '/learning-spaces' ? spaces : path === '/subjects' ? [{ id: 'english', name: 'English', status: '启用' }] : [];
+      return route.fulfill({ json: { code: 0, data } });
+    });
+    await page.goto('/content?tab=materials&courseId=source');
+    await expect(page.getByRole('heading', { name: source.name, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /上传讲义/ }).click();
+    const upload = page.getByRole('dialog', { name: '给课节上传资料', exact: true });
+    await upload.getByRole('button', { name: /维护本课程目录/ }).click();
+    const editor = page.getByRole('dialog', { name: '编辑课程', exact: true });
+    await expect(editor.getByRole('button', { name: '同步整套目录', exact: true })).toBeVisible();
+    await expect(editor.getByRole('button', { name: '同步此 Unit', exact: true })).toBeVisible();
+    await editor.getByRole('button', { name: scope === 'unit' ? '同步此 Unit' : '同步整套目录', exact: true }).click();
+    await editor.getByRole('checkbox', { name: target.name, exact: true }).check();
+    await editor.getByRole('button', { name: '保存并预览同步', exact: true }).click();
+    const modal = page.getByRole('dialog', { name: `跨班型同步 · ${source.name}`, exact: true });
+    if (failSave) {
+      await expect(page.getByText('目录保存失败', { exact: true })).toBeVisible();
+      await expect(editor).toBeVisible();
+      await expect(editor.getByRole('checkbox', { name: target.name, exact: true })).toBeChecked();
+      await expect(modal).toHaveCount(0);
+      expect(writes.map(item => item.path)).toEqual(['/courses/source']);
+      failSave = false;
+      await editor.getByRole('button', { name: '保存并预览同步', exact: true }).click();
+    }
+    await expect(modal).toBeVisible();
+    await expect.poll(() => writes.filter(item => item.path === '/courses/directory-sync-preview').length).toBe(1);
+    const syncRequest = { sourceCourseId: source.id, targetCourseIds: [target.id], ...(scope === 'unit' ? { unitIds: ['unit-one'] } : {}) };
+    expect(writes.find(item => item.path === '/courses/directory-sync-preview').body).toEqual(syncRequest);
+    await modal.getByRole('button', { name: '确认同步目录', exact: true }).click();
+    await expect(modal).toContainText('已同步');
+    expect(writes.at(-1)).toEqual({ path: '/courses/directory-sync', body: { ...syncRequest, snapshots: { [target.id]: 'upload-directory-version' } } });
+    await modal.getByRole('button', { name: /^关\s*闭$/ }).click();
+    await expect(upload).toBeVisible();
+    await expect(upload.getByRole('button', { name: /维护本课程目录/ })).toBeVisible();
+    await upload.getByRole('button', { name: /维护本课程目录/ }).click();
+    await expect(editor.getByRole('button', { name: '同步此 Unit', exact: true })).toBeVisible();
+    if (scope === 'unit') {
+      await expect.poll(async () => editor.evaluate(el => Math.round(el.getBoundingClientRect().right))).toBe(1280);
+      await page.screenshot({ path: '/tmp/starline-upload-directory-sync-fixed.png', fullPage: false });
+    }
+  });
+}
+
 test('course-only teaching plan uploads keep course and retry only failed file', async ({ page }) => {
   await login(page); const uploads: string[] = []; let count = 0;
   await page.route('**/api/**', route => {

@@ -22,7 +22,7 @@ export function CourseDirectorySync({ source, courses, spaces, onClose, onMateri
     return course.id !== source.id && course.grade === source.grade && subjectsMatch(course.subject, source.subject) && space && sourceSpace && space.semester === sourceSpace.semester && space.phase === sourceSpace.phase;
   });
   const request = { sourceCourseId: source.id, targetCourseIds: ids, ...(unitIds.length ? { unitIds } : {}) };
-  const refresh = () => Promise.all(['content', 'courses', 'course-families', 'teaching-plans'].map(key => client.invalidateQueries({ queryKey: [key] })));
+  const refresh = () => Promise.all(['content', 'courses', 'courses-for-content-resources', 'course-families', 'teaching-plans'].map(key => client.invalidateQueries({ queryKey: [key] })));
   const check = useMutation({ mutationFn: () => postData<Result>('/courses/directory-sync-preview', request), onMutate: () => { setOperationError(''); setPreview(undefined); }, onSuccess: data => { setPreview(data); setResult(undefined); }, onError: (err: Error) => setOperationError(err.message) });
   const execute = useMutation({ mutationFn: () => postData<Result>('/courses/directory-sync', { ...request, snapshots: Object.fromEntries((preview?.targets || []).map(target => [target.courseId, target.snapshot])) }), onMutate: () => setOperationError(''), onSuccess: async data => {
     setResult(data);

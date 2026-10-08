@@ -9,7 +9,8 @@ import { ActionButton } from '../../components/ListViews';
 import { ContentEditDialog, CourseDialog, type CourseFormValues, HomeworkSubmissionDialog, UploadDialog, homeworkTagOptions, materialTagOptions } from './ResourceDialogs';
 import { canUpload, suggestMaterialTagCode } from './resource-shared';
 import { MaterialUploadOverview } from './MaterialUploadOverview';
-import { curriculumLessonOptions, formatResourceCurriculumLabel, prepareCurriculumForSave, subjectLabel, suggestEquivalentCurriculumLessonId } from '../../utils/curriculum';
+import { CourseDirectorySync } from './CourseDirectorySync';
+import { curriculumLessonOptions, formatResourceCurriculumLabel, prepareCurriculumForSave, subjectsMatch, subjectLabel, suggestEquivalentCurriculumLessonId } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, LearningSpace, Material, MaterialReorderRequest, MaterialSyncPreview, MaterialSyncRequest, MaterialSyncResult, QuestionBankItem, StudyPackage } from '../../types/starline';
 import type { UploadFile } from 'antd';
 
@@ -121,6 +122,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
   const [contentForm] = Form.useForm<ContentValues>();
   const [courseForm] = Form.useForm<CourseFormValues>();
   const [courseEditor, setCourseEditor] = useState<Course | null>(null);
+  const [directorySync, setDirectorySync] = useState<{ source: Course; targetIds: string[]; unitIds: string[] } | null>(null);
   const client = useQueryClient();
   const title = kind === 'materials' ? '课程讲义' : '课后练习';
   const path = kind === 'materials' ? '/materials' : '/homework';
@@ -375,7 +377,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
       return putData<Course>(`/courses/${courseEditor.id}`, body);
     },
     onSuccess: () => {
-      message.success('课程目录已同步，当前上传可直接选择新课节。');
+      message.success('课程目录已保存，当前上传可直接选择新课节。');
       setCourseEditor(null);
       courseForm.resetFields();
       client.invalidateQueries({ queryKey: ['courses-for-content-resources'] });
@@ -386,6 +388,15 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
     },
     onError: (error: Error) => message.error(error.message || '保存课程目录失败，请检查层级关系。')
   });
+  const directoryTargets = (courses.data ?? []).filter(course => {
+    const sourceSpace = learningSpaces.data?.find(space => space.id === courseEditor?.learningSpaceId);
+    const space = learningSpaces.data?.find(item => item.id === course.learningSpaceId);
+    return courseEditor && sourceSpace && space && course.id !== courseEditor.id && course.status === '启用' && course.grade === courseEditor.grade && subjectsMatch(course.subject, courseEditor.subject) && space.semester === sourceSpace.semester && space.phase === sourceSpace.phase && (unrestrictedCourseScope || (user?.learningSpaceIds ?? []).includes(space.id));
+  }).map(course => ({ value: course.id, label: course.name }));
+  const saveCourseAndSync = (values: CourseFormValues, targetIds: string[], unitIds: string[]) => {
+    if (saveCourse.isPending) return;
+    saveCourse.mutate(values, { onSuccess: source => setDirectorySync({ source, targetIds, unitIds }) });
+  };
   const removeContent = useMutation({
     mutationFn: (id: string) => deleteData(`${path}/${id}`),
     onSuccess: () => {
@@ -643,7 +654,14 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
     <HomeworkSubmissionDialog homework={submissionHomework} summary={submissionSummary.data} loading={submissionSummary.isLoading} error={Boolean(submissionSummary.error)} onCancel={() => setSubmissionHomework(null)} />
     {open && <UploadDialog kind={kind} open loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} materials={(kind === 'materials' ? (resources.data ?? []) : []) as Material[]} initialCourse={uploadCourse} initialLessonId={uploadTarget?.lessonId} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => { setOpen(false); setUploadTarget(null); }} onSubmit={(values) => create.mutate(values)} />}
     <ContentEditDialog kind={kind} form={contentForm} item={editing} loading={save.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setEditing(null)} onSubmit={(values) => save.mutate(values)} />
-    <CourseDialog referenceCourseId={courseEditor?.id} form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
+    <CourseDialog referenceCourseId={courseEditor?.id} syncTargets={directoryTargets} onSaveAndSync={courseEditor ? saveCourseAndSync : undefined} form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
+    {directorySync && <CourseDirectorySync source={directorySync.source} courses={courses.data ?? []} spaces={learningSpaces.data ?? []} unitIds={directorySync.unitIds} initialTargetIds={directorySync.targetIds} onClose={() => setDirectorySync(null)} onMaterials={lessonId => {
+      const sourceId = directorySync.source.id;
+      const row = groupMaterialsByLesson((allMaterials.data ?? []) as Material[], courses.data ?? []).find(pack => pack.courseId === sourceId && pack.lessonId === lessonId);
+      if (!row) { message.warning('当前课节没有可同步的已发布讲义。'); return; }
+      setDirectorySync(null);
+      startManualSync(row);
+    }} />}
     <Modal
       title={syncBatch?.manual ? '跨班型同步课节讲义' : '同步本次课程讲义'}
       open={Boolean(syncBatch)}
