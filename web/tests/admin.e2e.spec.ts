@@ -1110,15 +1110,8 @@ test('上传课程讲义后可以预检查并同步到同阶段课程', async ({
   await expect(sync).toBeHidden();
   await page.setViewportSize({ width: 1280, height: 800 });
   const sourceRow = page.locator('.ant-table-tbody tr').filter({ hasText: sourceName }).filter({ hasText: 'HD' }).last();
-  await sourceRow.getByRole('button', { name: '跨班型同步' }).click();
-  const manualSync = page.getByRole('dialog', { name: '跨班型同步课节讲义' });
-  await expect(manualSync).toBeVisible();
-  await manualSync.getByRole('checkbox', { name: targetName, exact: false }).check();
-  await manualSync.getByRole('button', { name: '检查同步内容' }).click();
-  await expect(manualSync.getByText(targetName, { exact: true })).toBeVisible();
-  await manualSync.screenshot({ path: '../docs/跨班型手动同步_实施预览.png' });
-  await manualSync.getByRole('button', { name: '确认同步到 1 门课程' }).click();
-  await expect(manualSync).toBeHidden();
+  await expect(sourceRow).toBeVisible();
+  await expect(sourceRow.getByRole('button', { name: '跨班型同步', exact: true })).toHaveCount(0);
 });
 
 test('校区管理员可以从周历入口新建排课', async ({ page }) => {

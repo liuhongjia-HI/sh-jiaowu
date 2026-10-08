@@ -579,7 +579,6 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
             { title: '状态', render: (_: unknown, row: MaterialPackRow) => packPreviewStatus(row.materials) },
             { title: '操作', render: (_: unknown, row: MaterialPackRow) => (
               <div className="lesson-pack-actions">
-                {canManage && row.lessonId && <Button size="small" onClick={() => startManualSync(row)}>跨班型同步</Button>}
                 {row.materials.map((item) => {
                   const deleteAction = canManage ? <Popconfirm
                     title={`确定删除“${item.tagCode || item.title}”吗？`}
