@@ -76,7 +76,7 @@
       <view class="me-section-title">Quick Links</view>
       <view class="quick-grid">
         <block wx:for="{{quickActions}}" wx:key="action">
-          <view wx:if="{{item.action === 'schedule' || item.action === 'study' || item.action === 'favorites' || item.action === 'notices'}}" class="quick-action quick-action-{{item.tone}}" data-action="{{item.action}}" bindtap="handleQuickAction">
+          <view wx:if="{{item.action === 'schedule' || item.action === 'study' || item.action === 'downloads' || item.action === 'favorites' || item.action === 'notices'}}" class="quick-action quick-action-{{item.tone}}" data-action="{{item.action}}" bindtap="handleQuickAction">
             <view class="quick-symbol">{{item.symbol}}</view>
             <view class="quick-title">{{item.title}}</view>
           </view>
