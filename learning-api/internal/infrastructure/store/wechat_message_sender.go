@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -82,7 +83,7 @@ func validateOfficialMessageValues(values map[string]string) error {
 	return nil
 }
 
-func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID string) func(learning.OfficialMessageRequest) (string, error) {
+func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID string, miniSecrets ...string) func(learning.OfficialMessageRequest) (string, error) {
 	return func(request learning.OfficialMessageRequest) (string, error) {
 		if err := validateOfficialMessageValues(request.Values); err != nil {
 			return "", err
@@ -112,11 +113,13 @@ func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID stri
 			}
 			body["miniprogram"] = map[string]string{"appid": miniAppID, "pagepath": path}
 		}
+		log.Printf("event=official_template_send official_app_id=%q mini_app_id=%q has_mini_program=%t template_id=%q", appID, miniAppID, request.PagePath != "", request.TemplateID)
 		encoded, err := json.Marshal(body)
 		if err != nil {
 			return "", err
 		}
-		for attempt := 0; attempt < 2; attempt++ {
+		refreshed, linkFallback := false, false
+		for attempt := 0; attempt < 4; attempt++ {
 			token, err := wechatAccessToken(client, appID, secret)
 			if err != nil {
 				return "", &officialSendError{reason: "公众号授权服务暂不可用", temporary: true}
@@ -136,13 +139,31 @@ func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID stri
 			if decodeErr != nil {
 				return "", &officialSendError{reason: "微信响应无法解析，接收结果待确认", uncertain: true}
 			}
-			if (payload.ErrCode == 40001 || payload.ErrCode == 40014 || payload.ErrCode == 42001) && attempt == 0 {
+			if (payload.ErrCode == 40001 || payload.ErrCode == 40014 || payload.ErrCode == 42001) && !refreshed {
+				refreshed = true
 				invalidateWechatToken(appID, secret)
+				continue
+			}
+			// A definite rejection has no delivered message. Preserve the destination
+			// and deduplication ID when native mini-program navigation is rejected.
+			if payload.ErrCode == 40013 && request.PagePath != "" && !linkFallback && len(miniSecrets) > 0 && miniSecrets[0] != "" {
+				link, err := wechatMiniProgramURLLink(client, miniAppID, miniSecrets[0], request.PagePath)
+				if err != nil {
+					return "", err
+				}
+				delete(body, "miniprogram")
+				body["url"] = link
+				encoded, err = json.Marshal(body)
+				if err != nil {
+					return "", err
+				}
+				linkFallback = true
+				log.Printf("event=official_template_jump_fallback mini_app_id=%q reason=40013 route=url_link", miniAppID)
 				continue
 			}
 			if payload.ErrCode != 0 {
 				temporary := payload.ErrCode == -1 || payload.ErrCode == 45009 || payload.ErrCode == 45011
-				config := payload.ErrCode == 40037 || payload.ErrCode == 47003 || payload.ErrCode == 40165
+				config := payload.ErrCode == 40013 || payload.ErrCode == 40037 || payload.ErrCode == 47003 || payload.ErrCode == 40165
 				return "", &officialSendError{reason: fmt.Sprintf("微信发送失败（%d %s）", payload.ErrCode, payload.ErrMsg), temporary: temporary, configuration: config}
 			}
 			if payload.MessageID == "" {
@@ -152,4 +173,34 @@ func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID stri
 		}
 		return "", &officialSendError{reason: "公众号授权失败", configuration: true}
 	}
+}
+
+// The link resolves to the same released page and query as the native jump.
+func wechatMiniProgramURLLink(client *http.Client, appID, secret, pagePath string) (string, error) {
+	token, err := wechatAccessToken(client, appID, secret)
+	if err != nil {
+		return "", &officialSendError{reason: "小程序链接授权服务暂不可用", temporary: true}
+	}
+	target, err := url.Parse(strings.TrimPrefix(pagePath, "/"))
+	if err != nil || !strings.HasPrefix(target.Path, "pages/") || target.IsAbs() || target.Host != "" || target.Fragment != "" {
+		return "", &officialSendError{reason: "小程序链接目标不正确", configuration: true}
+	}
+	body, _ := json.Marshal(map[string]any{"path": target.Path, "query": target.RawQuery, "env_version": "release", "expire_type": 1, "expire_interval": 30})
+	response, err := client.Post("https://api.weixin.qq.com/wxa/generate_urllink?access_token="+url.QueryEscape(token), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", &officialSendError{reason: "小程序链接生成服务暂不可用", temporary: true}
+	}
+	defer response.Body.Close()
+	var result struct {
+		ErrCode int    `json:"errcode"`
+		URLLink string `json:"url_link"`
+	}
+	if json.NewDecoder(response.Body).Decode(&result) != nil {
+		return "", &officialSendError{reason: "小程序链接生成响应异常", temporary: true}
+	}
+	link, parseErr := url.Parse(result.URLLink)
+	if result.ErrCode != 0 || parseErr != nil || link.Scheme != "https" || (link.Host != "wxmpurl.cn" && link.Host != "wxaurl.cn") || link.User != nil || link.Fragment != "" {
+		return "", &officialSendError{reason: fmt.Sprintf("小程序链接生成失败（%d），原生跳转被微信拒绝（40013）", result.ErrCode), configuration: true}
+	}
+	return link.String(), nil
 }

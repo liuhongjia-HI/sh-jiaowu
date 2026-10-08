@@ -10,6 +10,7 @@ import (
 	"starline/learning-api/internal/application/learningapp"
 	"starline/learning-api/internal/infrastructure/config"
 	"starline/learning-api/internal/infrastructure/logger"
+	"starline/learning-api/internal/interfaces/http/middleware"
 	"starline/learning-api/internal/interfaces/http/router"
 	"strings"
 	"sync"
@@ -172,7 +173,8 @@ func TestOfficialTargetedMySQLAtomicReloadAndConcurrentDelivery(t *testing.T) {
 	if err := s.bootstrapPersistAll(); err != nil {
 		t.Fatal(err)
 	}
-	c, err := s.createOfficialCampaignUnlocked("test", targetedOfficialRequest("mysql"))
+	operator := middleware.AuditOperatorLabel("测试教务", "test-admin", "127.0.0.1", strings.Repeat("Chrome browser user agent ", 20))
+	c, err := s.createOfficialCampaignUnlocked(operator, targetedOfficialRequest("mysql"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,8 +183,8 @@ func TestOfficialTargetedMySQLAtomicReloadAndConcurrentDelivery(t *testing.T) {
 	if err = copyStore.loadOfficialMessagingFromDB(); err != nil {
 		t.Fatal(err)
 	}
-	again, err := copyStore.createOfficialCampaignUnlocked("test", targetedOfficialRequest("mysql"))
-	if err != nil || again.ID != c.ID || again.RecipientMode != "specified" || again.RequestDigest == "" || len(copyStore.officialCampaignRecipients) != 1 {
+	again, err := copyStore.createOfficialCampaignUnlocked(middleware.AuditOperatorLabel("测试教务", "test-admin", "127.0.0.2", "different browser"), targetedOfficialRequest("mysql"))
+	if err != nil || again.ID != c.ID || again.CreatedBy != "测试教务" || again.RecipientMode != "specified" || again.RequestDigest == "" || len(copyStore.officialCampaignRecipients) != 1 {
 		t.Fatal("selection or dedupe metadata lost on reload")
 	}
 	var sends atomic.Int32
@@ -318,5 +320,32 @@ func TestOfficialTargetedBusinessGuardianTrialScope(t *testing.T) {
 	})
 	if len(s.businessNoticeTasks) != 1 || s.businessNoticeTasks[0].GuardianID != "g1" || s.businessNoticeTasks[0].StudentID != "s1" {
 		t.Fatal("business trial scope broadened to other parent or student")
+	}
+}
+
+func TestOfficialCampaignAuditOperatorStoresNameAndPreservesLog(t *testing.T) {
+	for _, draft := range []bool{false, true} {
+		s := targetedOfficialFixture()
+		ua := strings.Repeat("Chrome browser user agent ", 20)
+		operator := middleware.AuditOperatorLabel("测试教务", "test-admin", "127.0.0.1", ua)
+		req := targetedOfficialRequest("audit-operator")
+		req.Draft = draft
+		campaign, err := s.createOfficialCampaignUnlocked(operator, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if campaign.CreatedBy != "测试教务" {
+			t.Fatal("campaign creator must contain name rather than encoded audit payload")
+		}
+		log := s.logs[0]
+		if log.Operator != "测试教务" || log.OperatorID != "test-admin" || log.IP != "127.0.0.1" || log.UserAgent != strings.TrimSpace(ua) {
+			t.Fatal("operator audit metadata was lost")
+		}
+		if !draft {
+			again, err := s.createOfficialCampaignUnlocked(middleware.AuditOperatorLabel("测试教务", "test-admin", "127.0.0.2", "different browser"), req)
+			if err != nil || again.ID != campaign.ID || len(s.officialCampaigns) != 1 {
+				t.Fatal("browser or IP change duplicated request")
+			}
+		}
 	}
 }

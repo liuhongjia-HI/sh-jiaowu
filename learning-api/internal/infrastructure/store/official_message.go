@@ -248,7 +248,7 @@ func (s *MemoryStore) applyStoredWechatSettingsUnlocked() {
 	officialAppID := s.settings[wechatOfficialAppIDKey]
 	officialSecret := s.decryptWechatValue(s.settings[wechatOfficialSecretKey])
 	if officialAppID != "" && officialSecret != "" {
-		s.useOfficialAccountMessagingUnlocked(officialAppID, officialSecret, miniAppID)
+		s.useOfficialAccountMessagingUnlocked(officialAppID, officialSecret, miniAppID, miniSecret)
 	}
 }
 
@@ -575,7 +575,12 @@ func (s *MemoryStore) createOfficialCampaignUnlocked(operator string, req learni
 	digest := businessNoticeHash(mustJSON(req))
 	campaignID := ""
 	if req.RequestID != "" && !req.Draft {
-		campaignID = "oa-request-" + businessNoticeHash(operator, req.RequestID)
+		audit := parseAuditOperator(operator)
+		operatorKey := audit.ID
+		if operatorKey == "" {
+			operatorKey = audit.Name
+		}
+		campaignID = "oa-request-" + businessNoticeHash(operatorKey, req.RequestID)
 		for _, old := range s.officialCampaigns {
 			if old.ID == campaignID {
 				if old.RequestDigest != digest {
@@ -635,7 +640,7 @@ func (s *MemoryStore) createOfficialCampaignUnlocked(operator string, req learni
 	if !req.Draft {
 		status = "发送中"
 	}
-	campaign := learning.OfficialCampaign{RecipientMode: req.RecipientMode, GuardianIDs: cloneStrings(req.GuardianIDs), RequestID: req.RequestID, RequestDigest: digest, ID: id, TemplateID: template.ID, TemplateTitle: template.Title, Grades: compactStrings(req.Grades), Values: cloneMap(req.Values), PagePath: strings.TrimSpace(req.PagePath), TargetCount: len(targets), Status: status, CreatedBy: operator, CreatedAt: now.Format("2006-01-02 15:04:05")}
+	campaign := learning.OfficialCampaign{RecipientMode: req.RecipientMode, GuardianIDs: cloneStrings(req.GuardianIDs), RequestID: req.RequestID, RequestDigest: digest, ID: id, TemplateID: template.ID, TemplateTitle: template.Title, Grades: compactStrings(req.Grades), Values: cloneMap(req.Values), PagePath: strings.TrimSpace(req.PagePath), TargetCount: len(targets), Status: status, CreatedBy: parseAuditOperator(operator).Name, CreatedAt: now.Format("2006-01-02 15:04:05")}
 	s.officialCampaigns = append([]learning.OfficialCampaign{campaign}, s.officialCampaigns...)
 	if !req.Draft {
 		for index, target := range targets {

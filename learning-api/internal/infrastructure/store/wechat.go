@@ -110,7 +110,7 @@ func wechatCode2Session(client *http.Client, appID, secret, code string) (string
 	return payload.OpenID, payload.UnionID, nil
 }
 
-func (s *MemoryStore) useOfficialAccountMessagingUnlocked(appID, secret, miniProgramAppID string) {
+func (s *MemoryStore) useOfficialAccountMessagingUnlocked(appID, secret, miniProgramAppID string, miniSecrets ...string) {
 	appID, secret, miniProgramAppID = strings.TrimSpace(appID), strings.TrimSpace(secret), strings.TrimSpace(miniProgramAppID)
 	if appID == "" || secret == "" {
 		return
@@ -150,7 +150,7 @@ func (s *MemoryStore) useOfficialAccountMessagingUnlocked(appID, secret, miniPro
 		}
 		return out, nil
 	}
-	s.officialMessageSender = newOfficialMessageSender(client, appID, secret, miniProgramAppID)
+	s.officialMessageSender = newOfficialMessageSender(client, appID, secret, miniProgramAppID, miniSecrets...)
 	s.officialTemplateSender = func(templateID, openID string, values map[string]string, pagePath string) error {
 		_, err := s.officialMessageSender(learning.OfficialMessageRequest{TemplateID: templateID, OpenID: openID, Values: values, PagePath: pagePath})
 		return err

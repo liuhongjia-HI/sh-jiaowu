@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"starline/learning-api/internal/domain/learning"
@@ -34,6 +35,10 @@ func TestBusinessWechatSenderCachesTokenRefreshesAndKeepsDedupID(t *testing.T) {
 		if body["client_msg_id"] != "same-id" || body["template_id"] != "real-template-id" {
 			t.Fatalf("wrong payload %#v", body)
 		}
+		mini, ok := body["miniprogram"].(map[string]any)
+		if !ok || mini["appid"] != "mini-fixture" || mini["pagepath"] != "pages/notice-detail/index?id=fixture" {
+			t.Fatal("mini-program jump payload used wrong config or path")
+		}
 		if sends == 1 {
 			return noticeResponse(`{"errcode":40014}`), nil
 		}
@@ -55,7 +60,7 @@ func TestBusinessWechatSenderClassifiesMissingReceiptAndConfiguration(t *testing
 	for _, tc := range []struct {
 		body              string
 		uncertain, config bool
-	}{{`{"errcode":0}`, true, false}, {`{"errcode":47003,"errmsg":"invalid fields"}`, false, true}} {
+	}{{`{"errcode":0}`, true, false}, {`{"errcode":47003,"errmsg":"invalid fields"}`, false, true}, {`{"errcode":40013,"errmsg":"invalid appid"}`, false, true}} {
 		app := "classification-" + tc.body
 		invalidateWechatToken(app, "fixture")
 		client := &http.Client{Transport: noticeTransport(func(req *http.Request) (*http.Response, error) {
@@ -169,5 +174,58 @@ func TestBusinessWorkerPreservesWebTargetAndDedupIdentity(t *testing.T) {
 	}
 	if len(sent) != 3 {
 		t.Fatalf("wrong unique recipient tasks: %d", len(sent))
+	}
+}
+
+func TestBusinessWechatSenderMiniLinkFallbackPreservesTargetAndDedup(t *testing.T) {
+	for _, reject := range []int{40013, 47003, 0} {
+		t.Run(fmt.Sprint(reject), func(t *testing.T) {
+			app := "fallback-" + t.Name()
+			mini := "mini-" + t.Name()
+			invalidateWechatToken(app, "official-secret")
+			invalidateWechatToken(mini, "mini-secret")
+			sends, links := 0, 0
+			client := &http.Client{Transport: noticeTransport(func(req *http.Request) (*http.Response, error) {
+				if req.URL.Path == "/cgi-bin/token" {
+					return noticeResponse(`{"access_token":"fixture","expires_in":7200}`), nil
+				}
+				var body map[string]any
+				if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if req.URL.Path == "/wxa/generate_urllink" {
+					links++
+					if body["path"] != "pages/notice-detail/index" || body["query"] != "id=notice-1&studentId=student-1" || body["env_version"] != "release" {
+						t.Fatal("link lost its authorized destination")
+					}
+					return noticeResponse(`{"errcode":0,"url_link":"https://wxmpurl.cn/fixture"}`), nil
+				}
+				sends++
+				if body["touser"] != "recipient" || body["client_msg_id"] != "same-dedup" || body["template_id"] != "template" {
+					t.Fatal("fallback changed message identity")
+				}
+				if sends == 1 {
+					if body["miniprogram"] == nil {
+						t.Fatal("native jump was not attempted first")
+					}
+					if reject == 0 {
+						return nil, errors.New("connection lost")
+					}
+					return noticeResponse(fmt.Sprintf(`{"errcode":%d}`, reject)), nil
+				}
+				if body["miniprogram"] != nil || body["url"] != "https://wxmpurl.cn/fixture" {
+					t.Fatal("fallback did not use generated link")
+				}
+				return noticeResponse(`{"errcode":0,"msgid":123}`), nil
+			})}
+			id, err := newOfficialMessageSender(client, app, "official-secret", mini, "mini-secret")(learning.OfficialMessageRequest{OpenID: "recipient", TemplateID: "template", Values: map[string]string{"thing1": "课程"}, PagePath: "pages/notice-detail/index?id=notice-1&studentId=student-1", ClientMessageID: "same-dedup"})
+			if reject == 40013 {
+				if err != nil || id != "123" || sends != 2 || links != 1 {
+					t.Fatalf("fallback failed: %v %s %d %d", err, id, sends, links)
+				}
+			} else if err == nil || sends != 1 || links != 0 {
+				t.Fatal("retried a field rejection or uncertain send")
+			}
+		})
 	}
 }
