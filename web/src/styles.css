@@ -519,8 +519,29 @@ body {
   width: 100%;
 }
 
-.package-filter-bar .ant-select,
-.course-filter-bar .ant-select {
+.course-filter-search-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.course-filter-search {
+  width: 260px;
+  max-width: calc(100% - 48px);
+}
+
+.course-filter-reset {
+  margin-left: auto;
+}
+
+.course-filter-bar .resource-filter-row {
+  margin-bottom: 0;
+}
+
+.package-filter-bar .ant-select {
   flex: 1;
   min-width: 140px;
 }

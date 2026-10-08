@@ -314,32 +314,24 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
       <Card>
         <div className="list-toolbar" style={{ marginBottom: 16 }}>
           <div className="course-filter-bar">
-            <Input.Search allowClear placeholder="搜索课程" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} style={{ width: 220 }} />
-            <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => { courses.refetch(); families.refetch(); }} />
+            <div className="course-filter-search-row">
+              <Input.Search allowClear placeholder="搜索课程" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} className="course-filter-search" />
+              <ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => { courses.refetch(); families.refetch(); }} />
+              {hasFilters && (
+                <Button type="text" className="course-filter-reset" onClick={() => {
+                  setKeyword('');
+                  setGradeFilter(undefined);
+                  setSubjectFilter(undefined);
+                  setTermFilter(undefined);
+                  setStatusFilter(undefined);
+                  setPage(1);
+                }}>重置筛选</Button>
+              )}
+            </div>
             <ResourceFilterTags label="年级" value={gradeFilter} options={gradeOptions()} onChange={value => { setGradeFilter(value); setSubjectFilter(current => value && current && !subjectsForGrade(value, subjectCatalog).some(subject => subjectsMatch(subject, current)) ? undefined : current); setPage(1); }} />
             <ResourceFilterTags label="学科" value={subjectFilter} options={subjectOptions(gradeFilter, subjectCatalog)} onChange={value => { setSubjectFilter(value); setPage(1); }} />
             <ResourceFilterTags label="学习阶段" value={termFilter} options={termSelectOptions} onChange={value => { setTermFilter(value); setPage(1); }} />
-            <Select
-              allowClear
-              aria-label="状态"
-              placeholder="状态"
-              value={statusFilter}
-              options={[{ label: '启用', value: '启用' }, { label: '停用', value: '停用' }]}
-              onChange={(value) => {
-                setStatusFilter(value);
-                setPage(1);
-              }}
-            />
-            {hasFilters && (
-              <Button onClick={() => {
-                setKeyword('');
-                setGradeFilter(undefined);
-                setSubjectFilter(undefined);
-                setTermFilter(undefined);
-                setStatusFilter(undefined);
-                setPage(1);
-              }}>重置</Button>
-            )}
+            <ResourceFilterTags label="状态" value={statusFilter} options={[{ label: '启用', value: '启用' }, { label: '停用', value: '停用' }]} onChange={value => { setStatusFilter(value); setPage(1); }} />
             {canManage && selectedRowKeys.length > 0 && (
               <Button disabled={selectedRowKeys.length < 2} onClick={() => { setFamilyImportName(rows.find((row) => row.id === selectedRowKeys[0])?.name || ''); setFamilyImportOpen(true); }}>合并为共享目录（{selectedRowKeys.length}）</Button>
             )}
