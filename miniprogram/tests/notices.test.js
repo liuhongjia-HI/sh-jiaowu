@@ -88,7 +88,7 @@ test("notice cards identify the current student by name and grade", async () => 
   page.onLoad();
   await flushPromises();
 
-  assert.equal(page.data.visibleNotices[0].studentDisplay, "小星（五年级）");
+  assert.equal(page.data.visibleNotices[0].studentDisplay, "小星（Grade 5）");
 });
 
 test("notice tab reloads messages for the student selected in personal center", async () => {
@@ -179,7 +179,7 @@ test("notice header only identifies the student selected in personal center", as
   page.onLoad();
   await flushPromises();
 
-  assert.equal(page.data.linkedStudentText, "小星（五年级）");
+  assert.equal(page.data.linkedStudentText, "小星（Grade 5）");
   assert.equal(page.data.studentCount, 2);
 });
 

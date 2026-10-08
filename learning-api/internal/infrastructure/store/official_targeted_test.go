@@ -349,3 +349,61 @@ func TestOfficialCampaignAuditOperatorStoresNameAndPreservesLog(t *testing.T) {
 		}
 	}
 }
+
+func TestOfficialTargetedExceptionReasonRequiresApprovedExactValue(t *testing.T) {
+	s := targetedOfficialFixture()
+	s.officialTemplates[0].Fields = parseOfficialTemplateFields("内容:{{thing1.DATA}}\n异常原因:{{const2.DATA}}")
+	req := targetedOfficialRequest("exception-config")
+	req.Values["const2"] = "测试"
+	if _, err := s.createOfficialCampaignUnlocked("ops", req); err == nil || !strings.Contains(err.Error(), "微信固定选项") {
+		t.Fatalf("missing approval was accepted: %v", err)
+	}
+	if len(s.officialCampaigns) != 0 || len(s.officialCampaignRecipients) != 0 {
+		t.Fatal("invalid reason created a send task")
+	}
+	req.Draft = true
+	if _, err := s.createOfficialCampaignUnlocked("ops", req); err != nil {
+		t.Fatal("blocked saving a draft", err)
+	}
+	s.settings[businessNoticeSettingsKey] = mustJSON([]learning.BusinessNoticeBinding{{Kind: learning.NoticeReviewException, TemplateID: "fixture", ApprovedReasons: []string{"已审核选项"}}})
+	req.Draft = false
+	for _, reason := range []string{"测试", "模板示例", "已审核选项 "} {
+		req.Values["const2"] = reason
+		if _, err := s.createOfficialCampaignUnlocked("ops", req); err == nil {
+			t.Fatal("unapproved exact value accepted")
+		}
+	}
+	req.Values["const2"] = "已审核选项"
+	if _, err := s.createOfficialCampaignUnlocked("ops", req); err != nil {
+		t.Fatal("approved value rejected", err)
+	}
+	if len(s.officialCampaignRecipients) != 1 {
+		t.Fatal("approved single recipient send was broadened")
+	}
+}
+
+func TestOfficialTargetedFullFailureStatusAndLegacyRead(t *testing.T) {
+	s := targetedOfficialFixture()
+	s.officialCampaigns = []learning.OfficialCampaign{{ID: "all", TargetCount: 1, FailureCount: 1, Status: "部分失败", SentAt: "historical"}, {ID: "partial", TargetCount: 2, SuccessCount: 1, FailureCount: 1, Status: "部分失败"}}
+	s.officialCampaignRecipients = []learning.OfficialCampaignRecipient{{ID: "failed", CampaignID: "all", Status: "发送失败", FailureReason: "微信明确拒绝", Retryable: false}}
+	rows := s.OfficialCampaigns()
+	for _, c := range rows {
+		if c.ID == "all" && (c.Status != "发送失败" || c.SentAt != "historical") {
+			t.Fatal("legacy output not corrected")
+		}
+		if c.ID == "partial" && c.Status != "部分失败" {
+			t.Fatal("partial failure was lost")
+		}
+	}
+	detail, err := s.OfficialCampaign("all")
+	if err != nil || detail.Campaign.Status != "发送失败" || detail.Recipients[0].FailureReason != "微信明确拒绝" {
+		t.Fatal("detail lost failure evidence")
+	}
+	if s.officialCampaigns[0].Status != "部分失败" || s.officialCampaigns[0].SentAt != "historical" {
+		t.Fatal("read rewrote history")
+	}
+	s.updateOfficialCampaignDelivery("all")
+	if s.officialCampaigns[0].Status != "发送失败" {
+		t.Fatal("new full failure is still partial")
+	}
+}

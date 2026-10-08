@@ -510,6 +510,7 @@ func (s *MemoryStore) OfficialCampaigns() []learning.OfficialCampaign {
 	defer s.mu.Unlock()
 	out := cloneOfficialCampaigns(s.officialCampaigns)
 	for i := range out {
+		out[i] = normalizeOfficialCampaignStatus(out[i])
 		out[i].RetryableCount = s.officialRetryableCount(out[i].ID)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
@@ -523,6 +524,7 @@ func (s *MemoryStore) OfficialCampaign(id string) (learning.OfficialCampaignDeta
 		if campaign.ID != id {
 			continue
 		}
+		campaign = normalizeOfficialCampaignStatus(campaign)
 		campaign.RetryableCount = s.officialRetryableCount(id)
 		recipients := []learning.OfficialCampaignRecipient{}
 		for _, recipient := range s.officialCampaignRecipients {
@@ -605,6 +607,21 @@ func (s *MemoryStore) createOfficialCampaignUnlocked(operator string, req learni
 			break
 		}
 		value := strings.TrimSpace(req.Values[field.Key])
+		if strings.HasPrefix(field.Key, "const") && field.Label == "异常原因" {
+			var approved []string
+			for _, binding := range s.businessNoticeBindingsUnlocked() {
+				if binding.Kind == learning.NoticeReviewException && binding.TemplateID == template.ID {
+					approved = binding.ApprovedReasons
+					break
+				}
+			}
+			if len(approved) == 0 {
+				return learning.OfficialCampaign{}, errors.New("异常原因是微信固定选项，请先在自动通知的批改异常提醒中配置已通过微信审核的原因")
+			}
+			if !containsString(approved, req.Values[field.Key]) {
+				return learning.OfficialCampaign{}, errors.New("请选择已配置且通过微信审核的异常原因，不能填写自由文字或模板示例")
+			}
+		}
 		if value == "" {
 			return learning.OfficialCampaign{}, fmt.Errorf("请填写%s", field.Label)
 		}
@@ -696,6 +713,8 @@ func (s *MemoryStore) updateOfficialCampaignDelivery(id string) {
 		switch {
 		case uncertain:
 			campaign.Status = "结果待确认"
+		case campaign.FailureCount > 0 && campaign.SuccessCount == 0 && !pending:
+			campaign.Status = "发送失败"
 		case campaign.FailureCount > 0:
 			campaign.Status = "部分失败"
 		case pending:
@@ -707,4 +726,13 @@ func (s *MemoryStore) updateOfficialCampaignDelivery(id string) {
 		}
 		campaign.SentAt = time.Now().Format("2006-01-02 15:04:05")
 	}
+}
+
+// Old complete failures were stored as partial failures. Normalize only the
+// returned status, preserving historical attempts and timestamps.
+func normalizeOfficialCampaignStatus(c learning.OfficialCampaign) learning.OfficialCampaign {
+	if c.Status == "部分失败" && c.TargetCount > 0 && c.FailureCount == c.TargetCount && c.SuccessCount == 0 {
+		c.Status = "发送失败"
+	}
+	return c
 }

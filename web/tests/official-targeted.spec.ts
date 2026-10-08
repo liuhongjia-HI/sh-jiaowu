@@ -104,3 +104,33 @@ test('异常原因配置保留指定家长范围，保存不自动开启',async(
  await modal.getByRole('button',{name:/确\s*定/}).click();await expect.poll(()=>writes.length).toBe(1);
  expect(writes[0].approvedReasons).toEqual(['作业缺页']);expect(writes[0].guardianIds).toEqual(['g1']);expect(writes[0].studentIds).toEqual(['s1']);expect(writes[0].enabled).toBe(false);
 });
+
+for (const approvedReasons of [[], ['已审核选项']]) {
+ test(`批改异常固定选项：${approvedReasons.length ? '只允许选择审核值' : '缺少配置禁止发送但可存草稿'}`, async ({page}) => {
+  const writes:any[]=[];
+  await page.addInitScript(user=>{localStorage.setItem('starline_admin_token','fixture');localStorage.setItem('starline_admin_user',JSON.stringify(user));},user);
+  await page.route('**/api/**',async route=>{
+   const req=route.request(),path=new URL(req.url()).pathname.replace('/api','');let data:any=[];
+   if(path==='/auth/me')data=user;
+   if(path==='/official-account/templates')data=[{id:'exception',title:'作业批改异常提醒',fields:[{key:'thing7',label:'作业名称',maxLength:20},{key:'const2',label:'异常原因',maxLength:20}]}];
+   if(path==='/official-account/automatic-notices')data=[{kind:'review_exception',title:'批改异常提醒',templateId:'exception',approvedReasons,enabled:false,ready:false,requiredFields:{}}];
+   if(path==='/official-account/recipient')data={guardianId:'g1',name:'测试家长',studentNames:['学生甲'],reachable:true};
+   if(path==='/official-account/campaigns/preview')data={studentCount:1,guardianCount:1,reachableCount:1,unreachableCount:0};
+   if(path==='/official-account/campaigns'&&req.method()==='POST'){writes.push(req.postDataJSON());data={id:'c1',targetCount:1,status:req.postDataJSON().draft?'草稿':'发送中'};}
+   await route.fulfill({json:{code:0,message:'ok',data}});
+  });
+  await page.goto('/notices');await page.getByRole('tab',{name:'消息推送',exact:true}).click();
+  await page.getByPlaceholder('输入已登录小程序的家长手机号').fill('18518673993');await page.getByRole('button',{name:/查\s*询\s*账\s*号/}).click();
+  await expect(page.getByText('已匹配 测试家长',{exact:false})).toBeVisible();await page.getByPlaceholder('请输入作业名称').fill('明确标注测试');
+  const send=page.locator('.official-actionbar').getByRole('button',{name:/确\s*认\s*发\s*送/});
+  await expect(send).toBeDisabled();
+  const reason=page.getByRole('combobox',{name:'异常原因',exact:true});
+  if(!approvedReasons.length){
+   await expect(reason).toBeDisabled();await expect(page.getByText('异常原因是微信固定选项。',{exact:false})).toBeVisible();
+   await page.getByRole('button',{name:/保\s*存\s*草\s*稿/}).click();await expect.poll(()=>writes.length).toBe(1);expect(writes[0].draft).toBe(true);
+   await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/starline-exception-reason-missing.png',fullPage:true});
+  }else{
+   await reason.click();await page.locator('.ant-select-item-option-content').getByText('已审核选项',{exact:true}).click();await expect(send).toBeEnabled();await send.click();await page.getByRole('dialog').getByRole('button',{name:/确\s*认\s*发\s*送/}).click();await expect.poll(()=>writes.length).toBe(1);expect(writes[0].values.const2).toBe('已审核选项');
+  }
+ });
+}

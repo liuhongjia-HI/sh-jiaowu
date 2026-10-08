@@ -25,7 +25,7 @@
       </button>
       <view class="profile-copy">
         <view class="profile-greeting">Good afternoon,</view>
-        <input class="profile-nickname" type="nickname" value="{{guardianProfile.nickname}}" placeholder="Enter your WeChat nickname" bindinput="onNicknameInput" bindblur="commitNickname" confirm-type="done" aria-label="WeChat nickname" />
+        <input class="profile-nickname" type="nickname" value="{{guardianProfile.nickname}}" placeholder="WeChat nickname" bindinput="onNicknameInput" bindblur="commitNickname" confirm-type="done" aria-label="WeChat nickname" />
         <button class="profile-phone-action {{studentProfile.phoneAuthorized ? 'authorized' : 'pending'}}" open-type="getPhoneNumber" bindgetphonenumber="authorizePhone" loading="{{savingProfile}}" disabled="{{savingProfile}}" aria-label="Authorize Phone">
           <text>{{studentProfile.phoneHint}}</text>
         </button>
@@ -37,7 +37,7 @@
       <view class="student-switcher-label">Current Student</view>
       <view class="student-switcher-list">
         <button wx:for="{{studentAccounts}}" wx:key="studentId" class="student-switch-button {{item.active ? 'active' : ''}} {{!item.canSwitch && !item.active ? 'pending' : ''}}" data-student-id="{{item.studentId}}" bindtap="switchStudent" loading="{{switchingStudentId === item.studentId}}" disabled="{{!item.canSwitch && !item.active || switchingStudentId}}">
-          <text>{{item.name}} · {{item.grade}}</text>
+          <text>{{item.name}} · {{item.gradeLabel}}</text>
           <text wx:if="{{!item.canSwitch}}" class="student-switch-status">Unavailable</text>
         </button>
         <button class="student-add-button" bindtap="openStudentAddModal">＋ Add Student</button>
@@ -102,7 +102,7 @@
         <view class="profile-form">
           <input class="form-input" value="{{profileForm.studentName}}" data-field="studentName" bindinput="onBasicInput" placeholder="Student name" />
           <view class="form-readonly">
-            <view class="form-readonly-value">{{profileForm.grade || "Grade not provided"}}</view>
+            <view class="form-readonly-value">{{profileGradeLabel || "Grade not provided"}}</view>
             <view class="form-readonly-hint">Your grade updates each school year. Contact your teacher if it is incorrect.</view>
           </view>
           <input class="form-input" value="{{profileForm.schoolName}}" data-field="schoolName" bindinput="onBasicInput" placeholder="School" />

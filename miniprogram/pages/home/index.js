@@ -1,6 +1,7 @@
 const { refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
 const { subjectLabel, subjectsMatchName } = require("../../utils/subject");
+const { gradeLabel } = require("../../utils/grade");
 
 const ONBOARDING_SEEN_KEY = "starline_onboarding_seen";
 
@@ -286,6 +287,9 @@ Page({
           recommendations: (Array.isArray(recommendations) ? recommendations : []).map((item) => ({
             ...item,
             displayName: subjectLabel(item.subject),
+            gradeLabel: gradeLabel(item.grade),
+            recommendationReasonLabel: item.recommendationReason === "本年级未开通学科" ? "Explore a new subject" : item.recommendationReason,
+            teacherIntroLabel: item.teacherIntro === `教学范围：${item.grade} · ${item.subject}` ? `Teaching: ${gradeLabel(item.grade)} · ${subjectLabel(item.subject)}` : item.teacherIntro,
             contentSampleText: (item.contentSamples || []).join("、")
           })),
           recommendationsLoading: false

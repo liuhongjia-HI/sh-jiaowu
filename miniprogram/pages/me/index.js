@@ -1,6 +1,7 @@
 const { refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
 const { subjectLabel } = require("../../utils/subject");
+const { gradeLabel } = require("../../utils/grade");
 const { showPhoneAuthFailed, isCancel } = require("../../utils/phone-auth");
 
 Page({
@@ -96,7 +97,7 @@ Page({
   },
   loadStudentAccounts() {
     request("/student/accounts", { silent: true }).then((accounts) => {
-      this.setData({ studentAccounts: Array.isArray(accounts) ? accounts : [] });
+      this.setData({ studentAccounts: Array.isArray(accounts) ? accounts.map((account) => ({ ...account, gradeLabel: gradeLabel(account.grade) })) : [] });
     }).catch(() => this.setData({ studentAccounts: [] }));
   },
   switchStudent(event) {
@@ -468,7 +469,8 @@ function buildPageState(home = {}) {
     quickActions: buildQuickActions(),
     profileCompleteness: buildProfileCompleteness(student),
     supportNotice: buildSupportNotice(notices, pendingHomework),
-    profileForm: profileFormFromStudent(student)
+    profileForm: profileFormFromStudent(student),
+    profileGradeLabel: gradeLabel(student.grade)
   };
 }
 
@@ -512,7 +514,7 @@ function buildGuardianProfile(guardian = {}) {
 
 function buildStudentProfile(student = {}) {
   const name = student.nickname || student.name || "Student";
-  const grade = student.grade || "Grade not provided";
+  const grade = gradeLabel(student.grade) || "Grade not provided";
   const school = student.schoolName || "School not provided";
   const latest = student.lastStudyAt || student.lastSubmittedAt || "";
   const avatarUrl = normalizeAvatarUrl(student.avatarUrl);
@@ -577,7 +579,7 @@ function buildPrimaryTask(home, pendingTask, continueCourse) {
       tone: "active",
       label: "Continue Learning",
       title: continueCourse.name || "Resume Learning",
-      desc: [continueCourse.grade, subjectLabel(continueCourse.subject), progress > 0 ? `Completed ${progress}%` : ""].filter(Boolean).join(" · ") || "Continue from where you left off.",
+      desc: [gradeLabel(continueCourse.grade), subjectLabel(continueCourse.subject), progress > 0 ? `Completed ${progress}%` : ""].filter(Boolean).join(" · ") || "Continue from where you left off.",
       buttonText: "Continue Learning"
     };
   }
@@ -618,11 +620,11 @@ function buildOverviewMetrics(student = {}, home = {}, continueCourse = null, pe
 function buildQuickActions() {
   return [
     { title: "My Schedule", action: "schedule", symbol: "▣", tone: "schedule" },
-    { title: "Course Materials", action: "study", symbol: "▰", tone: "materials" },
+    { title: "Materials", action: "study", symbol: "▰", tone: "materials" },
     { title: "My Downloads", action: "downloads", symbol: "↓", tone: "materials" },
     { title: "Class Feedback", action: "feedback", symbol: "▤", tone: "feedback" },
     { title: "Favorites", action: "favorites", symbol: "★", tone: "favorites" },
-    { title: "Learning Reminders", action: "notices", symbol: "🔔", tone: "notice" },
+    { title: "Reminders", action: "notices", symbol: "🔔", tone: "notice" },
     { title: "Account Settings", action: "profile", symbol: "⚙", tone: "settings" }
   ];
 }
@@ -637,7 +639,7 @@ function buildProfileCompleteness(student = {}) {
     complete,
     statusClass: complete ? "complete" : "pending",
     status: complete ? "Profile Complete" : "Profile Incomplete",
-    summary: complete ? `${student.name} · ${student.grade} · ${student.schoolName}` : `Missing: ${missing.join(", ")}`,
+    summary: complete ? `${student.name} · ${gradeLabel(student.grade)} · ${student.schoolName}` : `Missing: ${missing.join(", ")}`,
     detail: complete ? "Your teacher uses these details to record scores and feedback." : "Complete your profile for more accurate score and feedback records."
   };
 }

@@ -1,5 +1,6 @@
 const { updateNoticeBadge, refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
+const { gradeLabel } = require("../../utils/grade");
 
 Page({
   data: {
@@ -169,7 +170,7 @@ function noticeDestination(notice) {
 
 function studentDisplay(student) {
   const name = String(student && student.name || "").trim();
-  const grade = String(student && student.grade || "").trim();
+  const grade = gradeLabel(student && student.grade);
   if (!name) return "";
   return grade ? `${name}（${grade}）` : name;
 }

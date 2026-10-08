@@ -152,14 +152,14 @@
         <view wx:for="{{displayedRecommendations}}" wx:key="subject" class="recommendation-card" data-subject="{{item.subject}}" bindtap="showRecommendation">
           <view class="content-main">
             <view class="content-top">
-              <view class="content-type">{{item.recommendationReason}}</view>
+              <view class="content-type">{{item.recommendationReasonLabel}}</view>
               <view class="content-tag">{{item.displayName || item.subject}}</view>
             </view>
             <view class="content-title">{{item.displayName || item.subject}}</view>
-            <view class="content-meta">{{item.grade}} · {{item.courseCount}} courses · {{item.materialCount}} materials</view>
+            <view class="content-meta">{{item.gradeLabel}} · {{item.courseCount}} courses · {{item.materialCount}} materials</view>
             <view class="content-meta">{{item.questionCount}} questions · {{item.homeworkCount}} exercises</view>
             <view class="recommendation-summary">Teacher: {{item.teacherName || "Not assigned"}}</view>
-            <view wx:if="{{item.teacherIntro}}" class="recommendation-summary">{{item.teacherIntro}}</view>
+            <view wx:if="{{item.teacherIntroLabel}}" class="recommendation-summary">{{item.teacherIntroLabel}}</view>
             <button class="recommendation-action" data-name="{{item.subject}}" catchtap="contactTeacher">Contact Teacher</button>
           </view>
         </view>

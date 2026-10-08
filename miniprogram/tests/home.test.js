@@ -363,10 +363,6 @@ test("home page shortcuts follow the product priority order", () => {
   assert.deepEqual(page.data.shortcuts.map((item) => item.label), [
     "Exercises",
     "Materials",
-    "上次练习",
-    "Messages",
-    "Learning Center",
-    "成绩报告",
     "Schedule",
     "Class Feedback"
   ]);
@@ -378,7 +374,7 @@ test("home summary cards expose direct actions for todos, materials, and notices
   assert.match(template, /class="status-item"\s+data-action="tasks"\s+bindtap="handleShortcut"/);
   assert.match(template, /class="status-item"\s+data-action="study"\s+bindtap="handleShortcut"/);
   assert.match(template, /class="status-item"\s+data-action="notices"\s+bindtap="handleShortcut"/);
-  assert.match(template, /<view class="status-item"\s+data-action="study"\s+bindtap="handleShortcut">\s*<view class="status-value">\{\{openedSubjectCount\}\}<\/view>\s*<view class="status-label">在学课程<\/view>/);
+  assert.match(template, /<view class="status-item"\s+data-action="study"\s+bindtap="handleShortcut">\s*<view class="status-value">\{\{openedSubjectCount\}\}<\/view>\s*<view class="status-label">Course<\/view>/);
 });
 
 test("home summary card counts unique opened subjects instead of materials", async () => {
