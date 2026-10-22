@@ -334,7 +334,7 @@ test('course return restores grade, subject, search, pagination and actual conte
   await expect.poll(() => page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(saved);
 });
 
-test('directory editor previews per-target changes and keeps material sync separate', async ({ page }) => {
+test('directory editor previews directory and handouts with optional single-lesson entry', async ({ page }) => {
   const user = { userId: 'ops', name: '测试教务', roles: ['super_admin'] };
   const source = { id: 'source', name: '源课程', grade: '五年级', subject: 'English', learningSpaceId: 'e1', status: '启用', curriculum: [{ id: 'u1', type: 'unit', name: '第一课', sortOrder: 1 }] };
   const target = { ...source, id: 'target', name: '目标课程', learningSpaceId: 'e2', curriculum: [] };
@@ -417,7 +417,7 @@ for (const failure of ['database-reject', 'lost-response']) {
     await expect(dialog).toContainText('操作结果未确认');
     await expect(dialog.getByRole('checkbox', { name: target.name, exact: true })).toBeChecked();
     await expect(dialog.getByRole('button', { name: /确认同步目录/ })).toHaveCount(0);
-    const retryPreview = dialog.getByRole('button', { name: /预览目录变更/ });
+    const retryPreview = dialog.getByRole('button', { name: /预览同步变更/ });
     await expect(retryPreview).toBeEnabled();
     await page.screenshot({ path: `/tmp/starline-directory-${failure}.png`, fullPage: false, animations: 'disabled' });
     await retryPreview.click();

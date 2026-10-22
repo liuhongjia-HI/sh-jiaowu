@@ -20,7 +20,7 @@ func TestDirectorySyncMySQLFailureRollbackAndRetry(t *testing.T) {
 		t.Fatal("requires dedicated starline_directory_retry_test database")
 	}
 	s, p, source, target := directorySyncFixture(t)
-	target2, err := s.CreateCourse("管理员", p, learning.CourseUpsertRequest{Name: "第二目标课程", LearningSpaceID: target.LearningSpaceID, Curriculum: []learning.CurriculumNode{{ID: "retry-second-original", Type: learning.CurriculumUnit, Name: "第二目标独有课节", SortOrder: 1}}})
+	target2, err := s.CreateCourse("管理员", p, learning.CourseUpsertRequest{Name: "第二目标课程", LearningSpaceID: target.LearningSpaceID, Curriculum: []learning.CurriculumNode{{ID: "retry-second-original", Type: learning.CurriculumUnit, Name: "第二目标独有课节", SortOrder: 99}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,13 @@ func directorySyncFixture(t *testing.T) (*MemoryStore, learning.Principal, learn
 		}
 		return course
 	}
-	return s, p, create("源课节", "space-g05-english-s1-q1", "sync-source-unit"), create("目标原有课节", "space-g05-english-s1-q1-splus", "sync-target-unit")
+	source := create("源课节", "space-g05-english-s1-q1", "sync-source-unit")
+	target := create("目标原有课节", "space-g05-english-s1-q1-splus", "sync-target-unit")
+	// An unrelated extra unit has a different number; same-number branches now
+	// require explicit correspondence instead of silently creating duplicates.
+	target.Curriculum[0].SortOrder = 99
+	s.courses[findCourseIndex(s.courses, target.ID)].Curriculum = target.Curriculum
+	return s, p, source, target
 }
 
 func TestDirectorySyncMySQLRestartPreservesMatchedIdentity(t *testing.T) {

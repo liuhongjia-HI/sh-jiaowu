@@ -73,122 +73,6 @@ func directoryLabels(nodes []learning.CurriculumNode) map[string]string {
 	return labels
 }
 
-func (s *MemoryStore) directorySyncTarget(p learning.Principal, source learning.Course, targetID string) (learning.CourseDirectorySyncTarget, learning.Course) {
-	out := learning.CourseDirectorySyncTarget{CourseID: targetID, Added: []string{}, Updated: []string{}}
-	target, ok := s.findCourse(targetID)
-	if !ok {
-		out.Error = "目标课程不存在"
-		return out, target
-	}
-	out.CourseName = target.Name
-	if target.ID == source.ID || !p.CanMaintainCourses() || !canSeeCourse(p, target) || p.IsTeacherOnly() && !containsString(p.LearningSpaceIDs, target.LearningSpaceID) {
-		out.Error = "没有权限同步该目标课程"
-		return out, target
-	}
-	if !s.sameMaterialSyncScope(source, target) {
-		out.Error = "目标课程必须与源课程的年级、学科、学期和阶段一致"
-		return out, target
-	}
-	if target.Status != learning.StatusEnabled {
-		out.Error = "目标课程已停用"
-		return out, target
-	}
-	if source.FamilyID != "" && target.FamilyID == source.FamilyID {
-		out.Status = "已共用目录"
-		out.Preserved = len(target.Curriculum)
-		return out, target
-	}
-	if target.FamilyID != "" {
-		out.Error = "目标使用另一套共享目录，请在课程系列中维护"
-		return out, target
-	}
-	sourcePaths, err := directoryPaths(source.Curriculum)
-	if err != nil {
-		out.Error = err.Error()
-		return out, target
-	}
-	targetPaths, err := directoryPaths(target.Curriculum)
-	if err != nil {
-		out.Error = err.Error()
-		return out, target
-	}
-	sourceLabels, targetLabels := directoryLabels(source.Curriculum), directoryLabels(target.Curriculum)
-	byPath, byID := map[string]string{}, map[string]int{}
-	merged := append([]learning.CurriculumNode(nil), target.Curriculum...)
-	nextLinks := cloneMap(target.DirectorySyncMap)
-	if nextLinks == nil {
-		nextLinks = map[string]string{}
-	}
-	for i, node := range merged {
-		byPath[targetPaths[node.ID]] = node.ID
-		byID[node.ID] = i
-	}
-	mapping := map[string]string{}
-	reserved := map[string]string{}
-	for _, node := range source.Curriculum {
-		linked := target.DirectorySyncMap[source.ID+":"+node.ID]
-		if _, exists := byID[linked]; !exists {
-			linked = directorySyncID(source.ID, node.ID, target.ID)
-		}
-		if _, exists := byID[linked]; exists {
-			if owner := reserved[linked]; owner != "" && owner != node.ID {
-				out.Error = "章节对应关系冲突，请先调整目录"
-				return out, target
-			}
-			reserved[linked] = node.ID
-		}
-	}
-	for _, node := range source.Curriculum {
-		generated := directorySyncID(source.ID, node.ID, target.ID)
-		linked := target.DirectorySyncMap[source.ID+":"+node.ID]
-		if _, exists := byID[linked]; exists {
-			mapping[node.ID] = linked
-		} else if _, exists := byID[generated]; exists {
-			mapping[node.ID] = generated
-		} else if id := byPath[sourcePaths[node.ID]]; id != "" && (reserved[id] == "" || reserved[id] == node.ID) {
-			mapping[node.ID] = id
-		} else {
-			mapping[node.ID] = generated
-		}
-		reserved[mapping[node.ID]] = node.ID
-		nextLinks[source.ID+":"+node.ID] = mapping[node.ID]
-	}
-	matched := map[string]bool{}
-	for _, node := range source.Curriculum {
-		copy := node
-		copy.ID = mapping[node.ID]
-		copy.ParentID = mapping[node.ParentID]
-		if index, exists := byID[copy.ID]; exists {
-			matched[copy.ID] = true
-			if merged[index] != copy {
-				change := targetLabels[copy.ID] + " → " + sourceLabels[node.ID]
-				if merged[index].ParentID != copy.ParentID {
-					change += "（上级调整）"
-				}
-				out.Updated = append(out.Updated, change)
-				merged[index] = copy
-			}
-		} else {
-			out.Added = append(out.Added, sourceLabels[node.ID])
-			merged = append(merged, copy)
-		}
-	}
-	out.Preserved = len(target.Curriculum) - len(matched)
-	target.Curriculum = merged
-	target.DirectorySyncMap = nextLinks
-	if err := s.validateCourseContentBindings(target); err != nil {
-		out.Error = err.Error()
-		return out, target
-	}
-	target.LessonCount = countCurriculumLessons(merged)
-	// Source/target contents and scope are checked again immediately before write.
-	original := s.courses[findCourseIndex(s.courses, targetID)]
-	raw, _ := json.Marshal([]any{source, original, original.DirectorySyncMap})
-	sum := sha256.Sum256(raw)
-	out.Snapshot = hex.EncodeToString(sum[:])
-	return out, target
-}
-
 func findCourseIndex(courses []learning.Course, id string) int {
 	for i, course := range courses {
 		if course.ID == id {
@@ -291,7 +175,7 @@ func (s *MemoryStore) PreviewCourseDirectorySync(p learning.Principal, req learn
 			continue
 		}
 		seen[id] = true
-		preview, _ := s.directorySyncTarget(p, source, id)
+		preview, _ := s.directorySyncTarget(p, source, id, req)
 		out.Targets = append(out.Targets, preview)
 	}
 	return out, nil
@@ -313,18 +197,29 @@ func (s *MemoryStore) SyncCourseDirectory(operator string, p learning.Principal,
 				continue
 			}
 			seen[id] = true
-			preview, target := work.directorySyncTarget(p, source, id)
+			preview, planned := work.directorySyncTarget(p, source, id, req)
 			if preview.Error == "" && preview.Status == "" {
-				beforeLinks, _ := json.Marshal(work.courses[findCourseIndex(work.courses, id)].DirectorySyncMap)
-				afterLinks, _ := json.Marshal(target.DirectorySyncMap)
-				if len(preview.Added) == 0 && len(preview.Updated) == 0 && string(beforeLinks) == string(afterLinks) && req.Snapshots[id] != "" {
-					preview.Status = "已同步"
+				unresolved := false
+				for _, conflict := range preview.Conflicts {
+					if !conflict.Resolved {
+						unresolved = true
+					}
+				}
+				if unresolved {
+					preview.Error = "请先确认目录对应关系并重新预览"
 				} else if req.Snapshots[id] == "" || req.Snapshots[id] != preview.Snapshot {
-					preview.Error = "目录已发生变化，请重新预览"
+					// A completed, unchanged retry is safe; a new operation requires the exact preview.
+					before, _ := json.Marshal(work.courses[findCourseIndex(work.courses, id)].DirectorySyncMap)
+					after, _ := json.Marshal(planned.courses[findCourseIndex(planned.courses, id)].DirectorySyncMap)
+					if req.Snapshots[id] != "" && len(preview.Added)+len(preview.Updated)+len(preview.Merged)+len(preview.MaterialsAdded)+len(preview.MaterialsUpdated) == 0 && string(before) == string(after) {
+						preview.Status = "已同步"
+					} else {
+						preview.Error = "目录或讲义已发生变化，请重新预览"
+					}
 				} else {
-					work.courses[findCourseIndex(work.courses, id)] = target
-					work.syncCourseReferences(target)
-					work.prependLog(operator, "同步课程目录", source.Name+" → "+target.Name)
+					work.publishMutation(planned)
+					detail, _ := json.Marshal(preview)
+					work.prependLogDetail(operator, "同步课程目录及讲义", source.Name+" → "+preview.CourseName, string(detail))
 					preview.Status = "已同步"
 				}
 			}

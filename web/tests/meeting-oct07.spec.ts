@@ -88,7 +88,7 @@ for (const scope of ['whole', 'unit', 'save-failure'] as const) {
     await expect.poll(() => writes.filter(item => item.path === '/courses/directory-sync-preview').length).toBe(1);
     const syncRequest = { sourceCourseId: source.id, targetCourseIds: [target.id], ...(scope === 'unit' ? { unitIds: ['unit-one'] } : {}) };
     expect(writes.find(item => item.path === '/courses/directory-sync-preview').body).toEqual(syncRequest);
-    await modal.getByRole('button', { name: '确认同步目录', exact: true }).click();
+    await modal.getByRole('button', { name: '确认同步目录及讲义', exact: true }).click();
     await expect(modal).toContainText('已同步');
     expect(writes.at(-1)).toEqual({ path: '/courses/directory-sync', body: { ...syncRequest, snapshots: { [target.id]: 'upload-directory-version' } } });
     await modal.getByRole('button', { name: /^关\s*闭$/ }).click();
@@ -159,4 +159,53 @@ test('teacher table keeps common actions and name on left and account actions la
   await expect(edit).toBeVisible();
   const bounds = await edit.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThan(1280);
   await page.screenshot({ path: '/tmp/starline-oct07-teachers.png', fullPage: false });
+});
+
+test('Unit sync resolves duplicate branches and previews handout changes before confirmation', async ({ page }) => {
+  await login(page);
+  const writes: { path: string; body: any }[] = [];
+  const conflict = { sourceNodeId: 'unit-one', sourceLabel: 'Unit 2 · Fertile Crescent', allowNew: false, candidates: [{ id: 'original-unit', label: 'Unit 2（原有目录）' }, { id: 'copied-unit', label: 'Unit 2 · Fertile Crescent（此前同步目录）' }], resolved: false };
+  await page.route('**/api/**', async route => {
+    const req = route.request(); const path = new URL(req.url()).pathname.replace('/api', '');
+    if (path === '/courses/source' && req.method() === 'PUT') return route.fulfill({ json: { code: 0, data: { ...source, ...req.postDataJSON() } } });
+    if (path.includes('directory-sync')) {
+      const body = req.postDataJSON(); writes.push({ path, body });
+      const resolved = !!body.resolutions?.target?.['unit-one'];
+      return route.fulfill({ json: { code: 0, data: { targets: [{ courseId: 'target', courseName: target.name, added: [], updated: resolved ? ['Unit 2 → Fertile Crescent'] : [], preserved: 1, conflicts: [{ ...conflict, resolved }], merged: resolved ? ['此前同步目录 → 原有目录（包含讲义关联）'] : [], materialsAdded: resolved && body.includeMaterials !== false ? ['文明起源 HD', '文明起源 Blank'] : [], materialsUpdated: resolved && body.includeMaterials !== false ? ['课前阅读'] : [], materialsPreserved: 3, snapshot: resolved ? 'resolved-preview' : '', ...(path.endsWith('directory-sync') ? { status: '已同步' } : {}) }] } } });
+    }
+    const data = path === '/auth/me' ? user : path === '/courses' ? [source, target] : path === '/learning-spaces' ? spaces : path === '/subjects' ? [{ id: 'english', name: 'English', status: '启用' }] : [];
+    return route.fulfill({ json: { code: 0, data } });
+  });
+  await page.goto('/content');
+  await page.getByRole('row').filter({ hasText: source.name }).getByRole('button', { name: '编辑', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '编辑课程', exact: true });
+  await editor.getByRole('button', { name: '同步此 Unit', exact: true }).click();
+  await editor.getByRole('checkbox', { name: target.name, exact: true }).check();
+  await editor.getByRole('button', { name: '保存并预览同步', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: `跨班型同步 · ${source.name}`, exact: true });
+  await expect(modal.getByRole('checkbox', { name: '同时同步已发布讲义', exact: true })).toBeChecked();
+  await expect(modal.getByRole('button', { name: '确认同步目录及讲义', exact: true })).toHaveCount(0);
+  await modal.getByRole('combobox', { name: '对应目录 unit-one' }).click();
+  await page.locator('.ant-select-item-option').filter({ hasText: conflict.candidates[0].label }).click();
+  await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0);
+  const mergeCheckbox = modal.getByRole('checkbox', { name: conflict.candidates[1].label, exact: true });
+  await mergeCheckbox.focus();
+  await mergeCheckbox.press('Space');
+  await expect(mergeCheckbox).toBeChecked();
+  await expect(modal).toContainText('选择已变化，请重新预览后确认');
+  await modal.getByRole('button', { name: '预览同步变更', exact: true }).click();
+  await expect(modal).toContainText('讲义：新增 2 · 更新 1 · 保留 3');
+  await expect(modal).toContainText('合并并迁移关联');
+  const footer = await modal.locator('.ant-modal-footer').boundingBox();
+  expect(footer && footer.y + footer.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await page.screenshot({ path: '/tmp/starline-unit-sync-merge-preview.png', fullPage: false });
+  await modal.getByText('更新讲义：课前阅读', { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/starline-unit-sync-handout-preview.png', fullPage: false });
+  await modal.getByRole('checkbox', { name: '同时同步已发布讲义', exact: true }).uncheck();
+  await expect(modal.getByRole('button', { name: '确认同步目录', exact: true })).toHaveCount(0);
+  await modal.getByRole('button', { name: '预览同步变更', exact: true }).click();
+  expect(writes.at(-1)?.body.includeMaterials).toBe(false);
+  await modal.getByRole('button', { name: '确认同步目录', exact: true }).click();
+  await expect(modal).toContainText('已同步');
+  expect(writes.at(-1)).toEqual({ path: '/courses/directory-sync', body: { sourceCourseId: 'source', targetCourseIds: ['target'], unitIds: ['unit-one'], includeMaterials: false, resolutions: { target: { 'unit-one': { targetNodeId: 'original-unit', mergeNodeIds: ['copied-unit'] } } }, snapshots: { target: 'resolved-preview' } } });
 });

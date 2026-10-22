@@ -462,7 +462,7 @@ export function CourseDialog({
     <Typography.Text strong>{unitId ? '此 Unit 同步到' : '整套目录同步到'}</Typography.Text>
     <Checkbox.Group aria-label="目标班型" options={syncTargets || []} value={syncTargetIds} disabled={loading} onChange={ids => setSyncTargetIds(ids.map(String))} />
     {!syncTargets?.length && <Typography.Text type="secondary">没有同范围的其他班型课程</Typography.Text>}
-    <Typography.Text type="secondary">保留目标已有资料；保存后预览目录变更。</Typography.Text>
+    <Typography.Text type="secondary">默认同步目录及已发布讲义，保留目标已有资料；保存后确认对应关系并预览变更。</Typography.Text>
     <Button type="link" size="small" onClick={() => { setSyncUnitIds(null); setSyncTargetIds([]); }}>取消同步选择</Button>
   </div> : null;
 
