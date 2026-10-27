@@ -101,9 +101,9 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
     onError: (error: Error) => message.error(error.message || '创建课程系列失败。')
   });
   const familyUpdate = useMutation({
-    mutationFn: (values: CourseFormValues) => putData<CourseFamily>(`/course-families/${familyEditing?.id}`, { name: values.name, curriculum: prepareCurriculumForSave(values.curriculum || []) }),
+    mutationFn: (values: CourseFormValues) => putData<CourseFamily>(`/course-families/${familyEditing?.id}`, { name: values.name, referenceMoves: values.referenceMoves, curriculum: prepareCurriculumForSave(values.curriculum || []) }),
     onSuccess: () => { message.success('共享目录已更新。'); setFamilyEditing(null); familyForm.resetFields(); refreshCourses(); },
-    onError: (error: Error) => message.error(error.message || '保存共享目录失败。')
+    onError: (error: Error) => { client.invalidateQueries({ queryKey: ['curriculum-references'] }); message.error(error.message || '保存共享目录失败。'); }
   });
   const familyAdd = useMutation({
     mutationFn: () => postData<Course>(`/course-families/${familyAdding?.id}/courses`, { learningSpaceId: familyAddSpaceID }),
@@ -119,6 +119,12 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
     client.invalidateQueries({ queryKey: ['course-families'] });
     client.invalidateQueries({ queryKey: ['content'] });
     client.invalidateQueries({ queryKey: ['courses'] });
+    client.invalidateQueries({ queryKey: ['curriculum-references'] });
+    client.invalidateQueries({ queryKey: ['materials'] });
+    client.invalidateQueries({ queryKey: ['homework'] });
+    client.invalidateQueries({ queryKey: ['materials-overview'] });
+    client.invalidateQueries({ queryKey: ['courses-for-content-resources'] });
+    client.invalidateQueries({ queryKey: ['teaching-plans'] });
   }
   const syncTargetsFor = (source?: Course) => {
     const sourceSpace = spaces.data?.find(space => space.id === source?.learningSpaceId);
@@ -135,7 +141,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
       const curriculum = prepareCurriculumForSave(values.curriculum || []);
       let saved: Course;
       if (familyEditing) {
-        const family = await putData<CourseFamily>(`/course-families/${familyEditing.id}`, { name: values.name, curriculum });
+        const family = await putData<CourseFamily>(`/course-families/${familyEditing.id}`, { name: values.name, curriculum, referenceMoves: values.referenceMoves });
         saved = family.courses.find(course => course.id === source.id) || family.courses[0];
       } else {
         const { grade: _grade, subject: _subject, ...body } = values;
@@ -144,7 +150,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
       setDirectoryUnits(unitIds); setDirectoryTargets(targetCourseIds); setDirectorySource(saved);
       closeEditor(); setFamilyEditing(null); refreshCourses();
       message.success('源目录已保存，请预览并确认目标班型的变更。');
-    } catch (error) { message.error(error instanceof Error ? error.message : '保存目录失败，选择已保留'); }
+    } catch (error) { client.invalidateQueries({ queryKey: ['curriculum-references'] }); message.error(error instanceof Error ? error.message : '保存目录失败，选择已保留'); }
     finally { setSavingSync(false); }
   };
   const save = useMutation({
@@ -160,10 +166,9 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
     onSuccess: () => {
       message.success(editing ? '课程已保存。' : '课程已创建，可继续上传课程讲义和题目。');
       closeEditor();
-      client.invalidateQueries({ queryKey: ['content'] });
-      client.invalidateQueries({ queryKey: ['courses'] });
+      refreshCourses();
     },
-    onError: (error: Error) => message.error(error.message || '保存课程失败，请检查课程范围。')
+    onError: (error: Error) => { client.invalidateQueries({ queryKey: ['curriculum-references'] }); message.error(error.message || '保存课程失败，请检查课程范围。'); }
   });
   const copy = useMutation({
     mutationFn: ({ course, learningSpaceId, withMaterials = true, withHomework = true }: { course: Course; learningSpaceId: string; withMaterials?: boolean; withHomework?: boolean }) =>

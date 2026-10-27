@@ -192,7 +192,9 @@ func (s *MemoryStore) CopyCourse(operator string, principal learning.Principal, 
 func (s *MemoryStore) UpdateCourse(operator string, principal learning.Principal, id string, req learning.CourseUpsertRequest) (learning.Course, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	result1, err := s.updateCourseUnlocked(operator, principal, id, req)
+	result1, err := persistentMutation(s, func(work *MemoryStore) (learning.Course, error) {
+		return work.updateCourseUnlocked(operator, principal, id, req)
+	})
 	return result1, err
 }
 

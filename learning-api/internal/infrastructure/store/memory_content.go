@@ -214,6 +214,12 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 		if s.courses[index].FamilyID != "" {
 			return learning.Course{}, errors.New("共享目录课程请在课程系列中编辑")
 		}
+		if !canSeeCourse(principal, s.courses[index]) {
+			return learning.Course{}, errors.New("不能编辑未负责的课程")
+		}
+		if err := s.moveCurriculumReferences(principal, map[string]learning.Course{course.ID: course}, req.ReferenceMoves); err != nil {
+			return learning.Course{}, err
+		}
 		if err := s.validateCourseContentBindings(course); err != nil {
 			return learning.Course{}, err
 		}
@@ -221,14 +227,13 @@ func (s *MemoryStore) updateCourseUnlocked(operator string, principal learning.P
 		s.courses[index] = course
 		s.syncCourseReferences(course)
 		after := s.decorateCourse(course)
-		s.prependLogDetail(operator, "编辑课程", course.Name, auditChangeDetail(courseAuditSnapshot(before), courseAuditSnapshot(after)))
+		s.prependLogDetail(operator, "编辑课程", course.Name, auditChangeDetail(courseAuditSnapshot(before), courseAuditSnapshot(after))+referenceMovesAudit(req.ReferenceMoves))
 		return after, nil
 	}
 	return learning.Course{}, errors.New("课程不存在")
 }
 
 func (s *MemoryStore) validateCourseContentBindings(course learning.Course) error {
-	boundNodeIDs := make(map[string]bool)
 	availableNodeIDs := make(map[string]bool, len(course.Curriculum))
 	for _, node := range course.Curriculum {
 		availableNodeIDs[node.ID] = true
@@ -239,25 +244,37 @@ func (s *MemoryStore) validateCourseContentBindings(course learning.Course) erro
 		}
 		space, ok := s.findLearningSpace(course.LearningSpaceID)
 		if plan.LessonID != "" && (!availableNodeIDs[plan.LessonID] || !curriculumLeaf(course.Curriculum, plan.LessonID)) || !ok || course.Grade != plan.Grade || !subjectsMatch(course.Subject, plan.Subject) || space.Semester != plan.Semester || space.Phase != plan.Phase {
-			return errors.New("目录仍有关联教案，请先重新关联教案再删除章节或切换教学范围")
+			return fmt.Errorf("课程「%s」仍有关联教案「%s」，请先重新关联教案再删除章节或切换教学范围", course.Name, plan.Title)
 		}
 	}
+	check := func(kind, title, status, nodeID string) error {
+		if strings.TrimSpace(nodeID) == "" {
+			return nil
+		}
+		if status == "" {
+			status = "未标注"
+		}
+		if !availableNodeIDs[nodeID] {
+			return fmt.Errorf("课程「%s」的%s「%s」（%s）仍关联已移除或失效的目录（%s），请先迁移内容再删除章节", course.Name, kind, title, status, nodeID)
+		}
+		if !curriculumLeaf(course.Curriculum, nodeID) {
+			path, _ := referenceNodePath(course.Curriculum, nodeID)
+			return fmt.Errorf("课程「%s」的%s「%s」（%s）绑定到新增下级的目录「%s」，请先迁移内容再修改课程目录", course.Name, kind, title, status, path)
+		}
+		return nil
+	}
 	for _, item := range s.materials {
-		if item.CourseID == course.ID && strings.TrimSpace(item.LessonID) != "" {
-			boundNodeIDs[item.LessonID] = true
+		if item.CourseID == course.ID {
+			if err := check("讲义", item.Title, string(item.Status), item.LessonID); err != nil {
+				return err
+			}
 		}
 	}
 	for _, item := range s.homework {
-		if item.CourseID == course.ID && strings.TrimSpace(item.LessonID) != "" {
-			boundNodeIDs[item.LessonID] = true
-		}
-	}
-	for nodeID := range boundNodeIDs {
-		if !availableNodeIDs[nodeID] {
-			return errors.New("目录仍有关联讲义或练习，请先迁移内容再删除章节")
-		}
-		if availableNodeIDs[nodeID] && !curriculumLeaf(course.Curriculum, nodeID) {
-			return errors.New("已有讲义或练习绑定到新增下级的目录，请先迁移内容再修改课程目录")
+		if item.CourseID == course.ID {
+			if err := check("练习", item.Title, item.Status, item.LessonID); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

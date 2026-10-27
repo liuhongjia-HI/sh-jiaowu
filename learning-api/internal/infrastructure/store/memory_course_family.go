@@ -307,6 +307,16 @@ func (s *MemoryStore) updateCourseFamilyUnlocked(operator string, principal lear
 			return learning.CourseFamily{}, errors.New("该范围内课程系列名称已存在")
 		}
 	}
+	migrationCourses := map[string]learning.Course{}
+	for _, course := range s.courses {
+		if course.FamilyID == id {
+			course.Curriculum = curriculum
+			migrationCourses[course.ID] = course
+		}
+	}
+	if err := s.moveCurriculumReferences(principal, migrationCourses, req.ReferenceMoves); err != nil {
+		return learning.CourseFamily{}, err
+	}
 	updatedCourses := make([]learning.Course, 0)
 	for _, course := range s.courses {
 		if course.FamilyID != id {
@@ -357,7 +367,7 @@ func (s *MemoryStore) updateCourseFamilyUnlocked(operator string, principal lear
 	family.Curriculum = curriculum
 	family.Courses = updatedCourses
 	s.courseFamilies[index] = family
-	s.prependLogDetail(operator, "编辑共享课程目录", name, fmt.Sprintf("影响 %d 个班型", len(updatedCourses)))
+	s.prependLogDetail(operator, "编辑共享课程目录", name, fmt.Sprintf("影响 %d 个班型", len(updatedCourses))+referenceMovesAudit(req.ReferenceMoves))
 	return family, nil
 }
 

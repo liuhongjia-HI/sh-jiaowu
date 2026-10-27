@@ -61,8 +61,9 @@ type CourseFamilyCreateRequest struct {
 }
 
 type CourseFamilyUpdateRequest struct {
-	Name       string           `json:"name"`
-	Curriculum []CurriculumNode `json:"curriculum"`
+	ReferenceMoves []CurriculumReferenceMove `json:"referenceMoves,omitempty"`
+	Name           string                    `json:"name"`
+	Curriculum     []CurriculumNode          `json:"curriculum"`
 }
 
 type CourseFamilyAddCourseRequest struct {
@@ -75,12 +76,13 @@ type CourseFamilyImportRequest struct {
 }
 
 type CourseUpsertRequest struct {
-	Name            string           `json:"name"`
-	LearningSpaceID string           `json:"learningSpaceId"`
-	Curriculum      []CurriculumNode `json:"curriculum"`
-	ChapterCount    int              `json:"-"`
-	Chapters        []string         `json:"-"`
-	Status          Status           `json:"status"`
+	ReferenceMoves  []CurriculumReferenceMove `json:"referenceMoves,omitempty"`
+	Name            string                    `json:"name"`
+	LearningSpaceID string                    `json:"learningSpaceId"`
+	Curriculum      []CurriculumNode          `json:"curriculum"`
+	ChapterCount    int                       `json:"-"`
+	Chapters        []string                  `json:"-"`
+	Status          Status                    `json:"status"`
 }
 
 // CourseCopyRequest 复制课程。空的学习空间由服务端选下一个兄弟空间；

@@ -8,7 +8,7 @@ import { getData, http, postData, postForm, putData } from '../../services/http'
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
 import { ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, curriculumSiblings, formatLearningSpace, gradeIndex, gradeOptions, levelOptions, nextCurriculumSortOrder, phaseLabel, semesterLabel, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade, subjectsMatch, useSubjectCatalog } from '../../utils/curriculum';
-import type { Course, CourseUpsertRequest, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
+import type { Course, CourseUpsertRequest, CurriculumReference, CurriculumReferenceMove, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
 type UploadKind = Extract<Kind, 'materials' | 'homework'>;
@@ -31,7 +31,7 @@ type ContentFormValues = {
   allowDownload?: boolean;
 };
 type QuestionFormValues = QuestionBankUpsertRequest;
-type CurriculumReference = { id: string; kind: string; title: string; courseName: string; blocking?: boolean };
+const referenceKey = (ref: { kind: string; id: string }) => `${ref.kind}:${ref.id}`;
 
 const CONTENT_TYPE_NAME: Record<string, string> = {
   course: '课程',
@@ -303,6 +303,30 @@ export function CourseDialog({
   const [curriculumNodes, setCurriculumNodes] = useState<CourseFormValues['curriculum']>([]);
   const [curriculumError, setCurriculumError] = useState('');
   const [checkingReferences, setCheckingReferences] = useState(false);
+  const [referenceMoves, setReferenceMoves] = useState<CurriculumReferenceMove[]>([]);
+  const [referenceAction, setReferenceAction] = useState<{ refs: CurriculumReference[]; ids: string[]; snapshot: string; mode: 'view' | 'delete' | 'repair' } | null>(null);
+  const [referenceTarget, setReferenceTarget] = useState<string>();
+  const directoryReferences = useQuery({
+    queryKey: ['curriculum-references', referenceCourseId],
+    queryFn: () => postData<CurriculumReference[]>(`/courses/${referenceCourseId}/curriculum-references`, { includeAll: true }),
+    enabled: Boolean(open && referenceCourseId), retry: false, staleTime: 0
+  });
+  const effectiveReferences = (refs: CurriculumReference[]) => {
+    const byId = new Map(curriculumNodes.map(node => [node.id, node]));
+    const parentIds = new Set(curriculumNodes.map(node => node.parentId));
+    const options = curriculumLessonOptions(curriculumNodes);
+    return refs.map(ref => {
+      const move = referenceMoves.find(item => referenceKey(item) === referenceKey(ref) && item.fromLessonId === ref.lessonId);
+      const lessonId = move?.toLessonId || ref.lessonId;
+      const invalid = Boolean(lessonId && (!byId.has(lessonId) || parentIds.has(lessonId)));
+      return { ...ref, lessonId, invalidBinding: invalid, path: options.find(item => item.value === lessonId)?.label || (invalid ? `目录关联已失效（${lessonId}）` : ref.path) };
+    });
+  };
+  const visibleReferences = effectiveReferences(directoryReferences.data || []);
+  const invalidReferences = visibleReferences.filter(ref => ref.invalidBinding);
+  const staleMoves = directoryReferences.data ? referenceMoves.filter(move => !directoryReferences.data.some(ref => referenceKey(ref) === referenceKey(move) && ref.courseId === move.courseId && ref.lessonId === move.fromLessonId)) : [];
+
+
   const [originalSpaceId, setOriginalSpaceId] = useState('');
   const currentCurriculum = useRef(curriculumNodes);
   currentCurriculum.current = curriculumNodes;
@@ -368,6 +392,9 @@ export function CourseDialog({
     if (!open) return;
     setSyncUnitIds(null);
     setSyncTargetIds([]);
+    setReferenceMoves([]);
+    setReferenceAction(null);
+    setReferenceTarget(undefined);
     setCurriculumNodes(form.getFieldValue('curriculum') ?? []);
     setOriginalSpaceId(form.getFieldValue('learningSpaceId') || '');
     setCurriculumError('');
@@ -427,14 +454,13 @@ export function CourseDialog({
     if (referenceCourseId) {
       setCheckingReferences(true);
       try {
-        const refs = await postData<{ id: string; kind: string; title: string; courseName: string }[]>(`/courses/${referenceCourseId}/curriculum-references`, { nodeIds: [...ids] });
+        const response = await directoryReferences.refetch();
+        if (response.error) throw response.error;
         if (JSON.stringify(currentCurriculum.current) !== snapshot) { message.warning('目录已变化，请重新检查删除范围'); return; }
+        const refs = effectiveReferences(response.data || []).filter(ref => ids.has(ref.lessonId));
         if (refs.length) {
-          Modal.info({ title: '目录引用影响', zIndex: 1600, width: 640, content: <>
-            <Alert type="warning" message={`涉及 ${ids.size} 个目录节点、${refs.length} 份资料，请先重新关联后删除`} />
-            <div style={{ maxHeight: 320, overflow: 'auto', marginTop: 12 }}>{refs.map(ref => <div key={`${ref.kind}-${ref.id}`} style={{ marginBottom: 8 }}><Tag>{ref.kind}</Tag><Typography.Text strong>{ref.title}</Typography.Text><div><Typography.Text type="secondary">{ref.courseName}</Typography.Text></div></div>)}</div>
-            {refs.some(ref => ref.kind === '教案') && <a href="/teaching-plans" target="_blank" rel="noreferrer">打开教案管理并重新关联章节</a>}
-          </> });
+          setReferenceTarget(undefined);
+          setReferenceAction({ refs, ids: [...ids], snapshot, mode: 'delete' });
           return;
         }
       } catch (error) {
@@ -457,6 +483,40 @@ export function CourseDialog({
     .sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
   const curriculumNodeIsLeaf = (nodeId: string) => !curriculumNodes.some((node) => node.parentId === nodeId);
   const missingCurriculumTypes = () => ['unit'].filter((type) => !curriculumNodes.some((node) => node.type === type));
+
+  const referencesByNode = new Map<string, CurriculumReference[]>();
+  const nodesById = new Map(curriculumNodes.map(node => [node.id, node]));
+  visibleReferences.forEach(ref => {
+    const visited = new Set<string>();
+    for (let id = ref.lessonId; id && !visited.has(id); id = nodesById.get(id)?.parentId || '') {
+      visited.add(id);
+      referencesByNode.set(id, [...(referencesByNode.get(id) || []), ref]);
+    }
+  });
+  const referenceSummary = (nodeId: string) => {
+    if (!referenceCourseId) return null;
+    if (directoryReferences.isFetching) return <Typography.Text type="secondary">关联检查中…</Typography.Text>;
+    if (directoryReferences.error) return <Button size="small" type="link" onClick={() => directoryReferences.refetch()}>关联检查失败，重试</Button>;
+    const refs = referencesByNode.get(nodeId) || [];
+    return <Button size="small" type="link" style={{ height: 'auto', whiteSpace: 'normal' }} onClick={() => { setReferenceTarget(undefined); setReferenceAction({ refs, ids: [], snapshot: JSON.stringify(curriculumNodes), mode: 'view' }); }}>
+      {['讲义', '练习', '教案'].map(kind => `${kind} ${refs.filter(ref => ref.kind === kind).length}`).join(' · ')}
+    </Button>;
+  };
+  const migrationOptions = curriculumLessonOptions(curriculumNodes.filter(node => !referenceAction?.ids.includes(node.id)))
+    .filter(option => !referenceAction?.refs.some(ref => ref.lessonId === option.value));
+  const closeReferenceAction = () => { setReferenceAction(null); setReferenceTarget(undefined); };
+  const confirmReferenceMove = () => {
+    if (!referenceAction || !referenceTarget || !migrationOptions.some(option => option.value === referenceTarget)) return;
+    if (JSON.stringify(currentCurriculum.current) !== referenceAction.snapshot) { message.warning('目录已变化，请重新检查'); closeReferenceAction(); return; }
+    const next = new Map(referenceMoves.map(move => [referenceKey(move), move]));
+    referenceAction.refs.forEach(ref => {
+      const original = directoryReferences.data?.find(item => referenceKey(item) === referenceKey(ref));
+      next.set(referenceKey(ref), { id: ref.id, kind: ref.kind, courseId: ref.courseId, fromLessonId: original?.lessonId ?? ref.lessonId, toLessonId: referenceTarget });
+    });
+    setReferenceMoves([...next.values()]);
+    if (referenceAction.mode === 'delete') updateCurriculum(curriculumNodes.filter(node => !referenceAction.ids.includes(node.id)));
+    closeReferenceAction();
+  };
 
   const syncPicker = (unitId?: string) => syncUnitIds !== null && (unitId ? syncUnitIds.includes(unitId) : syncUnitIds.length === 0) ? <div className="directory-sync-picker">
     <Typography.Text strong>{unitId ? '此 Unit 同步到' : '整套目录同步到'}</Typography.Text>
@@ -508,8 +568,8 @@ export function CourseDialog({
           return;
         }
         if (syncUnitIds?.some(id => !curriculumNodes.some(node => node.id === id && node.type === 'unit'))) { setCurriculumError('所选同步 Unit 已删除，请重新选择'); return; }
-        if (onSaveAndSync && syncUnitIds !== null && syncTargetIds.length) onSaveAndSync({ ...values, curriculum: curriculumNodes }, syncTargetIds, syncUnitIds);
-        else onSubmit({ ...values, curriculum: curriculumNodes });
+        if (onSaveAndSync && syncUnitIds !== null && syncTargetIds.length) onSaveAndSync({ ...values, curriculum: curriculumNodes, referenceMoves }, syncTargetIds, syncUnitIds);
+        else onSubmit({ ...values, curriculum: curriculumNodes, referenceMoves });
       }}>
         <Form.Item name="name" label="课程名称" rules={[{ required: true, message: '请输入课程名称' }]}>
           <Input placeholder="例如：五年级英语 S1 Q1 阅读课程" />
@@ -560,6 +620,14 @@ export function CourseDialog({
         <Form.Item extra="支持一至三级目录；没有下级节点的叶子节点必须填写名称，上级节点名称可选。">
           <div className="curriculum-section-heading"><Typography.Text>课程目录</Typography.Text>{onSaveAndSync && <Button size="small" htmlType="button" disabled={loading || !curriculumNodes.length} onClick={() => setSyncUnitIds([])}>同步整套目录</Button>}</div>
           {syncPicker()}
+          {referenceCourseId && <Space wrap style={{ marginBottom: 8 }}>
+            <Typography.Text type="secondary">关联数量含草稿、停用资料；上级节点包含全部下级资料。</Typography.Text>
+            <Button size="small" onClick={() => { setReferenceTarget(undefined); setReferenceAction({ refs: visibleReferences, ids: [], snapshot: JSON.stringify(curriculumNodes), mode: 'view' }); }} disabled={directoryReferences.isLoading || !!directoryReferences.error}>查看全部关联（{visibleReferences.length}）</Button>
+            {!!invalidReferences.length && <Button danger size="small" onClick={() => { setReferenceTarget(undefined); setReferenceAction({ refs: invalidReferences, ids: [], snapshot: JSON.stringify(curriculumNodes), mode: 'repair' }); }}>处理失效关联（{invalidReferences.length}）</Button>}
+          </Space>}
+          {!!staleMoves.length && <Alert type="warning" showIcon message="部分资料关联已被其他操作修改，请重新检查迁移安排。" action={<Button size="small" onClick={() => setReferenceMoves(referenceMoves.filter(move => !staleMoves.includes(move)))}>清除过期迁移安排</Button>} style={{ marginBottom: 12 }} />}
+          {!!referenceMoves.length && <Alert type="info" showIcon message={`已安排迁移 ${referenceMoves.length} 份资料，保存后与目录变更一起生效；取消编辑可放弃。练习和学生提交记录将保留。`} style={{ marginBottom: 12 }} />}
+
           <div className="curriculum-toolbar">
             <Typography.Text type="secondary">共 {curriculumNodes.filter((node) => node.type === 'unit').length} 个 Unit · {curriculumNodes.filter((node) => node.type === 'chapter').length} 个 Chapter · {curriculumNodes.filter((node) => node.type === 'lesson').length} 个 Lesson</Typography.Text>
             {curriculumNodes.length > 0 && <Button type="link" size="small" htmlType="button" onClick={() => {
@@ -584,6 +652,7 @@ export function CourseDialog({
               <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('chapter', unit.id).length} 个 Chapter</Typography.Text>
               <Button danger type="text" size="small" htmlType="button" disabled={checkingReferences} onClick={() => removeCurriculumBranch(unit.id)}>删除</Button>
             </div>
+            {referenceSummary(unit.id)}
             {syncPicker(unit.id)}
             <div className="curriculum-node-actions">
               {onSaveAndSync && <Button size="small" htmlType="button" disabled={loading} onClick={() => setSyncUnitIds([unit.id])}>同步此 Unit</Button>}
@@ -601,6 +670,7 @@ export function CourseDialog({
                 <Typography.Text type="secondary" className="curriculum-node-count">{curriculumChildren('lesson', chapter.id).length} 个 Lesson</Typography.Text>
                 <Button danger type="text" size="small" htmlType="button" disabled={checkingReferences} onClick={() => removeCurriculumBranch(chapter.id)}>删除</Button>
               </div>
+              {referenceSummary(chapter.id)}
               <div className="curriculum-node-actions">
                 <span>批量创建 Lesson</span>
                 <InputNumber min={0} max={200} size="small" aria-label={`${chapter.name} Lesson数量`} value={lessonCounts[chapter.id] ?? curriculumChildren('lesson', chapter.id).length} onChange={(value) => setLessonCounts((current) => ({ ...current, [chapter.id]: value || 0 }))} onPressEnter={() => generateCurriculumChildren('lesson', lessonCounts[chapter.id] ?? 0, chapter.id)} />
@@ -611,6 +681,7 @@ export function CourseDialog({
                 <Typography.Text type="secondary" className="curriculum-node-type">Lesson</Typography.Text>
                 <InputNumber min={1} max={200} aria-label="Lesson序号" value={lesson.sortOrder} onChange={(value) => updateCurriculumSortOrder(lesson.id, value || 1)} />
                 <Input aria-label="Lesson名称（必填）" value={lesson.name} onChange={(event) => updateCurriculumName(lesson.id, event.target.value)} placeholder="Lesson 名称（必填）" status={curriculumNodeIsLeaf(lesson.id) && !lesson.name.trim() ? 'error' : undefined} />
+                {referenceSummary(lesson.id)}
                 <Button danger type="text" size="small" htmlType="button" disabled={checkingReferences} onClick={() => removeCurriculumBranch(lesson.id)}>删除</Button>
               </div>)}</div>}
             </div>)}
@@ -628,6 +699,24 @@ export function CourseDialog({
           />
         </Form.Item>
       </Form>
+      <Modal title="目录引用影响" open={open && Boolean(referenceAction)} zIndex={1600} width={820} onCancel={closeReferenceAction} destroyOnHidden
+        footer={referenceAction?.mode === 'view' ? <Button onClick={closeReferenceAction}>知道了</Button> : <Space><Button onClick={closeReferenceAction}>保留</Button><Button type="primary" danger={referenceAction?.mode === 'delete'} disabled={!referenceTarget || !migrationOptions.some(option => option.value === referenceTarget)} onClick={confirmReferenceMove}>{referenceAction?.mode === 'delete' ? '迁移后删除' : '安排迁移'}</Button></Space>}>
+        <Alert type={referenceAction?.mode === 'view' ? 'info' : 'warning'} showIcon
+          message={`共 ${referenceAction?.refs.length || 0} 份关联资料（含草稿、停用）`}
+          description={referenceAction?.mode === 'delete' ? '请先选择保留的目标课节。保存课程时迁移资料并删除目录，保留练习、学生答案及批改记录。共享目录中的资料仍留在各自班型内。' : referenceAction?.mode === 'repair' ? '以下资料的目录关联已失效，请选择有效课节重新归属，保存后生效。' : '关联数量与下级 Lesson 数量不同；没有 Lesson 的 Chapter 也可以关联资料。'} />
+        <Table<CurriculumReference> size="small" dataSource={referenceAction?.refs || []} rowKey={referenceKey} pagination={{ pageSize: 8, hideOnSinglePage: true }} scroll={{ x: 700, y: 300 }} style={{ marginTop: 12 }} columns={[
+          { title: '资料', key: 'title', render: (_, ref) => <><Tag>{ref.kind}</Tag><Typography.Text style={{ overflowWrap: 'anywhere' }}>{ref.title}</Typography.Text></> },
+          { title: '状态', key: 'status', width: 90, render: (_, ref) => <Tag>{ref.status || '未标注'}</Tag> },
+          { title: '所属班型 / 目录', key: 'path', render: (_, ref) => <><div>{ref.courseName}</div><Typography.Text type={ref.invalidBinding ? 'danger' : 'secondary'}>{ref.path || '未标注目录'}</Typography.Text></> },
+          { title: '学生提交', key: 'submissions', width: 100, render: (_, ref) => ref.kind === '练习' ? `${ref.submissionCount || 0} 份（保留）` : '—' }
+        ]} />
+        {referenceAction?.refs.some(ref => ref.kind === '教案') && <a href="/teaching-plans" target="_blank" rel="noreferrer">打开教案管理并重新关联章节</a>}
+        {referenceAction?.mode !== 'view' && <div style={{ marginTop: 16 }}>
+          <Typography.Text strong>迁移到课节</Typography.Text>
+          <Select aria-label="迁移到课节" showSearch optionFilterProp="label" placeholder="选择保留的目标课节" value={referenceTarget} onChange={setReferenceTarget} options={migrationOptions} style={{ width: '100%', marginTop: 8 }} />
+          {!migrationOptions.length && <Typography.Text type="danger">没有可用的目标课节，请保留目录，先在编辑页新增目标课节后重试。</Typography.Text>}
+        </div>}
+      </Modal>
     </FormDrawer>
   );
 }

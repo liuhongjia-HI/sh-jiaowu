@@ -381,12 +381,16 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
       setCourseEditor(null);
       courseForm.resetFields();
       client.invalidateQueries({ queryKey: ['courses-for-content-resources'] });
+      client.invalidateQueries({ queryKey: ['curriculum-references'] });
+      client.invalidateQueries({ queryKey: ['materials'] });
+      client.invalidateQueries({ queryKey: ['homework'] });
+      client.invalidateQueries({ queryKey: ['teaching-plans'] });
       client.invalidateQueries({ queryKey: ['courses'] });
       client.invalidateQueries({ queryKey: ['content'] });
       client.invalidateQueries({ queryKey: ['materials-overview'] });
       client.invalidateQueries({ queryKey: ['pending-material-notice-batches'] });
     },
-    onError: (error: Error) => message.error(error.message || '保存课程目录失败，请检查层级关系。')
+    onError: (error: Error) => { client.invalidateQueries({ queryKey: ['curriculum-references'] }); message.error(error.message || '保存课程目录失败，请检查层级关系。'); }
   });
   const directoryTargets = (courses.data ?? []).filter(course => {
     const sourceSpace = learningSpaces.data?.find(space => space.id === courseEditor?.learningSpaceId);

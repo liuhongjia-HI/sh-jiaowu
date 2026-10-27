@@ -483,7 +483,30 @@ export type CourseFamily = {
   courses: Course[];
 };
 
+export type CurriculumReferenceMove = {
+  id: string;
+  kind: string;
+  courseId: string;
+  fromLessonId: string;
+  toLessonId: string;
+};
+
+export type CurriculumReference = {
+  id: string;
+  kind: string;
+  title: string;
+  courseId: string;
+  courseName: string;
+  lessonId: string;
+  status: string;
+  path: string;
+  submissionCount: number;
+  invalidBinding?: boolean;
+  blocking?: boolean;
+};
+
 export type CourseUpsertRequest = {
+  referenceMoves?: CurriculumReferenceMove[];
   name: string;
   learningSpaceId: string;
   curriculum: CurriculumNode[];

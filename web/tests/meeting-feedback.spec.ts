@@ -259,9 +259,9 @@ test('chapter deletion previews bindings, preserves draft on failure and require
     if (path === '/subjects') data = [{ id: 'english', name: 'English', status: '启用' }];
     if (path === '/learning-spaces') data = [{ id: 'e1', name: '五年级英语', grade: '五年级', subject: 'English', semester: 'S1', phase: 'Q1', status: '启用' }];
     if (path.endsWith('/curriculum-references')) {
-      expect(req.postDataJSON()).toEqual({ nodeIds: ['u1'] });
+      expect(req.postDataJSON()).toEqual({ includeAll: true });
       if (fail) return route.fulfill({ status: 400, json: { code: 400, message: '引用检查暂时失败' } });
-      data = linked ? [{ id: 'plan1', kind: '教案', title: '教师备课文件', courseName: '引用检查课程' }] : [];
+      data = linked ? [{ id: 'plan1', kind: '教案', title: '教师备课文件', courseId: course.id, courseName: '引用检查课程', lessonId: 'u1', status: '已上传', path: '第一课', submissionCount: 0 }] : [];
     }
     if (path === '/courses/ref-course' && req.method() === 'PUT') { writes.push(req.postDataJSON()); data = course; }
     return route.fulfill({ json: { code: 0, data } });
@@ -286,7 +286,7 @@ test('chapter deletion previews bindings, preserves draft on failure and require
   await page.screenshot({ path: '/tmp/starline-curriculum-reference-impact.png', fullPage: false });
   await expect(impact.getByRole('link')).toHaveAttribute('href', '/teaching-plans');
   await expect(editor.getByTestId('curriculum-unit')).toHaveCount(2);
-  await impact.getByRole('button', { name: /知道了|确\s*定|OK/ }).click();
+  await impact.getByRole('button', { name: /保\s*留/ }).click();
   linked = false;
   await first.getByRole('button', { name: '删除', exact: true }).click();
   await page.getByRole('dialog', { name: '删除目录', exact: true }).getByRole('button', { name: /保\s*留/ }).click();
@@ -698,3 +698,95 @@ test('teacher batch completion recovers after reload without uploading successfu
  await expect(page.getByText('有 1 批教案待汇总提醒',{exact:true})).toHaveCount(0);
  expect(uploads).toHaveLength(2);expect(completions).toHaveLength(2);
 });
+
+for (const scenario of ['save', 'cancel', 'repair', 'save-failure', 'no-target', 'chain', 'chapter', 'compact'] as const) {
+  test(`directory reference migration ${scenario} shows statuses and preserves pending state`, async ({ page }) => {
+    const user = { userId: 'ops', name: '课程教务', roles: ['super_admin'] };
+    const nodes = [{ id: 'u1', type: 'unit', name: 'Ecosystem', sortOrder: 1 }, { id: 'u2', type: 'unit', name: 'Environmental Changes', sortOrder: 2 }, { id: 'u3', type: 'unit', name: 'Conservation', sortOrder: 3 }];
+    if (scenario === 'compact') await page.setViewportSize({ width: 390, height: 844 });
+    if (scenario === 'chapter') { nodes.forEach(node => Object.assign(node, { type: 'chapter', parentId: 'u0' })); nodes.unshift({ id: 'u0', type: 'unit', name: 'Ecosystems and Environment', sortOrder: 1 }); }
+    const course = { id: 'migration-course', name: 'G5 S1 Q1 Science S', grade: '五年级', subject: 'Science', learningSpaceId: 'science-space', status: '启用', curriculum: scenario === 'no-target' ? nodes.slice(0, 1) : nodes };
+    const refs = [
+      { id: 'handout-ecology', kind: '讲义', title: 'HD_Ecosystem', status: '草稿', courseId: course.id, courseName: course.name, lessonId: 'u1', path: 'Ecosystem', submissionCount: 0 },
+      { id: 'homework-ecology', kind: '练习', title: 'Ecosystem Practice', status: '停用', courseId: course.id, courseName: course.name, lessonId: scenario === 'repair' ? 'missing-chapter' : 'u1', path: scenario === 'repair' ? '目录关联已失效（missing-chapter）' : 'Ecosystem', invalidBinding: scenario === 'repair', submissionCount: 2 }
+    ];
+    const writes: any[] = [];
+    await page.addInitScript(user => { localStorage.setItem('starline_admin_token', 'local-curriculum-fixture'); localStorage.setItem('starline_admin_user', JSON.stringify(user)); }, user);
+    await page.route('**/api/**', route => {
+      const req = route.request(); const path = new URL(req.url()).pathname.replace('/api', '');
+      let data: any = [];
+      if (path === '/auth/me') data = user;
+      if (path === '/courses') data = [course];
+      if (path === '/subjects') data = [{ id: 'science', name: 'Science', status: '启用' }];
+      if (path === '/learning-spaces') data = [{ id: course.learningSpaceId, name: '五年级科学 S1 Q1', grade: '五年级', subject: 'Science', semester: 'S1', phase: 'Q1', status: '启用' }];
+      if (path.endsWith('/curriculum-references')) data = refs;
+      if (path === `/courses/${course.id}` && req.method() === 'PUT') {
+        writes.push(req.postDataJSON());
+        if (scenario === 'save-failure') return route.fulfill({ status: 400, json: { code: 400, message: '练习关联已变化，请刷新后重新选择迁移目标' } });
+        data = { ...course, curriculum: req.postDataJSON().curriculum };
+      }
+      return route.fulfill({ json: { code: 0, message: 'ok', data } });
+    });
+    await page.goto('/content');
+    const edit = () => page.getByRole('row').filter({ hasText: course.name }).getByRole('button', { name: '编辑', exact: true }).click();
+    await edit();
+    const editor = page.getByRole('dialog', { name: '编辑课程', exact: true });
+    await expect(editor.getByRole('button', { name: '查看全部关联（2）', exact: true })).toBeEnabled();
+    if (scenario === 'repair') await editor.getByRole('button', { name: '处理失效关联（1）', exact: true }).click();
+    else {
+      await expect(editor.getByTestId('curriculum-unit').first()).toContainText('讲义 1 · 练习 1 · 教案 0');
+      const sourceNode = editor.getByTestId(scenario === 'chapter' ? 'curriculum-chapter' : 'curriculum-unit').first();
+      if (scenario === 'chapter') await expect(sourceNode).toContainText('0 个 Lesson');
+      await sourceNode.getByRole('button', { name: '删除', exact: true }).click();
+    }
+    const impact = page.getByRole('dialog', { name: '目录引用影响', exact: true });
+    await expect(impact).toContainText('停用');
+    await expect(impact).toContainText('2 份（保留）');
+    await expect(impact).toContainText(course.name);
+    if (scenario !== 'repair') await expect(impact).toContainText('草稿');
+    const migrate = impact.getByRole('button', { name: scenario === 'repair' ? '安排迁移' : '迁移后删除', exact: true });
+    await expect(migrate).toBeDisabled();
+    if (scenario === 'no-target') {
+      await expect(impact).toContainText('没有可用的目标课节');
+      expect(writes).toHaveLength(0);
+      return;
+    }
+    await impact.getByRole('combobox', { name: '迁移到课节', exact: true }).click();
+    await page.locator('.ant-select-dropdown:visible').getByText(/Environmental Changes/).click();
+    await expect(migrate).toBeEnabled();
+    await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0);
+    await page.screenshot({ path: `/tmp/starline-curriculum-${scenario}-references.png`, fullPage: false });
+    await migrate.click();
+    await expect(impact).toBeHidden();
+    await expect(editor).toContainText(scenario === 'repair' ? '已安排迁移 1 份资料' : '已安排迁移 2 份资料');
+    expect(writes).toHaveLength(0);
+    if (scenario === 'cancel') {
+      await editor.getByRole('button', { name: /取\s*消/ }).click();
+      await edit();
+      await expect(editor.getByTestId('curriculum-unit')).toHaveCount(3);
+      await expect(editor.getByText(/已安排迁移/)).toHaveCount(0);
+      expect(writes).toHaveLength(0);
+      return;
+    }
+    if (scenario === 'chain') {
+      await editor.getByTestId('curriculum-unit').first().getByRole('button', { name: '删除', exact: true }).click();
+      await expect(impact).toBeVisible();
+      await impact.getByRole('combobox', { name: '迁移到课节', exact: true }).click();
+      await page.locator('.ant-select-dropdown:visible').getByText(/Conservation/).click();
+      await impact.getByRole('button', { name: '迁移后删除', exact: true }).click();
+    }
+    await editor.getByRole('button', { name: /保\s*存/ }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    expect(writes[0].referenceMoves).toHaveLength(scenario === 'repair' ? 1 : 2);
+    expect(writes[0].referenceMoves).toContainEqual({ id: 'homework-ecology', kind: '练习', courseId: course.id, fromLessonId: scenario === 'repair' ? 'missing-chapter' : 'u1', toLessonId: scenario === 'chain' ? 'u3' : 'u2' });
+    if (scenario === 'save-failure') {
+      await expect(page.getByText('练习关联已变化，请刷新后重新选择迁移目标', { exact: true })).toBeVisible();
+      await expect(editor).toBeVisible();
+      await expect(editor).toContainText('已安排迁移 2 份资料');
+      await expect(editor.getByTestId('curriculum-unit')).toHaveCount(2);
+    } else {
+      await expect(editor).toBeHidden();
+      expect(writes[0].curriculum.map((node: any) => node.id)).toEqual(scenario === 'repair' ? ['u1', 'u2', 'u3'] : scenario === 'chain' ? ['u3'] : scenario === 'chapter' ? ['u0', 'u2', 'u3'] : ['u2', 'u3']);
+    }
+  });
+}
