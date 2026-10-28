@@ -89,12 +89,6 @@ function movePack(courseMaterials: Material[], sourceKey: string, targetKey: str
   return without;
 }
 
-function packPreviewStatus(materials: Material[]) {
-  if (materials.some((item) => item.previewStatus === '转换失败')) return '转换失败';
-  if (materials.some((item) => item.previewStatus === '待转换' || item.previewStatus === '转换中')) return '待转换';
-  return materials.find((item) => item.previewStatus)?.previewStatus || materials[0]?.publishStatus || '';
-}
-
 function deadlineAtValue(value?: string) {
   if (!value) return '';
   const date = new Date(value);
@@ -572,6 +566,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
     {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">同一课节的五类讲义显示为一套；拖动可调整课节顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
       {kind === 'materials' ? (
         <Table<MaterialPackRow>
+          className="material-pack-table"
           rowKey="key"
           rowSelection={canManage ? { selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) } : undefined}
           dataSource={materialPacks}
@@ -585,16 +580,23 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
             };
           }}
           columns={[
-            ...(canManage ? [{ title: '排序', width: 64, render: (_: unknown, row: MaterialPackRow) => <button type="button" className="material-sort-handle" title="拖动调整同一课程内课节顺序" draggable onDragStart={(event) => { setDraggingPackKey(row.key); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button> }] : []),
-            { title: '课节', render: (_: unknown, row: MaterialPackRow) => <div><strong>{row.lessonLabel}</strong><div className="lesson-pack-versions">{row.materials.map((item) => <Tag key={item.id}>{item.tagCode || '未标签'}</Tag>)}</div></div> },
-            { title: '课程', dataIndex: 'course' },
-            { title: '学科', dataIndex: 'subject', render: (value: string) => subjectLabel(value) },
-            { title: '上传人', dataIndex: 'ownerTeacherName' },
-            { title: '最近上传', dataIndex: 'createdAt' },
-            { title: '状态', render: (_: unknown, row: MaterialPackRow) => packPreviewStatus(row.materials) },
-            { title: '操作', render: (_: unknown, row: MaterialPackRow) => (
-              <div className="lesson-pack-actions">
-                {row.materials.map((item) => {
+            { title: '课节与文件', render: (_: unknown, row: MaterialPackRow) => (
+              <div className="lesson-pack">
+                <div className="lesson-pack-info">
+                  <div className="lesson-pack-heading">
+                    {canManage && <button type="button" className="material-sort-handle" title="拖动调整同一课程内课节顺序" draggable onDragStart={(event) => { setDraggingPackKey(row.key); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button>}
+                    <strong>{row.lessonLabel}</strong>
+                    <span className="lesson-pack-count">{row.materials.length} 份文件</span>
+                  </div>
+                  <div className="lesson-pack-meta">
+                    <span>课程：{row.course || '—'}</span>
+                    <span>学科：{subjectLabel(row.subject || '') || '—'}</span>
+                    <span>上传人：{row.ownerTeacherName || '—'}</span>
+                    <span>最近上传：{row.createdAt || '—'}</span>
+                  </div>
+                </div>
+                <div className="lesson-pack-files" aria-label={`${row.lessonLabel}的文件`}>
+                {row.materials.map((item, index) => {
                   const deleteAction = canManage ? <Popconfirm
                     title={`确定删除“${item.tagCode || item.title}”吗？`}
                     description="删除后，学生将无法再查看这份资料。"
@@ -604,16 +606,23 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
                     onConfirm={() => removeContent.mutate(item.id)}
                   ><ActionButton tooltip={`删除${item.tagCode || '资料'}`} danger icon={<DeleteOutlined />} /></Popconfirm> : null;
                   return (
-                    <Space key={item.id} size={4} wrap>
-                      <Tag>{item.tagCode || '未标签'}</Tag>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>{item.fileName || item.title}</Typography.Text>
-                      <ActionButton tooltip={`预览${item.tagCode || ''}`} icon={<EyeOutlined />} disabled={item.previewStatus !== '可预览'} onClick={() => openFile(item.previewUrl, false, item.fileName)} />
-                      {canManage && <ActionButton tooltip={`编辑${item.tagCode || ''}`} icon={<EditOutlined />} onClick={() => openEdit(item)} />}
-                      {deleteAction}
-                      <ActionButton tooltip={`下载${item.tagCode || ''}`} icon={<DownloadOutlined />} onClick={() => openFile(item.downloadUrl, true, item.fileName)} />
-                    </Space>
+                    <div key={item.id} className="lesson-pack-file">
+                      <span className="lesson-pack-file-number">{String(index + 1).padStart(2, '0')}</span>
+                      <Tag className="lesson-pack-file-tag">{item.tagCode || '未标签'}</Tag>
+                      <div className="lesson-pack-file-detail">
+                        <span className="lesson-pack-file-name" title={item.fileName || item.title}>{item.fileName || item.title}</span>
+                        <span className={`lesson-pack-file-status${item.previewStatus === '转换失败' ? ' is-error' : ''}`}>{item.previewStatus || item.publishStatus || item.status}</span>
+                      </div>
+                      <Space className="lesson-pack-file-actions" size={4} wrap>
+                        <ActionButton tooltip={`预览${item.tagCode || ''}`} icon={<EyeOutlined />} disabled={item.previewStatus !== '可预览'} onClick={() => openFile(item.previewUrl, false, item.fileName)}>预览</ActionButton>
+                        <ActionButton tooltip={`下载${item.tagCode || ''}`} icon={<DownloadOutlined />} onClick={() => openFile(item.downloadUrl, true, item.fileName)}>下载</ActionButton>
+                        {canManage && <ActionButton tooltip={`编辑${item.tagCode || ''}`} icon={<EditOutlined />} onClick={() => openEdit(item)} />}
+                        {deleteAction}
+                      </Space>
+                    </div>
                   );
                 })}
+                </div>
               </div>
             ) }
           ]}
