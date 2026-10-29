@@ -26,7 +26,12 @@ body {
 .material-pack-table .ant-table-selection-column { vertical-align: top; width: 40px; }
 .material-pack-table .ant-table-tbody > tr > td { padding: 20px 12px; }
 .lesson-pack { min-width: 0; }
-.lesson-pack-info { margin-bottom: 14px; }
+.lesson-pack-info.is-expanded { margin-bottom: 14px; }
+.lesson-pack-toggle { display: flex; align-items: flex-start; gap: 8px; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.lesson-pack-toggle > .anticon { margin-top: 6px; font-size: 12px; color: #667085; }
+.lesson-pack-toggle:focus-visible { outline: 2px solid #1677ff; outline-offset: 3px; border-radius: 3px; }
+.lesson-pack-summary { color: #667085; font-size: 12px; line-height: 24px; }
+.lesson-pack-files[hidden] { display: none; }
 .lesson-pack-heading { display: flex; align-items: flex-start; gap: 8px; }
 .lesson-pack-heading strong { flex: 1; min-width: 0; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
 .lesson-pack-count { flex-shrink: 0; color: #667085; font-size: 12px; line-height: 24px; }

@@ -1388,6 +1388,7 @@ export function UploadDialog({
   materials,
   initialCourse,
   initialLessonId,
+  fixedTarget = false,
   onManageCurriculum,
   onCancel,
   onSubmit
@@ -1401,6 +1402,7 @@ export function UploadDialog({
   materials?: Material[];
   initialCourse?: Course;
   initialLessonId?: string;
+  fixedTarget?: boolean;
   onManageCurriculum?: (course: Course) => void;
   onCancel: () => void;
   onSubmit: (values: { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] }) => void;
@@ -1451,7 +1453,11 @@ export function UploadDialog({
             <Input placeholder="例如：五年级英语 S1 Q1 阅读练习" />
           </Form.Item>
         )}
-        <CourseScopeSelect
+        {fixedTarget ? <>
+          <Alert type="info" showIcon message="上传位置" description={`${initialCourse?.name || ''} · ${lessonLabel}`} style={{ marginBottom: 16 }} />
+          <Form.Item name="courseId" hidden rules={[{ required: true, message: '上传课程已失效，请关闭后重试' }]}><Input /></Form.Item>
+          <Form.Item name="lessonId" hidden rules={[{ required: true, message: '上传章节已失效，请关闭后重试' }]}><Input /></Form.Item>
+        </> : <CourseScopeSelect
           form={form}
           courses={courses}
           initialCourse={initialCourse}
@@ -1459,8 +1465,8 @@ export function UploadDialog({
             form.setFieldValue('lessonId', undefined);
             if (kind === 'homework') form.setFieldValue('questionIds', []);
           }}
-        />
-        {selectedCourse && onManageCurriculum && (
+        />}
+        {!fixedTarget && selectedCourse && onManageCurriculum && (
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => onManageCurriculum(selectedCourse)} style={{ marginTop: -16, marginBottom: 12, paddingInline: 0 }}>
             维护本课程目录（可直接使用末级 Unit）
           </Button>
@@ -1468,7 +1474,7 @@ export function UploadDialog({
         {kind === 'homework' && <Form.Item name="tagCode" label="主标签" extra="标题以 TK_ 开头时会自动识别；也可手动选择。">
           <Select allowClear placeholder="未识别时请补充标签" options={homeworkTagOptions} />
         </Form.Item>}
-        {kind === 'materials' ? <LessonSelect course={selectedCourse} /> : (
+        {kind === 'materials' ? (!fixedTarget && <LessonSelect course={selectedCourse} />) : (
           <>
             <LessonSelect course={selectedCourse} />
             <Form.Item name="allowDownload" valuePropName="checked" initialValue={true}><Checkbox>允许学生下载</Checkbox></Form.Item>

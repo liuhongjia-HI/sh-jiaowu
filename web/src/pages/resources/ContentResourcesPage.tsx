@@ -1,7 +1,7 @@
-import { useListPagination } from '../../hooks/useListState';
+import { clampListPage, useListPagination } from '../../hooks/useListState';
 import { useListState } from '../../hooks/useListState';
 import { Alert, Button, Card, Checkbox, Form, Input, Modal, Popconfirm, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
-import { DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, HolderOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
+import { DownOutlined, RightOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, HolderOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, http, postData, postForm, putData } from '../../services/http';
@@ -131,12 +131,14 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
   const [uploadedTo, setUploadedTo] = useListState(`resources:${kind}:uploadedTo`, '');
   const [draggingPackKey, setDraggingPackKey] = useState('');
   const [draggingHomeworkId, setDraggingHomeworkId] = useState('');
+  const [expandedPacks, setExpandedPacks] = useState<Record<string, boolean>>({});
+  const [searchExpansion, setSearchExpansion] = useState<{ keyword: string; packs: Record<string, boolean> }>({ keyword: '', packs: {} });
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [syncBatch, setSyncBatch] = useState<MaterialUploadResult | null>(null);
   const [syncCourseIds, setSyncCourseIds] = useState<string[]>([]);
   const [syncLessonIds, setSyncLessonIds] = useState<Record<string, string>>({});
   const [syncPreview, setSyncPreview] = useState<MaterialSyncPreview | null>(null);
-  const [uploadTarget, setUploadTarget] = useState<{ courseId: string; lessonId: string } | null>(null);
+  const [uploadTarget, setUploadTarget] = useState<{ courseId: string; lessonId: string; fixed?: boolean } | null>(null);
   const pagination = useListPagination(`resources:${kind}`, 10, JSON.stringify([keyword, subject, grade, tagCode, assessmentType, homeworkCourseId, uploaderId, uploadedFrom, uploadedTo, courseId, packageId]));
   const materialParams = Object.fromEntries(Object.entries({ keyword, subject, tagCode, uploaderId, uploadedFrom, uploadedTo }).filter(([, value]) => Boolean(value))) as Record<string, string>;
   const resources = useQuery({ queryKey: [kind, materialParams], queryFn: () => getData<(Material | Homework)[]>(path, kind === 'materials' ? materialParams : undefined) });
@@ -500,6 +502,21 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
   const loadError = resources.error || courses.error || (Boolean(packageId) && packages.error);
 
   const materialPacks = kind === 'materials' ? groupMaterialsByLesson(tableRows as Material[], courses.data ?? []) : [];
+  const searchKeyword = keyword.trim();
+  // Search overrides preserve the browsing state when the query is cleared.
+  const isPackExpanded = (key: string) => searchKeyword
+    ? (searchExpansion.keyword === searchKeyword ? searchExpansion.packs[key] : undefined) ?? true
+    : expandedPacks[key] ?? false;
+  const setPackExpansion = (keys: string[], expanded: boolean) => {
+    const updates = Object.fromEntries(keys.map(key => [key, expanded]));
+    if (searchKeyword) {
+      setSearchExpansion(current => ({ keyword: searchKeyword, packs: { ...(current.keyword === searchKeyword ? current.packs : {}), ...updates } }));
+    } else {
+      setExpandedPacks(current => ({ ...current, ...updates }));
+    }
+  };
+  const materialPage = clampListPage(pagination.current, materialPacks.length, pagination.pageSize);
+  const visibleMaterialPacks = materialPacks.slice((materialPage - 1) * pagination.pageSize, materialPage * pagination.pageSize);
   const autoSyncOpened = useRef('');
   useEffect(() => {
     const key = `${courseId}:${syncLessonId}`;
@@ -563,14 +580,14 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
     {kind === 'homework' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
     {canManage && selectedDeleteIds.length > 0 && <div style={{ marginBottom: 12 }}><Popconfirm title={`确定删除选中的 ${selectedDeleteIds.length} 项内容吗？`} description="删除后学生将无法再查看这些内容。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: removeSelected.isPending }} onConfirm={() => removeSelected.mutate(selectedDeleteIds)}><Button danger icon={<DeleteOutlined />}>批量删除（{selectedDeleteIds.length}）</Button></Popconfirm></div>}
 
-    {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space><ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">同一课节的五类讲义显示为一套；拖动可调整课节顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
+    {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space wrap>{kind === 'materials' && <><Button disabled={!visibleMaterialPacks.some(row => !isPackExpanded(row.key))} onClick={() => setPackExpansion(visibleMaterialPacks.map(row => row.key), true)}>全部展开</Button><Button disabled={!visibleMaterialPacks.some(row => isPackExpanded(row.key))} onClick={() => setPackExpansion(visibleMaterialPacks.map(row => row.key), false)}>全部收起</Button></>}<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">同一课节的五类讲义显示为一套；拖动可调整课节顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
       {kind === 'materials' ? (
         <Table<MaterialPackRow>
           className="material-pack-table"
           rowKey="key"
           rowSelection={canManage ? { selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) } : undefined}
           dataSource={materialPacks}
-          pagination={pagination}
+          pagination={{ ...pagination, current: materialPage }}
           onRow={(row) => {
             if (!canManage) return {};
             return {
@@ -582,11 +599,23 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
           columns={[
             { title: '课节与文件', render: (_: unknown, row: MaterialPackRow) => (
               <div className="lesson-pack">
-                <div className="lesson-pack-info">
+                <div className={`lesson-pack-info${isPackExpanded(row.key) ? ' is-expanded' : ''}`}>
                   <div className="lesson-pack-heading">
                     {canManage && <button type="button" className="material-sort-handle" title="拖动调整同一课程内课节顺序" draggable onDragStart={(event) => { setDraggingPackKey(row.key); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button>}
-                    <strong>{row.lessonLabel}</strong>
+                    <button type="button" className="lesson-pack-toggle" aria-expanded={isPackExpanded(row.key)} aria-controls={`lesson-files-${encodeURIComponent(row.key)}`} onClick={() => setPackExpansion([row.key], !isPackExpanded(row.key))}>
+                      {isPackExpanded(row.key) ? <DownOutlined /> : <RightOutlined />}
+                      <strong>{row.lessonLabel}</strong>
+                    </button>
+                    <span className="lesson-pack-summary">{[...new Set(row.materials.map(item => item.tagCode || '未标签'))].map(tag => `${tag} ${row.materials.filter(item => (item.tagCode || '未标签') === tag).length}`).join(' · ')}</span>
+                    {canManage && <Button
+                      size="small"
+                      icon={<UploadOutlined />}
+                      aria-label={`上传资料到${row.course} · ${row.lessonLabel}`}
+                      disabled={!curriculumLessonOptions((courses.data ?? []).find((course) => course.id === row.courseId)?.curriculum).some((lesson) => lesson.value === row.lessonId)}
+                      onClick={() => { setUploadTarget({ courseId: row.courseId, lessonId: row.lessonId, fixed: true }); setOpen(true); }}
+                    >上传资料</Button>}
                     <span className="lesson-pack-count">{row.materials.length} 份文件</span>
+                    <Button type="link" size="small" aria-expanded={isPackExpanded(row.key)} aria-controls={`lesson-files-${encodeURIComponent(row.key)}`} onClick={() => setPackExpansion([row.key], !isPackExpanded(row.key))}>{isPackExpanded(row.key) ? '收起文件' : '展开文件'}</Button>
                   </div>
                   <div className="lesson-pack-meta">
                     <span>课程：{row.course || '—'}</span>
@@ -595,7 +624,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
                     <span>最近上传：{row.createdAt || '—'}</span>
                   </div>
                 </div>
-                <div className="lesson-pack-files" aria-label={`${row.lessonLabel}的文件`}>
+                <div hidden={!isPackExpanded(row.key)} id={`lesson-files-${encodeURIComponent(row.key)}`} className="lesson-pack-files" aria-label={`${row.lessonLabel}的文件`}>
                 {row.materials.map((item, index) => {
                   const deleteAction = canManage ? <Popconfirm
                     title={`确定删除“${item.tagCode || item.title}”吗？`}
@@ -665,7 +694,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
       )}
     </Card>}
     <HomeworkSubmissionDialog homework={submissionHomework} summary={submissionSummary.data} loading={submissionSummary.isLoading} error={Boolean(submissionSummary.error)} onCancel={() => setSubmissionHomework(null)} />
-    {open && <UploadDialog kind={kind} open loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} materials={(kind === 'materials' ? (resources.data ?? []) : []) as Material[]} initialCourse={uploadCourse} initialLessonId={uploadTarget?.lessonId} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => { setOpen(false); setUploadTarget(null); }} onSubmit={(values) => create.mutate(values)} />}
+    {open && <UploadDialog kind={kind} open loading={create.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} materials={(kind === 'materials' ? (resources.data ?? []) : []) as Material[]} initialCourse={uploadCourse} initialLessonId={uploadTarget?.lessonId} fixedTarget={uploadTarget?.fixed} onManageCurriculum={canManageCourse ? (course) => { setCourseEditor(course); courseForm.setFieldsValue({ ...course, grade: course.grade, subject: course.subject, curriculum: course.curriculum ?? [] }); } : undefined} onCancel={() => { setOpen(false); setUploadTarget(null); }} onSubmit={(values) => create.mutate(values)} />}
     <ContentEditDialog kind={kind} form={contentForm} item={editing} loading={save.isPending} courses={courses.data ?? []} questions={questions.data ?? []} learningSpaces={learningSpaces.data ?? []} onCancel={() => setEditing(null)} onSubmit={(values) => save.mutate(values)} />
     <CourseDialog referenceCourseId={courseEditor?.id} syncTargets={directoryTargets} onSaveAndSync={courseEditor ? saveCourseAndSync : undefined} form={courseForm} open={Boolean(courseEditor)} editing loading={saveCourse.isPending} learningSpaces={learningSpaces.data ?? []} allowedLearningSpaceIds={user?.learningSpaceIds ?? []} unrestricted={unrestrictedCourseScope} onCancel={() => { setCourseEditor(null); courseForm.resetFields(); }} onSubmit={(values) => saveCourse.mutate(values)} />
     {directorySync && <CourseDirectorySync source={directorySync.source} courses={courses.data ?? []} spaces={learningSpaces.data ?? []} unitIds={directorySync.unitIds} initialTargetIds={directorySync.targetIds} onClose={() => setDirectorySync(null)} onMaterials={lessonId => {
