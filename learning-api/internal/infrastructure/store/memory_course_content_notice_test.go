@@ -40,10 +40,10 @@ func TestCreateMaterialNotifiesCurrentCourseStudentsOnly(t *testing.T) {
 	wantTitle := "G5英文课已上传新内容，请查看"
 	gotByStudent := map[string]learning.Notice{}
 	for _, notice := range store.notices {
-		if notice.RelatedType != "course" || notice.RelatedID != course.ID {
+		if event, ok := store.businessEvent(notice.RelatedID); !ok || notice.RelatedType != "business" || event.CourseID != course.ID {
 			continue
 		}
-		if notice.Title != wantTitle || notice.Summary != "请查看" || notice.Type != "课" || notice.Channel != "站内通知" {
+		if notice.Title != wantTitle || notice.Summary != course.Name+" / 共1份资料" || notice.Type != "课" || notice.Channel != "站内通知" {
 			t.Fatalf("unexpected course content notice: %#v", notice)
 		}
 		if notice.RecipientStudentID == "" {
@@ -76,7 +76,7 @@ func TestCreateMaterialNotifiesCurrentCourseStudentsOnly(t *testing.T) {
 		if notice.RecipientStudentID != "stu-001" {
 			t.Fatalf("student inbox leaked another student's notice: %#v", notice)
 		}
-		if notice.RelatedType != "course" {
+		if notice.RelatedType != "business" {
 			t.Fatalf("student inbox should only include course content notices, got %#v", notice)
 		}
 	}
@@ -122,7 +122,7 @@ func TestCreateMaterialNotifiesCurrentCourseStudentsOnly(t *testing.T) {
 	if len(lateNotices) != 1 {
 		t.Fatalf("late student should only see notices after joining, got %#v", lateNotices)
 	}
-	if lateNotices[0].RelatedID != course.ID || lateNotices[0].RecipientStudentID != lateStudent.ID {
+	if event, ok := store.businessEvent(lateNotices[0].RelatedID); !ok || event.CourseID != course.ID || lateNotices[0].RecipientStudentID != lateStudent.ID {
 		t.Fatalf("late student notice mismatch: %#v", lateNotices[0])
 	}
 	if got := store.noticesForStudent(mathOnly); len(got) != 0 {
@@ -135,7 +135,7 @@ func TestCreateMaterialNotifiesCurrentCourseStudentsOnly(t *testing.T) {
 	}
 	courseNoticeCount := 0
 	for _, notice := range xiaomingHome.Notices {
-		if notice.RelatedType == "course" && notice.RelatedID == course.ID {
+		if event, ok := store.businessEvent(notice.RelatedID); ok && event.CourseID == course.ID {
 			courseNoticeCount++
 		}
 	}
@@ -267,7 +267,12 @@ func TestStudentInboxIgnoresGradeWideHistoricalNotices(t *testing.T) {
 func countCourseNotices(store *MemoryStore, courseID, studentID string) int {
 	count := 0
 	for _, notice := range store.notices {
-		if notice.RelatedType == "course" && notice.RelatedID == courseID && notice.RecipientStudentID == studentID {
+		matches := notice.RelatedType == "course" && notice.RelatedID == courseID
+		if notice.RelatedType == "business" {
+			event, ok := store.businessEvent(notice.RelatedID)
+			matches = ok && event.Kind == learning.NoticeMaterialsPublished && event.CourseID == courseID
+		}
+		if matches && notice.RecipientStudentID == studentID {
 			count++
 		}
 	}

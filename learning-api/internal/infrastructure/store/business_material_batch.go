@@ -83,11 +83,31 @@ func (s *MemoryStore) materialBatchAccessibleResources(studentID string, ids []s
 		if !visible {
 			continue
 		}
-		if item, err := s.studentMaterialUnlocked(learning.Principal{StudentID: studentID}, id); err == nil {
-			items = append(items, item)
+		for _, item := range s.materials {
+			if item.ID == id && s.hasFormalMaterialAccess(studentID, item) {
+				items = append(items, s.decorateStudentMaterial(learning.Principal{StudentID: studentID}, item))
+				break
+			}
 		}
 	}
 	return items
+}
+
+// Notification eligibility requires a current formal grant, never preview access.
+func (s *MemoryStore) hasFormalMaterialAccess(studentID string, item learning.Material) bool {
+	course, ok := s.findCourse(item.CourseID)
+	if !ok || course.Status != learning.StatusEnabled || !materialVisibleToStudents(item) || !materialTagIn(item.TagCode, materialHandoutTags...) {
+		return false
+	}
+	for _, grant := range s.grants {
+		if grant.StudentID != studentID || !grantActive(grant) || !containsString(s.contentTypesForPackage(grant.PackageID), "handout") || !containsString(s.learningSpaceIDsForGrant(grant.ID), item.LearningSpaceID) {
+			continue
+		}
+		if _, trial := s.trialFirstLessonForGrant(grant, course.ID); !trial {
+			return true
+		}
+	}
+	return false
 }
 
 func materialBatchValues(binding learning.BusinessNoticeBinding, event learning.BusinessNoticeEvent, items []learning.Material) map[string]string {
@@ -141,7 +161,7 @@ func (s *MemoryStore) completeMaterialNoticeBatchUnlocked(p learning.Principal, 
 	now := time.Now()
 	binding := s.bindingForBusinessKind(learning.NoticeMaterialsPublished)
 	for _, student := range s.students {
-		if student.AccountStatus != "正常" {
+		if student.AccountStatus == "停用" || student.AccountStatus == "待审核" {
 			continue
 		}
 		items := s.materialBatchAccessibleResources(student.ID, registry.ResourceIDs)
@@ -153,14 +173,29 @@ func (s *MemoryStore) completeMaterialNoticeBatchUnlocked(p learning.Principal, 
 			ids = append(ids, item.ID)
 		}
 		id := businessNoticeHash(registryID, student.ID)
+		if registry.BatchCompleted {
+			if _, exists := s.businessEvent(id); !exists {
+				continue
+			}
+		}
 		event := learning.BusinessNoticeEvent{ID: id, BatchID: registryID, Kind: learning.NoticeMaterialsPublished, StudentID: student.ID, StudentName: student.Name, CourseID: courseID, RelatedID: courseID, ResourceIDs: ids, Title: "资料已更新", Summary: fmt.Sprintf("%s / 共%d份资料", course.Name, len(items)), CreatedAt: registry.CreatedAt, ExpiresAt: businessTime(parseBusinessTime(registry.CreatedAt).Add(7 * 24 * time.Hour))}
 		stationID := "notice-upload-" + businessNoticeHash(p.UserID, batchID, courseID, student.ID)
-		legacy := len(registry.ResourceIDs) == 1 && batchID == registry.ResourceIDs[0]
-		for _, notice := range s.notices {
-			if notice.RelatedType == "course" && notice.RelatedID == courseID && notice.RecipientStudentID == student.ID && (notice.ID == stationID || legacy) {
-				event.StationNoticeID = notice.ID
+		if old, exists := s.businessEvent(id); exists && old.StationNoticeID != "" {
+			stationID = old.StationNoticeID
+		}
+		// Station delivery is independent of the external template and recipients.
+		event.StationNoticeID = stationID
+		stationFound := false
+		for i := range s.notices {
+			if s.notices[i].ID == stationID {
+				s.notices[i].Summary = event.Summary
+				s.notices[i].RelatedType, s.notices[i].RelatedID = "business", event.ID
+				stationFound = true
 				break
 			}
+		}
+		if !stationFound && !registry.BatchCompleted {
+			s.notices = append([]learning.Notice{{ID: stationID, Type: "课", Title: event.Title, Summary: event.Summary, Target: student.Name, Channel: "站内通知", Status: "已发送", RecipientStudentID: student.ID, RelatedType: "business", RelatedID: event.ID}}, s.notices...)
 		}
 		event.Values = materialBatchValues(binding, event, items)
 		updated := false

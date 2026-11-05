@@ -16,15 +16,13 @@ import type { UploadFile } from 'antd';
 
 type ResourceKind = 'materials' | 'homework';
 type UploadValues = { title: string; courseId: string; lessonId: string; tagCode?: string; allowDownload?: boolean; deadline?: string; deadlineAt?: string; assessmentType?: 'practice' | 'mock_exam'; questionIds?: string[]; fileList?: UploadFile[] };
-type ContentValues = Omit<UploadValues, 'fileList'> & { status: string };
+type ContentValues = UploadValues & { status: string };
 type MaterialUploadFailure = { fileName: string; reason: string; file: File; title: string; tagCode: string; allowDownload: boolean };
 type MaterialUploadResult = { sourceCourseId: string; sourceLessonId: string; uploaded: Material[]; added: number; failures: MaterialUploadFailure[]; manual?: boolean; batchId?: string; noticePending?: boolean };
 
 function materialTitleFromFile(fileName: string) {
   return fileName.replace(/\.[^.]+$/, '').trim() || fileName;
 }
-
-const MATERIAL_TAG_ORDER = ['HD', 'Blank', 'HW', 'Exam', 'Special'];
 
 type MaterialPackRow = {
   key: string;
@@ -37,11 +35,6 @@ type MaterialPackRow = {
   createdAt?: string;
   materials: Material[];
 };
-
-function materialTagRank(tag?: string) {
-  const index = MATERIAL_TAG_ORDER.indexOf(tag || '');
-  return index < 0 ? MATERIAL_TAG_ORDER.length : index;
-}
 
 function packKey(item: Pick<Material, 'id' | 'courseId' | 'lessonId'>) {
   return item.lessonId ? `${item.courseId || ''}::${item.lessonId}` : item.id;
@@ -73,7 +66,7 @@ function groupMaterialsByLesson(rows: Material[], courses: Course[]): MaterialPa
   }
   return order.map((key) => {
     const pack = packs.get(key)!;
-    pack.materials.sort((left, right) => materialTagRank(left.tagCode) - materialTagRank(right.tagCode) || (left.sortOrder || 0) - (right.sortOrder || 0));
+    pack.materials.sort((left, right) => (left.sortOrder || Number.MAX_SAFE_INTEGER) - (right.sortOrder || Number.MAX_SAFE_INTEGER));
     return pack;
   });
 }
@@ -130,6 +123,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
   const [uploadedFrom, setUploadedFrom] = useListState(`resources:${kind}:uploadedFrom`, '');
   const [uploadedTo, setUploadedTo] = useListState(`resources:${kind}:uploadedTo`, '');
   const [draggingPackKey, setDraggingPackKey] = useState('');
+  const [draggingMaterialId, setDraggingMaterialId] = useState('');
   const [draggingHomeworkId, setDraggingHomeworkId] = useState('');
   const [expandedPacks, setExpandedPacks] = useState<Record<string, boolean>>({});
   const [searchExpansion, setSearchExpansion] = useState<{ keyword: string; packs: Record<string, boolean> }>({ keyword: '', packs: {} });
@@ -347,7 +341,15 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
       if (!editing) throw new Error('请选择要维护的内容');
       const course = (courses.data ?? []).find((item) => item.id === values.courseId);
       if (!course) throw new Error('请选择课程范围');
-	  if (kind === 'materials') return putData<Material>(`/materials/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', status: values.status || '已发布', allowDownload: Boolean(values.allowDownload) });
+	  if (kind === 'materials') {
+        const payload = { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', status: values.status || '已发布', allowDownload: Boolean(values.allowDownload) };
+        const file = values.fileList?.[0]?.originFileObj;
+        if (!file) return putData<Material>(`/materials/${editing.id}`, payload);
+        const data = new FormData();
+        Object.entries(payload).forEach(([key, value]) => data.append(key, String(value)));
+        data.append('file', file);
+        return putData<Material>(`/materials/${editing.id}`, data);
+      }
 	  return putData<Homework>(`/homework/${editing.id}`, { title: values.title, courseId: course.id, learningSpaceId: course.learningSpaceId, lessonId: values.lessonId, tagCode: values.tagCode || '', deadlineAt: deadlineAtValue(values.deadlineAt), assessmentType: values.assessmentType || 'practice', status: values.status || '启用', questionIds: values.questionIds ?? [], allowDownload: Boolean(values.allowDownload) });
     },
     onSuccess: () => {
@@ -460,6 +462,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
   const openEdit = (item: Material | Homework) => {
     setEditing(item);
     contentForm.setFieldsValue({
+      fileList: [],
       title: item.title,
       courseId: item.courseId || '',
 	  lessonId: item.lessonId || '',
@@ -537,7 +540,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
     }
     const sourceKey = draggingPackKey;
     setDraggingPackKey('');
-    if (!sourceKey || sourceKey === target.key) return;
+    if (!sourceKey || sourceKey === target.key || reorderMaterials.isPending) return;
     const sourceItems = (allMaterials.data ?? []).filter((item) => packKey(item) === sourceKey);
     const targetItems = (allMaterials.data ?? []).filter((item) => packKey(item) === target.key);
     if (!sourceItems.length || !targetItems.length) return;
@@ -549,6 +552,29 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
     const reordered = movePack(courseMaterials, sourceKey, target.key);
     if (reordered === courseMaterials) return;
     reorderMaterials.mutate({ courseId: target.courseId || '', materialIds: reordered.map((item) => item.id) });
+  };
+
+  const handleMaterialMove = (sourceId: string, target: Material) => {
+    setDraggingMaterialId('');
+    if (!sourceId || sourceId === target.id || reorderMaterials.isPending) return;
+    if (!allMaterials.data) {
+      message.info('资料正在加载，请稍后再试。');
+      return;
+    }
+    const source = allMaterials.data.find((item) => item.id === sourceId);
+    if (!source) return;
+    if (!target.courseId || source.courseId !== target.courseId || packKey(source) !== packKey(target)) {
+      message.warning('文件只能在同一课节内调整顺序。');
+      return;
+    }
+    // 使用完整课程列表，保留筛选隐藏的文件及其他课节的位置。
+    const courseMaterials = allMaterials.data.filter((item) => item.courseId === target.courseId);
+    const lessonMaterials = courseMaterials.filter((item) => packKey(item) === packKey(target));
+    const reordered = moveMaterial(lessonMaterials, sourceId, target.id);
+    if (reordered === lessonMaterials) return;
+    let index = 0;
+    const materialIds = courseMaterials.map((item) => packKey(item) === packKey(target) ? reordered[index++].id : item.id);
+    reorderMaterials.mutate({ courseId: target.courseId, materialIds });
   };
 
   const handleHomeworkDrop = (target: Homework) => {
@@ -580,7 +606,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
     {kind === 'homework' && <Card><div><Space wrap><Input.Search allowClear placeholder="搜索练习标题" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} /><Select allowClear placeholder="年级" value={grade} onChange={setGrade} options={gradeOptions} style={{ width: 130 }} /><Select allowClear showSearch optionFilterProp="label" placeholder="课程" value={homeworkCourseId} onChange={setHomeworkCourseId} options={courseOptions} style={{ width: 220 }} /><Select allowClear placeholder="练习类型" value={assessmentType} onChange={setAssessmentType} options={[{ label: '常规练习', value: 'practice' }, { label: '模拟考试', value: 'mock_exam' }]} style={{ width: 150 }} /><Button onClick={() => { setKeyword(''); setGrade(undefined); setTagCode(undefined); setAssessmentType(undefined); setHomeworkCourseId(undefined); }}>重置</Button></Space>{tagQuickFilters}</div></Card>}
     {canManage && selectedDeleteIds.length > 0 && <div style={{ marginBottom: 12 }}><Popconfirm title={`确定删除选中的 ${selectedDeleteIds.length} 项内容吗？`} description="删除后学生将无法再查看这些内容。" okText="删除" cancelText="取消" okButtonProps={{ danger: true, loading: removeSelected.isPending }} onConfirm={() => removeSelected.mutate(selectedDeleteIds)}><Button danger icon={<DeleteOutlined />}>批量删除（{selectedDeleteIds.length}）</Button></Popconfirm></div>}
 
-    {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space wrap>{kind === 'materials' && <><Button disabled={!visibleMaterialPacks.some(row => !isPackExpanded(row.key))} onClick={() => setPackExpansion(visibleMaterialPacks.map(row => row.key), true)}>全部展开</Button><Button disabled={!visibleMaterialPacks.some(row => isPackExpanded(row.key))} onClick={() => setPackExpansion(visibleMaterialPacks.map(row => row.key), false)}>全部收起</Button></>}<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">同一课节的五类讲义显示为一套；拖动可调整课节顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
+    {loading ? <Skeleton active /> : loadError ? <Alert type="error" message={`${title}加载失败，请稍后重试。`} /> : <Card extra={<Space wrap>{kind === 'materials' && <><Button disabled={!visibleMaterialPacks.some(row => !isPackExpanded(row.key))} onClick={() => setPackExpansion(visibleMaterialPacks.map(row => row.key), true)}>全部展开</Button><Button disabled={!visibleMaterialPacks.some(row => isPackExpanded(row.key))} onClick={() => setPackExpansion(visibleMaterialPacks.map(row => row.key), false)}>全部收起</Button></>}<ActionButton tooltip="刷新" icon={<ReloadOutlined />} onClick={() => resources.refetch()} />{kind === 'materials' && canManage && <Typography.Text type="secondary">同一课节的讲义显示为一套；拖动手柄可调整课节或课节内文件顺序</Typography.Text>}{(courseId || packageId) && onClearFilter && <Button type="link" onClick={onClearFilter}>查看全部讲义</Button>}</Space>}>
       {kind === 'materials' ? (
         <Table<MaterialPackRow>
           className="material-pack-table"
@@ -601,7 +627,7 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
               <div className="lesson-pack">
                 <div className={`lesson-pack-info${isPackExpanded(row.key) ? ' is-expanded' : ''}`}>
                   <div className="lesson-pack-heading">
-                    {canManage && <button type="button" className="material-sort-handle" title="拖动调整同一课程内课节顺序" draggable onDragStart={(event) => { setDraggingPackKey(row.key); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button>}
+                    {canManage && <button type="button" className="material-sort-handle" title="拖动调整同一课程内课节顺序" disabled={reorderMaterials.isPending} draggable={!reorderMaterials.isPending} onDragStart={(event) => { setDraggingMaterialId(''); setDraggingPackKey(row.key); event.dataTransfer.effectAllowed = 'move'; }}><HolderOutlined /></button>}
                     <button type="button" className="lesson-pack-toggle" aria-expanded={isPackExpanded(row.key)} aria-controls={`lesson-files-${encodeURIComponent(row.key)}`} onClick={() => setPackExpansion([row.key], !isPackExpanded(row.key))}>
                       {isPackExpanded(row.key) ? <DownOutlined /> : <RightOutlined />}
                       <strong>{row.lessonLabel}</strong>
@@ -635,11 +661,25 @@ export function ContentResourcesPage({ kind, user, courseId, syncLessonId, packa
                     onConfirm={() => removeContent.mutate(item.id)}
                   ><ActionButton tooltip={`删除${item.tagCode || '资料'}`} danger icon={<DeleteOutlined />} /></Popconfirm> : null;
                   return (
-                    <div key={item.id} className="lesson-pack-file">
+                    <div key={item.id} className={`lesson-pack-file${draggingMaterialId === item.id ? ' is-dragging' : ''}`}
+                      onDragOver={(event) => { if (draggingMaterialId) { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; } }}
+                      onDrop={(event) => { if (draggingMaterialId) { event.preventDefault(); event.stopPropagation(); handleMaterialMove(draggingMaterialId, item); } }}
+                    >
+                      {canManage && <button type="button" className="material-sort-handle" aria-label={`调整文件顺序：${item.fileName || item.title}`} title="拖动调整同一课节内文件顺序，也可用上下方向键调整" disabled={reorderMaterials.isPending} draggable={!reorderMaterials.isPending}
+                        onDragStart={(event) => { event.stopPropagation(); setDraggingPackKey(''); setDraggingMaterialId(item.id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); }}
+                        onDragEnd={(event) => { event.stopPropagation(); setDraggingMaterialId(''); }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                          event.preventDefault();
+                          const target = row.materials[index + (event.key === 'ArrowUp' ? -1 : 1)];
+                          if (target) handleMaterialMove(item.id, target);
+                        }}
+                      ><HolderOutlined /></button>}
                       <span className="lesson-pack-file-number">{String(index + 1).padStart(2, '0')}</span>
                       <Tag className="lesson-pack-file-tag">{item.tagCode || '未标签'}</Tag>
                       <div className="lesson-pack-file-detail">
                         <span className="lesson-pack-file-name" title={item.fileName || item.title}>{item.fileName || item.title}</span>
+                        <span className="lesson-pack-file-uploaded">上传时间：{item.createdAt || '—'}</span>
                         <span className={`lesson-pack-file-status${item.previewStatus === '转换失败' ? ' is-error' : ''}`}>{item.previewStatus || item.publishStatus || item.status}</span>
                       </div>
                       <Space className="lesson-pack-file-actions" size={4} wrap>

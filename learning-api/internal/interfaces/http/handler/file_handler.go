@@ -116,7 +116,13 @@ func (h *LearningHandler) SyncMaterials(c *gin.Context) {
 
 func (h *LearningHandler) UpdateMaterial(c *gin.Context) {
 	var req learning.MaterialUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
+		asset, ok := h.saveUploadedLearningFile(c)
+		if !ok {
+			return
+		}
+		req = learning.MaterialUpdateRequest{File: asset, Title: strings.TrimSpace(c.PostForm("title")), CourseID: strings.TrimSpace(c.PostForm("courseId")), LearningSpaceID: strings.TrimSpace(c.PostForm("learningSpaceId")), LessonID: strings.TrimSpace(c.PostForm("lessonId")), TagCode: strings.TrimSpace(c.PostForm("tagCode")), AllowDownload: c.PostForm("allowDownload") == "true", Status: learning.Status(c.PostForm("status"))}
+	} else if err := c.ShouldBindJSON(&req); err != nil {
 		BadRequest(c, "请求格式不正确")
 		return
 	}

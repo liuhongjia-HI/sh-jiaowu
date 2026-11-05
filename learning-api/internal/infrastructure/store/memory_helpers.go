@@ -259,6 +259,8 @@ func materialAuditSnapshot(item learning.Material) map[string]any {
 		"courseId":        item.CourseID,
 		"learningSpaceId": item.LearningSpaceID,
 		"chapter":         item.Chapter,
+		"fileId":          item.FileID,
+		"fileName":        item.FileName,
 		"status":          item.Status,
 		"publishStatus":   item.PublishStatus,
 	}

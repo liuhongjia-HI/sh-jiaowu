@@ -144,7 +144,7 @@ func TestMaterialUploadBatchHTTPMergesStudentNotifications(t *testing.T) {
 		}
 		result := 0
 		for _, notice := range home.Notices {
-			if notice.RelatedID == course.ID {
+			if notice.RelatedID == course.ID || notice.RelatedType == "business" && notice.Summary == course.Name+" / 共2份资料" {
 				if notice.RecipientStudentID != student.StudentID {
 					t.Fatal("another student's batch notification leaked")
 				}

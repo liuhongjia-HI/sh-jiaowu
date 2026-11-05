@@ -583,7 +583,7 @@ func (s *MemoryStore) BusinessNoticeDetail(principal learning.Principal, id stri
 			allowed = principal.StudentID == event.StudentID
 		}
 		student, ok := s.findStudent(event.StudentID)
-		if !allowed || !ok || student.AccountStatus != "正常" {
+		if !allowed || !ok || (student.AccountStatus != "正常" && !(event.Kind == learning.NoticeMaterialsPublished && student.AccountStatus == "待提醒")) {
 			break
 		}
 		if event.Kind == learning.NoticeReviewException {

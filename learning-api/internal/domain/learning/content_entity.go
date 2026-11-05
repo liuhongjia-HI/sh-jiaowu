@@ -200,14 +200,15 @@ type MaterialOverview struct {
 }
 
 type MaterialUpdateRequest struct {
-	Title           string `json:"title"`
-	CourseID        string `json:"courseId"`
-	LearningSpaceID string `json:"learningSpaceId"`
-	LessonID        string `json:"lessonId"`
-	Chapter         string `json:"-"`
-	TagCode         string `json:"tagCode"`
-	AllowDownload   bool   `json:"allowDownload"`
-	Status          Status `json:"status"`
+	File            FileAsset `json:"-"`
+	Title           string    `json:"title"`
+	CourseID        string    `json:"courseId"`
+	LearningSpaceID string    `json:"learningSpaceId"`
+	LessonID        string    `json:"lessonId"`
+	Chapter         string    `json:"-"`
+	TagCode         string    `json:"tagCode"`
+	AllowDownload   bool      `json:"allowDownload"`
+	Status          Status    `json:"status"`
 }
 
 type MaterialReorderRequest struct {

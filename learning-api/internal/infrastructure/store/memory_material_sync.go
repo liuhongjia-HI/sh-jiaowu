@@ -216,7 +216,7 @@ func (s *MemoryStore) applyMaterialSyncUnlocked(operator string, principal learn
 			targetResult.MaterialIDs = append(targetResult.MaterialIDs, item.ID)
 		}
 		s.prependLogDetail(operator, "同步课程讲义", target.Name, fmt.Sprintf("%s/%s → %s/%s；新增 %d", req.SourceCourseID, req.SourceLessonID, target.ID, preview.LessonID, targetResult.Created))
-		s.notifyCourseContentUploaded(target)
+		s.notifyCourseContentUploadedBatch(target, principal.UserID, req.Snapshot)
 		if _, err := s.completeMaterialNoticeBatchUnlocked(principal, req.Snapshot, target.ID); err != nil {
 			return learning.MaterialSyncResult{}, err
 		}

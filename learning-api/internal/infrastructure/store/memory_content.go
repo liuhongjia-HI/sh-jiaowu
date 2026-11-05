@@ -526,7 +526,7 @@ func (s *MemoryStore) createMaterialUnlocked(operator string, principal learning
 	}
 	s.materials = append([]learning.Material{item}, s.materials...)
 	s.prependLog(operator, "上传学习资料", item.Title)
-	s.notifyCourseContentUploadedBatch(course, principal.UserID, req.BatchID)
+	s.notifyCourseContentUploadedBatch(course, principal.UserID, firstNonEmpty(req.BatchID, item.ID))
 	s.registerMaterialNoticeBatch(principal, req.BatchID, item)
 	return s.decorateMaterial(item), nil
 }
@@ -688,9 +688,24 @@ func (s *MemoryStore) updateMaterialUnlocked(operator string, principal learning
 		s.materials[index].AllowDownload = req.AllowDownload
 		s.materials[index].Status = req.Status
 		s.materials[index].PublishStatus = publishStatus(req.Status)
+		if req.File.ID != "" && req.File.ID != before.FileID {
+			asset := req.File
+			s.fileAssets[asset.ID] = asset
+			s.enqueuePreviewJobUnlocked(asset.ID)
+			item := &s.materials[index]
+			item.FileID, item.FileName, item.FileSize, item.FileType = asset.ID, asset.FileName, asset.FileSize, asset.FileType
+			item.PreviewStatus, item.PreviewError = asset.PreviewStatus, ""
+			item.PreviewURL, item.DownloadURL = "/api/files/"+asset.ID+"/preview", "/api/files/"+asset.ID+"/download"
+		}
 		s.prependLogDetail(operator, "编辑学习资料", req.Title, auditChangeDetail(materialAuditSnapshot(before), materialAuditSnapshot(s.materials[index])))
-		if materialVisibleToStudents(s.materials[index]) && !materialVisibleToStudents(before) {
-			s.notifyCourseContentUploaded(course)
+		if materialVisibleToStudents(s.materials[index]) && (!materialVisibleToStudents(before) || s.materials[index].FileID != before.FileID) {
+			item := s.materials[index]
+			batchID := businessNoticeHash("material-version", item.ID, item.FileID, time.Now().Format(time.RFC3339Nano))
+			s.notifyCourseContentUploadedBatch(course, principal.UserID, batchID)
+			s.registerMaterialNoticeBatch(principal, batchID, item)
+			if _, err := s.completeMaterialNoticeBatchUnlocked(principal, batchID, course.ID); err != nil {
+				return learning.Material{}, err
+			}
 		}
 		return s.decorateMaterial(s.materials[index]), nil
 	}
@@ -890,6 +905,12 @@ func (s *MemoryStore) expectedStudentsForCourseHandout(course learning.Course) [
 		}
 		pkg, ok := s.findPackage(grant.PackageID)
 		if !ok || !s.packageOpensContent(pkg, course.LearningSpaceID, "handout") {
+			continue
+		}
+		if !containsString(s.learningSpaceIDsForGrant(grant.ID), course.LearningSpaceID) {
+			continue
+		}
+		if _, trial := s.trialFirstLessonForGrant(grant, course.ID); trial {
 			continue
 		}
 		student, ok := s.findStudent(grant.StudentID)

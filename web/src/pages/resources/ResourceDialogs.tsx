@@ -20,6 +20,7 @@ export type CourseFormValues = CourseUpsertRequest & {
 };
 type SettingFormValues = SettingUpdateRequest;
 type ContentFormValues = {
+  fileList?: UploadFile[];
   title: string;
   courseId: string;
 	lessonId: string;
@@ -1588,6 +1589,8 @@ export function ContentEditDialog({
   return (
     <FormDrawer
       title={kind === 'materials' ? '编辑课程讲义' : '编辑课后练习'}
+      forceRender
+      destroyOnHidden={false}
       open={Boolean(item)}
       onCancel={onCancel}
       onSubmit={() => form.submit()}
@@ -1632,6 +1635,11 @@ export function ContentEditDialog({
           </>
           )}
         </>
+        {kind === 'materials' && <Form.Item name="fileList" label="替换课件文件" valuePropName="fileList" getValueFromEvent={(event) => event?.fileList ?? []} extra="选填，支持 50MB 以内的 PDF、PPT、Word。替换并发布后会通知当前有正式访问权限的学生；仅改名或排序不会通知。">
+          <Upload beforeUpload={() => false} maxCount={1} accept=".pdf,.ppt,.pptx,.doc,.docx">
+            <Button>选择新文件</Button>
+          </Upload>
+        </Form.Item>}
         <Form.Item name="status" label="状态">
           <Select
             options={kind === 'materials'
