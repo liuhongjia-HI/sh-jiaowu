@@ -118,7 +118,7 @@ func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID stri
 		if err != nil {
 			return "", err
 		}
-		refreshed, linkFallback := false, false
+		refreshed, linkFallback, inboxFallback := false, false, false
 		for attempt := 0; attempt < 4; attempt++ {
 			token, err := wechatAccessToken(client, appID, secret)
 			if err != nil {
@@ -160,6 +160,21 @@ func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID stri
 				linkFallback = true
 				log.Printf("event=official_template_jump_fallback mini_app_id=%q reason=40013 route=url_link", miniAppID)
 				continue
+			}
+			// An unreleased detail page is a definite rejection, so no message
+			// was delivered. Older released clients can still open their inbox.
+			// Keep the same recipient, content and deduplication ID on retry.
+			if payload.ErrCode == 40165 && !inboxFallback {
+				if mini, ok := body["miniprogram"].(map[string]string); ok && strings.Split(mini["pagepath"], "?")[0] != "pages/notices/index" {
+					mini["pagepath"] = "pages/notices/index"
+					encoded, err = json.Marshal(body)
+					if err != nil {
+						return "", err
+					}
+					inboxFallback = true
+					log.Printf("event=official_template_jump_fallback mini_app_id=%q reason=40165 route=inbox", miniAppID)
+					continue
+				}
 			}
 			if payload.ErrCode != 0 {
 				temporary := payload.ErrCode == -1 || payload.ErrCode == 45009 || payload.ErrCode == 45011

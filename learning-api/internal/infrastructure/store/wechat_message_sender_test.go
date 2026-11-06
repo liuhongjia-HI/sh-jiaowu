@@ -229,3 +229,52 @@ func TestBusinessWechatSenderMiniLinkFallbackPreservesTargetAndDedup(t *testing.
 		})
 	}
 }
+
+func TestWechatSenderRejectedDetailPageFallsBackToReleasedInbox(t *testing.T) {
+	for _, tc := range []struct {
+		path      string
+		wantSends int
+		success   bool
+	}{
+		{"pages/notice-detail/index?id=existing-event", 2, true},
+		{"pages/notices/index", 1, false},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			app := "pagepath-test-" + t.Name()
+			invalidateWechatToken(app, "fixture")
+			sends := 0
+			client := &http.Client{Transport: noticeTransport(func(req *http.Request) (*http.Response, error) {
+				if strings.HasSuffix(req.URL.Path, "/token") {
+					return noticeResponse(`{"access_token":"fixture-token","expires_in":7200}`), nil
+				}
+				sends++
+				var body map[string]any
+				if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body["client_msg_id"] != "original-message-id" || body["touser"] != "same-parent" || body["template_id"] != "actual-template" {
+					t.Fatalf("retry changed identity: %+v", body)
+				}
+				mini := body["miniprogram"].(map[string]any)
+				if sends == 1 {
+					if mini["pagepath"] != tc.path {
+						t.Fatalf("lost original destination: %+v", mini)
+					}
+					return noticeResponse(`{"errcode":40165,"errmsg":"invalid weapp pagepath"}`), nil
+				}
+				if mini["pagepath"] != "pages/notices/index" || mini["appid"] != "original-mini-app" {
+					t.Fatalf("wrong inbox fallback: %+v", mini)
+				}
+				data := body["data"].(map[string]any)
+				if data["thing3"].(map[string]any)["value"] != "Gavin" {
+					t.Fatal("retry changed actual uploader")
+				}
+				return noticeResponse(`{"errcode":0,"msgid":987654321}`), nil
+			})}
+			id, err := newOfficialMessageSender(client, app, "fixture", "original-mini-app")(learning.OfficialMessageRequest{OpenID: "same-parent", TemplateID: "actual-template", ClientMessageID: "original-message-id", Values: map[string]string{"thing3": "Gavin"}, PagePath: tc.path})
+			if sends != tc.wantSends || (err == nil) != tc.success {
+				t.Fatalf("unexpected retries/result sends=%d id=%s err=%v", sends, id, err)
+			}
+		})
+	}
+}
