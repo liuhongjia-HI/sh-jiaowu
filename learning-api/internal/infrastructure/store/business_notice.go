@@ -62,12 +62,12 @@ func defaultBusinessNoticeBindings() []learning.BusinessNoticeBinding {
 }
 
 func materialNoticeFields() map[string]string {
-	return map[string]string{"course_name": "课程名称", "resource_title": "资料名称", "resource_count": "资料数量", "published_at": "发布时间", "student_name": "学生姓名"}
+	return map[string]string{"course_name": "课程名称", "resource_title": "资料名称", "resource_count": "资料数量", "published_at": "发布时间", "student_name": "学生姓名", "uploader_name": "上传人姓名"}
 }
 
 func materialNoticeMappingAllowed(key, value string) bool {
 	if strings.HasPrefix(key, "thing") {
-		return value == "course_name" || value == "resource_title" || value == "student_name"
+		return value == "course_name" || value == "resource_title" || value == "student_name" || value == "uploader_name"
 	}
 	if strings.HasPrefix(key, "time") || strings.HasPrefix(key, "date") {
 		return value == "published_at"
@@ -76,6 +76,9 @@ func materialNoticeMappingAllowed(key, value string) bool {
 }
 
 func resourceNoticeMappingAllowed(kind, key, value string) bool {
+	if value == "uploader_name" {
+		return kind == learning.NoticeMaterialsPublished && strings.HasPrefix(key, "thing")
+	}
 	if kind == learning.NoticeScheduleReminder {
 		return strings.HasPrefix(key, "thing") && (value == "course_name" || value == "student_name") || (strings.HasPrefix(key, "time") || strings.HasPrefix(key, "date")) && value == "lesson_time"
 	}

@@ -41,6 +41,7 @@ type BusinessNoticeEvent struct {
 	RecipientUserID        string                 `json:"recipientUserId,omitempty"`
 	RecipientName          string                 `json:"recipientName,omitempty"`
 	ResourceIDs            []string               `json:"resourceIds,omitempty"`
+	UploaderName           string                 `json:"uploaderName,omitempty"`
 	UploaderID             string                 `json:"uploaderId,omitempty"`
 	CourseID               string                 `json:"courseId,omitempty"`
 	BatchCompleted         bool                   `json:"batchCompleted,omitempty"`

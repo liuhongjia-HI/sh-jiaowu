@@ -51,7 +51,7 @@ func (s *MemoryStore) registerMaterialNoticeBatch(p learning.Principal, batchID 
 		}
 	}
 	if !found {
-		s.businessNoticeEvents = append(s.businessNoticeEvents, learning.BusinessNoticeEvent{ID: id, BatchID: batchID, Kind: materialBatchRegistryKind, UploaderID: p.UserID, CourseID: item.CourseID, ResourceIDs: []string{item.ID}, CreatedAt: businessTime(time.Now())})
+		s.businessNoticeEvents = append(s.businessNoticeEvents, learning.BusinessNoticeEvent{ID: id, BatchID: batchID, Kind: materialBatchRegistryKind, UploaderID: p.UserID, UploaderName: p.Name, CourseID: item.CourseID, ResourceIDs: []string{item.ID}, CreatedAt: businessTime(time.Now())})
 	}
 	if legacy {
 		_, _ = s.completeMaterialNoticeBatchUnlocked(p, batchID, item.CourseID)
@@ -123,6 +123,8 @@ func materialBatchValues(binding learning.BusinessNoticeBinding, event learning.
 			values[key] = businessShortName(items[0].Title)
 		case "student_name":
 			values[key] = businessShortName(event.StudentName)
+		case "uploader_name":
+			values[key] = businessShortName(event.UploaderName)
 		case "resource_count":
 			values[key] = fmt.Sprint(len(items))
 		case "published_at":
@@ -178,7 +180,7 @@ func (s *MemoryStore) completeMaterialNoticeBatchUnlocked(p learning.Principal, 
 				continue
 			}
 		}
-		event := learning.BusinessNoticeEvent{ID: id, BatchID: registryID, Kind: learning.NoticeMaterialsPublished, StudentID: student.ID, StudentName: student.Name, CourseID: courseID, RelatedID: courseID, ResourceIDs: ids, Title: "资料已更新", Summary: fmt.Sprintf("%s / 共%d份资料", course.Name, len(items)), CreatedAt: registry.CreatedAt, ExpiresAt: businessTime(parseBusinessTime(registry.CreatedAt).Add(7 * 24 * time.Hour))}
+		event := learning.BusinessNoticeEvent{ID: id, BatchID: registryID, Kind: learning.NoticeMaterialsPublished, UploaderID: registry.UploaderID, UploaderName: firstNonEmpty(registry.UploaderName, p.Name), StudentID: student.ID, StudentName: student.Name, CourseID: courseID, RelatedID: courseID, ResourceIDs: ids, Title: "资料已更新", Summary: fmt.Sprintf("%s / 共%d份资料", course.Name, len(items)), CreatedAt: registry.CreatedAt, ExpiresAt: businessTime(parseBusinessTime(registry.CreatedAt).Add(7 * 24 * time.Hour))}
 		stationID := "notice-upload-" + businessNoticeHash(p.UserID, batchID, courseID, student.ID)
 		if old, exists := s.businessEvent(id); exists && old.StationNoticeID != "" {
 			stationID = old.StationNoticeID
