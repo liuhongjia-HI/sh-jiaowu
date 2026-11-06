@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -148,6 +149,13 @@ func newOfficialMessageSender(client *http.Client, appID, secret, miniAppID stri
 			// and deduplication ID when native mini-program navigation is rejected.
 			if payload.ErrCode == 40013 && request.PagePath != "" && !linkFallback && len(miniSecrets) > 0 && miniSecrets[0] != "" {
 				link, err := wechatMiniProgramURLLink(client, miniAppID, miniSecrets[0], request.PagePath)
+				var linkError *officialSendError
+				if errors.As(err, &linkError) && linkError.wechatCode == 40165 && strings.Split(strings.TrimPrefix(request.PagePath, "/"), "?")[0] != "pages/notices/index" {
+					link, err = wechatMiniProgramURLLink(client, miniAppID, miniSecrets[0], "pages/notices/index")
+					if err == nil {
+						log.Printf("event=official_template_jump_fallback mini_app_id=%q reason=40165 route=inbox_url_link", miniAppID)
+					}
+				}
 				if err != nil {
 					return "", err
 				}
@@ -215,7 +223,7 @@ func wechatMiniProgramURLLink(client *http.Client, appID, secret, pagePath strin
 	}
 	link, parseErr := url.Parse(result.URLLink)
 	if result.ErrCode != 0 || parseErr != nil || link.Scheme != "https" || (link.Host != "wxmpurl.cn" && link.Host != "wxaurl.cn") || link.User != nil || link.Fragment != "" {
-		return "", &officialSendError{reason: fmt.Sprintf("小程序链接生成失败（%d），原生跳转被微信拒绝（40013）", result.ErrCode), configuration: true}
+		return "", &officialSendError{wechatCode: result.ErrCode, reason: fmt.Sprintf("小程序链接生成失败（%d），原生跳转被微信拒绝（40013）", result.ErrCode), configuration: true}
 	}
 	return link.String(), nil
 }

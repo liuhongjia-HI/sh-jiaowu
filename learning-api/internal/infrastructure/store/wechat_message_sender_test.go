@@ -278,3 +278,47 @@ func TestWechatSenderRejectedDetailPageFallsBackToReleasedInbox(t *testing.T) {
 		})
 	}
 }
+
+func TestWechatSenderLinkFallbackForUnreleasedDetailUsesInbox(t *testing.T) {
+	app, mini := "link-inbox-official", "link-inbox-mini"
+	invalidateWechatToken(app, "official-secret")
+	invalidateWechatToken(mini, "mini-secret")
+	sends, links := 0, 0
+	client := &http.Client{Transport: noticeTransport(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path == "/cgi-bin/token" {
+			return noticeResponse(`{"access_token":"fixture","expires_in":7200}`), nil
+		}
+		var body map[string]any
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if req.URL.Path == "/wxa/generate_urllink" {
+			links++
+			if links == 1 {
+				if body["path"] != "pages/notice-detail/index" || body["query"] != "id=actual-event" {
+					t.Fatal("lost original detail")
+				}
+				return noticeResponse(`{"errcode":40165}`), nil
+			}
+			if body["path"] != "pages/notices/index" || body["query"] != "" {
+				t.Fatalf("invalid released inbox: %+v", body)
+			}
+			return noticeResponse(`{"errcode":0,"url_link":"https://wxmpurl.cn/inbox"}`), nil
+		}
+		sends++
+		if body["touser"] != "same-parent" || body["client_msg_id"] != "same-message" {
+			t.Fatal("changed receiver or dedup identity")
+		}
+		if sends == 1 {
+			return noticeResponse(`{"errcode":40013}`), nil
+		}
+		if body["url"] != "https://wxmpurl.cn/inbox" || body["miniprogram"] != nil {
+			t.Fatalf("wrong link payload: %+v", body)
+		}
+		return noticeResponse(`{"errcode":0,"msgid":456}`), nil
+	})}
+	id, err := newOfficialMessageSender(client, app, "official-secret", mini, "mini-secret")(learning.OfficialMessageRequest{OpenID: "same-parent", TemplateID: "actual-template", ClientMessageID: "same-message", Values: map[string]string{"thing3": "Gavin"}, PagePath: "pages/notice-detail/index?id=actual-event"})
+	if err != nil || id != "456" || sends != 2 || links != 2 {
+		t.Fatalf("wrong fallback result: id=%s err=%v sends=%d links=%d", id, err, sends, links)
+	}
+}

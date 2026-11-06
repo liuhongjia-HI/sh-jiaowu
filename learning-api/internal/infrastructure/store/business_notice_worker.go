@@ -12,6 +12,7 @@ import (
 )
 
 type officialSendError struct {
+	wechatCode    int
 	reason        string
 	temporary     bool
 	uncertain     bool
@@ -185,7 +186,8 @@ func (s *MemoryStore) businessTaskValidity(task learning.BusinessNoticeTask, now
 }
 
 func (s *MemoryStore) businessTaskCanRetry(task learning.BusinessNoticeTask, now time.Time) bool {
-	return task.Status == "发送失败" && task.Retryable && s.businessTaskValidity(task, now) == "" && task.OpenID != ""
+	definiteConfigRejection := task.Status == "配置错误" && task.MessageID == "" && task.AcceptedAt == ""
+	return ((task.Status == "发送失败" && task.Retryable) || definiteConfigRejection) && s.businessTaskValidity(task, now) == "" && task.OpenID != ""
 }
 
 func (s *MemoryStore) RetryBusinessNotice(operator, id string) (learning.BusinessNoticeTask, error) {
