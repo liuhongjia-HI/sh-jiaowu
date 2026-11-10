@@ -228,7 +228,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
     if (statusFilter && !family.courses.some((course) => (course.status || '启用') === statusFilter)) return false;
     return !keyword.trim() || `${family.name} ${family.grade} ${family.subject} ${family.courses.map((course) => spaceById.get(course.learningSpaceId || '')?.level || '').join(' ')}`.toLowerCase().includes(keyword.trim().toLowerCase());
   });
-  const scopeSpaces = (spaces.data ?? []).filter((space) => space.status !== '停用' && (unrestricted || (user?.learningSpaceIds ?? []).includes(space.id)));
+  const scopeSpaces = (spaces.data ?? []).filter((space) => space.status !== '停用' && space.selectable !== false && (unrestricted || (user?.learningSpaceIds ?? []).includes(space.id)));
   const scopeGroups = Array.from(new Map(scopeSpaces.map((space) => [familyScopeOf(space), { value: familyScopeOf(space), label: `${space.grade} · ${subjectLabel(space.subject)} · ${semesterLabel(space.semester)} · ${phaseLabel(space.phase)}` }])).values());
   const selectedFamilySpaces = scopeSpaces.filter((space) => familyScopeOf(space) === familyScopeKey);
   function startFamilyCreate() {
@@ -260,7 +260,7 @@ function CourseCatalog({ user, onViewMaterials }: { user?: CurrentUser; onViewMa
     form.resetFields();
   }
   function availableCopySpaces() {
-    return (spaces.data ?? []).filter((space) => space.status !== '停用' && (unrestricted || (user?.learningSpaceIds ?? []).includes(space.id)));
+    return (spaces.data ?? []).filter((space) => space.status !== '停用' && space.selectable !== false && (unrestricted || (user?.learningSpaceIds ?? []).includes(space.id)));
   }
   function familyCopySpaces(course: Course) {
     const source = spaceById.get(course.learningSpaceId || '');

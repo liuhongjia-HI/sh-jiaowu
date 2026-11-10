@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteData, getData, postData, putData } from '../../services/http';
 import { ActionButton } from '../../components/ListViews';
 import { PackageDialog } from './ResourceDialogs';
-import { academicYearForDate, academicYearsFromCalendar, ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, gradeIndex, gradeOptions, LEARNING_LEVELS, levelOptions, levelsForGradeSubject, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade, useSubjectCatalog } from '../../utils/curriculum';
+import { academicYearForDate, academicYearsFromCalendar, ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, gradeIndex, gradeOptions, LEARNING_LEVELS, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade, subjectsMatch, useSubjectCatalog } from '../../utils/curriculum';
 import type { CurrentUser, LearningSpace, PackageUpsertRequest, StudyPackage } from '../../types/starline';
 import { useNavigate } from 'react-router-dom';
 
@@ -98,7 +98,11 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
     ? { name: editing.name, academicYear: editing.academicYear, grade: editing.grade, subject: editing.subject, semester: editing.semester, level: editing.level || 'S', phaseScope: editing.phaseScope, packageType: editing.packageType, summary: editing.summary, learningSpaceIds: editing.learningSpaceIds ?? [], contentTypeCodes: editing.contentTypeCodes ?? [], trialEnabled: editing.trialEnabled, status: editing.status }
     : defaults;
   const subjectSelectOptions = subjectOptions(gradeFilter, subjectCatalog);
-  const levelSelectOptions = filterLevelOptions(gradeFilter, subjectFilter, subjectCatalog);
+  function scopeLevels(grade?: string, subject?: string) {
+    const matching = [...(spaces.data ?? []), ...(packages.data ?? [])].filter(item => (!grade || item.grade === grade) && (!subject || subjectsMatch(item.subject, subject)));
+    return LEARNING_LEVELS.filter(level => matching.some(item => (item.level || 'S') === level));
+  }
+  const levelSelectOptions = scopeLevels(gradeFilter, subjectFilter).map(value => ({ label: value, value }));
 
   return (
     <div className="page-stack">
@@ -123,7 +127,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
               const nextSubject = value && subjectFilter && !subjectsForGrade(value, subjectCatalog).includes(subjectFilter) ? undefined : subjectFilter;
               setGradeFilter(value);
               setSubjectFilter(nextSubject);
-              setLevelFilter((current) => (value && current && !levelAllowed(value, nextSubject, current, subjectCatalog) ? undefined : current));
+              setLevelFilter((current) => (value && current && !scopeLevels(value, nextSubject).includes(current) ? undefined : current));
               setPage(1);
             }}
           />
@@ -135,7 +139,7 @@ export default function PackagesPage({ user }: { user?: CurrentUser }) {
             options={subjectSelectOptions}
             onChange={(value) => {
               setSubjectFilter(value);
-              setLevelFilter((current) => (gradeFilter && value && current && !levelsForGradeSubject(gradeFilter, value, subjectCatalog).includes(current) ? undefined : current));
+              setLevelFilter((current) => (gradeFilter && value && current && !scopeLevels(gradeFilter, value).includes(current) ? undefined : current));
               setPage(1);
             }}
           />
@@ -196,20 +200,4 @@ function comparePackages(left: StudyPackage, right: StudyPackage) {
 
 function sortableIndex(index: number) {
   return index < 0 ? Number.MAX_SAFE_INTEGER : index;
-}
-
-function filterLevelOptions(grade?: string, subject?: string, catalog?: string[]) {
-  if (grade && subject) return levelOptions(grade, subject, catalog);
-  if (grade) {
-    const allowed = new Set(subjectsForGrade(grade, catalog).flatMap((item) => levelsForGradeSubject(grade, item, catalog)));
-    return LEARNING_LEVELS.filter((level) => allowed.has(level)).map((level) => ({ label: level, value: level }));
-  }
-  return LEARNING_LEVELS.map((level) => ({ label: level, value: level }));
-}
-
-function levelAllowed(grade: string, subject: string | undefined, level: string, catalog?: string[]) {
-  const allowed = subject
-    ? levelsForGradeSubject(grade, subject, catalog)
-    : subjectsForGrade(grade, catalog).flatMap((item) => levelsForGradeSubject(grade, item, catalog));
-  return allowed.includes(level);
 }

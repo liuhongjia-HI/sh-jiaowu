@@ -349,3 +349,18 @@ func (h *LearningHandler) LookupOfficialRecipient(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	OK(c, value)
 }
+
+func (h *LearningHandler) UpdateGradeSubjectLevels(c *gin.Context) {
+	var req learning.GradeSubjectLevelsUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请求格式不正确")
+		return
+	}
+	operator, _ := c.Get(middleware.OperatorNameKey)
+	updated, err := h.service.UpdateGradeSubjectLevels(operator.(string), c.Param("id"), req)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	OK(c, updated)
+}

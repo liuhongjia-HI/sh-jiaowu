@@ -246,6 +246,7 @@ func registerSystemRoutes(api *gin.RouterGroup, service *learningapp.Service, to
 	g.DELETE("/subjects/:id", h.DeleteSubjectMetadata)
 	g.PUT("/grade-subjects", h.UpdateGradeSubjects)
 	g.PUT("/grade-subjects/:id", h.UpsertGradeSubject)
+	g.PUT("/grade-subjects/:id/levels", h.UpdateGradeSubjectLevels)
 	g.POST("/grade-subjects/upload", h.UploadGradeSubjectImage)
 }
 

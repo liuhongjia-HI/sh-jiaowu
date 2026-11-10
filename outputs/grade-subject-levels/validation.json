@@ -1,0 +1,91 @@
+{
+  "date": "2026-11-10",
+  "scope": "本地实现与验证；未发布生产",
+  "entry": "教学配置 → 年级课程目录 → 选择年级 → 科目行「配置班型」",
+  "rules": [
+    "按年级、科目配置 S / S+ / H / H+，各学期和阶段通用，至少一个",
+    "未配置范围沿用原有班型",
+    "新增仅补学习空间，不自动创建课程或转班",
+    "取消仅限制新课程、新课程方案及复制新增；历史课程、方案仍可维护，学生已有权限保留",
+    "普通目录编辑保留最新班型配置，避免旧页面覆盖",
+    "配置、空间及日志在同一数据库事务内保存"
+  ],
+  "checks": {
+    "backend_regression": {
+      "result": "passed with one known pre-existing test excluded",
+      "command": "GIN_MODE=release go test ./internal/infrastructure/store ./internal/interfaces/http/router ./internal/application/learningapp -skip '^TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow$' -count=1",
+      "evidence": "regression-tests.log"
+    },
+    "mysql": {
+      "result": "passed",
+      "version": "8.0.36, 临时独立本地实例",
+      "tests": [
+        "新增四个学期阶段空间",
+        "取消后阻止新课程、方案和复制",
+        "历史独立课程、共享目录及方案编辑",
+        "学生已有讲义授权继续有效",
+        "空值、非法值、重复班型拒绝",
+        "过时目录编辑不会覆盖班型配置",
+        "无关年级科目保持原值",
+        "取消系统默认 S 后重启仍不可新选",
+        "重启后新增空间和取消状态保持",
+        "触发器拒绝新增空间时事务回滚，配置和空间不产生部分写入",
+        "数据库连接失败时内存状态不发布"
+      ],
+      "evidence": "mysql-tests.log"
+    },
+    "api": {
+      "result": "passed",
+      "tests": [
+        "学生角色不可修改",
+        "非法请求拒绝",
+        "新增空间可选",
+        "后端阻止取消班型的新课程、新方案"
+      ]
+    },
+    "web_build": {
+      "result": "passed",
+      "command": "npm run build",
+      "evidence": "web-build.log"
+    },
+    "browser": {
+      "result": "passed",
+      "command": "node ./node_modules/@playwright/test/cli.js test --config=playwright.grade-subject-levels.config.ts",
+      "duration_seconds": 12.3,
+      "tests": [
+        "清空校验",
+        "增加后课程、方案可选",
+        "页面刷新保留",
+        "取消后课程、方案新建不可选",
+        "已有 S+ 方案编辑保存",
+        "浏览器无 pageerror",
+        "390×844 配置抽屉可见且不溢出"
+      ]
+    },
+    "visual_review": {
+      "result": "passed",
+      "method": "已实际查看最终页面截图",
+      "files": [
+        "catalog.png",
+        "desktop.png",
+        "mobile.png"
+      ]
+    },
+    "diff_check": "git diff --check passed"
+  },
+  "known_preexisting_failure": {
+    "test": "TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow",
+    "cause": "测试将作业截止日固定为 2026-11-01，当前提交被判截止",
+    "baseline": "使用 git archive HEAD 导出的未修改后端执行同一测试，同样在 memory_content_test.go:716 失败",
+    "action": "未修改无关测试；扩展回归明确排除此一项"
+  },
+  "limitations": [
+    "仅本地验证，不代表生产或微信真机验收",
+    "已有学科停用逻辑和操作权限沿用原实现"
+  ],
+  "reproduce": {
+    "mysql_schema": "先在独立测试库执行 learning-api/deploy/mysql/init.sql，再设置 STARLINE_LEVELS_TEST_MYSQL_DSN 执行 TestGradeSubjectLevelsMySQLRestartAndRollback；禁止指向业务库",
+    "browser": "启动指向独立测试库的本地 API（18897）和 Vite（15177），使用本地初始化账号，再运行浏览器测试配置；默认地址仅回环地址"
+  },
+  "cleanup": "临时 API、Vite 和 MySQL 实例关闭；测试产生的两个受版本管理 PDF 删除已恢复；保留用户原有改动"
+}

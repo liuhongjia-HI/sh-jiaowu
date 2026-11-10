@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined, EditOutlined, PictureOutlined, PlusOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons';
-import { Button, Card, Empty, Form, Image, Input, InputNumber, Select, Skeleton, Space, Table, Tag, Upload, message } from 'antd';
+import { Alert, Button, Card, Checkbox, Empty, Form, Image, Input, InputNumber, Select, Skeleton, Space, Table, Tag, Upload, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -7,7 +7,7 @@ import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton } from '../components/ListViews';
 import { getData, postForm, putData, resolveAssetUrl } from '../services/http';
 import type { GradeSubjectMetadata, SubjectMetadata } from '../types/starline';
-import { GRADES, gradeOptions, subjectLabel, subjectsMatch } from '../utils/curriculum';
+import { GRADES, LEARNING_LEVELS, gradeOptions, subjectLabel, subjectsMatch } from '../utils/curriculum';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const GRADE_GROUPS = [
@@ -36,6 +36,16 @@ export default function GradeSubjects() {
   const selectedGrade = GRADES.includes(requestedGrade ?? '') ? requestedGrade : null;
   const [editing, setEditing] = useState<GradeSubjectMetadata | null>(null);
   const [creating, setCreating] = useState(false);
+  const [levelEditing, setLevelEditing] = useState<GradeSubjectMetadata | null>(null);
+  const [levelForm] = Form.useForm<{ levels: string[] }>();
+  const saveLevels = useMutation({
+    mutationFn: (values: { levels: string[] }) => putData<GradeSubjectMetadata>(`/grade-subjects/${encodeURIComponent(levelEditing!.id)}/levels`, values),
+    onSuccess: () => {
+      message.success('开设班型已保存。'); setLevelEditing(null);
+      client.invalidateQueries({ predicate: query => query.queryKey.some(key => typeof key === 'string' && (key.startsWith('learning-spaces') || ['grade-subjects', 'logs', 'opening-options'].includes(key))) });
+    },
+    onError: (error: Error) => message.error(error.message || '班型保存失败，请稍后重试。')
+  });
   const items = useQuery({ queryKey: ['grade-subjects'], queryFn: () => getData<GradeSubjectMetadata[]>('/grade-subjects') });
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: () => getData<SubjectMetadata[]>('/subjects') });
   const gradeRows = items.data ?? [];
@@ -69,7 +79,15 @@ export default function GradeSubjects() {
   if (items.error || subjects.error) return <Card>年级课程目录加载失败，请刷新后重试。</Card>;
   const subjectOptions = (subjects.data ?? []).filter((item) => item.status === '启用' && !selectedRows.some((row) => subjectsMatch(row.subject, item.name))).map((item) => ({ value: item.name, label: subjectLabel(item.name) }));
   return <div className="page-stack grade-catalog-page">
-    {selectedGrade ? <GradeDetail grade={selectedGrade} summary={summaries[selectedGrade]} rows={selectedRows} subjects={subjects.data ?? []} onBack={() => selectGrade(null)} onChangeGrade={selectGrade} onCreate={openCreate} onEdit={openEdit} /> : <GradeOverview summaries={summaries} onSelect={selectGrade} />}
+    {selectedGrade ? <GradeDetail grade={selectedGrade} summary={summaries[selectedGrade]} rows={selectedRows} subjects={subjects.data ?? []} onBack={() => selectGrade(null)} onChangeGrade={selectGrade} onCreate={openCreate} onEdit={openEdit} onLevels={(row) => { setLevelEditing(row); levelForm.setFieldsValue({ levels: row.levels || [] }); }} /> : <GradeOverview summaries={summaries} onSelect={selectGrade} />}
+    <FormDrawer title={levelEditing ? `配置班型 · ${levelEditing.grade}${subjectLabel(levelEditing.subject)}` : '配置班型'} open={Boolean(levelEditing)} onCancel={() => !saveLevels.isPending && setLevelEditing(null)} onSubmit={() => levelForm.submit()} submitting={saveLevels.isPending}>
+      <Form form={levelForm} layout="vertical" onFinish={(values) => saveLevels.mutate(values)}>
+        <Form.Item name="levels" label="开设班型" rules={[{ required: true, type: 'array', min: 1, message: '请至少保留一个班型' }]} extra="统一适用于该年级、该科目的各学期和阶段；具体课程按需要选择开设。">
+          <Checkbox.Group options={LEARNING_LEVELS} disabled={saveLevels.isPending} />
+        </Form.Item>
+        <Alert type="info" showIcon message="取消班型后，新课程和新课程方案不能再选。已有课程、学生权限和学习记录保留；增加班型不会自动转班或创建课程。" />
+      </Form>
+    </FormDrawer>
     <FormDrawer title={creating ? `添加${selectedGrade}学科` : editing ? `编辑${editing.grade}${editing.displayName}` : '编辑课程目录'} open={Boolean(editing)} onCancel={() => { setEditing(null); setCreating(false); }} onSubmit={() => form.submit()} submitting={save.isPending || upload.isPending}>
       <Form form={form} layout="vertical" onFinish={(values) => editing && save.mutate({ ...editing, ...values, grade: selectedGrade || editing.grade, gradeCode: gradeCode(selectedGrade || editing.grade) })}>
         <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]}><Select disabled={!creating} options={subjectOptions} placeholder="选择已有学科" /></Form.Item>
@@ -88,7 +106,7 @@ function GradeOverview({ summaries, onSelect }: { summaries: Record<string, Grad
   return <><div className="page-heading grade-catalog-heading"><div><h2>年级课程目录</h2><p>选择年级后，维护学生端目录中显示的学科、课程图片和体验内容。</p></div></div>{GRADE_GROUPS.map((group) => <section className="grade-group" key={group.label} aria-labelledby={`grade-group-${group.label}`}><div className="grade-group-heading"><h3 id={`grade-group-${group.label}`}>{group.label}</h3><span>{group.grades.length} 个年级</span></div><div className="grade-overview-grid">{group.grades.map((grade) => { const summary = summaries[grade]; return <button className="grade-overview-card" type="button" key={grade} onClick={() => onSelect(grade)}><span className="grade-card-code">{summary.gradeCode}</span><strong>{summary.grade}</strong><span className="grade-card-summary">已配置 {summary.subjectCount} 门学科</span><span className="grade-card-status"><span>{summary.enabledCount} 门显示</span>{summary.missingCoverCount > 0 ? <span className="grade-card-warning">{summary.missingCoverCount} 张图片待补</span> : <span className="grade-card-ready">图片已齐全</span>}</span><RightOutlined aria-hidden="true" className="grade-card-arrow" /></button>; })}</div></section>)}</>;
 }
 
-function GradeDetail({ grade, summary, rows, subjects, onBack, onChangeGrade, onCreate, onEdit }: { grade: string; summary: GradeSummary; rows: GradeSubjectMetadata[]; subjects: SubjectMetadata[]; onBack: () => void; onChangeGrade: (grade: string) => void; onCreate: () => void; onEdit: (row: GradeSubjectMetadata) => void }) {
+function GradeDetail({ grade, summary, rows, subjects, onBack, onChangeGrade, onCreate, onEdit, onLevels }: { grade: string; summary: GradeSummary; rows: GradeSubjectMetadata[]; subjects: SubjectMetadata[]; onBack: () => void; onChangeGrade: (grade: string) => void; onCreate: () => void; onEdit: (row: GradeSubjectMetadata) => void; onLevels: (row: GradeSubjectMetadata) => void }) {
   const subjectStatus = (subject: string) => subjects.find((item) => subjectsMatch(item.name, subject))?.status;
-  return <><div className="grade-breadcrumb"><Button type="link" icon={<ArrowLeftOutlined />} onClick={onBack}>返回年级列表</Button><span>年级课程目录 / {grade}</span></div><div className="page-heading grade-catalog-heading"><div><h2>{grade}课程目录</h2><p>{summary.enabledCount} 门学科在目录中显示，{summary.missingCoverCount > 0 ? `${summary.missingCoverCount} 张课程图片待补充。` : '课程图片已配置完成。'}</p></div><Space><Select aria-label="切换年级" value={grade} options={gradeOptions()} onChange={onChangeGrade} style={{ width: 130 }} /><Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>添加已有学科</Button></Space></div><Card className="grade-subject-table-card">{rows.length === 0 ? <Empty description={`${grade}目录还没有学科`}><Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>添加已有学科</Button></Empty> : <Table rowKey="id" pagination={false} dataSource={rows} columns={[{ title: '课程图片', width: 132, render: (_, row: GradeSubjectMetadata) => row.imageUrl ? <Image width={92} height={52} style={{ objectFit: 'cover', borderRadius: 6 }} src={resolveAssetUrl(row.imageUrl)} /> : <span className="course-cover-empty"><PictureOutlined /> 待上传</span> }, { title: '学科', dataIndex: 'displayName', render: (value: string, row: GradeSubjectMetadata) => <div><Space><strong>{value || subjectLabel(row.subject)}</strong>{subjectStatus(row.subject) === '停用' && <Tag>学科已停用</Tag>}</Space>{row.summary && <div className="subject-summary-text">{row.summary}</div>}</div> }, { title: '体验内容', dataIndex: 'previewCourseId', render: (value: string) => value ? '已指定课程' : <Tag color="blue">自动选首课</Tag> }, { title: '排序', dataIndex: 'sortOrder', width: 90 }, { title: '目录展示', dataIndex: 'status', width: 100, render: (value: string) => <Tag color={value === '启用' ? 'green' : 'default'}>{value === '启用' ? '显示' : '隐藏'}</Tag> }, { title: '操作', width: 90, render: (_, row: GradeSubjectMetadata) => <ActionButton tooltip="编辑目录项" icon={<EditOutlined />} onClick={() => onEdit(row)} /> }]} />}</Card></>;
+  return <><div className="grade-breadcrumb"><Button type="link" icon={<ArrowLeftOutlined />} onClick={onBack}>返回年级列表</Button><span>年级课程目录 / {grade}</span></div><div className="page-heading grade-catalog-heading"><div><h2>{grade}课程目录</h2><p>{summary.enabledCount} 门学科在目录中显示，{summary.missingCoverCount > 0 ? `${summary.missingCoverCount} 张课程图片待补充。` : '课程图片已配置完成。'}</p></div><Space><Select aria-label="切换年级" value={grade} options={gradeOptions()} onChange={onChangeGrade} style={{ width: 130 }} /><Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>添加已有学科</Button></Space></div><Card className="grade-subject-table-card">{rows.length === 0 ? <Empty description={`${grade}目录还没有学科`}><Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>添加已有学科</Button></Empty> : <Table rowKey="id" scroll={{ x: 900 }} pagination={false} dataSource={rows} columns={[{ title: '课程图片', width: 132, render: (_, row: GradeSubjectMetadata) => row.imageUrl ? <Image width={92} height={52} style={{ objectFit: 'cover', borderRadius: 6 }} src={resolveAssetUrl(row.imageUrl)} /> : <span className="course-cover-empty"><PictureOutlined /> 待上传</span> }, { title: '学科', dataIndex: 'displayName', render: (value: string, row: GradeSubjectMetadata) => <div><Space><strong>{value || subjectLabel(row.subject)}</strong>{subjectStatus(row.subject) === '停用' && <Tag>学科已停用</Tag>}</Space>{row.summary && <div className="subject-summary-text">{row.summary}</div>}</div> }, { title: '开设班型', render: (_, row: GradeSubjectMetadata) => <Space wrap size={4}>{row.levels?.map(level => <Tag key={level}>{level}</Tag>)}</Space> }, { title: '体验内容', dataIndex: 'previewCourseId', render: (value: string) => value ? '已指定课程' : <Tag color="blue">自动选首课</Tag> }, { title: '排序', dataIndex: 'sortOrder', width: 90 }, { title: '目录展示', dataIndex: 'status', width: 100, render: (value: string) => <Tag color={value === '启用' ? 'green' : 'default'}>{value === '启用' ? '显示' : '隐藏'}</Tag> }, { title: '操作', width: 160, render: (_, row: GradeSubjectMetadata) => <Space><ActionButton tooltip="编辑目录项" icon={<EditOutlined />} onClick={() => onEdit(row)} /><Button type="link" size="small" onClick={() => onLevels(row)}>配置班型</Button></Space> }]} />}</Card></>;
 }

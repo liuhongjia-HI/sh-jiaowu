@@ -273,7 +273,14 @@ func filterPackageContentTypes(items []packageContentType, packageID string) []p
 
 func (s *MemoryStore) learningSpacesUnlocked() []learning.LearningSpace {
 	out := make([]learning.LearningSpace, 0, len(s.learningSpaces))
+	levelsByScope := map[string][]string{}
 	for _, space := range s.learningSpaces {
+		key := space.Grade + "|" + space.Subject
+		levels, exists := levelsByScope[key]
+		if !exists {
+			levels = s.availableGradeSubjectLevels(space.Grade, space.Subject)
+			levelsByScope[key] = levels
+		}
 		out = append(out, learning.LearningSpace{
 			ID:           space.ID,
 			AcademicYear: space.AcademicYear,
@@ -284,6 +291,7 @@ func (s *MemoryStore) learningSpacesUnlocked() []learning.LearningSpace {
 			Level:        space.Level,
 			Name:         space.Name,
 			Status:       space.Status,
+			Selectable:   space.Status == learning.StatusEnabled && containsString(levels, learningLevelOrDefault(space.Level)),
 		})
 	}
 	return out

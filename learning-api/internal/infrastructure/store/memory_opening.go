@@ -42,6 +42,16 @@ func (s *MemoryStore) openingSubject(spaceID, grade string) (learning.SubjectMet
 			break
 		}
 	}
+	for _, item := range s.gradeSubjectCatalogUnlocked() {
+		if item.Grade == grade && subjectsMatch(item.Subject, meta.Name) && item.Levels != nil {
+			// 班型配置限制新增课程/方案，不撤销历史方案的开通能力。
+			levels = append([]string(nil), item.Levels...)
+			if validLearningLevel(learningLevelOrDefault(space.Level)) {
+				levels = append(levels, learningLevelOrDefault(space.Level))
+			}
+			break
+		}
+	}
 	level := strings.TrimSpace(space.Level)
 	if level == "" {
 		level = "S"

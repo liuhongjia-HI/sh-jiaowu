@@ -1,0 +1,127 @@
+{
+  "date": "2026-11-06",
+  "productionVersion": "f0c07c5fe7efd07e540109ca73c6e6ed0e388d70",
+  "method": "线上真实新增课件、替换文件更新、自动发送任务与微信签名回执核对；未使用手动群发接口",
+  "testCourse": {
+    "id": "course-custom-20261106114959.968126878",
+    "name": "G4数学·课件通知验收（无需学习）",
+    "status": "停用"
+  },
+  "materialId": "material-20261106115032.843933204",
+  "fileChanged": true,
+  "createCaseNote": "首轮发现跳转兼容问题，修复发布后重试同一条明确拒绝的自动任务，未增加站内消息",
+  "updateCaseNote": "新版本发布后直接自动触发并送达，无人工补发",
+  "results": {
+    "2026-11-06T12:00:58+08:00": {
+      "station": 6,
+      "wechatDelivered": 1,
+      "noWechatAttempt": 5,
+      "students": [
+        {
+          "student": "Charles",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "Joanna",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "Grace",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "LEE 4",
+          "station": true,
+          "wechatStatus": "已送达",
+          "wechatAttempts": 1,
+          "deliveredAt": "2026-11-06T12:01:10+08:00"
+        },
+        {
+          "student": "Justin",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "Chloe",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        }
+      ]
+    },
+    "2026-11-06T11:50:34+08:00": {
+      "station": 6,
+      "wechatDelivered": 1,
+      "noWechatAttempt": 5,
+      "students": [
+        {
+          "student": "Chloe",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "Joanna",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "Grace",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "Charles",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "Justin",
+          "station": true,
+          "wechatStatus": "不可触达",
+          "wechatAttempts": 0,
+          "deliveredAt": null
+        },
+        {
+          "student": "LEE 4",
+          "station": true,
+          "wechatStatus": "已送达",
+          "wechatAttempts": 1,
+          "deliveredAt": "2026-11-06T12:00:41+08:00"
+        }
+      ]
+    }
+  },
+  "totals": {
+    "stationNotices": 12,
+    "wechatDelivered": 2,
+    "unfollowedWechatAttempts": 0
+  },
+  "duplicateBatchCompletionVerified": true,
+  "originalCourseAndMaterialsModified": false,
+  "studentPermissionsModified": false,
+  "limitations": [
+    "微信已送达不等于用户已阅读",
+    "站内消息通过线上接口、数据库及权限测试核对，未代学生进行真机已读操作"
+  ],
+  "acceptancePassed": true
+}

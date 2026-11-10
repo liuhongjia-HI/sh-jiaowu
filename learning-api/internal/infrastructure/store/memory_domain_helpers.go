@@ -691,6 +691,9 @@ func (s *MemoryStore) packageFromRequest(id string, req learning.PackageUpsertRe
 		if !s.learningSpaceMatches(spaceID, req.Grade, req.Subject, req.Semester) {
 			return learning.Package{}, errors.New("学习空间需与套餐年级、学科和学期一致")
 		}
+		if (!existing || !containsString(oldSpaces, spaceID)) && !s.learningSpaceSelectable(space) {
+			return learning.Package{}, errors.New("该班型已取消开设，不能用于新增课程方案")
+		}
 		if expandsAccess || !containsString(oldSpaces, spaceID) {
 			if _, reason := s.openingSubject(spaceID, req.Grade); reason != "" {
 				return learning.Package{}, errors.New(reason)
@@ -831,6 +834,10 @@ func (s *MemoryStore) courseFromRequest(principal learning.Principal, id string,
 	space, ok := s.findLearningSpace(req.LearningSpaceID)
 	if !ok {
 		return learning.Course{}, errors.New("学习空间不存在")
+	}
+	existingCourse, exists := s.findCourse(id)
+	if (!exists || existingCourse.LearningSpaceID != space.ID) && !s.learningSpaceSelectable(space) {
+		return learning.Course{}, errors.New("该班型已取消开设，不能用于新增课程")
 	}
 	course := learning.Course{
 		ID:              id,

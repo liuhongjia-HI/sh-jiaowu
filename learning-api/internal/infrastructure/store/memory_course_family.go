@@ -246,7 +246,7 @@ func (s *MemoryStore) createCourseFamilyUnlocked(operator string, principal lear
 		}
 		seen[spaceID] = true
 		space, ok := s.findLearningSpace(spaceID)
-		if !ok || space.Status == learning.StatusDisabled {
+		if !ok || !s.learningSpaceSelectable(space) {
 			return learning.CourseFamily{}, errors.New("班型对应的学习空间不存在或已停用")
 		}
 		if len(spaces) > 0 && !sameCourseFamilySpace(spaces[0], space) {
@@ -381,7 +381,7 @@ func (s *MemoryStore) addCourseFamilyCourseUnlocked(operator string, principal l
 	}
 	family := s.courseFamilies[index]
 	space, ok := s.findLearningSpace(strings.TrimSpace(req.LearningSpaceID))
-	if !ok || space.Status == learning.StatusDisabled {
+	if !ok || !s.learningSpaceSelectable(space) {
 		return learning.Course{}, errors.New("班型对应的学习空间不存在或已停用")
 	}
 	if family.Grade != space.Grade || !subjectsMatch(family.Subject, space.Subject) || family.Semester != space.Semester || family.Phase != space.Phase {

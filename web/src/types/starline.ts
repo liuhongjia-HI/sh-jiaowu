@@ -84,6 +84,7 @@ export type TeacherUpsertRequest = {
 };
 
 export type LearningSpace = {
+  selectable?: boolean;
   id: string;
   /** 数据库历史遗留列，纯展示、不参与匹配，别用它拼学年下拉——校历（settings.academicCalendar）才是学年的权威来源，见 academicYearsFromCalendar。 */
   academicYear: string;
@@ -559,6 +560,7 @@ export type SubjectMetadata = {
 export type SubjectMetadataUpdateRequest = Pick<SubjectMetadata, 'shortLabel' | 'color' | 'sortOrder' | 'status'>;
 
 export type GradeSubjectMetadata = {
+  levels?: string[];
   id: string;
   gradeCode: string;
   grade: string;

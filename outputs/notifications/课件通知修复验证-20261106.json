@@ -1,0 +1,31 @@
+{
+  "productionVersion": "f0c07c5fe7efd07e540109ca73c6e6ed0e388d70",
+  "automaticNoticeEnabled": true,
+  "templateReady": true,
+  "templateTitle": "培训资料确认审批提醒",
+  "fieldMappings": {
+    "thing2": "course_name",
+    "thing3": "uploader_name",
+    "time4": "published_at"
+  },
+  "singleRealMessageVerification": {
+    "student": "LEE 4",
+    "recipient": "已关联且已关注公众号的家长",
+    "campaignStatus": "发送完成",
+    "targetCount": 1,
+    "successCount": 1,
+    "failureCount": 0,
+    "receiptStatus": "已送达",
+    "acceptedAt": "2026-11-06T11:40:10+08:00",
+    "deliveredAt": "2026-11-06T11:40:11+08:00",
+    "pagePath": "pages/notices/index"
+  },
+  "automaticNaturalUploadObservedAfterEnable": false,
+  "limitations": [
+    "微信送达回执不等于用户已阅读",
+    "未关注或未匹配身份的家长仅保留站内消息",
+    "新详情路径被微信拒绝时回退到已发布消息中心"
+  ],
+  "latestAcceptanceReport": "课件新增与更新通知验收-20261106.json",
+  "automaticUploadAndUpdateVerifiedInProduction": true
+}

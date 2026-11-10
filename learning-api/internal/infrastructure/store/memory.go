@@ -360,7 +360,7 @@ func (s *MemoryStore) ensureLearningSpaces(academicYear string) {
 			s.learningSpaces[index].Status = learning.StatusEnabled
 		}
 	}
-	for _, space := range append(baseLearningSpaces(academicYear), extraLearningSpaces(academicYear, s.enabledOptionalSubjects())...) {
+	for _, space := range append(append(baseLearningSpaces(academicYear), extraLearningSpaces(academicYear, s.enabledOptionalSubjects())...), s.configuredLearningSpaces(academicYear)...) {
 		if exists[space.ID] {
 			continue
 		}

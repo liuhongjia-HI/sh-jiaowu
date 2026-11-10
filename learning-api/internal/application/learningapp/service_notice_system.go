@@ -90,3 +90,7 @@ func (s *Service) RevealWechatSecret(field string) (string, error) {
 func (s *Service) LookupOfficialRecipient(phone string) (learning.OfficialRecipientLookup, error) {
 	return s.notice.LookupOfficialRecipient(phone)
 }
+
+func (s *Service) UpdateGradeSubjectLevels(o, id string, req learning.GradeSubjectLevelsUpdateRequest) (learning.GradeSubjectMetadata, error) {
+	return s.system.UpdateGradeSubjectLevels(o, id, req)
+}

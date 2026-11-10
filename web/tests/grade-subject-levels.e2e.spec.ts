@@ -1,0 +1,98 @@
+import { expect, test } from '@playwright/test';
+
+test('配置班型、课程与方案选项、历史编辑及移动布局', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/login');
+  await page.getByLabel('手机号').fill('13800000001');
+  await page.getByLabel('密码').fill('123456');
+  await page.getByRole('button', { name: '进入工作台' }).click();
+  await expect(page.getByRole('heading', { name: '今日待办' })).toBeVisible();
+  const token = await page.evaluate(() => localStorage.getItem('starline_admin_token'));
+  const headers = { Authorization: `Bearer ${token}` };
+  const catalog = await page.request.get('/api/grade-subjects', { headers });
+  const item = (await catalog.json()).data.find((item: { id: string }) => item.id === 'g5-science');
+  expect(item).toBeTruthy();
+  await page.request.put(`/api/grade-subjects/${item.id}/levels`, { headers, data: { levels: ['S'] } });
+  await page.goto('/teaching-settings?tab=catalog&grade=五年级');
+  const row = page.getByRole('row').filter({ hasText: 'Science' });
+  await row.getByRole('button', { name: '配置班型' }).click();
+  const dialog = page.getByRole('dialog', { name: '配置班型 · 五年级Science' });
+  await expect(dialog.getByRole('checkbox', { name: 'S', exact: true })).toBeChecked();
+  await dialog.locator('.ant-checkbox-wrapper').filter({ hasText: /^S$/ }).click();
+  await expect(dialog.getByRole('checkbox', { name: 'S', exact: true })).not.toBeChecked();
+  await dialog.getByRole('button', { name: /^保\s*存$/ }).click();
+  await expect(dialog.getByText('请至少保留一个班型')).toBeVisible();
+  await dialog.locator('.ant-checkbox-wrapper').filter({ hasText: /^S$/ }).click();
+  await dialog.locator('.ant-checkbox-wrapper').filter({ hasText: /^S\+$/ }).click();
+  await dialog.getByRole('button', { name: /^保\s*存$/ }).click();
+  await expect(dialog).toBeHidden();
+  await expect(row).toContainText('S+');
+  await page.reload();
+  await expect(row).toContainText('S+');
+
+  await page.goto('/content');
+  await page.getByRole('button', { name: '新增课程系列' }).click();
+  const setup = page.getByRole('dialog', { name: '新增课程系列 · 选择班型' });
+  await setup.getByRole('combobox', { name: '课程系列范围' }).fill('五年级 · Science');
+  await page.locator('.ant-select-item-option').filter({ hasText: /五年级.*Science.*S1.*Q1/ }).click();
+  await expect(setup.locator('.ant-checkbox-wrapper').filter({ hasText: /^S\+ ·/ })).toBeVisible();
+  await setup.getByRole('button', { name: /^取\s*消$/ }).click();
+
+  await page.goto('/packages');
+  await page.getByRole('button', { name: '新增方案' }).click();
+  const pkgDialog = page.getByRole('dialog', { name: '新增课程方案' });
+  await pkgDialog.getByLabel('年级', { exact: true }).locator('..').locator('..').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('五年级', { exact: true }).click();
+  await pkgDialog.getByLabel('学科', { exact: true }).locator('..').locator('..').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('Science', { exact: true }).click();
+  await pkgDialog.getByLabel('等级', { exact: true }).locator('..').locator('..').click();
+  await expect(page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content').filter({ hasText: /^S\+$/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await pkgDialog.getByRole('button', { name: /^取\s*消$/ }).click();
+
+  // Create a historical package before removing the level, then save through the real UI.
+  const packageName = `科学班型验证 ${Date.now()}`;
+  const result = await page.request.post('/api/packages', { headers, data: { name: packageName, grade: '五年级', subject: '科学', semester: 'S1', level: 'S+', learningSpaceIds: ['space-g05-science-s1-q1-splus'], contentTypeCodes: ['handout'], status: '启用' } });
+  expect(result.ok(), await result.text()).toBeTruthy();
+  await page.goto('/teaching-settings?tab=catalog&grade=五年级');
+  await row.getByRole('button', { name: '配置班型' }).click();
+  await dialog.locator('.ant-checkbox-wrapper').filter({ hasText: /^S\+$/ }).click();
+  await dialog.getByRole('button', { name: /^保\s*存$/ }).click();
+  await expect(dialog).toBeHidden();
+  await expect(row).not.toContainText('S+');
+  await page.goto('/packages');
+  const packageRow = page.getByRole('row').filter({ hasText: packageName });
+  await packageRow.getByRole('button', { name: /^编\s*辑$/ }).click();
+  const edit = page.getByRole('dialog', { name: '编辑课程方案' });
+  await expect(edit).toContainText('S+');
+  await edit.getByLabel('方案名称').fill(`${packageName} 已编辑`);
+  await edit.getByRole('button', { name: /^保\s*存$/ }).click();
+  await expect(edit).toBeHidden();
+  await expect(page.getByRole('row').filter({ hasText: `${packageName} 已编辑` })).toBeVisible();
+
+  await page.getByRole('button', { name: '新增方案' }).click();
+  await pkgDialog.getByLabel('年级', { exact: true }).locator('..').locator('..').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('五年级', { exact: true }).click();
+  await pkgDialog.getByLabel('学科', { exact: true }).locator('..').locator('..').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('Science', { exact: true }).click();
+  await pkgDialog.getByLabel('等级', { exact: true }).locator('..').locator('..').click();
+  await expect(page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content').filter({ hasText: /^S\+$/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await pkgDialog.getByRole('button', { name: /^取\s*消$/ }).click();
+
+  await page.goto('/content');
+  await page.getByRole('button', { name: '新增课程系列' }).click();
+  await setup.getByRole('combobox', { name: '课程系列范围' }).fill('五年级 · Science');
+  await page.locator('.ant-select-item-option').filter({ hasText: /五年级.*Science.*S1.*Q1/ }).click();
+  await expect(setup.locator('.ant-checkbox-wrapper').filter({ hasText: /^S\+ ·/ })).toHaveCount(0);
+  await page.goto('/teaching-settings?tab=catalog&grade=五年级');
+  await page.screenshot({ path: '../outputs/grade-subject-levels/catalog.png', animations: 'disabled' });
+  await row.getByRole('button', { name: '配置班型' }).click();
+  await page.screenshot({ path: '../outputs/grade-subject-levels/desktop.png', animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog.getByRole('button', { name: /^保\s*存$/ })).toBeVisible();
+  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBeTruthy();
+  await page.screenshot({ path: '../outputs/grade-subject-levels/mobile.png', animations: 'disabled' });
+  expect(errors).toEqual([]);
+});

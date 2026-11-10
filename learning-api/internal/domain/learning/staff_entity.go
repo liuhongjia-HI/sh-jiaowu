@@ -37,7 +37,8 @@ type TeacherUpsertRequest struct {
 }
 
 type LearningSpace struct {
-	ID string `json:"id"`
+	Selectable bool   `json:"selectable"`
+	ID         string `json:"id"`
 	// AcademicYear 不是业务数据，不参与任何匹配（见 learningSpaceMatches），
 	// 也不出现在任何筛选/展示逻辑里——纯粹是 learning_spaces 表建表时留下的
 	// 历史遗留列，已从 uk_learning_space 业务唯一键移除，但暂时保留字段兼容

@@ -1,0 +1,77 @@
+{
+  "date": "2026-11-07",
+  "change": "课件新增与更新通知切换为作业提交成功通知",
+  "templateId": "YYwCfemaHRZNGtS_dDE0f21j3pvoloSEOpIbVD9m17Y",
+  "templateTitle": "作业提交成功通知",
+  "fieldMappings": {
+    "thing2": "resource_title",
+    "thing6": "course_name",
+    "time4": "published_at"
+  },
+  "enabled": true,
+  "ready": true,
+  "recipientScopeUnchanged": true,
+  "verificationMethod": "生产环境真实新增、替换文件更新，自动通知任务与微信回执核对；未使用手动群发补发",
+  "verification": {
+    "2026-11-07T17:51:34+08:00": {
+      "station": 6,
+      "wechatDelivered": 1,
+      "noWechatAttempt": 5,
+      "templateCorrect": true,
+      "valuesCorrect": true,
+      "deliveredAt": [
+        "2026-11-07T17:51:40+08:00"
+      ]
+    },
+    "2026-11-07T17:51:01+08:00": {
+      "station": 6,
+      "wechatDelivered": 1,
+      "noWechatAttempt": 5,
+      "templateCorrect": true,
+      "valuesCorrect": true,
+      "deliveredAt": [
+        "2026-11-07T17:51:11+08:00"
+      ]
+    }
+  },
+  "automaticCases": [
+    {
+      "student": "LEE 4",
+      "templateId": "YYwCfemaHRZNGtS_dDE0f21j3pvoloSEOpIbVD9m17Y",
+      "values": {
+        "thing2": "课件通知验收·更新（无需学习）",
+        "thing6": "G4数学·课件通知验收（无需学习）",
+        "time4": "2026-11-07 17:51:34"
+      },
+      "status": "已送达",
+      "attempts": 1,
+      "deliveredAt": "2026-11-07T17:51:40+08:00"
+    },
+    {
+      "student": "LEE 4",
+      "templateId": "YYwCfemaHRZNGtS_dDE0f21j3pvoloSEOpIbVD9m17Y",
+      "values": {
+        "thing2": "课件通知验收·新增（无需学习）",
+        "thing6": "G4数学·课件通知验收（无需学习）",
+        "time4": "2026-11-07 17:51:00"
+      },
+      "status": "已送达",
+      "attempts": 1,
+      "deliveredAt": "2026-11-07T17:51:11+08:00"
+    }
+  ],
+  "totals": {
+    "stationNotices": 12,
+    "wechatDelivered": 2,
+    "unreachableWechatAttempts": 0
+  },
+  "duplicateCompletionDidNotResend": true,
+  "testCourseStatusRestored": "停用",
+  "originalTeachingMaterialsChanged": false,
+  "studentPermissionsChanged": false,
+  "limitations": [
+    "微信回执已送达不等于用户已阅读",
+    "站内消息核对线上记录，未代替学生进行真机已读操作"
+  ],
+  "passed": true
+}

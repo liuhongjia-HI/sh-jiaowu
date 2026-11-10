@@ -83,7 +83,11 @@ func sortGradeSubjects(items []learning.GradeSubjectMetadata) {
 }
 
 func (s *MemoryStore) gradeSubjectsUnlocked() []learning.GradeSubjectMetadata {
-	return s.gradeSubjectCatalogUnlocked()
+	items := s.gradeSubjectCatalogUnlocked()
+	for i := range items {
+		items[i].Levels = s.availableGradeSubjectLevels(items[i].Grade, items[i].Subject)
+	}
+	return items
 }
 
 func (s *MemoryStore) updateGradeSubjectsUnlocked(operator string, req learning.GradeSubjectCatalogUpdateRequest) ([]learning.GradeSubjectMetadata, error) {
@@ -95,6 +99,7 @@ func (s *MemoryStore) updateGradeSubjectsUnlocked(operator string, req learning.
 	if len(req.Items) == 0 {
 		return nil, errors.New("请至少保留一门年级学科")
 	}
+	previous := s.gradeSubjectCatalogUnlocked()
 	seen := map[string]bool{}
 	items := make([]learning.GradeSubjectMetadata, 0, len(req.Items))
 	for _, item := range req.Items {
@@ -111,7 +116,32 @@ func (s *MemoryStore) updateGradeSubjectsUnlocked(operator string, req learning.
 		if item.Status != "启用" && item.Status != "停用" {
 			return nil, errors.New("目录状态只能为启用或停用")
 		}
-		key := item.Grade + "|" + item.Subject
+		if item.Levels == nil {
+			for _, old := range previous {
+				if old.ID == item.ID {
+					item.Levels = old.Levels
+					break
+				}
+			}
+		} else {
+			if len(item.Levels) == 0 {
+				return nil, errors.New("请至少保留一个班型")
+			}
+			selected := map[string]bool{}
+			for _, level := range item.Levels {
+				if !validLearningLevel(level) || selected[level] {
+					return nil, errors.New("班型只能选择 S、S+、H、H+，且不能重复")
+				}
+				selected[level] = true
+			}
+			item.Levels = nil
+			for _, level := range advancedLevels {
+				if selected[level] {
+					item.Levels = append(item.Levels, level)
+				}
+			}
+		}
+		key := item.Grade + "|" + subjectSlug(item.Subject)
 		if seen[key] {
 			return nil, errors.New("同一年级不能重复配置同一学科")
 		}
@@ -126,6 +156,16 @@ func (s *MemoryStore) updateGradeSubjectsUnlocked(operator string, req learning.
 		return nil, errors.New("年级课程目录保存失败")
 	}
 	s.settings[gradeSubjectCatalogSetting] = string(raw)
+	existing := map[string]bool{}
+	for _, space := range s.learningSpaces {
+		existing[space.ID] = true
+	}
+	for _, space := range s.configuredLearningSpaces(currentAcademicYear()) {
+		if !existing[space.ID] {
+			s.learningSpaces = append(s.learningSpaces, space)
+			existing[space.ID] = true
+		}
+	}
 	s.prependLog(operator, "更新年级课程目录", "已更新 "+itoa(len(items))+" 个年级学科")
 	return items, nil
 }
@@ -154,6 +194,7 @@ func (s *MemoryStore) upsertGradeSubjectUnlocked(operator, id string, item learn
 			if items[index].Grade != strings.TrimSpace(item.Grade) || !subjectsMatch(items[index].Subject, item.Subject) {
 				return learning.GradeSubjectMetadata{}, errors.New("已有目录项不能修改年级或学科")
 			}
+			item.Levels = items[index].Levels // 普通目录编辑不得覆盖并发更新的班型配置。
 			items[index] = item
 			found = true
 			break
@@ -169,6 +210,9 @@ func (s *MemoryStore) upsertGradeSubjectUnlocked(operator, id string, item learn
 		}
 		if !subjectEnabled {
 			return learning.GradeSubjectMetadata{}, errors.New("只能添加已启用的已有学科")
+		}
+		if item.Levels == nil {
+			item.Levels = s.availableGradeSubjectLevels(item.Grade, item.Subject)
 		}
 		items = append(items, item)
 	}
@@ -322,4 +366,95 @@ func (s *MemoryStore) previewContentCounts(course learning.Course) (int, int) {
 		}
 	}
 	return materials, homework
+}
+
+// availableGradeSubjectLevels preserves actual existing spaces until this scope is explicitly configured.
+func (s *MemoryStore) availableGradeSubjectLevels(grade, subject string) []string {
+	for _, item := range s.gradeSubjectCatalogUnlocked() {
+		if item.Grade == grade && subjectsMatch(item.Subject, subject) && item.Levels != nil {
+			return append([]string(nil), item.Levels...)
+		}
+	}
+	selected := map[string]bool{}
+	for _, space := range s.learningSpaces {
+		if space.Grade == grade && subjectsMatch(space.Subject, subject) && space.Status == learning.StatusEnabled {
+			level := space.Level
+			if level == "" {
+				level = "S"
+			}
+			selected[level] = true
+		}
+	}
+	levels := []string{}
+	for _, level := range advancedLevels {
+		if selected[level] {
+			levels = append(levels, level)
+		}
+	}
+	if len(levels) > 0 {
+		return levels
+	}
+	index := gradeIndexOf(grade)
+	for _, core := range demoSubjects {
+		if subjectsMatch(core, subject) {
+			return append([]string(nil), levelsForGradeSubject(index, core)...)
+		}
+	}
+	return append([]string(nil), extraSubjectLevels(index)...)
+}
+
+func (s *MemoryStore) learningSpaceSelectable(space learningSpace) bool {
+	return space.Status == learning.StatusEnabled && containsString(s.availableGradeSubjectLevels(space.Grade, space.Subject), learningLevelOrDefault(space.Level))
+}
+
+func (s *MemoryStore) configuredLearningSpaces(academicYear string) []learningSpace {
+	var spaces []learningSpace
+	for _, item := range s.gradeSubjectCatalogUnlocked() {
+		if len(item.Levels) == 0 {
+			continue
+		}
+		spaces = append(spaces, learningSpacesForSubjects(academicYear, []string{item.Subject}, func(index int, subject string) []string {
+			if demoGrades[index] == item.Grade {
+				return item.Levels
+			}
+			return nil
+		})...)
+	}
+	return spaces
+}
+
+func (s *MemoryStore) UpdateGradeSubjectLevels(operator, id string, req learning.GradeSubjectLevelsUpdateRequest) (learning.GradeSubjectMetadata, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return persistentMutation(s, func(work *MemoryStore) (learning.GradeSubjectMetadata, error) {
+		if len(req.Levels) == 0 {
+			return learning.GradeSubjectMetadata{}, errors.New("请至少保留一个班型")
+		}
+		items := work.gradeSubjectCatalogUnlocked()
+		for i := range items {
+			if items[i].ID != id {
+				continue
+			}
+			before := work.availableGradeSubjectLevels(items[i].Grade, items[i].Subject)
+			items[i].Levels = req.Levels
+			updated, err := work.updateGradeSubjectsUnlocked(operator, learning.GradeSubjectCatalogUpdateRequest{Items: items})
+			if err != nil {
+				return learning.GradeSubjectMetadata{}, err
+			}
+			for _, item := range updated {
+				if item.ID == id {
+					work.prependLogDetail(operator, "配置学科班型", item.Grade+item.Subject, strings.Join(before, "、")+" → "+strings.Join(item.Levels, "、"))
+					return item, nil
+				}
+			}
+		}
+		return learning.GradeSubjectMetadata{}, errors.New("年级学科不存在")
+	})
+}
+
+func learningLevelOrDefault(level string) string {
+	if strings.TrimSpace(level) == "" {
+		return "S"
+	}
+	return level
 }

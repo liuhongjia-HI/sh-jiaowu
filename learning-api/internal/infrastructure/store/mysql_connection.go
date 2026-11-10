@@ -168,7 +168,7 @@ func (s *MemoryStore) reconcileBaseLearningSpaces() error {
 	if err != nil {
 		return err
 	}
-	for _, space := range append(baseLearningSpaces(academicYear), extraLearningSpaces(academicYear, s.enabledOptionalSubjects())...) {
+	for _, space := range append(append(baseLearningSpaces(academicYear), extraLearningSpaces(academicYear, s.enabledOptionalSubjects())...), s.configuredLearningSpaces(academicYear)...) {
 		if _, err := tx.Exec(
 			`INSERT INTO learning_spaces (id, academic_year, grade, subject, semester, phase, level, name, status)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

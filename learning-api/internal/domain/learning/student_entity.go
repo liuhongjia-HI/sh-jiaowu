@@ -252,19 +252,23 @@ type StudentCourseCard struct {
 	IsNew          bool   `json:"isNew"`
 }
 
-// GradeSubjectMetadata 是学习中心的课程目录项。它描述“某年级开设什么学科”，
-// 与按学期/阶段拆分的具体 Course 分开，避免学生端出现同一学科多张卡片。
+type GradeSubjectLevelsUpdateRequest struct {
+	Levels []string `json:"levels"`
+}
+
+// GradeSubjectMetadata 描述某年级的学科目录；Levels 为 nil 时沿用现有班型。
 type GradeSubjectMetadata struct {
-	ID              string `json:"id"`
-	GradeCode       string `json:"gradeCode"`
-	Grade           string `json:"grade"`
-	Subject         string `json:"subject"`
-	DisplayName     string `json:"displayName"`
-	ImageURL        string `json:"imageUrl,omitempty"`
-	Summary         string `json:"summary,omitempty"`
-	SortOrder       int    `json:"sortOrder"`
-	Status          string `json:"status"`
-	PreviewCourseID string `json:"previewCourseId,omitempty"`
+	ID              string   `json:"id"`
+	GradeCode       string   `json:"gradeCode"`
+	Grade           string   `json:"grade"`
+	Subject         string   `json:"subject"`
+	DisplayName     string   `json:"displayName"`
+	ImageURL        string   `json:"imageUrl,omitempty"`
+	Summary         string   `json:"summary,omitempty"`
+	SortOrder       int      `json:"sortOrder"`
+	Status          string   `json:"status"`
+	PreviewCourseID string   `json:"previewCourseId,omitempty"`
+	Levels          []string `json:"levels,omitempty"`
 }
 
 type GradeSubjectCatalogUpdateRequest struct {

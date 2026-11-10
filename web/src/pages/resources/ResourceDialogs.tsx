@@ -7,7 +7,7 @@ import type React from 'react';
 import { getData, http, postData, postForm, putData } from '../../services/http';
 import { FormDrawer } from '../../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, TagGroup, useListViewMode } from '../../components/ListViews';
-import { ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, curriculumSiblings, formatLearningSpace, gradeIndex, gradeOptions, levelOptions, nextCurriculumSortOrder, phaseLabel, semesterLabel, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade, subjectsMatch, useSubjectCatalog } from '../../utils/curriculum';
+import { ALL_SUBJECTS, DEFAULT_ACADEMIC_YEAR, academicYearForDate, curriculumLessonOptions, curriculumSiblings, formatLearningSpace, gradeIndex, gradeOptions, nextCurriculumSortOrder, phaseLabel, semesterLabel, semesterOptions, subjectLabel, subjectOptions, subjectsForGrade, subjectsMatch, useSubjectCatalog } from '../../utils/curriculum';
 import type { Course, CourseUpsertRequest, CurriculumReference, CurriculumReferenceMove, CurrentUser, Homework, HomeworkSubmissionSummary, HomeworkUpdateRequest, LearningSpace, Material, MaterialUpdateRequest, NoticeCreateRequest, PackageUpsertRequest, QuestionBankItem, QuestionBankUpsertRequest, Review, ReviewCompleteRequest, SettingUpdateRequest, StudyPackage } from '../../types/starline';
 
 type Kind = 'packages' | 'content' | 'questions' | 'materials' | 'homework' | 'review' | 'notices' | 'logs' | 'settings';
@@ -337,8 +337,8 @@ export function CourseDialog({
   const [chapterCounts, setChapterCounts] = useState<Record<string, number>>({});
   const [lessonCounts, setLessonCounts] = useState<Record<string, number>>({});
   const availableSpaces = useMemo(
-    () => learningSpaces.filter((space) => unrestricted || allowedLearningSpaceIds.includes(space.id)),
-    [allowedLearningSpaceIds, learningSpaces, unrestricted]
+    () => learningSpaces.filter((space) => (space.selectable !== false || editing && space.id === originalSpaceId || scopeLocked && space.id === scopeSpaceId) && (unrestricted || allowedLearningSpaceIds.includes(space.id))),
+    [allowedLearningSpaceIds, learningSpaces, unrestricted, editing, originalSpaceId, scopeLocked, scopeSpaceId]
   );
   const subjectCatalog = useSubjectCatalog();
   const grade = Form.useWatch('grade', form);
@@ -840,8 +840,14 @@ export function PackageDialog({
   const contentTypeCodes = Form.useWatch('contentTypeCodes', form);
   const [autoNameEnabled, setAutoNameEnabled] = useState(!editing);
   const lastAutoName = useRef('');
-  const spaceOptions = learningSpaces
-    .filter((space) => space.status !== '停用' && (!grade || space.grade === grade) && (!subject || space.subject === subject) && (!semester || space.semester === semester) && (!level || (space.level || 'S') === level))
+  const selectableSpaces = learningSpaces.filter(space => space.status !== '停用' && (
+    space.selectable !== false || editing && initialValues.learningSpaceIds?.includes(space.id)
+  ));
+  const packageLevelOptions = ['S', 'S+', 'H', 'H+']
+    .filter(value => selectableSpaces.some(space => space.grade === grade && subjectsMatch(space.subject, subject) && (space.level || 'S') === value))
+    .map(value => ({ value, label: value }));
+  const spaceOptions = selectableSpaces
+    .filter((space) => (!grade || space.grade === grade) && (!subject || space.subject === subject) && (!semester || space.semester === semester) && (!level || (space.level || 'S') === level))
     .map((space) => ({ label: `${phaseLabel(space.phase)} · ${formatLearningSpace(space)}`, value: space.id }));
 
   useEffect(() => {
@@ -901,16 +907,16 @@ export function PackageDialog({
                 if (currentSubject && !subjectsForGrade(value, subjectCatalog).includes(currentSubject)) {
                   form.setFieldValue('subject', undefined);
                 }
-                form.setFieldValue('level', 'S');
+                form.setFieldValue('level', learningSpaces.find(space => space.grade === value && subjectsMatch(space.subject, form.getFieldValue('subject')) && space.selectable !== false)?.level);
                 form.setFieldValue('learningSpaceIds', []);
               }}
             />
           </Form.Item>
           <Form.Item name="subject" label="学科" rules={[{ required: true, message: '请选择学科' }]}>
-            <Select style={{ width: 150 }} options={subjectOptions(grade, subjectCatalog)} onChange={(value) => { form.setFieldValue('level', levelOptions(grade, value, subjectCatalog)[0]?.value); form.setFieldValue('learningSpaceIds', []); }} />
+            <Select style={{ width: 150 }} options={subjectOptions(grade, subjectCatalog)} onChange={(value) => { form.setFieldValue('level', learningSpaces.find(space => space.grade === grade && subjectsMatch(space.subject, value) && space.selectable !== false)?.level); form.setFieldValue('learningSpaceIds', []); }} />
           </Form.Item>
           <Form.Item name="level" label="等级" rules={[{ required: true, message: '请选择等级' }]}>
-            <Select style={{ width: 110 }} options={levelOptions(grade, subject, subjectCatalog)} onChange={() => form.setFieldValue('learningSpaceIds', [])} />
+            <Select style={{ width: 110 }} options={packageLevelOptions} onChange={() => form.setFieldValue('learningSpaceIds', [])} />
           </Form.Item>
           <Form.Item name="semester" label="学期" rules={[{ required: true, message: '请选择学期' }]}>
             <Select
