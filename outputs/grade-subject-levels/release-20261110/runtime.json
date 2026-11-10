@@ -1,0 +1,13 @@
+{
+  "release": "/opt/starline/releases/86cf7ed6a1012c5d9f9e41af678b2ff2c1f78aa8",
+  "processExecutable": "/opt/starline/releases/86cf7ed6a1012c5d9f9e41af678b2ff2c1f78aa8/learning-api/learning-api",
+  "binarySha256": "4b72da46f15278956cf9a0fd14ba2fa938be935e35ce9e2a84cfcf344f60c92e",
+  "processBinarySha256": "4b72da46f15278956cf9a0fd14ba2fa938be935e35ce9e2a84cfcf344f60c92e",
+  "webIndexSha256": "ce334ec574073fa85e0a4b26eb2da9e8f230f6fcf521df64ed396c7285ba8c6e",
+  "serviceActive": "active",
+  "panicOrFatalLines": 0,
+  "api5xxLines": 0,
+  "previewRuntime": true,
+  "checkedLogLines": 389,
+  "embeddedCommit": "86cf7ed6a1012c5d9f9e41af678b2ff2c1f78aa8"
+}

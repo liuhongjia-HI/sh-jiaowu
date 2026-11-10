@@ -1,0 +1,32 @@
+[
+  {
+    "sampleStudent": 1,
+    "materialIdHash": "84d026885e1d8918b42944fcc2ca075a1f3d10a7813a77806396215e15170aa3",
+    "metadataStatus": "ready",
+    "pageCount": 6,
+    "firstPageHTTP": 200,
+    "contentType": "image/jpeg",
+    "bytes": 137699,
+    "jpegValidated": true
+  },
+  {
+    "sampleStudent": 3,
+    "materialIdHash": "7f1267479c6c57bd69de5f82185a618c556b3fd191b137d3aa4fbf043b262979",
+    "metadataStatus": "ready",
+    "pageCount": 6,
+    "firstPageHTTP": 200,
+    "contentType": "image/jpeg",
+    "bytes": 137247,
+    "jpegValidated": true
+  },
+  {
+    "sampleStudent": 5,
+    "materialIdHash": "6296b4a4d78af252f6af2a98989478299241acfd2e288e032c30d7e19780465e",
+    "metadataStatus": "ready",
+    "pageCount": 12,
+    "firstPageHTTP": 200,
+    "contentType": "image/jpeg",
+    "bytes": 84925,
+    "jpegValidated": true
+  }
+]

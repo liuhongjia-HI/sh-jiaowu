@@ -1,0 +1,168 @@
+{
+  "date": "2026-11-10",
+  "result": "production_verified",
+  "commit": "86cf7ed6a1012c5d9f9e41af678b2ff2c1f78aa8",
+  "previousCommit": "f0c07c5fe7efd07e540109ca73c6e6ed0e388d70",
+  "workflow": {
+    "url": "https://github.com/liuhongjia-HI/sh-jiaowu/actions/runs/42735551321",
+    "status": "completed",
+    "conclusion": "success",
+    "note": "执行期间固定提交已由用户推送，自动流水线完成；未重复发布。"
+  },
+  "entry": "https://sa.starlineeducation.com.cn/teaching-settings?tab=catalog",
+  "production": {
+    "api": "https://gate.starlineeducation.com.cn/api",
+    "upstream": "127.0.0.1:8892",
+    "runningBinaryCommitVerified": true,
+    "publicWebIndexMatchesRelease": true,
+    "health": {
+      "status": "ok"
+    },
+    "runtimeEvidence": "runtime.json"
+  },
+  "backup": {
+    "completedAt": "2026-11-10 09:29:23 +08:00",
+    "serviceSwitchedAt": "2026-11-10 09:29:43 +08:00",
+    "path": "/root/starline-levels-release-20261110/before.sql",
+    "bytes": 13969120,
+    "protected": true,
+    "restoreTest": "已恢复至独立本地 MySQL，生产未执行数据库恢复。"
+  },
+  "businessData": {
+    "method": "切换前一致性备份恢复后生成摘要，与生产最终状态逐表比对。",
+    "groupsCompared": 20,
+    "allIdentical": true,
+    "counts": {
+      "courses": 37,
+      "course_families": 1,
+      "course_curriculum_nodes": 286,
+      "study_packages": 260,
+      "package_spaces": 260,
+      "package_content_types": 1024,
+      "student_package_grants": 190,
+      "student_learning_space_access": 190,
+      "student_trial_records": 0,
+      "materials": 611,
+      "homework_tasks": 1,
+      "homework_submissions": 0,
+      "question_bank_items": 4,
+      "teacher_learning_space_access": 42,
+      "user_roles": 90,
+      "teacher_course_scopes": 0,
+      "teacher_class_scopes": 0,
+      "admin_campus_scopes": 1,
+      "students": 81,
+      "users": 90
+    },
+    "comparisonBoundary": "课程、目录、方案、授权和内容表忽略 created_at、updated_at，其他列均比对；学生及用户仅比对身份、年级、账号状态、有效期、入学信息及令牌版本等权限相关字段。",
+    "evidence": [
+      "backup-database-snapshot.json",
+      "final.json"
+    ]
+  },
+  "studentAccess": {
+    "existingProductionAccountsChecked": 10,
+    "courseMemberships": 27,
+    "courseDetailsChecked": 19,
+    "oldVersionReplayMatches": true,
+    "productionBeforeAndAfterConfigSaveMatches": true,
+    "realPreviews": [
+      {
+        "sampleStudent": 1,
+        "materialIdHash": "84d026885e1d8918b42944fcc2ca075a1f3d10a7813a77806396215e15170aa3",
+        "metadataStatus": "ready",
+        "pageCount": 6,
+        "firstPageHTTP": 200,
+        "contentType": "image/jpeg",
+        "bytes": 137699,
+        "jpegValidated": true
+      },
+      {
+        "sampleStudent": 3,
+        "materialIdHash": "7f1267479c6c57bd69de5f82185a618c556b3fd191b137d3aa4fbf043b262979",
+        "metadataStatus": "ready",
+        "pageCount": 6,
+        "firstPageHTTP": 200,
+        "contentType": "image/jpeg",
+        "bytes": 137247,
+        "jpegValidated": true
+      },
+      {
+        "sampleStudent": 5,
+        "materialIdHash": "6296b4a4d78af252f6af2a98989478299241acfd2e288e032c30d7e19780465e",
+        "metadataStatus": "ready",
+        "pageCount": 12,
+        "firstPageHTTP": 200,
+        "contentType": "image/jpeg",
+        "bytes": 84925,
+        "jpegValidated": true
+      }
+    ],
+    "method": "新生产走真实 HTTPS 网关；旧生产二进制在切换前备份的独立本地副本上重放，10 个账号的课程、讲义和抽取的课程详情一致。不是上线前线上采样，也未进行微信真机验收。",
+    "evidence": "old-version-replay.json"
+  },
+  "configuration": {
+    "scopesCompared": 68,
+    "existingChoicesUnchanged": true,
+    "productionSave": {
+      "productionOrigin": "https://sa.starlineeducation.com.cn",
+      "apiOrigin": "https://gate.starlineeducation.com.cn/api",
+      "scope": "一年级数学",
+      "levelsBefore": [
+        "S"
+      ],
+      "levelsAfter": [
+        "S"
+      ],
+      "saveWithoutChangingLevels": 200,
+      "emptyLevelsRejected": 400,
+      "studentRoleDenied": 403,
+      "reloadReadback": true,
+      "pageErrors": [],
+      "serverErrors": [],
+      "screenshots": [
+        "production-config-desktop.png",
+        "production-config-mobile.png"
+      ],
+      "note": "保留原有 S 选择，仅验证保存与回读；未增减任何实际班型、课程或学生授权。"
+    },
+    "note": "保持一年级数学原有 S 选择保存并刷新回读；生产未执行增减班型或转班。新增、取消、重启和回滚等分支使用同源实现的独立本地验证记录。"
+  },
+  "expectedWrites": [
+    "原有 S 选择持久化为显式配置，语义不变；配置审计日志。",
+    "3 份讲义预览的防盗版审计，以及本次临时令牌退出的安全审计。"
+  ],
+  "knownPreexistingTest": {
+    "name": "TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow",
+    "reason": "测试截止日期固定为 2026-11-01，现已过期。",
+    "pipelineWarningVerified": true,
+    "unchangedBaselineFailurePreviouslyConfirmed": true,
+    "newTargetedReleaseRegression": "passed"
+  },
+  "rollback": {
+    "previousReleaseRetained": "/opt/starline/releases/f0c07c5fe7efd07e540109ca73c6e6ed0e388d70",
+    "productionDatabaseRestorePerformed": false,
+    "condition": "若发现本次改动导致课程读取、配置保存或授权回归，则先切回旧 release；不直接用整库备份覆盖后续并发业务数据。"
+  },
+  "cleanup": {
+    "temporaryTokensRevoked": 11,
+    "otherUserSessionsChanged": false,
+    "serverPrivateFilesRemoved": [
+      "tokens.json",
+      "live-baseline-api-private.json",
+      "after-api-private.json",
+      "final-api-private.json"
+    ],
+    "protectedProductionBackupRetained": true,
+    "localProductionDataAndTemporaryDatabaseRemoved": true,
+    "unrelatedMiniProgramWork": "保留工作区改动，未纳入本次固定提交。"
+  },
+  "screenshotsReviewed": [
+    "production-config-desktop.png",
+    "production-config-mobile.png"
+  ],
+  "limitations": [
+    "未做微信真机操作；学生端结果来自已有真实账号的服务端授权及内容接口。",
+    "生产只验证保留原选择的保存，不取消已有业务班型。"
+  ]
+}

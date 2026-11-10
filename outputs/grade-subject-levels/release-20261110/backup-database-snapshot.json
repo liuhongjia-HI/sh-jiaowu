@@ -1,0 +1,82 @@
+{
+  "courses": {
+    "count": 37,
+    "sha256": "cdbcd2ed9d89cfed4025f7a8b8e643a580842549ba66293d1cc22f4f83553b08"
+  },
+  "course_families": {
+    "count": 1,
+    "sha256": "528f49af5c63543f69b795515ab9089bf1eb7adc965f279ad2293b8df577d4fe"
+  },
+  "course_curriculum_nodes": {
+    "count": 286,
+    "sha256": "95b81dd4859478a54f29b98b473096a72160de62fb9302ef5be01b6e26da0fa4"
+  },
+  "study_packages": {
+    "count": 260,
+    "sha256": "5c330144c7f79ddad61d72c52dd7b4d82d2cf4bd3bdd89b75bdc203bdccb5d69"
+  },
+  "package_spaces": {
+    "count": 260,
+    "sha256": "1c282273ee1c9fcdf8311b5ffdaee6f8019126f3c07462d6d9722fd5a5017205"
+  },
+  "package_content_types": {
+    "count": 1024,
+    "sha256": "beb4d45158612c787694fa7d47c3890139d6445ad37564ee8e58a1cf95ec6dc4"
+  },
+  "student_package_grants": {
+    "count": 190,
+    "sha256": "e4d108ff6c66c9a755ee272d541492c4031aa0b6425b54a10949a265b9eddd1d"
+  },
+  "student_learning_space_access": {
+    "count": 190,
+    "sha256": "09feae2558549e59f97390e748f70812b0787bf9d39590048785ad5253168584"
+  },
+  "student_trial_records": {
+    "count": 0,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "materials": {
+    "count": 611,
+    "sha256": "e43d6db7f8381a30bd230939851dfe9cda829d1ef114e8ed23d4b8c754182e42"
+  },
+  "homework_tasks": {
+    "count": 1,
+    "sha256": "ed0282119615af86e48fdfc91cd87faf14173bf3ffdd085279fe5df69e2748c4"
+  },
+  "homework_submissions": {
+    "count": 0,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "question_bank_items": {
+    "count": 4,
+    "sha256": "aae08f80072be9610a00f493e44f9ae6ba4758e97d3e7e00bfee7802cd4cf674"
+  },
+  "teacher_learning_space_access": {
+    "count": 42,
+    "sha256": "2d7e0108d1c088676b7ce28cce588ec59da92a5dfcdfe5c9e24220e692351aa0"
+  },
+  "user_roles": {
+    "count": 90,
+    "sha256": "595075346df33cc3a66f2cdea375465294f48d23c2da2bce991a2e65a6dc07f1"
+  },
+  "teacher_course_scopes": {
+    "count": 0,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "teacher_class_scopes": {
+    "count": 0,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "admin_campus_scopes": {
+    "count": 1,
+    "sha256": "a1031ff178b106ff071b61b3de01c69502b8e16b6784bd4d473bfa649d164305"
+  },
+  "students": {
+    "count": 81,
+    "sha256": "5e38cea4996e5da7843adb2a3f45cef449d24a8a0f1501318d0ca195c84206d4"
+  },
+  "users": {
+    "count": 90,
+    "sha256": "de27693135185185e20f10705b17604e319df53637917b42396b8bd1ac43bf98"
+  }
+}

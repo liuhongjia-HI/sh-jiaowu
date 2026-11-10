@@ -1,0 +1,211 @@
+{
+  "phase": "live-baseline",
+  "time": "2026-11-10T01:35:06Z",
+  "release": "/opt/starline/releases/86cf7ed6a1012c5d9f9e41af678b2ff2c1f78aa8",
+  "backupBytes": 13969120,
+  "database": {
+    "courses": {
+      "count": 37,
+      "sha256": "cdbcd2ed9d89cfed4025f7a8b8e643a580842549ba66293d1cc22f4f83553b08"
+    },
+    "course_families": {
+      "count": 1,
+      "sha256": "528f49af5c63543f69b795515ab9089bf1eb7adc965f279ad2293b8df577d4fe"
+    },
+    "course_curriculum_nodes": {
+      "count": 286,
+      "sha256": "95b81dd4859478a54f29b98b473096a72160de62fb9302ef5be01b6e26da0fa4"
+    },
+    "study_packages": {
+      "count": 260,
+      "sha256": "5c330144c7f79ddad61d72c52dd7b4d82d2cf4bd3bdd89b75bdc203bdccb5d69"
+    },
+    "package_spaces": {
+      "count": 260,
+      "sha256": "1c282273ee1c9fcdf8311b5ffdaee6f8019126f3c07462d6d9722fd5a5017205"
+    },
+    "package_content_types": {
+      "count": 1024,
+      "sha256": "beb4d45158612c787694fa7d47c3890139d6445ad37564ee8e58a1cf95ec6dc4"
+    },
+    "student_package_grants": {
+      "count": 190,
+      "sha256": "e4d108ff6c66c9a755ee272d541492c4031aa0b6425b54a10949a265b9eddd1d"
+    },
+    "student_learning_space_access": {
+      "count": 190,
+      "sha256": "09feae2558549e59f97390e748f70812b0787bf9d39590048785ad5253168584"
+    },
+    "student_trial_records": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "materials": {
+      "count": 611,
+      "sha256": "e43d6db7f8381a30bd230939851dfe9cda829d1ef114e8ed23d4b8c754182e42"
+    },
+    "homework_tasks": {
+      "count": 1,
+      "sha256": "ed0282119615af86e48fdfc91cd87faf14173bf3ffdd085279fe5df69e2748c4"
+    },
+    "homework_submissions": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "question_bank_items": {
+      "count": 4,
+      "sha256": "aae08f80072be9610a00f493e44f9ae6ba4758e97d3e7e00bfee7802cd4cf674"
+    },
+    "teacher_learning_space_access": {
+      "count": 42,
+      "sha256": "2d7e0108d1c088676b7ce28cce588ec59da92a5dfcdfe5c9e24220e692351aa0"
+    },
+    "user_roles": {
+      "count": 90,
+      "sha256": "595075346df33cc3a66f2cdea375465294f48d23c2da2bce991a2e65a6dc07f1"
+    },
+    "teacher_course_scopes": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "teacher_class_scopes": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "admin_campus_scopes": {
+      "count": 1,
+      "sha256": "a1031ff178b106ff071b61b3de01c69502b8e16b6784bd4d473bfa649d164305"
+    },
+    "students": {
+      "count": 81,
+      "sha256": "5e38cea4996e5da7843adb2a3f45cef449d24a8a0f1501318d0ca195c84206d4"
+    },
+    "users": {
+      "count": 90,
+      "sha256": "de27693135185185e20f10705b17604e319df53637917b42396b8bd1ac43bf98"
+    }
+  },
+  "api": {
+    "admin": {
+      "/auth/me": {
+        "count": 1,
+        "sha256": "a9f876df0d0bdd50804f28ddf9ac8d7b4645ee3c43fff0a1d61325898bdd82a0"
+      },
+      "/courses": {
+        "count": 37,
+        "sha256": "fd9dc1f74d6707bd4a3886c435382df441dc9de42d9453248fa619f62f004938"
+      },
+      "/course-families": {
+        "count": 1,
+        "sha256": "9035725033f662843883570490b645d24d22ef2578fe8a5da1c1745be20f894c"
+      },
+      "/packages": {
+        "count": 39,
+        "sha256": "d667d01fb5b08b00255a6a2cb5ff91ed1a04c70b0055cb1823700938fcb1ef8e"
+      },
+      "/learning-spaces": {
+        "count": 1008,
+        "sha256": "3ca76c1d98f75cb6217c02cbf2ef7419b7e0160c5a363d19a3ecb7540b632ccf"
+      },
+      "/grade-subjects": {
+        "count": 68,
+        "sha256": "281b3f1b452c34122c56841b6adfd84a3af7350de9f9066124f365d4a18b39f3"
+      }
+    },
+    "students": [
+      {
+        "userHash": "ee4df74221bad7fbb56311e809aece9809bc0ce32ba3fb5918eb66a1d9a63c58",
+        "courseCount": 2,
+        "materialCount": 92,
+        "coursesSha256": "25e421c2990db2a52d80409f429fdd576cb80885002e79f97a5f0703db66b570",
+        "materialSha256": "b8156e492d9799579ee19a8eae129395065166c29618aa06c478a7a2d0d31dd5",
+        "subjectsSha256": "d8483372e746b139f6d564c440c41fd2221fda481ee9c9350ff7b41b7dd7b852",
+        "detailSha256": "5a68690d75f88ca18e8bcdb9475da1a9ad2c566f22a558088ee0919264381c66"
+      },
+      {
+        "userHash": "c4b823be7411c7daef6d251dfe5665b25d7a3d4e2d02c4f0d6c9399e47776c99",
+        "courseCount": 1,
+        "materialCount": 43,
+        "coursesSha256": "8bb14d7d5afa162c13e319da7a58732b7ce7f3e3d085129d4aa01f8869c215d1",
+        "materialSha256": "9b299f4b66301a26af5ae63536f82d11e316939aaea9be39e58493c142f7e8ae",
+        "subjectsSha256": "1c166bd91b55efe666560c7689e9bde857ae449277832b2f85c431368dbd855f",
+        "detailSha256": "f7851fc40c34d89456f785a936f73118803f9fd8bc97702a8acfd7b732646840"
+      },
+      {
+        "userHash": "859826f0d749a708e197cc4bd405108ba7f46aa759a659ed15a580c6bfbdd170",
+        "courseCount": 4,
+        "materialCount": 98,
+        "coursesSha256": "dade27493bc6f51a1d79c6143e60db6dc6b8de0074c605ef0247bb84795add40",
+        "materialSha256": "46589a1d9ae72d3efc0d4f8d0779c0df8e7502c061c572dc318c1b54673cc22d",
+        "subjectsSha256": "854a103ef113aa56e1df782c206f8f1735cdb7310d391611431ec8421220079b",
+        "detailSha256": "03e7ecafa8e23555f5966789939de6ef59c0bb53c3077fa389fa550e6e72aa8f"
+      },
+      {
+        "userHash": "ae7b69ca9eaa96ae24b035b359953118cce510468c3fe43198242d35a6008f10",
+        "courseCount": 4,
+        "materialCount": 107,
+        "coursesSha256": "ed0d4375f2c82ecb3a235089d1a512df0de81316c38eb47cbf27b2ccb0fcf64a",
+        "materialSha256": "e467653763f6547b01e12173ed2923644eed86a007d01275795de2d3f34f1085",
+        "subjectsSha256": "d7ea2b7573f5510fbba5bb9a2f3f6b36ca39712ad79540896eca2d1dbdfbcb20",
+        "detailSha256": "b3a757bc2b165d3771fac830a2f1d2a1a7cee24886cf6bbbf7e9251b29c832fd"
+      },
+      {
+        "userHash": "0868f96ab6ad9e693b9e3434ca642f17a43b4e3df05e25a34c16a4cdfb212636",
+        "courseCount": 2,
+        "materialCount": 56,
+        "coursesSha256": "990f96fb9d59def854be48965581679970236743690b95ca5af53297cdca646b",
+        "materialSha256": "1b44824c95e95cd575f2cb9ffedcb4857807a22245ba1de5e59d9c8e59e19204",
+        "subjectsSha256": "a871ada6387beecb06241d3eadcab65e2bb380ae44e3d066f924d7eb672924fd",
+        "detailSha256": "6aa5d7e329c3fe93ef66c58e25d41a886f6b0a412602d511580faafa285e30fc"
+      },
+      {
+        "userHash": "de92d88a5bcb91c05e947bf0e547bf54a1aaafda75003d0ccf09abc26d9741ab",
+        "courseCount": 3,
+        "materialCount": 60,
+        "coursesSha256": "cca619543e3dafc5f2bff83503da0b21fea592c92e7234a039e9f86bcc8d9195",
+        "materialSha256": "c2e57638ee9e8b69e1b12a132172f68bc9bf7c6470e9cd52b64accee76669c54",
+        "subjectsSha256": "ddc1b3c905c2f43a16901241b47d5cafe116a34566e0240e1d76edc4ddd31b0d",
+        "detailSha256": "21bfe898dc690b52058ca1e9dac0d5757eda138d475b3c9c7bccf186719b73fc"
+      },
+      {
+        "userHash": "f080686fca2f1fb6dbab80353c4543890a6feb7c9225de6550f8eda7663c7cf5",
+        "courseCount": 2,
+        "materialCount": 92,
+        "coursesSha256": "9cfd8710e535908a2054d9e16f859688bb9f0390b06aaa6b9bb4ea3818b7e126",
+        "materialSha256": "3eb931780e57e5a0d609cb6860a25b0fcd1cbc5930e86780dbf3ae570e64b1f1",
+        "subjectsSha256": "313fe236f299cf8773f1f685394ff721cf768cbde06aa0def0a4722c1f025b89",
+        "detailSha256": "94a91f735bb1285cee9ca188f2cd4256b85fbebc2256bb726291f7d5d3beb9c3"
+      },
+      {
+        "userHash": "1b2f20f45ecc207f74e30697a18c8f3c9804a9e60a886d32d6dcc85688f7a1c1",
+        "courseCount": 2,
+        "materialCount": 63,
+        "coursesSha256": "8b91080601e31eb7380c897758b6af090c3d77d6e54bee8e5d398209ff9b7cd4",
+        "materialSha256": "2ad28de3b3795bab7e0b97c76b5246dd1d37e4837b11d86cf22b5620e5a45311",
+        "subjectsSha256": "19dbeedd4b362b46dffd1c418c073d8f86cef35ac7055cc86512c3038816ed8d",
+        "detailSha256": "cae1f94302a3b784b0c9f2ebfd17b8541d52930b718d8d60e1ab7797417ea197"
+      },
+      {
+        "userHash": "74bf88e7107524ad3bd558f3f5001fb19b4373cb292d4dd12048586a150c3936",
+        "courseCount": 4,
+        "materialCount": 96,
+        "coursesSha256": "fa1ce120454a5a9ce9923a3533e3a74ae2846ea91c8be97da05afd16072f5540",
+        "materialSha256": "3e9439099505cd64fa8753ffef334f5d5be7df266a9c3ca08fa8ee1266bbf9bc",
+        "subjectsSha256": "613c7c1e15345fb703d803d4cf9cce5f420e8da9b7b371e94483079bea3a2c0a",
+        "detailSha256": "1c609745416c24f6666e572cb98e7c92f51771f963de46a914c8c1fe95fc0789"
+      },
+      {
+        "userHash": "5c35e20cd37c9945e6d74184974118be29d758a78fadfbf5c958bde7c88e1be2",
+        "courseCount": 3,
+        "materialCount": 62,
+        "coursesSha256": "e0013f65a42cdcba47ab5b56279bc6dbced7828b031f1d76dae940be656482cc",
+        "materialSha256": "e3df274ac464926e4c61ba75714c93863fb629620f50a5687d80cc9e07e214bc",
+        "subjectsSha256": "c58032836a233be442a206c191023d798ed3486ae810dd996bf21563cca9efc9",
+        "detailSha256": "0962053fd495bce7f3ba21e9f6ba6c1d7509885b60a1799106ef259d7ecb8fc6"
+      }
+    ]
+  },
+  "health": {
+    "status": "ok"
+  }
+}

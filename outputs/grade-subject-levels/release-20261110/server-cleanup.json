@@ -1,0 +1,10 @@
+{
+  "privateApiAndTokenFilesRemoved": [
+    "tokens.json",
+    "live-baseline-api-private.json",
+    "after-api-private.json",
+    "final-api-private.json"
+  ],
+  "privateFilesRemaining": false,
+  "protectedRollbackBackupRetained": true
+}

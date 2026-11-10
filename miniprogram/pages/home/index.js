@@ -290,7 +290,7 @@ Page({
             gradeLabel: gradeLabel(item.grade),
             recommendationReasonLabel: item.recommendationReason === "本年级未开通学科" ? "Explore a new subject" : item.recommendationReason,
             teacherIntroLabel: item.teacherIntro === `教学范围：${item.grade} · ${item.subject}` ? `Teaching: ${gradeLabel(item.grade)} · ${subjectLabel(item.subject)}` : item.teacherIntro,
-            contentSampleText: (item.contentSamples || []).join("、")
+            contentSampleText: (item.contentSamples || []).join(", ")
           })),
           recommendationsLoading: false
         }, () => this.applySearch());
@@ -518,14 +518,14 @@ Page({
       return;
     }
     wx.showModal({
-      title: recommendation.subject,
-      content: `${recommendation.courseCount} courses · ${recommendation.materialCount} materials · ${recommendation.questionCount} questions · ${recommendation.homeworkCount} exercises\nTeacher: ${recommendation.teacherName || "Not assigned"}\n${recommendation.teacherIntro || ""}`,
+      title: recommendation.displayName || subjectLabel(recommendation.subject),
+      content: `${recommendation.courseCount} courses · ${recommendation.materialCount} materials · ${recommendation.questionCount} questions · ${recommendation.homeworkCount} exercises\nTeacher: ${recommendation.teacherName || "Not assigned"}\n${recommendation.teacherIntroLabel || recommendation.teacherIntro || ""}`,
       showCancel: false,
       confirmText: "OK"
     });
   },
   contactTeacher(event) {
-    const name = event.currentTarget.dataset.name || "this subject";
+    const name = subjectLabel(event.currentTarget.dataset.name) || "this subject";
     wx.showModal({
       title: "Contact Teacher",
       content: `Contact your teacher or school office to activate ${name}. Courses, materials, and exercises will then appear in the Learning Center.`,
@@ -645,7 +645,7 @@ function buildCourseSlides(courses, pendingTask) {
 
 function formatCourseMeta(course = {}) {
   const chapterCount = Number(course.chapterCount) || countChapters(course.curriculum) || Number(course.lessonCount) || 0;
-  return [course.grade, subjectLabel(course.subject), `${chapterCount} chapters`].filter(Boolean).join(" · ");
+  return [gradeLabel(course.grade), subjectLabel(course.subject), `${chapterCount} ${chapterCount === 1 ? "chapter" : "chapters"}`].filter(Boolean).join(" · ");
 }
 
 function countChapters(curriculum) {
@@ -681,7 +681,7 @@ function buildFallbackTodos({ pendingHomework, continueCourse }) {
     id: `todo-study-${continueCourse.id}`,
     type: "schedule",
     title: "Continue Learning",
-    summary: [continueCourse.name, continueCourse.grade, subjectLabel(continueCourse.subject)].filter(Boolean).join(" · "),
+    summary: [continueCourse.name, gradeLabel(continueCourse.grade), subjectLabel(continueCourse.subject)].filter(Boolean).join(" · "),
     actionText: "Continue Learning",
     path: `/pages/study-detail/index?id=${continueCourse.id}`,
     priority: 60,

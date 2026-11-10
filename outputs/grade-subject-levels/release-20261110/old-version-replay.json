@@ -1,0 +1,95 @@
+{
+  "oldRelease": "f0c07c5fe7efd07e540109ca73c6e6ed0e388d70",
+  "newRelease": "86cf7ed6a1012c5d9f9e41af678b2ff2c1f78aa8",
+  "method": "旧生产二进制在切换前备份的独立本地副本上重放；与新生产真实网关结果比较。并非上线前学生真机或线上接口采样。",
+  "ignoredFields": [
+    "levels",
+    "selectable",
+    "progress",
+    "isNew",
+    "highlightUntil"
+  ],
+  "adminDifferences": {},
+  "students": [
+    {
+      "sample": 1,
+      "courseCount": 2,
+      "materialCount": 92,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 2,
+      "courseCount": 1,
+      "materialCount": 43,
+      "detailCount": 1,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 3,
+      "courseCount": 4,
+      "materialCount": 98,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 4,
+      "courseCount": 4,
+      "materialCount": 107,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 5,
+      "courseCount": 2,
+      "materialCount": 56,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 6,
+      "courseCount": 3,
+      "materialCount": 60,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 7,
+      "courseCount": 2,
+      "materialCount": 92,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 8,
+      "courseCount": 2,
+      "materialCount": 63,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 9,
+      "courseCount": 4,
+      "materialCount": 96,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    },
+    {
+      "sample": 10,
+      "courseCount": 3,
+      "materialCount": 62,
+      "detailCount": 2,
+      "differences": [],
+      "differenceCount": 0
+    }
+  ]
+}

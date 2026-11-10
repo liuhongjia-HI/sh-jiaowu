@@ -38,6 +38,31 @@ function flushPromises() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
+test("exercise download and local save failures show English instead of native error details", async () => {
+  for (const stage of ["download", "save"]) {
+    let modal;
+    const nativeError = { errMsg: "系统错误：存储空间不足", message: "系统错误：存储空间不足" };
+    const page = loadAnswerPage(() => Promise.resolve({}), {
+      getStorageSync: () => "token",
+      showLoading() {}, hideLoading() {},
+      downloadFile(options) {
+        if (stage === "download") options.fail(nativeError);
+        else options.success({ statusCode: 200, tempFilePath: "/tmp/exercise.pdf" });
+      },
+      saveFile(options) { options.fail(nativeError); },
+      showModal(options) { modal = options; }
+    });
+    global.getApp = () => ({ globalData: { apiBaseUrl: "https://school.example/api" } });
+    page.setData({ downloadUrl: "/api/student/homework/hw-1/download" });
+    page.downloadHomework();
+    await flushPromises();
+    assert.equal(modal.confirmText, "OK");
+    assert.equal(modal.content, stage === "download"
+      ? "Download failed. Check your network and try again."
+      : "Unable to save the file. Check your device storage and try again.");
+  }
+});
+
 test("answer page builds submission payload from selected option and text answer", async () => {
   const calls = [];
   const wxMock = {

@@ -9,6 +9,7 @@ const {
 } = require("../../utils/phone-auth");
 
 const STUDENT_SELECTION_KEY = "starline_student_id";
+const { gradeLabel } = require("../../utils/grade");
 
 function rememberedStudentID() {
   if (!wx.getStorageSync) {
@@ -234,7 +235,7 @@ Page({
       return;
     }
     wx.showActionSheet({
-      itemList: candidates.map((item) => `${item.name} · ${item.grade}`),
+      itemList: candidates.map((item) => [item.name, gradeLabel(item.grade)].filter(Boolean).join(" · ")),
       success: (res) => {
         const picked = candidates[res.tapIndex];
         if (!picked) {

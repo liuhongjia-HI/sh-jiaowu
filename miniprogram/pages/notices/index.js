@@ -172,7 +172,7 @@ function studentDisplay(student) {
   const name = String(student && student.name || "").trim();
   const grade = gradeLabel(student && student.grade);
   if (!name) return "";
-  return grade ? `${name}（${grade}）` : name;
+  return grade ? `${name} (${grade})` : name;
 }
 
 function noticeScopeText(notice) {

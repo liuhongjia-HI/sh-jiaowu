@@ -1,6 +1,7 @@
 const { refreshNoticeBadge } = require("../../utils/notice-badge");
 const { request } = require("../../utils/request");
 const { subjectEmoji, subjectsMatchName } = require("../../utils/subject");
+const { gradeLabel } = require("../../utils/grade");
 
 Page({
   data: {
@@ -174,7 +175,7 @@ function decorateCourses(courses, favorites) {
       newCourseText: isNew && course.availableAt ? `New · ${formatCourseTime(course.availableAt)}` : "",
       coverIcon: subjectEmoji(course.subject || course.displayName, index),
       displayName,
-      displayMeta: course.grade || "Learning content",
+      displayMeta: gradeLabel(course.grade) || "Learning content",
       entryCourseId: course.entryCourseId || course.id,
       accessLabel,
       isPreview,

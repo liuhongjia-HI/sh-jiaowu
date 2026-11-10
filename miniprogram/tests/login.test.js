@@ -442,7 +442,8 @@ test("login page offers a picker and resubmits with selectedStudentId when the p
   assert.equal(requests.length, 2, "expected a first request and a resubmission after picking");
   assert.equal(requests[0].selectedStudentId, undefined);
   assert.equal(requests[1].selectedStudentId, "stu-b");
-  assert.deepEqual(calls.find((item) => item[0] === "showActionSheet"), ["showActionSheet", ["大娃 · 五年级", "二娃 · 三年级"]]);
+  assert.deepEqual(calls.find((item) => item[0] === "showActionSheet"), ["showActionSheet", ["大娃 · Grade 5", "二娃 · Grade 3"]]);
+  assert.equal(requests[0].grade, "五年级", "display translation must not change the submitted grade");
   assert.deepEqual(calls.find((item) => item[0] === "setStorageSync"), ["setStorageSync", "starline_token", "sibling-token"]);
   assert.deepEqual(calls.find((item) => item[0] === "switchTab"), ["switchTab", "/pages/home/index"]);
   assert.equal(page.data.binding, false);

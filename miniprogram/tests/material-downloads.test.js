@@ -70,3 +70,24 @@ test('file list expansion survives task polling', async () => {
  page.onLoad({}); page.data.jobs = [job]; page.showFiles({ currentTarget: { dataset: { id: job.id } } });
  await page.refreshJobs(); assert.equal(page.data.jobs[0].expanded, true); page.onUnload();
 });
+
+test('download dates and copy-link confirmation stay English while server content is preserved', async () => {
+ let modal;
+ const expiresAt = new Date(2026, 10, 10, 15, 4).toISOString();
+ const page = pageFixture(path => Promise.resolve(path === '/student/home'
+  ? { student: { id: 'a', name: '小星' } }
+  : [{ ...job, courseName: '中文课程名称', expiresAt, error: '接口提示原文' }]), {
+  setClipboardData({ success }) { success(); },
+  showModal(options) { modal = options; }
+ });
+ page.onLoad({}); await page.load();
+ assert.equal(page.data.jobs[0].expiresText, '2026-11-10 15:04');
+ assert.equal(page.data.jobs[0].statusText, 'Ready');
+ assert.equal(page.data.jobs[0].status, '可下载');
+ assert.equal(page.data.jobs[0].courseName, '中文课程名称');
+ assert.equal(page.data.jobs[0].error, '接口提示原文');
+ page.copyLink({ currentTarget: { dataset: { id: job.id } } });
+ assert.equal(modal.confirmText, 'OK');
+ assert.equal(modal.showCancel, false);
+ page.onUnload();
+});

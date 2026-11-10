@@ -460,7 +460,9 @@ function downloadWithAuth(path) {
         resolve(res.tempFilePath);
       },
       fail(err) {
-        reject(new Error((err && err.errMsg) || "Download failed"));
+        const error = new Error("Download failed. Check your network and try again.");
+        error.cause = err;
+        reject(error);
       }
     });
   });
@@ -509,7 +511,9 @@ function openDocument(filePath, showMenu = true) {
       showMenu,
       success: resolve,
       fail(error) {
-        reject(new Error((error && error.errMsg) || "Unable to open. Please try again"));
+        const failure = new Error("Unable to open the file. Please try again.");
+        failure.cause = error;
+        reject(failure);
       }
     });
   });

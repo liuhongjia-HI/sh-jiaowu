@@ -1,0 +1,22 @@
+{
+  "productionOrigin": "https://sa.starlineeducation.com.cn",
+  "apiOrigin": "https://gate.starlineeducation.com.cn/api",
+  "scope": "一年级数学",
+  "levelsBefore": [
+    "S"
+  ],
+  "levelsAfter": [
+    "S"
+  ],
+  "saveWithoutChangingLevels": 200,
+  "emptyLevelsRejected": 400,
+  "studentRoleDenied": 403,
+  "reloadReadback": true,
+  "pageErrors": [],
+  "serverErrors": [],
+  "screenshots": [
+    "production-config-desktop.png",
+    "production-config-mobile.png"
+  ],
+  "note": "保留原有 S 选择，仅验证保存与回读；未增减任何实际班型、课程或学生授权。"
+}

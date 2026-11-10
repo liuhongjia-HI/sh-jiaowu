@@ -82,7 +82,11 @@ Page({
     }
     wx.showLoading({ title: "Downloading" });
     downloadWithAuth(stripApiPrefix(downloadUrl)).then((tempFilePath) => new Promise((resolve, reject) => {
-      wx.saveFile({ tempFilePath, success: resolve, fail: reject });
+      wx.saveFile({ tempFilePath, success: resolve, fail(cause) {
+        const error = new Error("Unable to save the file. Check your device storage and try again.");
+        error.cause = cause;
+        reject(error);
+      } });
     })).then(() => {
       wx.showToast({ title: "Exercise saved", icon: "success" });
     }).catch((error) => {
@@ -268,7 +272,9 @@ function downloadWithAuth(path) {
         resolve(res.tempFilePath);
       },
       fail(err) {
-        reject(new Error((err && err.errMsg) || "Download failed"));
+        const error = new Error("Download failed. Check your network and try again.");
+        error.cause = err;
+        reject(error);
       }
     });
   });

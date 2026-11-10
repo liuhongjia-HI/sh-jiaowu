@@ -1,9 +1,10 @@
 const { request } = require("../../utils/request");
+const { formatDateTime } = require("../../utils/date-time");
 const statusLabels = { "准备中": "Queued", "打包中": "Preparing", "可下载": "Ready", "失败": "Failed", "已过期": "Expired" };
 function sizeLabel(bytes) { return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`; }
 function decorateJobs(jobs, previous = []) {
   const expanded = new Map(previous.map(job => [job.id, job.expanded]));
-  return jobs.map(job => ({ ...job, expanded: expanded.get(job.id) || false, materials: (job.materials || []).map(file => ({ ...file, pathText: [file.unit, file.chapter, file.lesson].filter(Boolean).join(" / ") })), statusText: statusLabels[job.status] || job.status, sizeText: sizeLabel(job.size), ready: job.status === "可下载", retryable: ["失败", "已过期"].includes(job.status), expiresText: job.expiresAt ? new Date(job.expiresAt).toLocaleString() : "" }));
+  return jobs.map(job => ({ ...job, expanded: expanded.get(job.id) || false, materials: (job.materials || []).map(file => ({ ...file, pathText: [file.unit, file.chapter, file.lesson].filter(Boolean).join(" / ") })), statusText: statusLabels[job.status] || job.status, sizeText: sizeLabel(job.size), ready: job.status === "可下载", retryable: ["失败", "已过期"].includes(job.status), expiresText: formatDateTime(job.expiresAt) }));
 }
 Page({
   data: { loading: true, error: "", studentName: "", courses: [], groups: [], selectedCount: 0, selectedSize: "", jobs: [], generating: false, confirming: false, confirmed: false, pickup: null },
@@ -83,7 +84,7 @@ Page({
   copyLink(event) {
     const job = this.data.jobs.find(item => item.id === event.currentTarget.dataset.id && item.ready); if (!job) return;
     const origin = getApp().globalData.webBaseUrl.replace(/\/$/, "");
-    wx.setClipboardData({ data: `${origin}/student-download?job=${encodeURIComponent(job.id)}`, success: () => wx.showModal({ title: "Link copied", content: "Send it to File Transfer on WeChat. Open it in a computer browser, then scan the QR code here to confirm.", showCancel: false }) });
+    wx.setClipboardData({ data: `${origin}/student-download?job=${encodeURIComponent(job.id)}`, success: () => wx.showModal({ title: "Link copied", content: "Send it to File Transfer on WeChat. Open it in a computer browser, then scan the QR code here to confirm.", showCancel: false, confirmText: "OK" }) });
   },
   showFiles(event) { const id = event.currentTarget.dataset.id; this.setData({ jobs: this.data.jobs.map(job => job.id === id ? { ...job, expanded: !job.expanded } : job) }); },
   scanPickup() { wx.scanCode({ onlyFromCamera: true, scanType: ["qrCode"], success: result => { const match = /^starline-download:([a-f0-9]{48})$/.exec(result.result || ""); if (!match) { wx.showToast({ title: "Use the QR code on the download page", icon: "none" }); return; } wx.navigateTo({ url: `/pages/material-downloads/index?challenge=${match[1]}` }); } }); },

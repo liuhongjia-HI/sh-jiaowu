@@ -346,6 +346,28 @@ function baseWxMock(overrides = {}) {
   };
 }
 
+test("material download and document viewer failures use English while keeping server errors separate", async () => {
+  for (const stage of ["download", "open"]) {
+    let modal;
+    const page = loadMaterialPreviewPage(() => Promise.resolve({}), baseWxMock({
+      downloadFile(options) {
+        if (stage === "download") options.fail({ errMsg: "下载失败" });
+        else options.success({ statusCode: 200, tempFilePath: "/tmp/material.pdf" });
+      },
+      openDocument(options) { options.fail({ errMsg: "文件打开失败" }); },
+      showModal(options) { modal = options; }
+    }));
+    page.setData({ material: { title: "中文讲义", downloadUrl: "/api/student/materials/mat-1/download" } });
+    await page.printMaterial();
+    assert.equal(modal.content, stage === "download"
+      ? "Download failed. Check your network and try again."
+      : "Unable to open the file. Please try again.");
+    assert.equal(modal.confirmText, "OK");
+    assert.equal(page.data.material.title, "中文讲义");
+    assert.equal(page.data.downloading, false);
+  }
+});
+
 test("material preview downloads only the first page as the clickable cover", async () => {
   const downloadedUrls = [];
   const wxMock = baseWxMock({
