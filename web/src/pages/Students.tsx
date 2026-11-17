@@ -168,6 +168,7 @@ export default function Students({ user }: { user: CurrentUser }) {
   const [editing, setEditing] = useState<Student | null>(null);
   const [studentDrawerOpen, setStudentDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Student | null>(null);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [studentDrawerTab, setStudentDrawerTab] = useState('profile');
   const [directSelections, setDirectSelections] = useState<DirectGrantSelection[]>([]);
   const [revokeDirectSpaceIds, setRevokeDirectSpaceIds] = useState<string[]>([]);
@@ -453,6 +454,24 @@ export default function Students({ user }: { user: CurrentUser }) {
     setDirectPeriodChanged(false);
   }
 
+  const initialPermissionKeys = selectionKeys(initialDirectSelections);
+  const currentPermissionKeys = selectionKeys(directSelections);
+  const unsavedPermissionChanges = initialPermissionKeys.size !== currentPermissionKeys.size
+    || [...initialPermissionKeys].some((key) => !currentPermissionKeys.has(key));
+  const unsavedPeriodChanges = currentPermissionKeys.size > 0 && directPeriodChanged
+    && (directStartsAt !== directGrantPeriod.data?.startsAt || directEndsAt !== directGrantPeriod.data?.endsAt);
+  const hasUnsavedOpeningChanges = writable && Boolean(selected)
+    && (unsavedPermissionChanges || unsavedPeriodChanges || revokeDirectSpaceIds.length > 0);
+
+  function closeStudentDetail() {
+    if (createDirectGrant.isPending) {
+      message.info({ content: '正在保存课程开通变更，请稍候。', key: 'saving-course-opening', duration: 2 });
+      return;
+    }
+    if (hasUnsavedOpeningChanges) setConfirmCloseOpen(true);
+    else setSelected(null);
+  }
+
   function submitDirectGrant() {
     const previous = selectionKeys(initialDirectSelections);
     const next = selectionKeys(directSelections);
@@ -695,12 +714,25 @@ export default function Students({ user }: { user: CurrentUser }) {
         )}
       </Modal>
 
+      <Modal
+        title="课程开通变更尚未保存"
+        zIndex={1200}
+        open={confirmCloseOpen}
+        okText="放弃变更"
+        cancelText="继续编辑"
+        okButtonProps={{ danger: true }}
+        onCancel={() => setConfirmCloseOpen(false)}
+        onOk={() => { setConfirmCloseOpen(false); setSelected(null); }}
+      >
+        <Typography.Paragraph>关闭后，本次勾选、有效期调整和待撤销的直接权限变更将丢失。</Typography.Paragraph>
+      </Modal>
+
       <Drawer
         className="student-detail-drawer"
         title={selected ? <StudentDrawerTitle student={selected} /> : '学生详情'}
         width="min(760px, 100vw)"
         open={Boolean(selected)}
-        onClose={() => setSelected(null)}
+        onClose={closeStudentDetail}
       >
         {detail.isLoading && <Skeleton active />}
         {detail.error && <Alert type="error" message="学生详情加载失败，请稍后重试。" />}
