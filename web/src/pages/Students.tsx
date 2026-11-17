@@ -37,7 +37,7 @@ import { StudentOpeningOverview, openingSelectionLabel } from '../components/Stu
 import type { OpeningSelection } from '../components/StudentOpeningOverview';
 import { FormDrawer } from '../components/FormDrawer';
 import { ActionButton, CardList, InfoCard, ListViewToggle, useListViewMode } from '../components/ListViews';
-import { gradeOptions as curriculumGradeOptions, subjectLabel, subjectOptions, useSubjectCatalog } from '../utils/curriculum';
+import { gradeOptions as curriculumGradeOptions, semesterLabel, subjectLabel, subjectOptions, useSubjectCatalog } from '../utils/curriculum';
 import type {
   CurrentUser,
   DirectGrantReplaceRequest,
@@ -728,6 +728,7 @@ export default function Students({ user }: { user: CurrentUser }) {
                     onRevokeDirectSpaceIdsChange={setRevokeDirectSpaceIds}
                     student={selected}
                     writable={writable}
+                    learningSpaces={learningSpaces.data ?? []}
                     loadingLearningSpaces={learningSpaces.isLoading}
                     learningSpacesError={Boolean(learningSpaces.error)}
                     periodLoading={directGrantPeriod.isLoading}
@@ -1136,6 +1137,7 @@ function CourseOpeningPanel({
   onRevokeDirectSpaceIdsChange,
   student,
   writable,
+  learningSpaces,
   loadingLearningSpaces,
   learningSpacesError,
   periodLoading,
@@ -1157,6 +1159,7 @@ function CourseOpeningPanel({
   onRevokeDirectSpaceIdsChange: (ids: string[]) => void;
   student: Student;
   writable: boolean;
+  learningSpaces: LearningSpace[];
   loadingLearningSpaces: boolean;
   learningSpacesError: boolean;
   periodLoading: boolean;
@@ -1200,10 +1203,11 @@ function CourseOpeningPanel({
           })}
         </Space>
       </Card>}
-      {!writable ? <CourseOpeningMatrix matrix={matrix} selections={selections} onSelectionsChange={onSelectionsChange} readOnly /> : <DirectGrantPanel
+      {!writable ? <CourseOpeningMatrix matrix={matrix} learningSpaces={learningSpaces} selections={selections} onSelectionsChange={onSelectionsChange} readOnly /> : <DirectGrantPanel
       pendingRevokeCount={revokeDirectSpaceIds.length}
       student={student}
       matrix={matrix}
+      learningSpaces={learningSpaces}
       loadingLearningSpaces={loadingLearningSpaces}
       learningSpacesError={learningSpacesError}
       periodLoading={periodLoading}
@@ -1233,12 +1237,14 @@ const openingContentLabels: Record<StudentOpeningCell['contentTypeCode'], string
 
 function CourseOpeningMatrix({
   matrix,
+  learningSpaces,
   selections,
   onSelectionsChange,
   onRevokePackage,
   readOnly = false
 }: {
   matrix: StudentOpeningScope[];
+  learningSpaces: LearningSpace[];
   selections: DirectGrantSelection[];
   onSelectionsChange: (values: DirectGrantSelection[]) => void;
   onRevokePackage?: (packageId: string, packageName: string) => void;
@@ -1255,65 +1261,95 @@ function CourseOpeningMatrix({
     onSelectionsChange(next);
   };
 
+  const semesterBySpace = new Map(learningSpaces.map((space) => [space.id, space.semester?.trim()]));
+  const groups = new Map<string, StudentOpeningScope[]>();
+  matrix.forEach((scope) => {
+    const semester = semesterBySpace.get(scope.learningSpaceId) || '';
+    const group = groups.get(semester) ?? [];
+    group.push(scope);
+    groups.set(semester, group);
+  });
+  const semesterOrder = ['S1', 'S2', 'S3'];
+  const sortedGroups = Array.from(groups).sort(([a], [b]) => {
+    if (!a || !b) return a ? -1 : b ? 1 : 0;
+    const aIndex = semesterOrder.indexOf(a);
+    const bIndex = semesterOrder.indexOf(b);
+    if (aIndex !== -1 || bIndex !== -1) return (aIndex === -1 ? semesterOrder.length : aIndex) - (bIndex === -1 ? semesterOrder.length : bIndex);
+    return a.localeCompare(b, 'zh-CN', { numeric: true });
+  });
+  const semesterColors: Record<string, { background: string; border: string; tag: string }> = {
+    S1: { background: '#f0f7ff', border: '#d6e8ff', tag: 'blue' },
+    S2: { background: '#f9f3ff', border: '#eadcff', tag: 'purple' },
+    S3: { background: '#effafa', border: '#cceeed', tag: 'cyan' }
+  };
+
   return (
     <Space direction="vertical" size={10} style={{ width: '100%' }}>
-      {matrix.map((scope) => (
-        <Card size="small" key={scope.learningSpaceId} title={scope.name}>
-          <Space wrap size={[20, 8]} aria-label={`${scope.name}学科权限`}>
-            <Typography.Text type="secondary">开通权限</Typography.Text>
-            {scope.content.filter((cell) => cell.contentTypeCode !== 'download').map((cell) => {
-              const directSelected = selectionFor(scope.learningSpaceId).includes(cell.contentTypeCode);
-              const checked = cell.packageOpened ? cell.opened : directSelected;
-              const locked = cell.packageOpened;
-              const label = openingContentLabels[cell.contentTypeCode];
-              const resourceLabel = { course: '课程', handout: '讲义', question: '习题', download: '讲义' }[cell.contentTypeCode];
-              const resourceUnit = { course: '节', handout: '份', question: '道', download: '份' }[cell.contentTypeCode];
-              const permissionStatus = checked ? (cell.opened ? '已开通' : '待开通') : (cell.opened ? '待取消' : '未开通');
-              const items = cell.items ?? [];
-              const previewItems = items.slice(0, 5);
-              const packageNames = cell.packageNames ?? [];
-              const sourceText = cell.packageOpened
-                ? `由 ${packageNames.join('、')} 开通`
-                : directSelected || cell.directOpened ? '单独开通' : '尚未开通';
-              return (
-                <Popover
-                  key={cell.contentTypeCode}
-                  trigger={['hover', 'click', 'focus']}
-                  title={`${resourceLabel}明细`}
-                  content={(
-                    <Space direction="vertical" size={6} style={{ maxWidth: 300 }}>
-                      <Typography.Text type="secondary">{sourceText}</Typography.Text>
-                      <Typography.Text>权限状态：{permissionStatus}</Typography.Text>
-                      <Typography.Text strong>当前{resourceLabel}：{items.length} {resourceUnit}</Typography.Text>
-                      {previewItems.length > 0 ? previewItems.map((item) => <Typography.Text key={item.id}>· {item.title}</Typography.Text>) : <Typography.Text type="secondary">暂未配置{resourceLabel}</Typography.Text>}
-                      {items.length > previewItems.length && <Typography.Text type="secondary">还有 {items.length - previewItems.length} {resourceUnit}{resourceLabel}</Typography.Text>}
-                      {!readOnly && locked && directSelected && (
-                        <Button type="link" size="small" danger onClick={() => changeSelection(scope.learningSpaceId, cell.contentTypeCode, false)}>撤销单独开通</Button>
-                      )}
-                      {!readOnly && (cell.packageGrants ?? []).map((packageGrant) => (
-                        <Button key={packageGrant.packageId} type="link" size="small" danger onClick={() => onRevokePackage?.(packageGrant.packageId, packageGrant.packageName)}>
-                          撤销套餐“{packageGrant.packageName}”
-                        </Button>
-                      ))}
-                    </Space>
-                  )}
-                >
-                  <span aria-label={`${scope.name}${resourceLabel}明细`} tabIndex={0}>
-                    <Checkbox
-                      checked={checked}
-                      disabled={readOnly || locked}
-                      onChange={(event) => changeSelection(scope.learningSpaceId, cell.contentTypeCode, event.target.checked)}
-                    >
-                      {label}
-                    </Checkbox>
-                    {locked && <Tooltip title={sourceText}><LockOutlined aria-label={`${label}由课程方案开通`} style={{ marginLeft: 4, color: '#8c8c8c' }} /></Tooltip>}
-                  </span>
-                </Popover>
-              );
-            })}
+      {sortedGroups.map(([semester, scopes]) => {
+        const colors = semesterColors[semester] ?? { background: '#fafafa', border: '#e8e8e8', tag: 'default' };
+        return <section role="region" aria-label={semesterLabel(semester) || '未设置学期'} key={semester} style={{ background: colors.background, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 12 }}>
+          <div style={{ marginBottom: 10 }}><Tag color={colors.tag}>{semesterLabel(semester) || '未设置学期'}</Tag><Typography.Text type="secondary">{scopes.length} 个课程范围</Typography.Text></div>
+          <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              {scopes.map((scope) => (
+                <Card size="small" key={scope.learningSpaceId} title={scope.name}>
+                  <Space wrap size={[20, 8]} aria-label={`${scope.name}学科权限`}>
+                    <Typography.Text type="secondary">开通权限</Typography.Text>
+                    {scope.content.filter((cell) => cell.contentTypeCode !== 'download').map((cell) => {
+                      const directSelected = selectionFor(scope.learningSpaceId).includes(cell.contentTypeCode);
+                      const checked = cell.packageOpened ? cell.opened : directSelected;
+                      const locked = cell.packageOpened;
+                      const label = openingContentLabels[cell.contentTypeCode];
+                      const resourceLabel = { course: '课程', handout: '讲义', question: '习题', download: '讲义' }[cell.contentTypeCode];
+                      const resourceUnit = { course: '节', handout: '份', question: '道', download: '份' }[cell.contentTypeCode];
+                      const permissionStatus = checked ? (cell.opened ? '已开通' : '待开通') : (cell.opened ? '待取消' : '未开通');
+                      const items = cell.items ?? [];
+                      const previewItems = items.slice(0, 5);
+                      const packageNames = cell.packageNames ?? [];
+                      const sourceText = cell.packageOpened
+                        ? `由 ${packageNames.join('、')} 开通`
+                        : directSelected || cell.directOpened ? '单独开通' : '尚未开通';
+                      return (
+                        <Popover
+                          key={cell.contentTypeCode}
+                          trigger={['hover', 'click', 'focus']}
+                          title={`${resourceLabel}明细`}
+                          content={(
+                            <Space direction="vertical" size={6} style={{ maxWidth: 300 }}>
+                              <Typography.Text type="secondary">{sourceText}</Typography.Text>
+                              <Typography.Text>权限状态：{permissionStatus}</Typography.Text>
+                              <Typography.Text strong>当前{resourceLabel}：{items.length} {resourceUnit}</Typography.Text>
+                              {previewItems.length > 0 ? previewItems.map((item) => <Typography.Text key={item.id}>· {item.title}</Typography.Text>) : <Typography.Text type="secondary">暂未配置{resourceLabel}</Typography.Text>}
+                              {items.length > previewItems.length && <Typography.Text type="secondary">还有 {items.length - previewItems.length} {resourceUnit}{resourceLabel}</Typography.Text>}
+                              {!readOnly && locked && directSelected && (
+                                <Button type="link" size="small" danger onClick={() => changeSelection(scope.learningSpaceId, cell.contentTypeCode, false)}>撤销单独开通</Button>
+                              )}
+                              {!readOnly && (cell.packageGrants ?? []).map((packageGrant) => (
+                                <Button key={packageGrant.packageId} type="link" size="small" danger onClick={() => onRevokePackage?.(packageGrant.packageId, packageGrant.packageName)}>
+                                  撤销套餐“{packageGrant.packageName}”
+                                </Button>
+                              ))}
+                            </Space>
+                          )}
+                        >
+                          <span aria-label={`${scope.name}${resourceLabel}明细`} tabIndex={0}>
+                            <Checkbox
+                              checked={checked}
+                              disabled={readOnly || locked}
+                              onChange={(event) => changeSelection(scope.learningSpaceId, cell.contentTypeCode, event.target.checked)}
+                            >
+                              {label}
+                            </Checkbox>
+                            {locked && <Tooltip title={sourceText}><LockOutlined aria-label={`${label}由课程方案开通`} style={{ marginLeft: 4, color: '#8c8c8c' }} /></Tooltip>}
+                          </span>
+                        </Popover>
+                      );
+                    })}
+                  </Space>
+                </Card>
+              ))}
           </Space>
-        </Card>
-      ))}
+        </section>;
+      })}
     </Space>
   );
 }
@@ -1322,6 +1358,7 @@ function DirectGrantPanel({
   student,
   pendingRevokeCount,
   matrix,
+  learningSpaces,
   loadingLearningSpaces,
   learningSpacesError,
   periodLoading,
@@ -1341,6 +1378,7 @@ function DirectGrantPanel({
   student: Student;
   pendingRevokeCount: number;
   matrix: StudentOpeningScope[];
+  learningSpaces: LearningSpace[];
   loadingLearningSpaces: boolean;
   learningSpacesError: boolean;
   periodLoading: boolean;
@@ -1443,7 +1481,7 @@ function DirectGrantPanel({
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选条件下暂无学科。" />
         ) : (
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
-            <CourseOpeningMatrix matrix={visibleMatrix} selections={selections} onSelectionsChange={onSelectionsChange} onRevokePackage={onRevokePackage} />
+            <CourseOpeningMatrix matrix={visibleMatrix} learningSpaces={learningSpaces} selections={selections} onSelectionsChange={onSelectionsChange} onRevokePackage={onRevokePackage} />
           </Space>
         )}
       </div>

@@ -105,3 +105,68 @@ test('四年级五科矩阵在桌面紧凑展示，窄屏可横向查看', async
   await scroll.evaluate(el => { el.scrollLeft = el.scrollWidth; });
   await expect(overview.getByRole('button', { name: '七年级 Geography 全部班型 8人', exact: true })).toBeVisible();
 });
+
+test('课程权限按学期分组，跨筛选勾选仍按原协议保存', async ({ page }) => {
+  const student = { id: 'semester-student', name: '学期检查学生', grade: '四年级', phone: '', accountStatus: '正常', learningStatus: '未开始', activeOpenings: [], openedPackages: [], openedPackageRefs: [], streakDays: 0, badgeCount: 0 };
+  // 名称刻意不带学期，验证使用关联数据而非解析标题。
+  const spaces = [
+    { id: 'second', name: '英语下阶段', semester: 'S2', subject: 'English' },
+    { id: 'first', name: '英语上阶段', semester: 'S1', subject: 'English' },
+    { id: 'locked', name: '数学套餐范围', semester: 'S1', subject: 'Mathematics' },
+    { id: 'custom', name: '暑期英语', semester: '暑期', subject: 'English' }
+  ].map(space => ({ grade: '四年级', phase: 'Q1', level: 'S', status: '启用', ...space }));
+  const matrix = [...spaces, { id: 'missing', name: '历史英语范围', subject: 'English' }].map(space => ({
+    learningSpaceId: space.id, name: space.name, subject: space.subject, subjectId: space.subject, subjectSortOrder: space.subject === 'English' ? 1 : 2,
+    content: ['course', 'handout', 'question', 'download'].map(contentTypeCode => ({ contentTypeCode, opened: space.id === 'locked', packageOpened: space.id === 'locked', directOpened: false, packageNames: space.id === 'locked' ? ['数学套餐'] : [], packageGrants: [], items: [] }))
+  }));
+  let saved: unknown;
+  await page.addInitScript(() => localStorage.setItem('starline_admin_token', 'test-token'));
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = [];
+    if (path.endsWith('/auth/me')) data = { userId: 'test', name: '测试管理员', roles: ['super_admin'] };
+    else if (path.endsWith('/grants/direct') && route.request().method() === 'PUT') {
+      saved = route.request().postDataJSON(); data = { studentName: student.name };
+    } else if (path.endsWith('/grants/direct/default')) data = { startsAt: '2026-11-17', endsAt: '2027-01-15' };
+    else if (path.endsWith('/students/semester-student')) data = { student, grants: [], openingMatrix: matrix, permissions: {}, learningRecords: [], notices: [], logs: [] };
+    else if (path.endsWith('/students')) data = [student];
+    else if (path.endsWith('/learning-spaces')) data = spaces;
+    await route.fulfill({ json: { code: 0, message: 'ok', data } });
+  });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto('/students');
+  await page.getByRole('button', { name: '课程开通', exact: true }).click();
+  const first = page.getByRole('region', { name: 'S1 第一学期', exact: true });
+  const second = page.getByRole('region', { name: 'S2 第二学期', exact: true });
+  await expect(first).toContainText('英语上阶段');
+  await expect(second).toContainText('英语下阶段');
+  expect(await page.locator('.student-opening-panel [role=region]').evaluateAll(elements => elements.map(el => el.getAttribute('aria-label')))).toEqual(['S1 第一学期', 'S2 第二学期', '暑期', '未设置学期']);
+  expect(await first.evaluate(el => getComputedStyle(el).backgroundColor)).not.toEqual(await second.evaluate(el => getComputedStyle(el).backgroundColor));
+  await expect(page.getByRole('region', { name: '暑期', exact: true })).toContainText('暑期英语');
+  await expect(page.getByRole('region', { name: '未设置学期', exact: true })).toContainText('历史英语范围');
+  const locked = first.locator('.ant-card').filter({ hasText: '数学套餐范围' });
+  await expect(locked.getByRole('checkbox', { name: '课程学习' })).toBeDisabled();
+  await expect(locked.getByRole('checkbox', { name: '课程学习' })).toBeChecked();
+  const firstCourse = first.locator('.ant-card').filter({ hasText: '英语上阶段' }).getByRole('checkbox', { name: '课程学习' });
+  await firstCourse.check();
+  await expect(first.locator('.ant-card').filter({ hasText: '英语上阶段' }).getByRole('checkbox', { name: '讲义查看' })).toBeChecked();
+  await second.getByRole('checkbox', { name: '习题练习' }).check();
+  await page.getByRole('group', { name: '科目筛选' }).getByRole('button', { name: /Mathematics/ }).click();
+  await expect(second).toHaveCount(0);
+  await page.getByRole('group', { name: '科目筛选' }).getByRole('button', { name: /全部/ }).click();
+  await expect(firstCourse).toBeChecked();
+  await expect(second.getByRole('checkbox', { name: '习题练习' })).toBeChecked();
+  await page.mouse.move(0, 0);
+  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-semester-groups-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await first.scrollIntoViewIfNeeded();
+  expect(await first.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-semester-groups-narrow.png' });
+  await page.getByRole('region', { name: '未设置学期', exact: true }).scrollIntoViewIfNeeded();
+  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-semester-groups-fallback.png' });
+  await page.getByRole('button', { name: /保存变更/ }).click();
+  await expect.poll(() => saved).toEqual({ studentId: student.id, revokeDirectLearningSpaceIds: [], selections: [
+    { learningSpaceId: 'first', contentTypeCodes: ['course', 'handout', 'question', 'download'] },
+    { learningSpaceId: 'second', contentTypeCodes: ['question'] }
+  ] });
+});
