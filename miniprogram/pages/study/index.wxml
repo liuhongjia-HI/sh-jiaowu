@@ -4,6 +4,11 @@
     <view class="study-heading-sub">Courses, materials, and exercises</view>
   </view>
 
+  <view wx:if="{{!loading && !authRequired && !error && historyCourses.length}}" class="study-scope">
+    <view class="study-scope-item {{courseScope === 'current' ? 'active' : ''}}" data-scope="current" bindtap="changeScope">Current</view>
+    <view class="study-scope-item {{courseScope === 'history' ? 'active' : ''}}" data-scope="history" bindtap="changeScope">History ({{historyCourses.length}})</view>
+  </view>
+
   <view class="study-search">
     <view class="study-search-icon">⌕</view>
     <input class="study-search-input" value="{{keyword}}" placeholder="Search courses or materials" bindinput="changeKeyword" confirm-type="search" />
@@ -22,7 +27,14 @@
       <button class="button" bindtap="goLogin">Bind student</button>
     </view>
   </view>
-  <view wx:elif="{{courses.length === 0}}" class="study-section">
+  <view wx:elif="{{error}}" class="study-section">
+    <view class="study-empty">
+      <view class="study-empty-title">Unable to load learning content</view>
+      <view class="study-empty-sub">{{error}}</view>
+      <button class="button" bindtap="loadStudy">Try again</button>
+    </view>
+  </view>
+  <view wx:elif="{{courseScope === 'current' && courses.length === 0}}" class="study-section">
     <view class="study-empty">
       <view class="study-empty-art">📚</view>
       <view class="study-empty-title">No learning content yet</view>
@@ -37,9 +49,9 @@
     </view>
   </view>
   <view wx:else class="study-section course-list">
-    <view wx:if="{{openedCourseCount}}" class="course-list-heading">
-      <view class="course-list-title">Unlocked courses</view>
-      <view class="course-list-count">{{openedCourseCount}} ready to learn</view>
+    <view wx:if="{{courseScope === 'history' || openedCourseCount}}" class="course-list-heading">
+      <view class="course-list-title">{{courseScope === 'history' ? 'History' : 'Unlocked courses'}}</view>
+      <view class="course-list-count">{{courseScope === 'history' ? historyCourses.length : openedCourseCount}} ready to learn</view>
     </view>
     <block wx:for="{{visibleCourses}}" wx:key="id">
       <view wx:if="{{item.canOpen}}" class="course-card-hit-area" bindtap="goDetail" data-id="{{item.entryCourseId}}" data-message="{{item.isPreparing ? 'Content is being prepared' : 'Unlock to access all content'}}">
@@ -51,7 +63,7 @@
     </block>
   </view>
 
-  <view wx:if="{{materials.length}}" class="study-section study-material-hint">
+  <view wx:if="{{!loading && !authRequired && !error && courseScope === 'current' && materials.length}}" class="study-section study-material-hint">
     <view class="study-section-title">Materials</view>
     <view class="study-section-link">{{materials.length}} ready for you</view>
   </view>

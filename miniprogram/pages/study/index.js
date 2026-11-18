@@ -17,6 +17,8 @@ Page({
       { key: "done", label: "Completed", className: "" }
     ],
     courses: [],
+    historyCourses: [],
+    courseScope: "current",
     subjects: [],
     visibleCourses: [],
     openedCourseCount: 0,
@@ -60,6 +62,8 @@ Page({
       loginPrompted: true,
       error: "",
       courses: [],
+      historyCourses: [],
+      courseScope: "current",
       subjects: [],
       visibleCourses: [],
       openedCourseCount: 0,
@@ -78,16 +82,21 @@ Page({
   },
   loadStudy() {
     this.setData({ loading: true, error: "" });
-    Promise.all([request("/student/study"), request("/student/favorites").catch(() => [])])
+    const studyOptions = { header: { "X-Starline-Study-History": "1" } };
+    Promise.all([request("/student/study", studyOptions), request("/student/favorites").catch(() => [])])
       .then(([data, favorites]) => {
         const courses = Array.isArray(data) ? data : (data.courses || []);
+        const historyCourses = Array.isArray(data) ? [] : (data.historyCourses || []);
         const subjects = Array.isArray(data) ? [] : (data.subjects || []);
         const materials = Array.isArray(data) ? [] : (data.materials || []);
         const student = Array.isArray(data) ? {} : (data.student || {});
         const hasOpenedPackage = Array.isArray(student.openedPackages) && student.openedPackages.length > 0;
         const mergedCourses = mergeStudyCourses(subjects, courses, favorites || []);
+        const decoratedHistory = decorateCourses(historyCourses.map((course) => ({ ...course, isOpened: true, displayName: course.name || course.displayName })), favorites || []);
         this.setData({
           courses: mergedCourses,
+          historyCourses: decoratedHistory,
+          courseScope: decoratedHistory.length ? this.data.courseScope : "current",
           openedCourseCount: mergedCourses.filter((course) => course.isOpened).length,
           subjects,
           materials,
@@ -106,6 +115,11 @@ Page({
         loading: false
       }));
   },
+  changeScope(event) {
+    const courseScope = event.currentTarget.dataset.scope;
+    if (courseScope !== "current" && (courseScope !== "history" || !this.data.historyCourses.length)) return;
+    this.setData({ courseScope }, () => this.applyFilters());
+  },
   changeKeyword(event) {
     this.setData({ keyword: event.detail.value }, () => this.applyFilters());
   },
@@ -119,7 +133,8 @@ Page({
   applyFilters() {
     const keyword = this.data.keyword.trim().toLowerCase();
     const activeFilter = this.data.activeFilter;
-    const visibleCourses = this.data.courses.filter((course) => {
+    const source = this.data.courseScope === "history" ? this.data.historyCourses : this.data.courses;
+    const visibleCourses = source.filter((course) => {
       const matchKeyword = !keyword || [course.name, course.displayName, course.subject, course.grade, course.displayMeta, course.accessLabel].join(" ").toLowerCase().includes(keyword);
       const completed = isCompletedCourse(course);
       const matchFilter = activeFilter === "all"
@@ -133,7 +148,7 @@ Page({
   goDetail(event) {
     const dataset = event.currentTarget.dataset || {};
     const id = dataset.id || "";
-    const course = this.data.courses.find((item) => item.entryCourseId === id || item.id === id);
+    const course = [...this.data.courses, ...this.data.historyCourses].find((item) => item.entryCourseId === id || item.id === id);
     const canOpen = course ? course.canOpen : dataset.canOpen;
     if (!canOpen) {
       wx.showToast({ title: dataset.message || "Unlock to access all content", icon: "none" });

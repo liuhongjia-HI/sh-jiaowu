@@ -87,7 +87,7 @@ Page({
       this.loadPromoBanners();
       return;
     }
-    if (!this.data.loading && !this.data.home) {
+    if (!this.data.loading) {
       this.loadHome();
     }
     this.startTodoRotation();

@@ -10,6 +10,7 @@ import (
 
 func TestNewStudentCanReadFirstChapterLessonOfEachSubjectWithoutPackage(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	store.grants = nil
 	store.spaceAccess = nil
 
@@ -275,6 +276,7 @@ func TestPreviewLessonMatchesContentByLearningSpaceWhenCourseIDIsBlank(t *testin
 
 func TestUnopenedDetailShowsOnlyPublishedFirstLesson(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	student, err := store.PrincipalByUserID("user-student-001")
 	if err != nil {
 		t.Fatal(err)

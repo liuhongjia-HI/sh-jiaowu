@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -22,7 +23,8 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 	if student.AccountStatus == "停用" {
 		return learning.StudentHome{}, errors.New("账号已停用，请联系老师或管理员")
 	}
-	courses := s.coursesForStudent(student.ID)
+	stage := s.studentCourseStage()
+	courses, _ := s.splitStudentCourses(student.ID, stage)
 	courseCards := make([]learning.StudentCourseCard, 0, len(courses))
 	for _, course := range courses {
 		access := s.courseAccessForStudent(student.ID, course)
@@ -35,14 +37,14 @@ func (s *MemoryStore) studentHomeUnlocked(principal learning.Principal) (learnin
 			IsNew:          access.IsNew,
 		})
 	}
-	materials := s.studentMaterialsForPrincipal(principal)
-	pendingHomework := s.pendingHomeworkForPrincipal(principal)
+	materials := s.studentStageMaterials(principal, stage)
+	pendingHomework := slices.DeleteFunc(s.pendingHomeworkForPrincipal(principal), func(item learning.Homework) bool {
+		rank := s.courseStageRank(item.CourseID, item.LearningSpaceID)
+		return rank != 0 && !stage.isCurrent(rank)
+	})
 	continueCourse := learning.Course{}
 	if len(courses) > 0 {
 		continueCourse = courses[0]
-	}
-	if len(materials) == 0 {
-		materials = []learning.Material{}
 	}
 	if len(pendingHomework) == 0 {
 		pendingHomework = []learning.Homework{}
@@ -90,10 +92,11 @@ func (s *MemoryStore) studentRecommendationsUnlocked(principal learning.Principa
 	}
 
 	// 学习空间跨学年复用；以学生年级聚合，不用套餐学年筛掉目录。
+	stage := s.studentCourseStage()
 	opened := map[string]bool{}
 	spaces := map[string][]string{}
 	for _, space := range s.learningSpaces {
-		if space.Grade != student.Grade || space.Status != learning.StatusEnabled {
+		if space.Grade != student.Grade || space.Status != learning.StatusEnabled || !stage.isCurrent(spaceStage(space)) {
 			continue
 		}
 		spaces[space.Subject] = appendUnique(spaces[space.Subject], space.ID)
@@ -457,27 +460,46 @@ func (s *MemoryStore) studentStudyUnlocked(principal learning.Principal) (learni
 	if student.AccountStatus == "停用" {
 		return learning.StudentStudyBoard{}, errors.New("账号已停用，请联系老师或管理员")
 	}
-	courses := s.coursesForStudent(student.ID)
+	stage := s.studentCourseStage()
+	courses, history := s.splitStudentCourses(student.ID, stage)
+	return learning.StudentStudyBoard{
+		Student:        student,
+		Courses:        s.studyCourseCards(student.ID, courses),
+		HistoryCourses: s.studyCourseCards(student.ID, history),
+		Materials:      s.studentStageMaterials(principal, stage),
+		Trial:          s.studentTrialUnlocked(student),
+		Subjects:       s.studentSubjectCards(student, stage, courses),
+	}, nil
+}
+
+func (s *MemoryStore) studyCourseCards(studentID string, courses []learning.Course) []learning.StudentCourseCard {
 	cards := make([]learning.StudentCourseCard, 0, len(courses))
 	for _, course := range courses {
-		access := s.courseAccessForStudent(student.ID, course)
+		access := s.courseAccessForStudent(studentID, course)
 		display := course
 		display.Grade = gradeEnglishName(course.Grade)
 		cards = append(cards, learning.StudentCourseCard{
 			Course:         display,
 			DisplayName:    s.catalogDisplayNameForCourse(course),
-			Progress:       s.courseProgress(student.ID, course.ID),
+			Progress:       s.courseProgress(studentID, course.ID),
 			OpenedAt:       access.OpenedAt,
 			AvailableAt:    access.AvailableAt,
 			HighlightUntil: access.HighlightUntil,
 			IsNew:          access.IsNew,
 		})
 	}
-	materials := s.studentMaterialsForPrincipal(principal)
+	return cards
+}
+
+func (s *MemoryStore) studentStageMaterials(principal learning.Principal, stage studentCourseStage) []learning.Material {
+	materials := slices.DeleteFunc(s.studentMaterialsForPrincipal(principal), func(item learning.Material) bool {
+		rank := s.courseStageRank(item.CourseID, item.LearningSpaceID)
+		return rank != 0 && !stage.isCurrent(rank)
+	})
 	if len(materials) == 0 {
-		materials = []learning.Material{}
+		return []learning.Material{}
 	}
-	return learning.StudentStudyBoard{Student: student, Courses: cards, Materials: materials, Trial: s.studentTrialUnlocked(student), Subjects: s.studentSubjectCards(student)}, nil
+	return materials
 }
 
 // StudentTasks 返回任务列表，studentStatus 由提交记录派生（已完成/待完成）。

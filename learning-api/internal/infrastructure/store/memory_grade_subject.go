@@ -228,7 +228,7 @@ func (s *MemoryStore) upsertGradeSubjectUnlocked(operator, id string, item learn
 	return learning.GradeSubjectMetadata{}, errors.New("年级课程目录保存失败")
 }
 
-func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.StudentSubjectCard {
+func (s *MemoryStore) studentSubjectCards(student learning.Student, stage studentCourseStage, currentCourses []learning.Course) []learning.StudentSubjectCard {
 	cards := make([]learning.StudentSubjectCard, 0)
 	grade := effectiveStudentGrade(student)
 	student.Grade = grade
@@ -237,18 +237,22 @@ func (s *MemoryStore) studentSubjectCards(student learning.Student) []learning.S
 			continue
 		}
 		card := learning.StudentSubjectCard{GradeSubjectMetadata: meta, AccessState: "locked", AccessLabel: "Unavailable"}
-		courseIDs := s.courseIDsForGradeSubject(meta.Grade, meta.Subject)
-		fullMaterials, fullHomework := s.subjectContentCounts(student.ID, courseIDs)
-		if s.hasActiveSubjectLearningAccess(student.ID, meta.Grade, meta.Subject) {
+		var openedIDs []string
+		for _, course := range currentCourses {
+			if course.Grade == meta.Grade && subjectsMatch(course.Subject, meta.Subject) {
+				openedIDs = append(openedIDs, course.ID)
+			}
+		}
+		if len(openedIDs) > 0 {
 			card.AccessState, card.AccessLabel, card.CanOpen = "full", "Ready", true
-			card.MaterialNum, card.HomeworkNum = fullMaterials, fullHomework
-			card.EntryCourseID = s.firstAccessibleCourseID(student.ID, meta.Grade, meta.Subject)
+			card.MaterialNum, card.HomeworkNum = s.subjectContentCounts(student.ID, openedIDs)
+			card.EntryCourseID = openedIDs[0]
 		} else if previewCourse, ok := s.previewCourseForGradeSubject(student.ID, meta); ok {
 			card.AccessState, card.AccessLabel, card.CanOpen = "preview", "Preview", true
 			card.PreviewCourseID = previewCourse.ID
 			card.EntryCourseID = previewCourse.ID
 			card.MaterialNum, card.HomeworkNum = s.previewContentCounts(previewCourse)
-		} else if len(courseIDs) == 0 {
+		} else if !s.hasCurrentCourseForGradeSubject(meta.Grade, meta.Subject, stage) {
 			card.AccessState, card.AccessLabel = "pending", "Preparing"
 		}
 		card.Grade = gradeEnglishName(meta.Grade)
@@ -270,39 +274,11 @@ func (s *MemoryStore) catalogDisplayNameForCourse(course learning.Course) string
 	return subjectEnglishName(course.Subject)
 }
 
-func (s *MemoryStore) firstAccessibleCourseID(studentID, grade, subject string) string {
-	for _, course := range s.coursesForStudent(studentID) {
-		if course.Grade == grade && subjectsMatch(course.Subject, subject) {
-			return course.ID
-		}
-	}
-	return ""
-}
-
-func (s *MemoryStore) courseIDsForGradeSubject(grade, subject string) []string {
-	ids := make([]string, 0)
+func (s *MemoryStore) hasCurrentCourseForGradeSubject(grade, subject string, stage studentCourseStage) bool {
 	for _, course := range s.courses {
-		if course.Status == learning.StatusEnabled && course.Grade == grade && subjectsMatch(course.Subject, subject) {
-			ids = append(ids, course.ID)
-		}
-	}
-	return ids
-}
-
-func (s *MemoryStore) hasActiveSubjectLearningAccess(studentID, grade, subject string) bool {
-	return s.hasActiveSubjectContent(studentID, grade, subject)
-}
-
-func (s *MemoryStore) hasActiveSubjectContent(studentID, grade, subject string) bool {
-	for _, grant := range s.grants {
-		if grant.StudentID != studentID || !grantActive(grant) {
-			continue
-		}
-		for _, spaceID := range s.learningSpaceIDsForGrant(grant.ID) {
-			if space, ok := s.findLearningSpace(spaceID); ok && space.Grade == grade && subjectsMatch(space.Subject, subject) &&
-				(containsString(s.contentTypesForPackage(grant.PackageID), "handout") || containsString(s.contentTypesForPackage(grant.PackageID), "question")) {
-				return true
-			}
+		if course.Status == learning.StatusEnabled && course.Grade == grade && subjectsMatch(course.Subject, subject) &&
+			stage.isCurrent(s.courseStageRank(course.ID, course.LearningSpaceID)) {
+			return true
 		}
 	}
 	return false

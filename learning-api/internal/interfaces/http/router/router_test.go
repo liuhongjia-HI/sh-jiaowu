@@ -879,6 +879,7 @@ func TestStudentLearningReviewClosedLoopThroughAPI(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
 	adminToken := app.loginAdmin(t, "13800000002")
+	useS1Q1Calendar(t, app, adminToken)
 	teacherToken := app.loginAdmin(t, "13800000004")
 
 	var student learning.Student
@@ -949,7 +950,7 @@ func TestStudentLearningReviewClosedLoopThroughAPI(t *testing.T) {
 		CourseID:        "course-g05-english-s1-q1",
 		LearningSpaceID: "space-g05-english-s1-q1",
 		LessonID:        "course-g05-english-s1-q1-lesson-1",
-		Deadline:        "2026-12-31",
+		Deadline:        time.Now().AddDate(0, 0, 7).Format(time.DateOnly),
 		Status:          string(learning.StatusEnabled),
 		QuestionIDs:     []string{singleQuestion.ID, textQuestion.ID},
 	}, http.StatusOK, &homework)

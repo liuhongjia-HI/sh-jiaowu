@@ -106,6 +106,7 @@ func TestCreateDirectGrantWithCourseOpensFullLearningContent(t *testing.T) {
 
 func TestReplaceDirectGrantWithCourseKeepsFullLearningContent(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	studentID := "stu-001"
 	spaceID := "space-g05-math-s1-q1"
 	startsAt := time.Now().Add(-time.Hour).Format("2006-01-02T15:04")
@@ -223,6 +224,7 @@ func TestRevokePackageGrantOnlyRemovesTheSelectedStudentsPackageAccess(t *testin
 
 func TestStudentStudyCountsFullContentForCourseGrant(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	request := learning.DirectGrantCreateRequest{
 		StudentID:        "stu-001",
 		LearningSpaceIDs: []string{"space-g05-math-s1-q1"},
@@ -264,6 +266,7 @@ func TestStudentStudyCountsFullContentForCourseGrant(t *testing.T) {
 
 func TestCourseGrantEnablesSecureHandoutDownload(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	studentID := "stu-001"
 	spaceID := "space-g05-math-s1-q1"
 
@@ -353,6 +356,7 @@ func findMaterialByLearningSpace(materials []learning.Material, learningSpaceID 
 
 func TestContentPermissionsDoNotLeakIntoOtherContentTypes(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	studentID := "stu-001"
 	spaceID := "space-g05-math-s1-q1"
 	principal, err := store.PrincipalByUserID("user-student-001")
@@ -376,6 +380,7 @@ func TestContentPermissionsDoNotLeakIntoOtherContentTypes(t *testing.T) {
 
 func TestDirectGrantSupportsTimedPeriodAndHighlightsNewCourse(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	startsAt := time.Now().Add(-5 * time.Minute).Format("2006-01-02T15:04")
 	endsAt := time.Now().Add(time.Hour).Format("2006-01-02T15:04")
 
@@ -407,6 +412,7 @@ func TestDirectGrantSupportsTimedPeriodAndHighlightsNewCourse(t *testing.T) {
 
 func TestDirectGrantKeepsFutureCourseHiddenUntilItsStartTime(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	startsAt := time.Now().Add(10 * time.Minute).Format("2006-01-02T15:04")
 	endsAt := time.Now().Add(2 * time.Hour).Format("2006-01-02T15:04")
 
@@ -437,6 +443,7 @@ func TestDirectGrantKeepsFutureCourseHiddenUntilItsStartTime(t *testing.T) {
 
 func TestDirectGrantMarksCourseAsNewWhenItIsAddedToAnExistingContentGrant(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	startsAt := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04")
 	endsAt := time.Now().Add(time.Hour).Format("2006-01-02T15:04")
 	request := learning.DirectGrantCreateRequest{

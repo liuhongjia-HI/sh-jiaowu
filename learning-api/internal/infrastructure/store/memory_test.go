@@ -30,6 +30,7 @@ func TestLoginWithDemoStudentPassword(t *testing.T) {
 
 func TestStudentRecommendationsExcludeOpenedSubjects(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	principal, err := store.PrincipalByUserID("user-student-001")
 	if err != nil {
 		t.Fatal(err)
@@ -75,10 +76,11 @@ func TestStudentRecommendationsExcludeOpenedSubjects(t *testing.T) {
 
 func TestSubjectRecommendationCountsAndTeacher(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 	principal, _ := store.PrincipalByUserID("user-student-001")
 	store.grants = nil
 	store.spaceAccess = nil
-	store.learningSpaces = []learningSpace{{ID: "s1", Grade: "五年级", Subject: "地理", Status: learning.StatusEnabled}, {ID: "s2", Grade: "五年级", Subject: "地理", Status: learning.StatusEnabled}}
+	store.learningSpaces = []learningSpace{{ID: "s1", Grade: "五年级", Subject: "地理", Semester: "S1", Phase: "Q1", Status: learning.StatusEnabled}, {ID: "s2", Grade: "五年级", Subject: "地理", Semester: "S1", Phase: "Q1", Status: learning.StatusEnabled}}
 	store.courses = []learning.Course{{ID: "c", LearningSpaceID: "s1", Status: learning.StatusEnabled}}
 	store.materials = []learning.Material{{ID: "m", LearningSpaceID: "s1", Status: learning.StatusEnabled, PublishStatus: "已发布"}, {ID: "draft", LearningSpaceID: "s1", Status: learning.StatusEnabled, PublishStatus: "草稿"}}
 	store.homework = []learning.Homework{{ID: "h", LearningSpaceID: "s2", Status: "启用", PublishStatus: "已发布"}}
@@ -341,6 +343,7 @@ func TestWechatLoginWithSharedPhoneAcrossUnboundStudentsOffersSelection(t *testi
 
 func TestWechatStudentBindingUsesExistingMaskedPhoneStudent(t *testing.T) {
 	store := NewMemoryStoreWithOptions(Options{SeedDemoData: false})
+	useS1Q1Calendar(t, store)
 	spaceID := "space-g05-english-s1-q1"
 	store.students = []learning.Student{{
 		ID:             "stu-acceptance",

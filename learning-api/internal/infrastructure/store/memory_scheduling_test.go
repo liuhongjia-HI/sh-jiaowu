@@ -393,6 +393,7 @@ func assertScheduleNotice(t *testing.T, notice learning.Notice, scheduleID, titl
 
 func TestUpdateMaterialDraftHidesFromStudent(t *testing.T) {
 	store := NewMemoryStore()
+	useS1Q1Calendar(t, store)
 
 	teacher, err := store.PrincipalByUserID("user-teacher")
 	if err != nil {

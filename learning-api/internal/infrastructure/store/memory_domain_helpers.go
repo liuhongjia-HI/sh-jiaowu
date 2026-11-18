@@ -1519,15 +1519,16 @@ func (s *MemoryStore) previewCoursesForStudent(studentID string) []learning.Cour
 		return nil
 	}
 	grade := effectiveStudentGrade(student)
+	stage := s.studentCourseStage()
 	selected := make(map[string]learning.Course)
 	for _, course := range s.courses {
-		if course.Grade != grade {
+		if course.Grade != grade || course.Status != learning.StatusEnabled {
 			continue
 		}
 		// 体验入口由学科卡片在“无有效学习内容”时决定；课程授权本身
 		// 不能阻断首章体验，否则历史套餐数据会把课程误判为未开通。
 		space, exists := s.findLearningSpace(course.LearningSpaceID)
-		if !exists || space.Grade != grade {
+		if !exists || space.Grade != grade || !stage.isCurrent(spaceStage(space)) {
 			continue
 		}
 		if _, ready := s.previewLessonForCourse(course); !ready {

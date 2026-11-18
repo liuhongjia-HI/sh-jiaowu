@@ -145,6 +145,21 @@ test("home page opens directly for a visitor and still loads promo banners", asy
   assert.equal(page.data.promoBanners.length, 1);
 });
 
+test("returning to home refreshes the current course after a calendar switch", async () => {
+  let course = { id: "q1", name: "S1Q1" };
+  const page = loadHomePage((path) => Promise.resolve(path === "/student/home" ? { courses: [course] } : []), {
+    getStorageSync: (key) => key === "starline_token" ? "token" : ""
+  });
+  page.onLoad();
+  await new Promise(setImmediate);
+  assert.equal(page.data.continueCourse.id, "q1");
+
+  course = { id: "q2", name: "S1Q2" };
+  page.onShow();
+  await new Promise(setImmediate);
+  assert.equal(page.data.continueCourse.id, "q2");
+});
+
 test("home page routes an unauthenticated visitor to parent onboarding once", () => {
   const navigations = [];
   const storage = {};

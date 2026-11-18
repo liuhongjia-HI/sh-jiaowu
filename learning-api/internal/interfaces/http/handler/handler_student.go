@@ -323,6 +323,11 @@ func (h *LearningHandler) StudentStudy(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
+	// Older clients have no history tab. Keep authorized historical courses
+	// reachable while storefront review and client updates are in flight.
+	if c.GetHeader("X-Starline-Study-History") != "1" {
+		board.Courses = append(board.Courses, board.HistoryCourses...)
+	}
 	OK(c, board)
 }
 func (h *LearningHandler) StudentTasks(c *gin.Context) {

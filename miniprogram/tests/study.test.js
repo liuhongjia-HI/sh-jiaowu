@@ -243,3 +243,37 @@ test("course cards render API English copy and do not repeat the subject in meta
   assert.equal(page.data.visibleCourses[1].displayMeta, "Grade 5");
   assert.equal(page.data.visibleCourses[1].accessLabel, "Unavailable");
 });
+
+test("history courses are separate, identifiable and remain accessible after refresh", async () => {
+  const navigations = [];
+  let historyCourses = [{ id: "old", name: "Geography S1Q1", displayName: "Geography", grade: "Grade 5", canOpen: true }];
+  const page = loadStudyPage((path) => path === "/student/favorites" ? Promise.resolve([]) : Promise.resolve({
+    courses: [{ id: "current", name: "Geography S1Q2", displayName: "Geography", grade: "Grade 5" }],
+    subjects: [], materials: [{ id: "current-material" }], historyCourses
+  }));
+  global.wx.navigateTo = (value) => navigations.push(value.url);
+  page.loadStudy();
+  await flushPromises();
+  assert.equal(page.data.courseScope, "current");
+  assert.deepEqual(page.data.visibleCourses.map((item) => item.id), ["current"]);
+  page.changeScope({ currentTarget: { dataset: { scope: "history" } } });
+  assert.equal(page.data.visibleCourses[0].displayName, "Geography S1Q1");
+  page.goDetail({ currentTarget: { dataset: { id: "old" } } });
+  assert.deepEqual(navigations, ["/pages/study-detail/index?id=old"]);
+  page.loadStudy();
+  await flushPromises();
+  assert.equal(page.data.courseScope, "history");
+  assert.equal(page.data.visibleCourses[0].id, "old");
+  historyCourses = [];
+  page.loadStudy();
+  await flushPromises();
+  assert.equal(page.data.courseScope, "current");
+  assert.equal(page.data.visibleCourses[0].id, "current");
+});
+
+test("history entry and materials respect loading, error and selected scope", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../pages/study/index.wxml"), "utf8");
+  assert.match(template, /!loading && !authRequired && !error && historyCourses\.length/);
+  assert.match(template, /courseScope === 'current' && materials\.length/);
+  assert.match(template, /wx:elif="{{error}}"/);
+});

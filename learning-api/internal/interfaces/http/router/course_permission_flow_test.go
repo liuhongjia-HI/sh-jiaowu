@@ -1,16 +1,28 @@
 package router_test
 
 import (
+	"fmt"
 	"net/http"
 	"starline/learning-api/internal/domain/learning"
 	"testing"
+	"time"
 )
+
+func useS1Q1Calendar(t *testing.T, app *testApp, admin string) {
+	t.Helper()
+	now := time.Now().In(time.FixedZone("Asia/Shanghai", 8*60*60))
+	startYear := now.AddDate(0, -6, 0).Year()
+	calendar := fmt.Sprintf(`[{"academicYear":"%d.%d学年","semester":"S1","startDate":%q,"midtermDate":%q,"endDate":%q}]`,
+		startYear, startYear+1, now.AddDate(0, 0, -30).Format(time.DateOnly), now.AddDate(0, 0, 30).Format(time.DateOnly), now.AddDate(0, 0, 60).Format(time.DateOnly))
+	app.doJSON(t, http.MethodPut, "/api/settings", admin, learning.SettingUpdateRequest{Key: "academicCalendar", Value: calendar}, http.StatusOK, nil)
+}
 
 // The real router/auth/service runs against a disposable store, without MySQL writes.
 func TestCoursePermissionActivationAndRevocationFlow(t *testing.T) {
 	app := newTestApp(t)
 	defer app.close()
 	admin := app.loginAdmin(t, "13800000002")
+	useS1Q1Calendar(t, app, admin)
 	var student learning.Student
 	app.doJSON(t, http.MethodPost, "/api/students", admin, learning.StudentUpsertRequest{Name: "权限闭环测试", Phone: "18600009876", Grade: "五年级", SchoolName: "测试学校", AccountStatus: "正常"}, http.StatusOK, &student)
 	token := app.login(t, "/api/auth/demo-student-login", map[string]string{"phone": student.Phone, "password": "123456"})

@@ -289,11 +289,12 @@ type StudentSubjectCard struct {
 
 // StudentStudyBoard 是学习页的聚合数据：课程卡（带进度）+ 资料。
 type StudentStudyBoard struct {
-	Student   Student              `json:"student"`
-	Courses   []StudentCourseCard  `json:"courses"`
-	Materials []Material           `json:"materials"`
-	Trial     StudentTrial         `json:"trial"`
-	Subjects  []StudentSubjectCard `json:"subjects"`
+	Student        Student              `json:"student"`
+	Courses        []StudentCourseCard  `json:"courses"`
+	HistoryCourses []StudentCourseCard  `json:"historyCourses"`
+	Materials      []Material           `json:"materials"`
+	Trial          StudentTrial         `json:"trial"`
+	Subjects       []StudentSubjectCard `json:"subjects"`
 }
 
 // StudentTask 是任务列表中的一项，studentStatus 由提交记录派生。

@@ -75,7 +75,7 @@ func (s *MemoryStore) studentCourseDetailUnlocked(principal learning.Principal, 
 			materials = append(materials, material)
 		}
 	}
-	if len(materials) == 0 {
+	if len(materials) == 0 && s.studentCourseStage().isCurrent(s.courseStageRank(course.ID, course.LearningSpaceID)) {
 		if lessonID, ok := s.previewLessonForCourse(course); ok {
 			for _, material := range s.materials {
 				if (material.CourseID == courseID || material.LearningSpaceID == course.LearningSpaceID) && material.LessonID == lessonID && materialVisibleToStudents(material) {

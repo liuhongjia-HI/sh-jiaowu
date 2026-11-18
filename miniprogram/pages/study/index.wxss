@@ -383,3 +383,25 @@
   color: #9b9da5;
   font-size: 21rpx;
 }
+
+.study-scope {
+  display: inline-flex;
+  gap: 4rpx;
+  margin-top: 22rpx;
+  padding: 5rpx;
+  border-radius: 30rpx;
+  background: #ededf0;
+}
+
+.study-scope-item {
+  padding: 10rpx 20rpx;
+  border-radius: 25rpx;
+  color: #777a83;
+  font-size: 22rpx;
+}
+
+.study-scope-item.active {
+  background: #fff;
+  color: #ff5a1f;
+  font-weight: 800;
+}

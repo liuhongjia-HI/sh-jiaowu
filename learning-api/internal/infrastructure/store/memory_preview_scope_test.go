@@ -8,6 +8,7 @@ import (
 func TestPreviewScopeFollowsDirectoryDepth(t *testing.T) {
 	for _, nested := range []bool{false, true} {
 		s := NewMemoryStore()
+		useS1Q1Calendar(t, s)
 		s.grants = nil
 		s.spaceAccess = nil
 		principal, err := s.PrincipalByUserID("user-student-001")

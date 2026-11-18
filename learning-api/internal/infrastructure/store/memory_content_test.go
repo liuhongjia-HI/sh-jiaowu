@@ -3,6 +3,7 @@ package store
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"starline/learning-api/internal/domain/learning"
 )
@@ -700,7 +701,7 @@ func TestQuestionBankReusableByGradeSemesterSubjectAndHomeworkReviewFlow(t *test
 	}
 	created, err := store.CreateHomework("英语老师", teacher, learning.HomeworkUploadRequest{
 		Title: "题库组卷练习", CourseID: "course-g05-english-s1-q1", LearningSpaceID: "space-g05-english-s1-q1", LessonID: "course-g05-english-s1-q1-lesson-1",
-		Deadline: "2026-11-01", Status: string(learning.StatusEnabled), QuestionIDs: []string{item.ID},
+		Deadline: time.Now().AddDate(0, 0, 7).Format(time.DateOnly), Status: string(learning.StatusEnabled), QuestionIDs: []string{item.ID},
 	})
 	if err != nil {
 		t.Fatalf("expected homework creation to succeed: %v", err)
