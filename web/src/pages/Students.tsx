@@ -1267,6 +1267,13 @@ const openingContentLabels: Record<StudentOpeningCell['contentTypeCode'], string
   download: '下载讲义'
 };
 
+const openingTerms = [
+  { semester: 'S1', phase: 'Q1', label: 'Term 1 · S1 Q1' },
+  { semester: 'S1', phase: 'Q2', label: 'Term 2 · S1 Q2' },
+  { semester: 'S2', phase: 'Q1', label: 'Term 3 · S2 Q1' },
+  { semester: 'S2', phase: 'Q2', label: 'Term 4 · S2 Q2' }
+];
+
 function CourseOpeningMatrix({
   matrix,
   learningSpaces,
@@ -1293,22 +1300,24 @@ function CourseOpeningMatrix({
     onSelectionsChange(next);
   };
 
-  const semesterBySpace = new Map(learningSpaces.map((space) => [space.id, space.semester?.trim()]));
-  const groups = new Map<string, StudentOpeningScope[]>();
+  const spacesById = new Map(learningSpaces.map((space) => [space.id, space]));
+  const groups = new Map<string, { label: string; semester: string; order: number; scopes: StudentOpeningScope[] }>();
   matrix.forEach((scope) => {
-    const semester = semesterBySpace.get(scope.learningSpaceId) || '';
-    const group = groups.get(semester) ?? [];
-    group.push(scope);
-    groups.set(semester, group);
+    const space = spacesById.get(scope.learningSpaceId);
+    const semester = space?.semester?.trim() || '';
+    const phase = space?.phase?.trim() || '';
+    const termIndex = openingTerms.findIndex((term) => term.semester === semester && term.phase === phase);
+    const key = JSON.stringify([semester, phase]);
+    const label = openingTerms[termIndex]?.label
+      ?? [semesterLabel(semester) || '未设置学期', phase || (semester && '未设置阶段')].filter(Boolean).join(' · ');
+    const order = termIndex >= 0 ? termIndex : openingTerms.length + (semester ? 0 : 1);
+    const group = groups.get(key) ?? { label, semester, order, scopes: [] };
+    group.scopes.push(scope);
+    groups.set(key, group);
   });
-  const semesterOrder = ['S1', 'S2', 'S3'];
-  const sortedGroups = Array.from(groups).sort(([a], [b]) => {
-    if (!a || !b) return a ? -1 : b ? 1 : 0;
-    const aIndex = semesterOrder.indexOf(a);
-    const bIndex = semesterOrder.indexOf(b);
-    if (aIndex !== -1 || bIndex !== -1) return (aIndex === -1 ? semesterOrder.length : aIndex) - (bIndex === -1 ? semesterOrder.length : bIndex);
-    return a.localeCompare(b, 'zh-CN', { numeric: true });
-  });
+  const sortedGroups = Array.from(groups).sort(([, a], [, b]) =>
+    a.order - b.order || a.label.localeCompare(b.label, 'zh-CN', { numeric: true })
+  );
   const semesterColors: Record<string, { background: string; border: string; tag: string }> = {
     S1: { background: '#f0f7ff', border: '#d6e8ff', tag: 'blue' },
     S2: { background: '#f9f3ff', border: '#eadcff', tag: 'purple' },
@@ -1317,10 +1326,10 @@ function CourseOpeningMatrix({
 
   return (
     <Space direction="vertical" size={10} style={{ width: '100%' }}>
-      {sortedGroups.map(([semester, scopes]) => {
+      {sortedGroups.map(([key, { label, semester, scopes }]) => {
         const colors = semesterColors[semester] ?? { background: '#fafafa', border: '#e8e8e8', tag: 'default' };
-        return <section role="region" aria-label={semesterLabel(semester) || '未设置学期'} key={semester} style={{ background: colors.background, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 12 }}>
-          <div style={{ marginBottom: 10 }}><Tag color={colors.tag}>{semesterLabel(semester) || '未设置学期'}</Tag><Typography.Text type="secondary">{scopes.length} 个课程范围</Typography.Text></div>
+        return <section role="region" aria-label={label} key={key} style={{ background: colors.background, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 12 }}>
+          <div style={{ marginBottom: 10 }}><Tag color={colors.tag}>{label}</Tag><Typography.Text type="secondary">{scopes.length} 个课程范围</Typography.Text></div>
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
               {scopes.map((scope) => (
                 <Card size="small" key={scope.learningSpaceId} title={scope.name}>

@@ -106,14 +106,17 @@ test('四年级五科矩阵在桌面紧凑展示，窄屏可横向查看', async
   await expect(overview.getByRole('button', { name: '七年级 Geography 全部班型 8人', exact: true })).toBeVisible();
 });
 
-test('课程权限按学期分组，跨筛选勾选仍按原协议保存', async ({ page }) => {
+test('课程权限按四个 Term 分组，跨筛选勾选仍按原协议保存', async ({ page }) => {
   const student = { id: 'semester-student', name: '学期检查学生', grade: '四年级', phone: '', accountStatus: '正常', learningStatus: '未开始', activeOpenings: [], openedPackages: [], openedPackageRefs: [], streakDays: 0, badgeCount: 0 };
-  // 名称刻意不带学期，验证使用关联数据而非解析标题。
+  // 名称刻意不带期次，验证分组使用课程范围的结构化字段。
   const spaces = [
     { id: 'second', name: '英语下阶段', semester: 'S2', subject: 'English' },
     { id: 'first', name: '英语上阶段', semester: 'S1', subject: 'English' },
+    { id: 'fourth-term', name: '英语期末阶段', semester: 'S2', phase: 'Q2', subject: 'English' },
+    { id: 'second-term', name: '英语进阶阶段', semester: 'S1', phase: 'Q2', subject: 'English' },
     { id: 'locked', name: '数学套餐范围', semester: 'S1', subject: 'Mathematics' },
-    { id: 'custom', name: '暑期英语', semester: '暑期', subject: 'English' }
+    { id: 'custom', name: '暑期英语', semester: '暑期', phase: '', subject: 'English' },
+    { id: 'missing-phase', name: '未设置阶段的英语', semester: 'S1', phase: '', subject: 'English' }
   ].map(space => ({ grade: '四年级', phase: 'Q1', level: 'S', status: '启用', ...space }));
   const matrix = [...spaces, { id: 'missing', name: '历史英语范围', subject: 'English' }].map(space => ({
     learningSpaceId: space.id, name: space.name, subject: space.subject, subjectId: space.subject, subjectSortOrder: space.subject === 'English' ? 1 : 2,
@@ -136,13 +139,19 @@ test('课程权限按学期分组，跨筛选勾选仍按原协议保存', async
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto('/students');
   await page.getByRole('button', { name: '课程开通', exact: true }).click();
-  const first = page.getByRole('region', { name: 'S1 第一学期', exact: true });
-  const second = page.getByRole('region', { name: 'S2 第二学期', exact: true });
+  const first = page.getByRole('region', { name: 'Term 1 · S1 Q1', exact: true });
+  const third = page.getByRole('region', { name: 'Term 3 · S2 Q1', exact: true });
   await expect(first).toContainText('英语上阶段');
-  await expect(second).toContainText('英语下阶段');
-  expect(await page.locator('.student-opening-panel [role=region]').evaluateAll(elements => elements.map(el => el.getAttribute('aria-label')))).toEqual(['S1 第一学期', 'S2 第二学期', '暑期', '未设置学期']);
-  expect(await first.evaluate(el => getComputedStyle(el).backgroundColor)).not.toEqual(await second.evaluate(el => getComputedStyle(el).backgroundColor));
-  await expect(page.getByRole('region', { name: '暑期', exact: true })).toContainText('暑期英语');
+  await expect(first).toContainText('2 个课程范围');
+  await expect(page.getByRole('region', { name: 'Term 2 · S1 Q2', exact: true })).toContainText('英语进阶阶段');
+  await expect(third).toContainText('英语下阶段');
+  await expect(page.getByRole('region', { name: 'Term 4 · S2 Q2', exact: true })).toContainText('英语期末阶段');
+  const regionNames = await page.locator('.student-opening-panel [role=region]').evaluateAll(elements => elements.map(el => el.getAttribute('aria-label')));
+  expect(regionNames.slice(0, 4)).toEqual(['Term 1 · S1 Q1', 'Term 2 · S1 Q2', 'Term 3 · S2 Q1', 'Term 4 · S2 Q2']);
+  expect(regionNames.slice(4)).toHaveLength(3);
+  expect(await first.evaluate(el => getComputedStyle(el).backgroundColor)).not.toEqual(await third.evaluate(el => getComputedStyle(el).backgroundColor));
+  await expect(page.getByRole('region', { name: '暑期 · 未设置阶段', exact: true })).toContainText('暑期英语');
+  await expect(page.getByRole('region', { name: 'S1 第一学期 · 未设置阶段', exact: true })).toContainText('未设置阶段的英语');
   await expect(page.getByRole('region', { name: '未设置学期', exact: true })).toContainText('历史英语范围');
   const locked = first.locator('.ant-card').filter({ hasText: '数学套餐范围' });
   await expect(locked.getByRole('checkbox', { name: '课程学习' })).toBeDisabled();
@@ -150,20 +159,20 @@ test('课程权限按学期分组，跨筛选勾选仍按原协议保存', async
   const firstCourse = first.locator('.ant-card').filter({ hasText: '英语上阶段' }).getByRole('checkbox', { name: '课程学习' });
   await firstCourse.check();
   await expect(first.locator('.ant-card').filter({ hasText: '英语上阶段' }).getByRole('checkbox', { name: '讲义查看' })).toBeChecked();
-  await second.getByRole('checkbox', { name: '习题练习' }).check();
+  await third.getByRole('checkbox', { name: '习题练习' }).check();
   await page.getByRole('group', { name: '科目筛选' }).getByRole('button', { name: /Mathematics/ }).click();
-  await expect(second).toHaveCount(0);
+  await expect(third).toHaveCount(0);
   await page.getByRole('group', { name: '科目筛选' }).getByRole('button', { name: /全部/ }).click();
   await expect(firstCourse).toBeChecked();
-  await expect(second.getByRole('checkbox', { name: '习题练习' })).toBeChecked();
+  await expect(third.getByRole('checkbox', { name: '习题练习' })).toBeChecked();
   await page.mouse.move(0, 0);
-  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-semester-groups-desktop.png' });
+  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-term-groups-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
   await first.scrollIntoViewIfNeeded();
   expect(await first.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-semester-groups-narrow.png' });
+  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-term-groups-narrow.png' });
   await page.getByRole('region', { name: '未设置学期', exact: true }).scrollIntoViewIfNeeded();
-  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-semester-groups-fallback.png' });
+  await page.locator('.ant-drawer-body').screenshot({ path: '/tmp/starline-term-groups-fallback.png' });
   await page.getByRole('button', { name: /保存变更/ }).click();
   await expect.poll(() => saved).toEqual({ studentId: student.id, revokeDirectLearningSpaceIds: [], selections: [
     { learningSpaceId: 'first', contentTypeCodes: ['course', 'handout', 'question', 'download'] },
